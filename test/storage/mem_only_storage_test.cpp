@@ -5,7 +5,7 @@
 TEST(MemOnlyStorageTest, ReadWriteTest) {
   MemOnlyStorage storage;
   Key key = "key1";
-  Key value = "value1";
+  Value value = "value1";
   Record record(value, 0);
   storage.Write(key, record);
 
