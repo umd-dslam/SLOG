@@ -1,12 +1,16 @@
 cmake_minimum_required(VERSION 3.13.4)
 project(slog)
 
+set(DEPENDENCIES_DIR, .dep)
+set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_CXX_FLAGS "-std=c++14 -W -Wextra -Wall")
+
+find_package(cppzmq)
 
 # Add root directory to include path
 include_directories(${PROJECT_SOURCE_DIR})
 
-# All sublibraries
+# All libraries
 add_subdirectory(storage)
 
 set(LIBS
