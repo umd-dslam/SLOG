@@ -1,6 +1,6 @@
 project(storage)
 
-SET(SOURCES
+set(SOURCES
   mem_only_storage.cpp
 )
 

@@ -1,0 +1,13 @@
+syntax = "proto3";
+package slog;
+
+message Machine {
+  uint32 machine_id = 1;
+  string host = 2;
+  uint32 port = 3;
+  uint32 replica = 4;
+}
+
+message Configuration {
+  repeated Machine machines = 1;
+}
