@@ -2,6 +2,8 @@
 
 #include "storage/mem_only_storage.h"
 
+using namespace slog;
+
 TEST(MemOnlyStorageTest, ReadWriteTest) {
   MemOnlyStorage storage;
   Key key = "key1";

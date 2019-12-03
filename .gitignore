@@ -35,3 +35,6 @@
 build/
 .deps/
 .dep/
+
+# VS Code
+.vscode

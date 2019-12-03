@@ -3,6 +3,7 @@ project(slog)
 
 set(DEPENDENCIES_DIR ".dep")
 set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_FLAGS "-std=c++14 -W -Wextra -Wall")
 
 find_package(cppzmq REQUIRED)
@@ -17,16 +18,21 @@ endif()
 find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+find_package(Glog REQUIRED)
+include_directories(${GLOG_INCLUDE_DIRS})
+
 # Add root and build directory to include path. The build directory inclusion is
 # necessary for protobuf
-include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_BINARY_DIR})
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_BINARY_DIR})
 
 # ================================== Server =============================================
 
+add_subdirectory(common)
 add_subdirectory(proto)
 add_subdirectory(storage)
 set(SLOG_LIBS
+  common
   proto
   storage)
 
@@ -35,7 +41,8 @@ add_executable(slog_server machine/server.cpp)
 target_link_libraries(slog_server 
   ${SLOG_LIBS} 
   ${Protobuf_LIBRARIES} 
-  ${cppzmq_STATIC_LIBRARY})
+  ${cppzmq_STATIC_LIBRARY}
+  ${GLOG_LIBRARIES})
 
 # =================================== Tests =============================================
 

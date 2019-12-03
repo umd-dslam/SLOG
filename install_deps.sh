@@ -64,7 +64,7 @@ else
   echo "Downloading protobuf"
   wget -nc https://github.com/protocolbuffers/protobuf/releases/download/v3.11.1/protobuf-cpp-3.11.1.tar.gz
   tar -xzf protobuf-cpp-3.11.1.tar.gz
-  rm -rf protobuf-cpp-3.11.1.tar.gz
+  rm -f protobuf-cpp-3.11.1.tar.gz
 
   echo "Installing protobuf"
   cd protobuf-3.11.1
@@ -75,4 +75,25 @@ else
 
   cd ..
   rm -rf $DOWNLOAD_DIR
-fi 
+fi
+
+if [ -n "$(find $INSTALL_PREFIX -name 'libglog*')" ]; then
+  echo "Found glog. Skipping installation."
+else
+  mkdir -p $DOWNLOAD_DIR
+  cd $DOWNLOAD_DIR
+  echo "Downloading glog"
+  wget https://github.com/google/glog/archive/v0.4.0.tar.gz
+  tar -xzf v0.4.0.tar.gz
+  rm -r v0.4.0.tar.gz
+
+  echo "Installing glog"
+  cd glog-0.4.0
+  ./autogen.sh
+  ./configure --prefix=$INSTALL_PREFIX
+  make -j$(nproc) install
+  cd ..
+
+  cd ..
+  rm -rf $DOWNLOAD_DIR
+fi

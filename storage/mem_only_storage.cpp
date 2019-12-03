@@ -1,10 +1,12 @@
 #include "storage/mem_only_storage.h"
 
+namespace slog {
+
 MemOnlyStorage::MemOnlyStorage() {
   table_ = std::make_unique<Table>();
 }
 
-bool MemOnlyStorage::Read(const Key& key, Record* result) {
+bool MemOnlyStorage::Read(const Key& key, Record* result) const {
   if (table_->count(key) == 0) {
     return false;
   }
@@ -24,10 +26,11 @@ bool MemOnlyStorage::Delete(const Key& key) {
   return true;
 }
 
-bool MemOnlyStorage::GetMasterMetadata(const Key& key, Metadata* result) {
+bool MemOnlyStorage::GetMasterMetadata(const Key& key, Metadata* result) const {
   if (table_->count(key) == 0) {
     return false;
   }
   *result = (*table_)[key].metadata;
   return true;
 }
+} // namespace slog
