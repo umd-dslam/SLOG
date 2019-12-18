@@ -1,6 +1,10 @@
 #include <iostream>
 #include <glog/logging.h>
+
 #include "common/configuration.h"
+#include "connection/broker.h"
+#include "machine/client.h"
+#include "machine/server.h"
 
 using namespace slog;
 using namespace std;
@@ -11,6 +15,10 @@ int main(int argc, char* argv[]) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
   google::InitGoogleLogging(argv[0]);
   auto config = Configuration::FromFile("slog.conf", 0);
-  LOG(ERROR) << "Local port: " << config.GetLocalPort();
+  zmq::context_t context(1);
+
+  Broker broker(config, context);
+  LOG(ERROR) << "Broker started";
+
   return 0;
 }

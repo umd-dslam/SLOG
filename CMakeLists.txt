@@ -6,6 +6,8 @@ set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_FLAGS "-std=c++14 -W -Wextra -Wall")
 
+find_package(ZeroMQ REQUIRED)
+include_directories(${ZeroMQ_INCLUDE_DIR})
 find_package(cppzmq REQUIRED)
 include_directories(${cppzmq_INCLUDE_DIR})
 
@@ -28,19 +30,24 @@ include_directories(${CMAKE_BINARY_DIR})
 
 # ================================== Server =============================================
 
-add_subdirectory(common)
+# Proto needs to be added before everything else so that protobuf gets to generate files
+# needed in subsequent modules
 add_subdirectory(proto)
+add_subdirectory(common)
+add_subdirectory(connection)
 add_subdirectory(storage)
 set(SLOG_LIBS
   common
+  connection
   proto
   storage)
 
 # Create an executable for the server
-add_executable(slog_server machine/server.cpp)
-target_link_libraries(slog_server 
+add_executable(slog machine/slog.cpp)
+target_link_libraries(slog
   ${SLOG_LIBS} 
-  ${Protobuf_LIBRARIES} 
+  ${Protobuf_LIBRARIES}
+  ${ZeroMQ_STATIC_LIBRARY}
   ${cppzmq_STATIC_LIBRARY}
   ${GLOG_LIBRARIES})
 
