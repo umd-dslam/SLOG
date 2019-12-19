@@ -10,7 +10,9 @@ namespace slog {
 
 class Broker {
 public:
-  Broker(std::shared_ptr<Configuration> config, zmq::context_t& context);
+  Broker(
+      std::shared_ptr<Configuration> config, 
+      std::shared_ptr<zmq::context_t> context);
   ~Broker();
 
   void Run();
@@ -21,7 +23,7 @@ private:
   zmq::socket_t router_;
   std::thread thread_;
 
-  std::vector<Channel> channels_;
+  std::vector<std::unique_ptr<Channel>> channels_;
 
   std::atomic<bool> running_;
 };

@@ -4,7 +4,7 @@ project(slog)
 set(DEPENDENCIES_DIR ".dep")
 set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "-std=c++14 -W -Wextra -Wall")
+set(CMAKE_CXX_FLAGS "-std=c++14 -g -W -Wextra -Wall")
 
 find_package(ZeroMQ REQUIRED)
 include_directories(${ZeroMQ_INCLUDE_DIR})
@@ -37,8 +37,8 @@ add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(storage)
 set(SLOG_LIBS
-  common
   connection
+  common
   proto
   storage)
 
@@ -61,7 +61,6 @@ enable_testing()
 
 # Add tests
 file(GLOB_RECURSE TEST_SRCS RELATIVE ${PROJECT_SOURCE_DIR} "test/*.cpp")
-set(TEST_OUTPUT_DIR ${CMAKE_BINARY_DIR}/test)
 foreach(TEST ${TEST_SRCS})
   # Extract file names (w/o extension)
   get_filename_component(TEST_NAME ${TEST} NAME_WE)
@@ -71,11 +70,9 @@ foreach(TEST ${TEST_SRCS})
   #link to libraries
   target_link_libraries(${TEST_NAME} ${ALL_LIBRARIES} GTest::GTest GTest::Main)
 
-  # move tests to 'test' folder and add to test execution
-  set_target_properties(${TEST_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TEST_OUTPUT_DIR})
   add_test(
     NAME ${TEST_NAME}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${TEST_OUTPUT_DIR}/${TEST_NAME})
+    COMMAND ${TEST_NAME})
 
 endforeach(TEST)

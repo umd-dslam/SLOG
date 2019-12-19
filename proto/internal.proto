@@ -7,21 +7,21 @@ message Transaction {
 }
 
 message Request {
-    message TransactionRequest {
-        Transaction transaction = 1;
+    message Echo {
+        bytes data = 1;
     }
 
     oneof type {
-        TransactionRequest transaction = 1;
+        Echo echo = 1; // For debugging and testing purposes
     }
 }
 
 message Response {
-    message TransactionResponse {
-        
+    message Echo {
+        bytes data = 1;
     }
 
     oneof type {
-        TransactionResponse transaction = 1;
+        Echo echo = 1; // For debugging and testing purposes
     }
 }

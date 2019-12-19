@@ -20,23 +20,21 @@ public:
   MMessage(const proto::Response& response);
   MMessage(zmq::socket_t& socket);
 
+  void SetIdentity(std::string&& identity);
+
   void FromRequest(const proto::Request& request);
   bool ToRequest(proto::Request& request);
 
   void FromResponse(const proto::Response& response);
   bool ToResponse(proto::Response& response);
 
-  void Send(zmq::socket_t& socket);
+  void Send(zmq::socket_t& socket) const;
   void Receive(zmq::socket_t& socket);
-
-  int GetType();
 
   void Clear();
 
 private:
   std::string identity_;
-  // Message type is the type case of a Request or Response
-  int message_type_;
   std::vector<std::string> body_;
 };
 

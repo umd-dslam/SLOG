@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 
-#include "connection/mmessage.h"
+#include "common/mmessage.h"
 
 namespace slog {
 
@@ -20,7 +20,11 @@ MMessage::MMessage(zmq::socket_t& socket) {
   Receive(socket);
 }
 
-void MMessage::Send(zmq::socket_t& socket) {
+void MMessage::SetIdentity(std::string&& identity) {
+  identity_ = std::move(identity);
+}
+
+void MMessage::Send(zmq::socket_t& socket) const {
   zmq::message_t message;
   // Send the connection identity
   if (!identity_.empty()) {
@@ -31,12 +35,6 @@ void MMessage::Send(zmq::socket_t& socket) {
 
   // Send the empty delimiter frame
   message.rebuild();
-  socket.send(message, zmq::send_flags::sndmore);
-
-  // Send message type
-  auto type_str = std::to_string(message_type_);
-  message.rebuild(type_str.size());
-  memcpy(message.data(), type_str.data(), type_str.size());
   socket.send(message, zmq::send_flags::sndmore);
 
   // Send the body
@@ -60,9 +58,7 @@ void MMessage::Receive(zmq::socket_t& socket) {
   }
   // Read the empty delimiter
   socket.recv(message);
-  if (socket.recv(message)) {
-    message_type_ = std::stoi(MessageToString(message));
-  }
+
   while (true) {
     if (!socket.recv(message)) {
       break;
@@ -75,10 +71,7 @@ void MMessage::Receive(zmq::socket_t& socket) {
 }
 
 void MMessage::FromRequest(const proto::Request& request) {
-  Clear();
-
-  message_type_ = request.type_case();
-  
+  Clear();  
   std::string buf;
   request.SerializeToString(&buf);
   body_.push_back(buf);
@@ -86,9 +79,6 @@ void MMessage::FromRequest(const proto::Request& request) {
 
 void MMessage::FromResponse(const proto::Response& response) {
   Clear();
-
-  message_type_ = response.type_case();
-
   std::string buf;
   response.SerializeToString(&buf);
   body_.push_back(buf);
@@ -108,13 +98,8 @@ bool MMessage::ToResponse(proto::Response& response) {
   return response.ParseFromString(body_[0]);
 }
 
-int MMessage::GetType() {
-  return message_type_;
-}
-
 void MMessage::Clear() {
   identity_.clear();
-  message_type_ = 0;
   body_.clear();
 }
 
