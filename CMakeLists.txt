@@ -42,14 +42,18 @@ set(SLOG_LIBS
   proto
   storage)
 
+# All libraries to be linked to executables
+set(ALL_LIBRARIES
+    ${SLOG_LIBS} 
+    ${Protobuf_LIBRARIES}
+    ${ZeroMQ_STATIC_LIBRARY}
+    ${cppzmq_STATIC_LIBRARY}
+    ${GLOG_LIBRARIES})
+
+
 # Create an executable for the server
 add_executable(slog machine/slog.cpp)
-target_link_libraries(slog
-  ${SLOG_LIBS} 
-  ${Protobuf_LIBRARIES}
-  ${ZeroMQ_STATIC_LIBRARY}
-  ${cppzmq_STATIC_LIBRARY}
-  ${GLOG_LIBRARIES})
+target_link_libraries(slog ${ALL_LIBRARIES})
 
 # =================================== Tests =============================================
 
@@ -65,7 +69,7 @@ foreach(TEST ${TEST_SRCS})
   add_executable(${TEST_NAME} ${TEST})
 
   #link to libraries
-  target_link_libraries(${TEST_NAME} ${SLOG_LIBS} GTest::GTest GTest::Main)
+  target_link_libraries(${TEST_NAME} ${ALL_LIBRARIES} GTest::GTest GTest::Main)
 
   # move tests to 'test' folder and add to test execution
   set_target_properties(${TEST_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TEST_OUTPUT_DIR})

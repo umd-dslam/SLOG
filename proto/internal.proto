@@ -1,0 +1,27 @@
+syntax = "proto3";
+package slog.proto;
+
+message Transaction {
+    repeated bytes read_set = 1;
+    repeated bytes write_set = 2;
+}
+
+message Request {
+    message TransactionRequest {
+        Transaction transaction = 1;
+    }
+
+    oneof type {
+        TransactionRequest transaction = 1;
+    }
+}
+
+message Response {
+    message TransactionResponse {
+        
+    }
+
+    oneof type {
+        TransactionResponse transaction = 1;
+    }
+}

@@ -4,15 +4,12 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
+#include "connection/channel.h"
 
 namespace slog {
 
 class Broker {
 public:
-  static const std::string SERVER_ENDPOINT;
-  static const std::string SEQUENCER_ENDPOINT;
-  static const std::string SCHEDULER_ENDPOINT;
-
   Broker(std::shared_ptr<Configuration> config, zmq::context_t& context);
   ~Broker();
 
@@ -24,9 +21,7 @@ private:
   zmq::socket_t router_;
   std::thread thread_;
 
-  zmq::socket_t server_channel_;
-  zmq::socket_t sequencer_channel_;
-  zmq::socket_t scheduler_channel_;
+  std::vector<Channel> channels_;
 
   std::atomic<bool> running_;
 };
