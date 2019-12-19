@@ -36,14 +36,14 @@ void Broker::Run() {
 
   while (running_) {
     // Wait until a message arrived at one of the sockets
-    zmq::poll(&items[0], items.size(), -1 /* no timeout */);
+    zmq::poll(items);
 
     // Router received a request
     if (items[0].revents & ZMQ_POLLIN) {
       MMessage message(router_);
       // Send to all channels
       for (auto& channel : channels_) {
-        channel->PassToListener(message);
+        channel->SendToListener(message);
       }
     }
 

@@ -30,7 +30,12 @@ public:
    * Passes a message to this channel. That message would be received by the
    * listener
    */
-  void PassToListener(const MMessage& msg);
+  void SendToListener(const MMessage& msg);
+
+  /**
+   * Receives a message from the listener
+   */
+  void ReceiveFromListener(MMessage& msg);
 
   /**
    * Returns a pointer to the listener corresponding to this channel.

@@ -31,6 +31,28 @@ TEST_F(ChannelTest, ListenToChannel) {
 
   MMessage message(MakeEchoRequest("test"));
   message.SetIdentity("zZz");
-  channel_->PassToListener(message);
+  channel_->SendToListener(message);
+  th.join();
+}
+
+TEST_F(ChannelTest, SendToChannel) {
+  std::thread th([this](){
+    std::unique_ptr<ChannelListener> listener(channel_->GetListener());
+    MMessage message(MakeEchoRequest("test"));
+    message.SetIdentity("zZz");
+    listener->SendResponse(message);
+  });
+
+  // Not necessary to poll but still do to test GetPollItem
+  auto item = channel_->GetPollItem();
+  zmq::poll(&item, 1);
+
+  MMessage message;
+  channel_->ReceiveFromListener(message);
+  proto::Response res;
+  message.ToResponse(res);
+
+  ASSERT_EQ("test", res.echo().data());
+
   th.join();
 }
