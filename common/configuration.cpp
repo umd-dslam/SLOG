@@ -14,7 +14,7 @@ using std::runtime_error;
 std::shared_ptr<Configuration> Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
-    const MachineIdentifier& local_identifier) {
+    const proto::SlogIdentifier& local_identifier) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
@@ -31,7 +31,7 @@ std::shared_ptr<Configuration> Configuration::FromFile(
 Configuration::Configuration(
     proto::Configuration&& config, 
     const std::string& local_address,
-    const MachineIdentifier& local_identifier) 
+    const proto::SlogIdentifier& local_identifier) 
   : broker_port_(config.broker_port()),
     local_address_(local_address),
     local_identifier_(local_identifier) {
@@ -48,6 +48,17 @@ Configuration::Configuration(
 
 uint32_t Configuration::GetBrokerPort() const {
   return broker_port_;
+}
+
+const vector<string>& Configuration::GetAllAddresses() const {
+  return all_addresses_;
+}
+
+const string& Configuration::GetLocalAddress() const {
+  return local_address_;
+}
+const proto::SlogIdentifier& Configuration::GetLocalSlogIdentifier() const {
+  return local_identifier_;
 }
 
 } // namespace slog

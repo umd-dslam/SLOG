@@ -1,6 +1,11 @@
 syntax = "proto3";
 package slog.proto;
 
+message SlogIdentifier {
+    uint32 replica = 1;
+    uint32 partition = 2;
+}
+
 message Transaction {
     repeated bytes read_set = 1;
     repeated bytes write_set = 2;
@@ -11,8 +16,14 @@ message Request {
         bytes data = 1;
     }
 
+    message Ready {
+        bytes ip_address = 1;
+        SlogIdentifier slog_identifier = 2;
+    }
+
     oneof type {
         Echo echo = 1; // For debugging and testing purposes
+        Ready ready = 2;
     }
 }
 

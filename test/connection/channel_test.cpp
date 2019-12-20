@@ -25,7 +25,7 @@ TEST_F(ChannelTest, ListenToChannel) {
     MMessage message;
     listener->PollMessage(message);
     proto::Request req;
-    message.ToRequest(req);
+    ASSERT_TRUE(message.ToRequest(req));
     ASSERT_EQ("test", req.echo().data());
   });
 
@@ -38,7 +38,7 @@ TEST_F(ChannelTest, ListenToChannel) {
 TEST_F(ChannelTest, SendToChannel) {
   std::thread th([this](){
     std::unique_ptr<ChannelListener> listener(channel_->GetListener());
-    MMessage message(MakeEchoRequest("test"));
+    MMessage message(MakeEchoResponse("test"));
     message.SetIdentity("zZz");
     listener->SendMessage(message);
   });
@@ -50,8 +50,7 @@ TEST_F(ChannelTest, SendToChannel) {
   MMessage message;
   channel_->ReceiveFromListener(message);
   proto::Response res;
-  message.ToResponse(res);
-
+  ASSERT_TRUE(message.ToResponse(res));
   ASSERT_EQ("test", res.echo().data());
 
   th.join();

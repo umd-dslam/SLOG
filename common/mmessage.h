@@ -7,11 +7,13 @@
 
 #include "proto/internal.pb.h"
 
+using std::string;
+
 namespace slog {
 
 /**
  * Encapsulates a multi-part zmq message. 
- * [identity of connection][empty frame][message type][body]
+ * [identity of connection][empty frame][is response or not][body]
  */
 class MMessage {
 public:
@@ -21,12 +23,13 @@ public:
   MMessage(zmq::socket_t& socket);
 
   void SetIdentity(std::string&& identity);
+  const string& GetIdentity() const;
 
   void FromRequest(const proto::Request& request);
-  bool ToRequest(proto::Request& request);
+  bool ToRequest(proto::Request& request) const;
 
   void FromResponse(const proto::Response& response);
-  bool ToResponse(proto::Response& response);
+  bool ToResponse(proto::Response& response) const;
 
   void Send(zmq::socket_t& socket) const;
   void Receive(zmq::socket_t& socket);
@@ -34,8 +37,9 @@ public:
   void Clear();
 
 private:
-  std::string identity_;
-  std::vector<std::string> body_;
+  string identity_;
+  bool is_response_;
+  string body_;
 };
 
 } // namespace slog

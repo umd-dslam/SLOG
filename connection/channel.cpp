@@ -2,9 +2,13 @@
 
 namespace slog {
 
+namespace {
+
 std::string MakeEndpoint(const std::string& name) {
   return "inproc://" + name + ".ipc";
 }
+
+} // namespace 
 
 Channel::Channel(
     std::shared_ptr<zmq::context_t> context, 

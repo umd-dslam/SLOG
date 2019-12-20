@@ -4,9 +4,34 @@
 
 namespace slog {
 
-std::string MessageToString(zmq::message_t& message) {
-  return std::string(static_cast<char*>(message.data()), message.size());
+namespace {
+
+void SendSingleMessage(
+    zmq::socket_t& socket, 
+    const string& msg_str,
+    bool send_more) {
+  zmq::message_t message(msg_str.size());
+  memcpy(message.data(), msg_str.data(), msg_str.size());
+  socket.send(
+      message, 
+      send_more ? zmq::send_flags::sndmore : zmq::send_flags::none);
 }
+
+// Returns true if there is more
+bool ReceiveSingleMessage(
+    string& str,
+    zmq::socket_t& socket) {
+  zmq::message_t message;
+  if (!socket.recv(message)) {
+    throw std::runtime_error("Malformed multi-part message");
+  }
+  str = string(
+      static_cast<char*>(message.data()),
+      message.size());
+  return message.more();
+}
+
+} // namespace
 
 MMessage::MMessage(const proto::Request& request) {
   FromRequest(request);
@@ -20,86 +45,78 @@ MMessage::MMessage(zmq::socket_t& socket) {
   Receive(socket);
 }
 
-void MMessage::SetIdentity(std::string&& identity) {
+void MMessage::SetIdentity(string&& identity) {
   identity_ = std::move(identity);
 }
 
+const string& MMessage::GetIdentity() const {
+  return identity_;
+}
+
 void MMessage::Send(zmq::socket_t& socket) const {
-  zmq::message_t message;
-  // Send the connection identity
   if (!identity_.empty()) {
-    message.rebuild(identity_.size());
-    memcpy(message.data(), identity_.data(), identity_.size());
-    socket.send(message, zmq::send_flags::sndmore);
+    SendSingleMessage(socket, identity_, true);
   }
-
-  // Send the empty delimiter frame
-  message.rebuild();
-  socket.send(message, zmq::send_flags::sndmore);
-
-  // Send the body
-  for (size_t i = 0; i < body_.size(); i++) {
-    const auto& part = body_[i];
-    message.rebuild(part.size());
-    memcpy(message.data(), part.data(), part.size());
-    auto send_more = i == body_.size() - 1 
-        ? zmq::send_flags::none 
-        : zmq::send_flags::sndmore;
-    socket.send(message, send_more);
-  }
+  SendSingleMessage(socket, "", true);
+  SendSingleMessage(socket, std::to_string((int)is_response_), true);
+  SendSingleMessage(socket, body_, false);
 }
 
 void MMessage::Receive(zmq::socket_t& socket) {
   Clear();
 
-  zmq::message_t message;
-  if (socket.recv(message)) {
-    identity_ = MessageToString(message);
-  }
-  // Read the empty delimiter
-  socket.recv(message);
+  string dummy;
+  bool more;
 
-  while (true) {
-    if (!socket.recv(message)) {
-      break;
-    }
-    body_.push_back(MessageToString(message));
-    if (!message.more()) {
-      break;
-    }
+  if (!ReceiveSingleMessage(identity_, socket)) {
+    return;
   }
+  // Empty delimiter
+  if (!ReceiveSingleMessage(dummy, socket)) {
+    return;
+  }
+  
+  more = ReceiveSingleMessage(dummy, socket);
+  is_response_ = dummy == "1";
+  if (!more) { return; }
+
+  if (!ReceiveSingleMessage(body_, socket)) {
+    return;
+  }
+
+  // Ignore the rest, if any
+  while (ReceiveSingleMessage(dummy, socket)) {}
 }
 
 void MMessage::FromRequest(const proto::Request& request) {
   Clear();  
-  std::string buf;
-  request.SerializeToString(&buf);
-  body_.push_back(buf);
+  is_response_ = false;
+  request.SerializeToString(&body_);
 }
 
 void MMessage::FromResponse(const proto::Response& response) {
   Clear();
-  std::string buf;
-  response.SerializeToString(&buf);
-  body_.push_back(buf);
+  is_response_ = true;
+  response.SerializeToString(&body_);
 }
 
-bool MMessage::ToRequest(proto::Request& request) {
-  if (body_.empty()) {
+bool MMessage::ToRequest(proto::Request& request) const {
+  if (is_response_ || body_.empty()) {
     return false;
   }
-  return request.ParseFromString(body_[0]);
+  return request.ParseFromString(body_);
 }
 
-bool MMessage::ToResponse(proto::Response& response) {
-  if (body_.empty()) {
+bool MMessage::ToResponse(proto::Response& response) const {
+  if (!is_response_ || body_.empty()) {
     return false;
   }
-  return response.ParseFromString(body_[0]);
+  return response.ParseFromString(body_);
 }
 
 void MMessage::Clear() {
   identity_.clear();
+  is_response_ = false;
   body_.clear();
 }
 
