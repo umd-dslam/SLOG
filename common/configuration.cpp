@@ -1,4 +1,4 @@
-#include "configuration.h"
+#include "common/configuration.h"
 
 #include <fstream>
 #include <sstream>
@@ -11,7 +11,10 @@ namespace slog {
 
 using std::runtime_error;
 
-std::shared_ptr<Configuration> Configuration::FromFile(const std::string& file_path, uint32_t local_machine_id) {
+std::shared_ptr<Configuration> Configuration::FromFile(
+    const std::string& file_path, 
+    const std::string& local_address,
+    const MachineIdentifier& local_identifier) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
@@ -22,22 +25,24 @@ std::shared_ptr<Configuration> Configuration::FromFile(const std::string& file_p
   std::string str = ss.str();
   google::protobuf::TextFormat::ParseFromString(str, &config);
 
-  return std::make_shared<Configuration>(std::move(config), local_machine_id);
+  return std::make_shared<Configuration>(std::move(config), local_address, local_identifier);
 }
 
 Configuration::Configuration(
     proto::Configuration&& config, 
-    uint32_t local_machine_id) 
-  : local_machine_id_(local_machine_id),
-    broker_port_(config.broker_port()) {
+    const std::string& local_address,
+    const MachineIdentifier& local_identifier) 
+  : broker_port_(config.broker_port()),
+    local_address_(local_address),
+    local_identifier_(local_identifier) {
 
-  for (int i = 0; i < config.machines_size(); i++) {
-    const auto& machine = config.machines(i);
-    uint32_t machine_id = machine.id();
-    all_machines_[machine_id] = machine;
-    replica_to_machine_ids_[machine.replica()].push_back(machine_id);
+  for (int i = 0; i < config.addresses_size(); i++) {
+    all_addresses_.push_back(config.addresses(i));
   }
-  CHECK(all_machines_.count(local_machine_id) > 0) 
+  CHECK(std::find(
+      all_addresses_.begin(), 
+      all_addresses_.end(), 
+      local_address) != all_addresses_.end()) 
       << "Local machine ID is not present in the configuration";
 }
 

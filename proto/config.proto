@@ -1,13 +1,9 @@
 syntax = "proto3";
 package slog.proto;
 
-message Machine {
-  uint32 replica = 3;
-  uint32 id = 1;
-  string host = 2;
-}
-
 message Configuration {
-  repeated Machine machines = 1;
+  repeated bytes addresses = 1;
   uint32 broker_port = 2;
+  uint32 num_replicas = 3;
+  uint32 num_partitions = 4;
 }
