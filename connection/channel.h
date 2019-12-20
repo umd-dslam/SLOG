@@ -21,6 +21,11 @@ public:
   Channel& operator=(const Channel&) = delete;
 
   /**
+   * Returns the name of current channel
+   */
+  const std::string& GetName() const;
+
+  /**
    * Returns a zmq pollitem data structure for this channel. This method is
    * used by the Broker
    */
@@ -47,8 +52,9 @@ public:
 
 private:
   std::shared_ptr<zmq::context_t> context_;
-  std::string name_;
+  const std::string name_;
   zmq::socket_t socket_;
+  std::atomic<bool> listener_created_;
 };
 
 /**
@@ -60,19 +66,19 @@ public:
   ChannelListener(std::shared_ptr<zmq::context_t> context, const std::string& name);
 
   /**
-   * Blocks until a request message arrived at the channel.
+   * Blocks until a message arrived at the channel.
    * Arguments:
    *  msg         - To be filled with the next message in the channel
    *  timeout_us  - If no message is received by the channel in after timeout_us 
    *                microseconds, the method returns with false.
    * Returns true if a message is received, false if timed out.
    */
-  bool PollRequest(MMessage& msg, long timeout_us = -1);
+  bool PollMessage(MMessage& msg, long timeout_us = -1);
 
   /**
-   * Sends a response message to this channel.
+   * Sends a message to this channel.
    */
-  void SendResponse(const MMessage& msg);
+  void SendMessage(const MMessage& msg);
 
 private:
   zmq::socket_t socket_;

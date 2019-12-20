@@ -2,14 +2,23 @@
 
 namespace slog {
 
+std::string MakeEndpoint(const std::string& name) {
+  return "inproc://" + name + ".ipc";
+}
+
 Channel::Channel(
     std::shared_ptr<zmq::context_t> context, 
     const std::string& name) 
   : context_(context),
     name_(name),
-    socket_(*context, ZMQ_PAIR) {
-  std::string endpoint = "inproc://" + name;
+    socket_(*context, ZMQ_PAIR),
+    listener_created_(false) {
+  auto endpoint = MakeEndpoint(name);
   socket_.connect(endpoint);
+}
+
+const std::string& Channel::GetName() const {
+  return name_;
 }
 
 zmq::pollitem_t Channel::GetPollItem() {
@@ -30,6 +39,10 @@ void Channel::ReceiveFromListener(MMessage& msg) {
 }
 
 ChannelListener* Channel::GetListener() {
+  if (listener_created_) {
+    throw std::runtime_error("Listener has already been created");
+  }
+  listener_created_ = true;
   return new ChannelListener(context_, name_);
 }
 
@@ -38,11 +51,11 @@ ChannelListener::ChannelListener(
     std::shared_ptr<zmq::context_t> context,
     const std::string& name)
   : socket_(*context, ZMQ_PAIR) {
-  std::string endpoint = "inproc://" + name;
+  auto endpoint = MakeEndpoint(name);
   socket_.bind(endpoint);
 }
 
-bool ChannelListener::PollRequest(MMessage& msg, long timeout_us) {
+bool ChannelListener::PollMessage(MMessage& msg, long timeout_us) {
   zmq::pollitem_t item { 
       static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0 };
   zmq::poll(&item, 1, timeout_us);
@@ -53,7 +66,7 @@ bool ChannelListener::PollRequest(MMessage& msg, long timeout_us) {
   return false;
 }
 
-void ChannelListener::SendResponse(const MMessage& msg) {
+void ChannelListener::SendMessage(const MMessage& msg) {
   msg.Send(socket_);
 }
 

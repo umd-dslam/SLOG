@@ -17,8 +17,8 @@ int main(int argc, char* argv[]) {
   auto config = Configuration::FromFile("slog.conf", 0);
   auto context = std::make_shared<zmq::context_t>(1);
 
-  Broker broker(config, context);
-  LOG(ERROR) << "Broker started";
-
+  // Broker broker(config, context);
+  LOG(INFO) << "Broker started";
+ 
   return 0;
 }

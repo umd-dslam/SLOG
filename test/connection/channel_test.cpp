@@ -23,7 +23,7 @@ TEST_F(ChannelTest, ListenToChannel) {
   std::thread th([this](){
     std::unique_ptr<ChannelListener> listener(channel_->GetListener());
     MMessage message;
-    listener->PollRequest(message);
+    listener->PollMessage(message);
     proto::Request req;
     message.ToRequest(req);
     ASSERT_EQ("test", req.echo().data());
@@ -40,7 +40,7 @@ TEST_F(ChannelTest, SendToChannel) {
     std::unique_ptr<ChannelListener> listener(channel_->GetListener());
     MMessage message(MakeEchoRequest("test"));
     message.SetIdentity("zZz");
-    listener->SendResponse(message);
+    listener->SendMessage(message);
   });
 
   // Not necessary to poll but still do to test GetPollItem
@@ -55,4 +55,9 @@ TEST_F(ChannelTest, SendToChannel) {
   ASSERT_EQ("test", res.echo().data());
 
   th.join();
+}
+
+TEST_F(ChannelTest, CannotCreateListenerTwice) {
+  std::unique_ptr<ChannelListener> listener(channel_->GetListener());
+  ASSERT_THROW(channel_->GetListener(), std::runtime_error);
 }

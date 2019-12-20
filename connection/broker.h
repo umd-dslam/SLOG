@@ -7,17 +7,20 @@
 #include "connection/channel.h"
 
 namespace slog {
-
 class Broker {
 public:
+  static const std::string SERVER_CHANNEL;
+
   Broker(
       std::shared_ptr<Configuration> config, 
       std::shared_ptr<zmq::context_t> context);
   ~Broker();
 
-  void Run();
+  ChannelListener* GetChannelListener(const std::string& name);
 
 private:
+  void Run();
+
   std::shared_ptr<Configuration> config_;
 
   zmq::socket_t router_;
