@@ -25,11 +25,11 @@ std::shared_ptr<Configuration> Configuration::FromFile(
   std::string str = ss.str();
   google::protobuf::TextFormat::ParseFromString(str, &config);
 
-  return std::make_shared<Configuration>(std::move(config), local_address, local_id);
+  return std::make_shared<Configuration>(config, local_address, local_id);
 }
 
 Configuration::Configuration(
-    proto::Configuration&& config, 
+    const proto::Configuration& config, 
     const std::string& local_address,
     const proto::SlogIdentifier& local_id) 
   : protocol_(config.protocol()),

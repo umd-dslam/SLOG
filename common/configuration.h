@@ -19,7 +19,7 @@ public:
       const proto::SlogIdentifier& local_identifier);
 
   Configuration(
-      proto::Configuration&& config,
+      const proto::Configuration& config,
       const string& local_address,
       const proto::SlogIdentifier& local_identifier);
 

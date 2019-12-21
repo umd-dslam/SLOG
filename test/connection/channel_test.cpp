@@ -38,8 +38,9 @@ TEST_F(ChannelTest, ListenToChannel) {
 TEST_F(ChannelTest, SendToChannel) {
   std::thread th([this](){
     std::unique_ptr<ChannelListener> listener(channel_->GetListener());
-    MMessage message(MakeEchoResponse("test"));
+    MMessage message;
     message.SetIdentity("zZz");
+    message.SetResponse(MakeEchoResponse("test"));
     listener->SendMessage(message);
   });
 

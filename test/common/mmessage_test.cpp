@@ -23,7 +23,8 @@ TEST(MMessageTest, FromAndToRequestProto) {
 }
 
 TEST(MMessageTest, FromAndToResponseProto) {
-  MMessage message(MakeEchoResponse(TEST_STRING));
+  MMessage message;
+  message.SetResponse(MakeEchoResponse(TEST_STRING));
 
   proto::Response response;
   ASSERT_TRUE(message.ToResponse(response));

@@ -17,7 +17,10 @@ using std::vector;
 namespace slog {
 class Broker {
 public:
+  // TODO: Use enum for channel identification
   static const std::string SERVER_CHANNEL;
+  static const std::string SEQUENCER_CHANNEL;
+  static const std::string SCHEDULER_CHANNEL;
 
   Broker(
       shared_ptr<Configuration> config, 
@@ -47,10 +50,11 @@ private:
 
   std::thread thread_;
 
-  vector<unique_ptr<Channel>> channels_;
-
+  // Map from channel name to the channel
+  unordered_map<string, unique_ptr<Channel>> channels_;
   // Map from ip addresses to sockets
   unordered_map<string, unique_ptr<zmq::socket_t>> address_to_socket_;
+
   // Map from connection ids (zmq identities) to serialized-to-string SlogIdentifiers
   // Used to translate the identities of incoming messages
   unordered_map<string, string> connection_id_to_slog_id_;
