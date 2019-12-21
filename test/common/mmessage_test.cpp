@@ -40,9 +40,9 @@ TEST(MMessageTest, SendAndReceive) {
   zmq::context_t context(1);
 
   zmq::socket_t router(context, ZMQ_ROUTER);
-  router.bind("ipc://test.ipc");
+  router.bind("ipc:///tmp/test_mmessage");
   zmq::socket_t dealer(context, ZMQ_DEALER);
-  dealer.connect("ipc://test.ipc");
+  dealer.connect("ipc:///tmp/test_mmessage");
 
   MMessage message(MakeEchoRequest(TEST_STRING));
   message.Send(dealer);
