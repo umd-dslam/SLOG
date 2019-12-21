@@ -29,35 +29,11 @@ void Module::Run() {
   MMessage message;
   while (running_) {
     if (listener_->PollMessage(message, MODULE_POLL_TIMEOUT_MS)) {
-
-      if (message.IsResponse()) {
-
-        proto::Response response;
-        message.ToResponse(response);
-
-        HandleResponse(response);
-
-      } else {
-
-        proto::Request request;
-        message.ToRequest(request);
-
-        HandleRequest(request);
-
-      }
+      HandleMessage(message);
     }
 
     PostProcessing();
   }
-}
-
-void Module::Send(const proto::Request& request) {
-  MMessage message(request);
-  Send(request);
-}
-
-void Module::Send(const proto::Response& response) {
-
 }
 
 void Module::Send(const MMessage& message) {

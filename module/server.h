@@ -15,12 +15,12 @@ class Server : public Module {
 public:
   Server(ChannelListener* listener);
 
-  void HandleRequest(const proto::Request& request) final;
-  void HandleResponse(const proto::Response& response) final;
+  void HandleMessage(MMessage message) final;
+
   void PostProcessing() final;
 
 private:
-  unordered_map<uint32_t, proto::Request> waiting_requests_;
+  unordered_map<uint32_t, MMessage> waiting_requests_;
 };
 
 } // namespace slog
