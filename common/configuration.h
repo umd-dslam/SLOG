@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include "proto/config.pb.h"
-#include "proto/internal.pb.h"
+#include "proto/slog_identifier.pb.h"
 
 using std::string;
 using std::unordered_map;

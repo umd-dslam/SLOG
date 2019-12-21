@@ -5,7 +5,8 @@
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
 
-#include "proto/internal.pb.h"
+#include "proto/request.pb.h"
+#include "proto/response.pb.h"
 
 using std::string;
 

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+import "slog_identifier.proto"; 
+
+package slog.proto;
+
+message Request {
+    oneof type {
+        EchoRequest echo = 1;
+        ReadyRequest ready = 2;
+    }
+}
+
+// For debugging and testing purposes
+message EchoRequest {
+    bytes data = 1;
+}
+
+message ReadyRequest {
+    bytes ip_address = 1;
+    SlogIdentifier slog_id = 2;
+}
+

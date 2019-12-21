@@ -1,6 +1,7 @@
 #pragma once
 
-#include "proto/internal.pb.h"
+#include "proto/request.pb.h"
+#include "proto/response.pb.h"
 
 namespace slog {
 

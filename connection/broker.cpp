@@ -6,11 +6,10 @@
 #include <glog/logging.h>
 
 #include "common/mmessage.h"
-#include "proto/internal.pb.h"
+#include "proto/request.pb.h"
 
 using std::pair;
 using std::unordered_set;
-
 namespace slog {
 
 const long BROKER_POLL_TIMEOUT_MS = 1000;

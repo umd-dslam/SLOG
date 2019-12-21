@@ -1,0 +1,13 @@
+syntax = "proto3";
+package slog.proto;
+
+message Response {
+    oneof type {
+        EchoResponse echo = 1; 
+    }
+}
+
+// For debugging and testing purposes
+message EchoResponse {
+    bytes data = 1;
+}

@@ -1,0 +1,7 @@
+syntax = "proto3";
+package slog.proto;
+
+message SlogIdentifier {
+    uint32 replica = 1;
+    uint32 partition = 2;
+}
