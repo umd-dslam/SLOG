@@ -2,9 +2,18 @@ syntax = "proto3";
 package slog.proto;
 
 message Configuration {
+  // Protocol for the zmq sockets in the broker. Use "tcp" for
+  // normal running and "icp" for unit and integration tests
   bytes protocol = 1;
+  // List of all machine addresses in the system. 
+  // If protocol is "tcp", these are IP addresses.
+  // If protocol is "icp", these are filesystem paths.
   repeated bytes addresses = 2;
+  // Port for the zmq sockets in the broker. This is ignored if
+  // the icp protocol is used
   uint32 broker_port = 3;
+  // Number of replicas of the database
   uint32 num_replicas = 4;
+  // Number of partitions per replica
   uint32 num_partitions = 5;
 }
