@@ -5,6 +5,7 @@
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
 
+#include "common/types.h"
 #include "proto/internal.pb.h"
 
 using std::string;
@@ -30,9 +31,8 @@ public:
   void RemoveIdentity();
   const string& GetIdentity() const;
 
-  void SetChannel(const string& channel);
-  void SetChannel(string&& channel);
-  const string& GetChannel() const;
+  void SetChannel(ChannelName channel);
+  ChannelName GetChannel() const;
 
   void FromRequest(const proto::Request& request);
   bool ToRequest(proto::Request& request) const;

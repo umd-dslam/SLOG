@@ -6,6 +6,7 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
+#include "common/types.h"
 #include "connection/channel.h"
 
 using std::shared_ptr;
@@ -15,19 +16,43 @@ using std::unordered_map;
 using std::vector;
 
 namespace slog {
+
+/**
+ * A Broker plays the role of distributing messages in and out of a machine.
+ * It runs its own thread with the components depicted below
+ * 
+ *                   -----------------------
+ *                   |                     |
+ *  Module A <---> Channel A             Router  <----- Incoming Message
+ *                   |         B           |
+ *                   |          R          |
+ *  Module B <---> Channel B     O         |
+ *                   |            K      Dealer  -----> Outgoing Message to XXX.XXX.XXX.XXX
+ *                   |             E     Dealer  -----> Outgoing Message to YYY.YYY.YYY.YYY
+ *  Module C <---> Channel C        R    Dealer  -----> Outgoing Message to ZZZ.ZZZ.ZZZ.ZZZ
+ *                   |                   ...
+ *                   -----------------------
+ * 
+ * To receive messages from the outside, it uses a ZMQ_ROUTER socket, which automatically
+ * prepend a connection identity to the arriving zmq message. Using this identity, it can
+ * tell where the message comes from.
+ * 
+ * The messages going into the system via the router will be broker to the channel
+ * specified in each message. On the other end of each channel is a module which also runs
+ * in its own thread. The module can also send messages back to the broker and
+ * subsequently to other machines.
+ * 
+ * To send messages to other machines, a broker uses a ZMQ_DEALER socket for each machines.
+ * 
+ */
 class Broker {
 public:
-  // TODO: Use enum for channel identification
-  static const std::string SERVER_CHANNEL;
-  static const std::string SEQUENCER_CHANNEL;
-  static const std::string SCHEDULER_CHANNEL;
-
   Broker(
       shared_ptr<Configuration> config, 
       shared_ptr<zmq::context_t> context);
   ~Broker();
 
-  ChannelListener* GetChannelListener(const string& name);
+  ChannelListener* GetChannelListener(ChannelName name);
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -51,7 +76,7 @@ private:
   std::thread thread_;
 
   // Map from channel name to the channel
-  unordered_map<string, unique_ptr<Channel>> channels_;
+  vector<unique_ptr<Channel>> channels_;
   // Map from ip addresses to sockets
   unordered_map<string, unique_ptr<zmq::socket_t>> address_to_socket_;
 

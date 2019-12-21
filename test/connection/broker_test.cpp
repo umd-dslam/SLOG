@@ -55,11 +55,11 @@ TEST(BrokerTest, PingPong) {
     auto context = std::make_shared<zmq::context_t>(1);
     Broker broker(configs[0], context);
     std::unique_ptr<ChannelListener> channel(
-        broker.GetChannelListener(Broker::SEQUENCER_CHANNEL));
+        broker.GetChannelListener(ChannelName::SEQUENCER));
 
     // Send ping
     MMessage msg(MakeEchoRequest("ping"));
-    msg.SetChannel(Broker::SCHEDULER_CHANNEL);
+    msg.SetChannel(ChannelName::SCHEDULER);
     msg.SetIdentity(0, 1);
     channel->SendMessage(std::move(msg));
 
@@ -74,7 +74,7 @@ TEST(BrokerTest, PingPong) {
     auto context = std::make_shared<zmq::context_t>(1);
     Broker broker(configs[1], context);
     std::unique_ptr<ChannelListener> channel(
-        broker.GetChannelListener(Broker::SCHEDULER_CHANNEL));
+        broker.GetChannelListener(ChannelName::SCHEDULER));
 
     // Wait for ping
     MMessage msg;
@@ -86,7 +86,7 @@ TEST(BrokerTest, PingPong) {
     // Send pong
     proto::Response res;
     res.mutable_echo()->set_data("pong");
-    msg.SetChannel(Broker::SEQUENCER_CHANNEL);
+    msg.SetChannel(ChannelName::SEQUENCER);
     msg.SetResponse(res);
     channel->SendMessage(msg);
 
