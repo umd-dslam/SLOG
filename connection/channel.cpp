@@ -59,10 +59,10 @@ ChannelListener::ChannelListener(
   socket_.bind(endpoint);
 }
 
-bool ChannelListener::PollMessage(MMessage& msg, long timeout_us) {
+bool ChannelListener::PollMessage(MMessage& msg, long timeout_ms) {
   zmq::pollitem_t item { 
       static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0 };
-  zmq::poll(&item, 1, timeout_us);
+  zmq::poll(&item, 1, timeout_ms);
   if (item.revents & ZMQ_POLLIN) {
     msg.Receive(socket_);
     return true;

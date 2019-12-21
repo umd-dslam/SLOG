@@ -18,7 +18,7 @@ message Request {
 
     message Ready {
         bytes ip_address = 1;
-        SlogIdentifier slog_identifier = 2;
+        SlogIdentifier slog_id = 2;
     }
 
     oneof type {

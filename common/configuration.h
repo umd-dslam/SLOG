@@ -23,16 +23,23 @@ public:
       const string& local_address,
       const proto::SlogIdentifier& local_identifier);
 
-  uint32_t GetBrokerPort() const;
+  const string& GetProtocol() const;
   const vector<string>& GetAllAddresses() const;
+  uint32_t GetBrokerPort() const;
+  uint32_t GetNumReplicas() const;
+  uint32_t GetNumPartitions() const;
   const string& GetLocalAddress() const;
-  const proto::SlogIdentifier& GetLocalSlogIdentifier() const;
+  const proto::SlogIdentifier& GetLocalSlogId() const;
 
 private:
+  string protocol_;
   uint32_t broker_port_;
+  uint32_t num_replicas_;
+  uint32_t num_partitions_;
   vector<string> all_addresses_;
   string local_address_;
-  proto::SlogIdentifier local_identifier_;
+  proto::SlogIdentifier local_id_;
+
 };
 
 } // namespace slog

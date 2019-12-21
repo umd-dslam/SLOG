@@ -2,8 +2,9 @@ syntax = "proto3";
 package slog.proto;
 
 message Configuration {
-  repeated bytes addresses = 1;
-  uint32 broker_port = 2;
-  uint32 num_replicas = 3;
-  uint32 num_partitions = 4;
+  bytes protocol = 1;
+  repeated bytes addresses = 2;
+  uint32 broker_port = 3;
+  uint32 num_replicas = 4;
+  uint32 num_partitions = 5;
 }

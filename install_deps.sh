@@ -77,27 +77,6 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libglog*')" ]; then
-  echo "Found glog. Skipping installation."
-else
-  mkdir -p $DOWNLOAD_DIR
-  cd $DOWNLOAD_DIR
-  echo "Downloading glog"
-  wget -nc https://github.com/google/glog/archive/v0.4.0.tar.gz
-  tar -xzf v0.4.0.tar.gz
-  rm -r v0.4.0.tar.gz
-
-  echo "Installing glog"
-  cd glog-0.4.0
-  ./autogen.sh
-  ./configure --prefix=$INSTALL_PREFIX
-  make -j$(nproc) install
-  cd ..
-
-  cd ..
-  rm -rf $DOWNLOAD_DIR
-fi
-
 if [ -n "$(find $INSTALL_PREFIX -name 'libgflags*')" ]; then
   echo "Found gflags. Skipping installation."
 else
@@ -119,4 +98,25 @@ else
 
     cd ..
     rm -rf $DOWNLOAD_DIR
+fi
+
+if [ -n "$(find $INSTALL_PREFIX -name 'libglog*')" ]; then
+  echo "Found glog. Skipping installation."
+else
+  mkdir -p $DOWNLOAD_DIR
+  cd $DOWNLOAD_DIR
+  echo "Downloading glog"
+  wget -nc https://github.com/google/glog/archive/v0.4.0.tar.gz
+  tar -xzf v0.4.0.tar.gz
+  rm -r v0.4.0.tar.gz
+
+  echo "Installing glog"
+  cd glog-0.4.0
+  ./autogen.sh
+  ./configure --prefix=$INSTALL_PREFIX
+  make -j$(nproc) install
+  cd ..
+
+  cd ..
+  rm -rf $DOWNLOAD_DIR
 fi

@@ -24,6 +24,9 @@ include_directories(${GTEST_INCLUDE_DIRS})
 find_package(Glog REQUIRED)
 include_directories(${GLOG_INCLUDE_DIRS})
 
+find_package(gflags REQUIRED)
+include_directories(${GFLAGS_INCLUDE_DIRS})
+
 # Add root and build directory to include path. The build directory inclusion is
 # necessary for protobuf
 include_directories(${CMAKE_SOURCE_DIR})
@@ -49,8 +52,8 @@ set(ALL_LIBRARIES
     ${Protobuf_LIBRARIES}
     ${ZeroMQ_STATIC_LIBRARY}
     ${cppzmq_STATIC_LIBRARY}
-    ${GLOG_LIBRARIES})
-
+    ${GLOG_LIBRARIES}
+    ${GFLAGS_LIBRARIES})
 
 # Create an executable for the server
 add_executable(slog machine/slog.cpp)

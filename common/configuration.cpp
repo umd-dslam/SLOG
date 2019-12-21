@@ -14,7 +14,7 @@ using std::runtime_error;
 std::shared_ptr<Configuration> Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
-    const proto::SlogIdentifier& local_identifier) {
+    const proto::SlogIdentifier& local_id) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
@@ -25,16 +25,19 @@ std::shared_ptr<Configuration> Configuration::FromFile(
   std::string str = ss.str();
   google::protobuf::TextFormat::ParseFromString(str, &config);
 
-  return std::make_shared<Configuration>(std::move(config), local_address, local_identifier);
+  return std::make_shared<Configuration>(std::move(config), local_address, local_id);
 }
 
 Configuration::Configuration(
     proto::Configuration&& config, 
     const std::string& local_address,
-    const proto::SlogIdentifier& local_identifier) 
-  : broker_port_(config.broker_port()),
+    const proto::SlogIdentifier& local_id) 
+  : protocol_(config.protocol()),
+    broker_port_(config.broker_port()),
+    num_replicas_(config.num_replicas()),
+    num_partitions_(config.num_partitions()),
     local_address_(local_address),
-    local_identifier_(local_identifier) {
+    local_id_(local_id) {
 
   for (int i = 0; i < config.addresses_size(); i++) {
     all_addresses_.push_back(config.addresses(i));
@@ -44,21 +47,33 @@ Configuration::Configuration(
       all_addresses_.end(), 
       local_address) != all_addresses_.end()) 
       << "Local machine ID is not present in the configuration";
-}
+  }
 
-uint32_t Configuration::GetBrokerPort() const {
-  return broker_port_;
+const string& Configuration::GetProtocol() const {
+  return protocol_;
 }
 
 const vector<string>& Configuration::GetAllAddresses() const {
   return all_addresses_;
 }
 
+uint32_t Configuration::GetNumReplicas() const {
+  return num_replicas_;
+}
+
+uint32_t Configuration::GetNumPartitions() const {
+  return num_partitions_;
+}
+
+uint32_t Configuration::GetBrokerPort() const {
+  return broker_port_;
+}
+
 const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
-const proto::SlogIdentifier& Configuration::GetLocalSlogIdentifier() const {
-  return local_identifier_;
+const proto::SlogIdentifier& Configuration::GetLocalSlogId() const {
+  return local_id_;
 }
 
 } // namespace slog

@@ -69,11 +69,11 @@ public:
    * Blocks until a message arrived at the channel.
    * Arguments:
    *  msg         - To be filled with the next message in the channel
-   *  timeout_us  - If no message is received by the channel in after timeout_us 
-   *                microseconds, the method returns with false.
+   *  timeout_ms  - If no message is received by the channel in after timeout_ms 
+   *                milliseconds, the method returns with false.
    * Returns true if a message is received, false if timed out.
    */
-  bool PollMessage(MMessage& msg, long timeout_us = -1);
+  bool PollMessage(MMessage& msg, long timeout_ms = -1);
 
   /**
    * Sends a message to this channel.
