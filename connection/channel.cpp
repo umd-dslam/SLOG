@@ -4,15 +4,15 @@ namespace slog {
 
 namespace {
 
-std::string MakeEndpoint(ChannelName name) {
-  return "inproc://channel_" + std::to_string((int)name);
+std::string MakeEndpoint(const std::string& name) {
+  return "inproc://" + name + ".ipc";
 }
 
 } // namespace 
 
 Channel::Channel(
     std::shared_ptr<zmq::context_t> context, 
-    ChannelName name) 
+    const std::string& name) 
   : context_(context),
     name_(name),
     socket_(*context, ZMQ_PAIR),
@@ -21,7 +21,7 @@ Channel::Channel(
   socket_.connect(endpoint);
 }
 
-ChannelName Channel::GetName() const {
+const std::string& Channel::GetName() const {
   return name_;
 }
 
@@ -53,7 +53,7 @@ ChannelListener* Channel::GetListener() {
 
 ChannelListener::ChannelListener(
     std::shared_ptr<zmq::context_t> context,
-    ChannelName name)
+    const std::string& name)
   : socket_(*context, ZMQ_PAIR) {
   auto endpoint = MakeEndpoint(name);
   socket_.bind(endpoint);

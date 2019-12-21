@@ -71,12 +71,16 @@ const string& MMessage::GetIdentity() const {
   return identity_;
 }
 
-void MMessage::SetChannel(ChannelName channel) {
-  channel_ = std::to_string(static_cast<size_t>(channel));
+void MMessage::SetChannel(const string& channel) {
+  channel_ = channel;
 }
 
-ChannelName MMessage::GetChannel() const {
-  return static_cast<ChannelName>(std::stoul(channel_));
+void MMessage::SetChannel(string&& channel) {
+  channel_ = std::move(channel);
+}
+
+const string& MMessage::GetChannel() const {
+  return channel_;
 }
 
 void MMessage::Send(zmq::socket_t& socket) const {

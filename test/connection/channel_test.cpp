@@ -13,7 +13,7 @@ protected:
 
   void SetUp() override {
     auto context = std::make_shared<zmq::context_t>(1);
-    channel_ = std::make_unique<Channel>(context, ChannelName::SERVER);
+    channel_ = std::make_unique<Channel>(context, "test_channel");
   }
 
   std::unique_ptr<Channel> channel_;

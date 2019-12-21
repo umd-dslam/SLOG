@@ -15,6 +15,10 @@ namespace slog {
 
 const long BROKER_POLL_TIMEOUT_MS = 1000;
 
+const std::string Broker::SERVER_CHANNEL = "server";
+const std::string Broker::SEQUENCER_CHANNEL = "sequencer";
+const std::string Broker::SCHEDULER_CHANNEL = "scheduler";
+
 Broker::Broker(
     std::shared_ptr<Configuration> config, 
     std::shared_ptr<zmq::context_t> context) 
@@ -30,13 +34,9 @@ Broker::Broker(
     address_to_socket_[addr] = std::move(socket);
   }
 
-  // Initialize all channels
-  for (
-      size_t c = 0; 
-      c < static_cast<size_t>(ChannelName::END); 
-      c++) {
-    channels_.emplace_back(new Channel(context, static_cast<ChannelName>(c)));
-  }
+  channels_[SERVER_CHANNEL] = std::make_unique<Channel>(context, SERVER_CHANNEL);
+  channels_[SEQUENCER_CHANNEL] = std::make_unique<Channel>(context, SEQUENCER_CHANNEL);
+  channels_[SCHEDULER_CHANNEL] = std::make_unique<Channel>(context, SCHEDULER_CHANNEL);
 
   thread_ = std::thread(&Broker::Run, this);
 }
@@ -46,8 +46,11 @@ Broker::~Broker() {
   thread_.join();
 }
 
-ChannelListener* Broker::GetChannelListener(ChannelName name) {
-  return channels_[static_cast<size_t>(name)]->GetListener();
+ChannelListener* Broker::GetChannelListener(const std::string& name) {
+  if (channels_.count(name) == 0) {
+    return nullptr;
+  }
+  return channels_[name]->GetListener();    
 }
 
 string Broker::MakeEndpoint(const string& addr) const {
@@ -161,8 +164,12 @@ void Broker::Run() {
   vector<zmq::pollitem_t> items;
   items.reserve(channels_.size() + 1);
 
-  for (const auto& channel : channels_) {
-    items.push_back(channel->GetPollItem());
+  vector<std::string> channel_names;
+  channel_names.reserve(channels_.size());
+
+  for (const auto& pair : channels_) {
+    items.push_back(pair.second->GetPollItem());
+    channel_names.push_back(pair.first);
   }
   // NOTE: always push this item at the end so that the channel indices
   // start from 0
@@ -178,24 +185,25 @@ void Broker::Run() {
       MMessage message(router_);
 
       // Broker the message to the target channel
-      auto target_channel = message.GetChannel();
-      if (target_channel == ChannelName::END) {
-        LOG(ERROR) << "Invalid channel \"END\". Dropping the message";
+      const auto& target_channel = message.GetChannel();
+      if (channels_.count(target_channel) == 0) {
+        LOG(ERROR) << "Unknown channel: \"" << target_channel 
+                   << "\". Dropping the message";
       } else {
         // Translate connection id to slog id (replica, partition) 
         // before sending to the channel
         const auto& conn_id = message.GetIdentity();
         message.SetIdentity(connection_id_to_slog_id_[conn_id]);
-        auto& channel = channels_[static_cast<size_t>(target_channel)];
-        channel->SendToListener(message);
+        channels_[target_channel]->SendToListener(message);
       }
     }
 
-    for (size_t c = 0; c < items.size() - 1; c++) {
+    for (size_t i = 0; i < items.size() - 1; i++) {
       // A channel sent a message. Pass this message to the router to send it out.
-      if (items[c].revents & ZMQ_POLLIN) {
+      if (items[i].revents & ZMQ_POLLIN) {
+        const auto& name = channel_names[i];
         MMessage message;
-        channels_[c]->ReceiveFromListener(message);
+        channels_[name]->ReceiveFromListener(message);
 
         // Remove the identity part of the message before sending out to a DEALER socket
         const auto& slog_id = message.GetIdentity();

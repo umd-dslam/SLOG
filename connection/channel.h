@@ -3,7 +3,6 @@
 #include <zmq.hpp>
 
 #include "common/mmessage.h"
-#include "common/types.h"
 
 namespace slog {
 
@@ -17,14 +16,14 @@ class ChannelListener;
  */
 class Channel {
 public:
-  Channel(std::shared_ptr<zmq::context_t> context, ChannelName name);
+  Channel(std::shared_ptr<zmq::context_t> context, const std::string& name);
   Channel(const Channel&) = delete;
   Channel& operator=(const Channel&) = delete;
 
   /**
    * Returns the name of current channel
    */
-  ChannelName GetName() const;
+  const std::string& GetName() const;
 
   /**
    * Returns a zmq pollitem data structure for this channel. This method is
@@ -53,7 +52,7 @@ public:
 
 private:
   std::shared_ptr<zmq::context_t> context_;
-  ChannelName name_;
+  const std::string name_;
   zmq::socket_t socket_;
   std::atomic<bool> listener_created_;
 };
@@ -64,7 +63,7 @@ private:
  */
 class ChannelListener {
 public:
-  ChannelListener(std::shared_ptr<zmq::context_t> context, ChannelName name);
+  ChannelListener(std::shared_ptr<zmq::context_t> context, const std::string& name);
 
   /**
    * Blocks until a message arrived at the channel.

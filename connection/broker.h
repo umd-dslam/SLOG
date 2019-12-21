@@ -6,7 +6,6 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
-#include "common/types.h"
 #include "connection/channel.h"
 
 using std::shared_ptr;
@@ -47,12 +46,17 @@ namespace slog {
  */
 class Broker {
 public:
+  // TODO: Use enum for channel identification
+  static const std::string SERVER_CHANNEL;
+  static const std::string SEQUENCER_CHANNEL;
+  static const std::string SCHEDULER_CHANNEL;
+
   Broker(
       shared_ptr<Configuration> config, 
       shared_ptr<zmq::context_t> context);
   ~Broker();
 
-  ChannelListener* GetChannelListener(ChannelName name);
+  ChannelListener* GetChannelListener(const string& name);
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -76,7 +80,7 @@ private:
   std::thread thread_;
 
   // Map from channel name to the channel
-  vector<unique_ptr<Channel>> channels_;
+  unordered_map<string, unique_ptr<Channel>> channels_;
   // Map from ip addresses to sockets
   unordered_map<string, unique_ptr<zmq::socket_t>> address_to_socket_;
 
