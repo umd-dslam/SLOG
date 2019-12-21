@@ -18,7 +18,7 @@ using std::vector;
 namespace slog {
 
 /**
- * A Broker plays the role of distributing messages in and out of a machine.
+ * A Broker distributes messages in and out of a machine.
  * It runs its own thread with the components depicted below
  * 
  *                   -----------------------
@@ -33,8 +33,8 @@ namespace slog {
  *                   |                   ...
  *                   -----------------------
  * 
- * To receive messages from the outside, it uses a ZMQ_ROUTER socket, which automatically
- * prepend a connection identity to the arriving zmq message. Using this identity, it can
+ * To receive messages from other machines, it uses a ZMQ_ROUTER socket, which automatically
+ * prepends a connection identity to an arriving zmq message. Using this identity, it can
  * tell where the message comes from.
  * 
  * The messages going into the system via the router will be broker to the channel
@@ -58,7 +58,7 @@ private:
   string MakeEndpoint(const string& addr = "") const;
 
   /**
-   * All brokers only start working after every other broker is up and send a READY
+   * A broker only starts working after every other broker is up and send a READY
    * message to everyone. There is one caveat: if after the synchronization happens, 
    * a machine goes down, and restarts, that machine cannot join anymore since the
    * READY messages are only sent once in the beginning. 
