@@ -46,7 +46,6 @@ namespace slog {
  */
 class Broker {
 public:
-  // TODO: Use enum for channel identification
   static const std::string SERVER_CHANNEL;
   static const std::string SEQUENCER_CHANNEL;
   static const std::string SCHEDULER_CHANNEL;
@@ -56,7 +55,9 @@ public:
       shared_ptr<zmq::context_t> context);
   ~Broker();
 
-  ChannelListener* GetChannelListener(const string& name);
+  void Start();
+
+  ChannelListener* AddChannel(const string& name);
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -74,6 +75,7 @@ private:
   void Run();
 
   shared_ptr<Configuration> config_;
+  shared_ptr<zmq::context_t> context_;
   zmq::socket_t router_;
   std::atomic<bool> running_;
 

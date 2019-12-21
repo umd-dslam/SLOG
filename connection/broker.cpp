@@ -20,11 +20,12 @@ const std::string Broker::SEQUENCER_CHANNEL = "sequencer";
 const std::string Broker::SCHEDULER_CHANNEL = "scheduler";
 
 Broker::Broker(
-    std::shared_ptr<Configuration> config, 
-    std::shared_ptr<zmq::context_t> context) 
+    shared_ptr<Configuration> config, 
+    shared_ptr<zmq::context_t> context) 
   : config_(config),
+    context_(context),
     router_(*context, ZMQ_ROUTER),
-    running_(true) {
+    running_(false) {
   // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
   // Otherwise, it would hang indefinitely until the messages are sent.
   router_.setsockopt(ZMQ_LINGER, 0);
@@ -33,12 +34,6 @@ Broker::Broker(
     socket->setsockopt(ZMQ_LINGER, 0);
     address_to_socket_[addr] = std::move(socket);
   }
-
-  channels_[SERVER_CHANNEL] = std::make_unique<Channel>(context, SERVER_CHANNEL);
-  channels_[SEQUENCER_CHANNEL] = std::make_unique<Channel>(context, SEQUENCER_CHANNEL);
-  channels_[SCHEDULER_CHANNEL] = std::make_unique<Channel>(context, SCHEDULER_CHANNEL);
-
-  thread_ = std::thread(&Broker::Run, this);
 }
 
 Broker::~Broker() {
@@ -46,11 +41,17 @@ Broker::~Broker() {
   thread_.join();
 }
 
-ChannelListener* Broker::GetChannelListener(const std::string& name) {
-  if (channels_.count(name) == 0) {
-    return nullptr;
-  }
-  return channels_[name]->GetListener();    
+void Broker::Start() {
+  running_ = true;
+  thread_ = std::thread(&Broker::Run, this);
+}
+
+ChannelListener* Broker::AddChannel(const std::string& name) {
+  CHECK(!running_) << "Cannot add new channel. The broker has already been running";
+  CHECK(channels_.count(name) == 0) << "Channel \"" << name << "\" already exists";
+
+  channels_[name] = std::make_unique<Channel>(context_, SERVER_CHANNEL);
+  return channels_[name]->GetListener();
 }
 
 string Broker::MakeEndpoint(const string& addr) const {

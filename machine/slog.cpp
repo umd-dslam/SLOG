@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
   auto context = std::make_shared<zmq::context_t>(1);
 
   Broker broker(config, context);
-
+  broker.Start();
   LOG(INFO) << "Broker started";
   
   while (true) {}

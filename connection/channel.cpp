@@ -1,5 +1,7 @@
 #include "connection/channel.h"
 
+#include <glog/logging.h>
+
 namespace slog {
 
 namespace {
@@ -43,9 +45,8 @@ void Channel::ReceiveFromListener(MMessage& msg) {
 }
 
 ChannelListener* Channel::GetListener() {
-  if (listener_created_) {
-    throw std::runtime_error("Listener has already been created");
-  }
+  CHECK(!listener_created_) << "Listener of channel \"" << name_ 
+                            << "\" has already been created";
   listener_created_ = true;
   return new ChannelListener(context_, name_);
 }

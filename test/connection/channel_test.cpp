@@ -56,8 +56,3 @@ TEST_F(ChannelTest, SendToChannel) {
 
   th.join();
 }
-
-TEST_F(ChannelTest, CannotCreateListenerTwice) {
-  std::unique_ptr<ChannelListener> listener(channel_->GetListener());
-  ASSERT_THROW(channel_->GetListener(), std::runtime_error);
-}
