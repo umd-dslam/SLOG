@@ -67,16 +67,16 @@ public:
 
   /**
    * Blocks until a message arrived at the channel.
-   * Arguments:
-   *  msg         - To be filled with the next message in the channel
-   *  timeout_ms  - If no message is received by the channel in after timeout_ms 
-   *                milliseconds, the method returns with false.
-   * Returns true if a message is received, false if timed out.
+   * @param msg To be filled with the next message in the channel
+   * @param timeout_ms If no message is received by the channel in after timeout_ms 
+   * milliseconds, the method returns with false.
+   * @return true if a message is received, false if timed out.
    */
   bool PollMessage(MMessage& msg, long timeout_ms = -1);
 
   /**
    * Sends a message to this channel.
+   * @param msg Message to be sent
    */
   void SendMessage(const MMessage& msg);
 

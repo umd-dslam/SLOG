@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "common/configuration.h"
+#include "common/proto_utils.h"
 #include "common/test_utils.h"
 #include "connection/broker.h"
 #include "proto/config.pb.h"
@@ -63,14 +64,15 @@ TEST(BrokerTest, PingPong) {
     // Send ping
     MMessage msg(MakeEchoRequest("ping"));
     msg.SetChannel(Broker::SCHEDULER_CHANNEL);
-    msg.SetIdentity(0, 1);
+    msg.SetIdentity(
+        MakeSlogIdentifier(0, 1).SerializeAsString());
     channel->SendMessage(std::move(msg));
 
     // Wait for pong
     ASSERT_TRUE(channel->PollMessage(msg, 2000));
     proto::Response res;
     ASSERT_TRUE(msg.ToResponse(res));
-    ASSERT_EQ("pong", res.echo().data());
+    ASSERT_EQ("pong", res.echo_res().data());
   });
 
   auto receiver = thread([&configs]() {
@@ -86,11 +88,11 @@ TEST(BrokerTest, PingPong) {
     ASSERT_TRUE(channel->PollMessage(msg, 2000));
     proto::Request req;
     ASSERT_TRUE(msg.ToRequest(req));
-    ASSERT_EQ("ping", req.echo().data());
+    ASSERT_EQ("ping", req.echo_req().data());
 
     // Send pong
     proto::Response res;
-    res.mutable_echo()->set_data("pong");
+    res.mutable_echo_res()->set_data("pong");
     msg.SetChannel(Broker::SEQUENCER_CHANNEL);
     msg.SetResponse(res);
     channel->SendMessage(msg);

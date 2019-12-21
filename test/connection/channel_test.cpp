@@ -26,7 +26,7 @@ TEST_F(ChannelTest, ListenToChannel) {
     listener->PollMessage(message);
     proto::Request req;
     ASSERT_TRUE(message.ToRequest(req));
-    ASSERT_EQ("test", req.echo().data());
+    ASSERT_EQ("test", req.echo_req().data());
   });
 
   MMessage message(MakeEchoRequest("test"));
@@ -52,7 +52,7 @@ TEST_F(ChannelTest, SendToChannel) {
   channel_->ReceiveFromListener(message);
   proto::Response res;
   ASSERT_TRUE(message.ToResponse(res));
-  ASSERT_EQ("test", res.echo().data());
+  ASSERT_EQ("test", res.echo_res().data());
 
   th.join();
 }

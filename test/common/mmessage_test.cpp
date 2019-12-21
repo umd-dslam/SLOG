@@ -17,8 +17,8 @@ TEST(MMessageTest, FromAndToRequestProto) {
   proto::Response response;
   ASSERT_FALSE(message.ToResponse(response));
 
-  ASSERT_TRUE(request.has_echo());
-  auto echo = request.echo();
+  ASSERT_TRUE(request.has_echo_req());
+  auto echo = request.echo_req();
   ASSERT_EQ(TEST_STRING, echo.data());
 }
 
@@ -32,8 +32,8 @@ TEST(MMessageTest, FromAndToResponseProto) {
   proto::Request request;
   ASSERT_FALSE(message.ToRequest(request));
 
-  ASSERT_TRUE(response.has_echo());
-  auto echo = response.echo();
+  ASSERT_TRUE(response.has_echo_res());
+  auto echo = response.echo_res();
   ASSERT_EQ(TEST_STRING, echo.data());
 }
 
@@ -51,7 +51,7 @@ TEST(MMessageTest, SendAndReceive) {
 
   proto::Request request;
   ASSERT_TRUE(recv_msg.ToRequest(request));
-  ASSERT_TRUE(request.has_echo());
-  auto echo = request.echo();
+  ASSERT_TRUE(request.has_echo_req());
+  auto echo = request.echo_req();
   ASSERT_EQ(TEST_STRING, echo.data());
 }

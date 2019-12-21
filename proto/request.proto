@@ -1,13 +1,16 @@
 syntax = "proto3";
 
-import "slog_identifier.proto"; 
+import "slog_identifier.proto";
+import "transaction.proto";
 
 package slog.proto;
 
 message Request {
+    uint32 stream_id = 1;
     oneof type {
-        EchoRequest echo = 1;
-        ReadyRequest ready = 2;
+        EchoRequest echo_req = 2;
+        ReadyRequest ready_req = 3;
+        TransactionRequest txn_req = 4;
     }
 }
 
@@ -21,3 +24,6 @@ message ReadyRequest {
     SlogIdentifier slog_id = 2;
 }
 
+message TransactionRequest {
+    Transaction txn = 1;
+}

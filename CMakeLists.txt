@@ -35,16 +35,18 @@ include_directories(${CMAKE_BINARY_DIR})
 # ================================== Server =============================================
 
 # Proto needs to be added before everything else so that protobuf gets to generate files
-# needed in subsequent modules
+# needed in subsequent libraries
 add_subdirectory(proto)
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(storage)
+add_subdirectory(module)
 set(SLOG_LIBS
   connection
   common
   proto
-  storage)
+  storage
+  module)
 
 # All libraries to be linked to executables
 set(ALL_LIBRARIES
@@ -55,8 +57,8 @@ set(ALL_LIBRARIES
     ${GLOG_LIBRARIES}
     ${GFLAGS_LIBRARIES})
 
-# Create an executable for the server
-add_executable(slog machine/slog.cpp)
+# Create an executable for the service
+add_executable(slog service/slog.cpp)
 target_link_libraries(slog ${ALL_LIBRARIES})
 
 # =================================== Tests =============================================

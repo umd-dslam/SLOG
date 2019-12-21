@@ -5,8 +5,7 @@
 
 #include "common/configuration.h"
 #include "connection/broker.h"
-#include "machine/client.h"
-#include "machine/server.h"
+#include "module/server.h"
 #include "proto/slog_identifier.pb.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");

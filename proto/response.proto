@@ -1,13 +1,22 @@
 syntax = "proto3";
+
+import "transaction.proto";
+
 package slog.proto;
 
 message Response {
+    uint32 stream_id = 1;
     oneof type {
-        EchoResponse echo = 1; 
+        EchoResponse echo_res = 2;
+        TransactionResponse txn_res = 3;
     }
 }
 
 // For debugging and testing purposes
 message EchoResponse {
     bytes data = 1;
+}
+
+message TransactionResponse {
+    Transaction txn = 1;
 }

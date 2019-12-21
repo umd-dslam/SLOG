@@ -12,7 +12,9 @@ using std::pair;
 using std::unordered_set;
 namespace slog {
 
+namespace {
 const long BROKER_POLL_TIMEOUT_MS = 1000;
+}
 
 const std::string Broker::SERVER_CHANNEL = "server";
 const std::string Broker::SEQUENCER_CHANNEL = "sequencer";
@@ -80,7 +82,7 @@ bool Broker::InitializeConnection() {
 
   // Prepare a READY message
   proto::Request request;
-  auto ready = request.mutable_ready();
+  auto ready = request.mutable_ready_req();
   ready->set_ip_address(config_->GetLocalAddress());
   *ready->mutable_slog_id() = config_->GetLocalSlogId();
   MMessage ready_msg(request);
@@ -121,13 +123,13 @@ bool Broker::InitializeConnection() {
       }
       
       // The request message must be READY
-      if (!request.has_ready()) {
+      if (!request.has_ready_req()) {
         continue;
       }
 
       // Use the information in each READY message to build up the translation maps
       const auto& conn_id = ready_msg.GetIdentity();
-      const auto& ready = request.ready();
+      const auto& ready = request.ready_req();
       const auto& addr = ready.ip_address();
       const auto& slog_id = ready.slog_id();
       auto slog_id_str = slog_id.SerializeAsString();

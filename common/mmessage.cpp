@@ -51,14 +51,6 @@ void MMessage::SetIdentity(string&& identity) {
   has_identity_ = true;
 }
 
-void MMessage::SetIdentity(uint32_t replica, uint32_t partition) {
-  proto::SlogIdentifier slog_id;
-  slog_id.set_replica(replica);
-  slog_id.set_partition(partition);
-  slog_id.SerializeToString(&identity_);
-  has_identity_ = true;
-}
-
 void MMessage::RemoveIdentity() {
   identity_ = "";
   has_identity_ = false;
@@ -147,6 +139,10 @@ bool MMessage::ToResponse(proto::Response& response) const {
     return false;
   }
   return response.ParseFromString(body_);
+}
+
+bool MMessage::IsResponse() const {
+  return is_response_;
 }
 
 void MMessage::Clear() {
