@@ -83,7 +83,7 @@ else
   mkdir -p $DOWNLOAD_DIR
   cd $DOWNLOAD_DIR
   echo "Downloading glog"
-  wget https://github.com/google/glog/archive/v0.4.0.tar.gz
+  wget -nc https://github.com/google/glog/archive/v0.4.0.tar.gz
   tar -xzf v0.4.0.tar.gz
   rm -r v0.4.0.tar.gz
 
@@ -96,4 +96,27 @@ else
 
   cd ..
   rm -rf $DOWNLOAD_DIR
+fi
+
+if [ -n "$(find $INSTALL_PREFIX -name 'libgflags*')" ]; then
+  echo "Found gflags. Skipping installation."
+else
+    mkdir -p $DOWNLOAD_DIR
+    cd $DOWNLOAD_DIR
+    echo "Downloading gflags"
+    wget -nc https://github.com/gflags/gflags/archive/v2.2.2.tar.gz
+    tar -xzf v2.2.2.tar.gz
+    rm -r v2.2.2.tar.gz
+
+    echo "Installing gflags"
+    cd gflags-2.2.2
+    mkdir -p build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX ..
+    make -j$(nproc) install
+    cd ..
+    cd ..
+
+    cd ..
+    rm -rf $DOWNLOAD_DIR
 fi
