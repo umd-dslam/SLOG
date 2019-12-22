@@ -43,23 +43,13 @@ MMessage::MMessage(zmq::socket_t& socket) {
 
 void MMessage::SetIdentity(const string& identity) {
   identity_ = identity;
-  has_identity_ = true;
 }
 
 void MMessage::SetIdentity(string&& identity) {
   identity_ = std::move(identity);
-  has_identity_ = true;
-}
-
-void MMessage::RemoveIdentity() {
-  identity_ = "";
-  has_identity_ = false;
 }
 
 const string& MMessage::GetIdentity() const {
-  if (!has_identity_) {
-    throw std::runtime_error("No identity set");
-  }
   return identity_;
 }
 
@@ -76,7 +66,7 @@ const string& MMessage::GetChannel() const {
 }
 
 void MMessage::Send(zmq::socket_t& socket) const {
-  if (has_identity_) {
+  if (!identity_.empty()) {
     SendSingleMessage(socket, identity_, true);
   }
   SendSingleMessage(socket, "", true);
@@ -88,24 +78,24 @@ void MMessage::Send(zmq::socket_t& socket) const {
 void MMessage::Receive(zmq::socket_t& socket) {
   Clear();
 
-  string dummy;
-  bool more;
+  string tmp;
 
-  has_identity_ = true;
   if (!ReceiveSingleMessage(identity_, socket)) {
     return;
   }
-  // Empty delimiter
-  if (!ReceiveSingleMessage(dummy, socket)) {
-    return;
+  if (!identity_.empty()) {
+    // Empty delimiter
+    if (!ReceiveSingleMessage(tmp, socket)) {
+      return;
+    }
   }
   
   if (!ReceiveSingleMessage(channel_, socket)) {
     return;
   }
 
-  more = ReceiveSingleMessage(dummy, socket);
-  is_response_ = dummy == "1";
+  bool more = ReceiveSingleMessage(tmp, socket);
+  is_response_ = tmp == "1";
   if (!more) { return; }
 
   if (!ReceiveSingleMessage(body_, socket)) {
@@ -113,7 +103,7 @@ void MMessage::Receive(zmq::socket_t& socket) {
   }
 
   // Ignore the rest, if any
-  while (ReceiveSingleMessage(dummy, socket)) {}
+  while (ReceiveSingleMessage(tmp, socket)) {}
 }
 
 void MMessage::FromRequest(const proto::Request& request) {
@@ -147,7 +137,6 @@ bool MMessage::IsResponse() const {
 
 void MMessage::Clear() {
   identity_.clear();
-  has_identity_ = false;
   is_response_ = false;
   body_.clear();
 }

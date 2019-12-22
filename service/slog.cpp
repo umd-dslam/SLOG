@@ -3,6 +3,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "common/proto_utils.h"
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "module/server.h"
@@ -24,9 +25,7 @@ int main(int argc, char* argv[]) {
   // compatible with the version of the headers we compiled against
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  proto::SlogIdentifier slog_id;
-  slog_id.set_replica(FLAGS_replica);
-  slog_id.set_partition(FLAGS_partition);
+  auto slog_id = MakeSlogId(FLAGS_replica, FLAGS_partition);
   auto config = Configuration::FromFile(
       "slog.conf", 
       FLAGS_address,

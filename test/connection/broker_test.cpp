@@ -32,17 +32,14 @@ ConfigVec MakeTestConfigurations(
   ConfigVec configs;
   configs.reserve(num_machines);
 
-  proto::SlogIdentifier slog_id;
   for (int rep = 0; rep < num_replicas; rep++) {
     for (int part = 0; part < num_partitions; part++) {
       int i = rep * num_partitions + part;
-      slog_id.set_replica(rep);
-      slog_id.set_partition(part);
       string local_addr = addr + to_string(i);
       configs.push_back(make_shared<Configuration>(
           common_config,
           local_addr,
-          slog_id));
+          MakeSlogId(rep, part)));
     }
   }
   
@@ -65,7 +62,7 @@ TEST(BrokerTest, PingPong) {
     MMessage msg(MakeEchoRequest("ping"));
     msg.SetChannel(Broker::SCHEDULER_CHANNEL);
     msg.SetIdentity(
-        MakeSlogIdentifier(0, 1).SerializeAsString());
+        SlogIdToString(MakeSlogId(0, 1)));
     channel->SendMessage(std::move(msg));
 
     // Wait for pong

@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 
 #include "common/mmessage.h"
+#include "common/proto_utils.h"
 #include "proto/request.pb.h"
 
 using std::pair;
@@ -103,10 +104,8 @@ bool Broker::InitializeConnection() {
   unordered_set<string> needed_slog_ids;
   for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
     for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-      proto::SlogIdentifier slog_id;
-      slog_id.set_replica(rep);
-      slog_id.set_partition(part);
-      needed_slog_ids.insert(slog_id.SerializeAsString());
+      auto slog_id = MakeSlogId(rep, part);
+      needed_slog_ids.insert(SlogIdToString(slog_id));
     }
   }
 
@@ -132,7 +131,7 @@ bool Broker::InitializeConnection() {
       const auto& ready = request.ready_req();
       const auto& addr = ready.ip_address();
       const auto& slog_id = ready.slog_id();
-      auto slog_id_str = slog_id.SerializeAsString();
+      auto slog_id_str = SlogIdToString(slog_id);
 
       if (needed_slog_ids.count(slog_id_str) == 0) {
         continue;
@@ -210,7 +209,7 @@ void Broker::Run() {
         // Remove the identity part of the message before sending out to a DEALER socket
         const auto& slog_id = message.GetIdentity();
         const auto& addr = slog_id_to_address_[slog_id];
-        message.RemoveIdentity();
+        message.SetIdentity("");
         message.Send(*address_to_socket_[addr]);
       }
     }

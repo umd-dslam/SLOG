@@ -24,7 +24,6 @@ public:
 
   void SetIdentity(const string& identity);
   void SetIdentity(string&& identity);
-  void RemoveIdentity();
   const string& GetIdentity() const;
 
   void SetChannel(const string& channel);
@@ -49,8 +48,6 @@ private:
   string channel_;
   bool is_response_;
   string body_;
-
-  bool has_identity_;
 };
 
 } // namespace slog
