@@ -44,6 +44,9 @@ Broker::~Broker() {
 }
 
 void Broker::Start() {
+  if (running_) {
+    return;
+  }
   running_ = true;
   thread_ = std::thread(&Broker::Run, this);
 }
@@ -52,7 +55,7 @@ ChannelListener* Broker::AddChannel(const std::string& name) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
   CHECK(channels_.count(name) == 0) << "Channel \"" << name << "\" already exists";
 
-  channels_[name] = std::make_unique<Channel>(context_, SERVER_CHANNEL);
+  channels_[name] = std::make_unique<Channel>(context_, name);
   return channels_[name]->GetListener();
 }
 
@@ -143,6 +146,9 @@ bool Broker::InitializeConnection() {
 
       slog_id_to_address_[slog_id_str] = addr;
       connection_id_to_slog_id_[conn_id] = slog_id_str;
+      if (slog_id_str == SlogIdToString(config_->GetLocalSlogId())) {
+        loopback_connection_id_ = conn_id;
+      }
 
       needed_slog_ids.erase(slog_id_str);
     }
@@ -185,18 +191,15 @@ void Broker::Run() {
 
       MMessage message(router_);
 
-      // Broker the message to the target channel
-      const auto& target_channel = message.GetChannel();
-      if (channels_.count(target_channel) == 0) {
-        LOG(ERROR) << "Unknown channel: \"" << target_channel 
-                   << "\". Dropping the message";
+      // Translate connection id to slog id (replica, partition) 
+      // before sending to the channel
+      const auto& conn_id = message.GetIdentity();
+      if (conn_id == loopback_connection_id_) {
+        message.SetIdentity("");
       } else {
-        // Translate connection id to slog id (replica, partition) 
-        // before sending to the channel
-        const auto& conn_id = message.GetIdentity();
         message.SetIdentity(connection_id_to_slog_id_[conn_id]);
-        channels_[target_channel]->SendToListener(message);
       }
+      SendToTargetChannel(message);
     }
 
     for (size_t i = 0; i < items.size() - 1; i++) {
@@ -206,14 +209,33 @@ void Broker::Run() {
         MMessage message;
         channels_[name]->ReceiveFromListener(message);
 
-        // Remove the identity part of the message before sending out to a DEALER socket
-        const auto& slog_id = message.GetIdentity();
-        const auto& addr = slog_id_to_address_[slog_id];
-        message.SetIdentity("");
-        message.Send(*address_to_socket_[addr]);
+        // If a message has an identity, it is sent out to the DEALER socket
+        // corresponding to the identity. Otherwise, it is routed to another
+        // channel on the same machine.
+        if (message.HasIdentity()) {
+          // Remove the identity part of the message before sending 
+          // out to a DEALER socket
+          const auto& slog_id = message.GetIdentity();
+          const auto& addr = slog_id_to_address_[slog_id];
+          message.SetIdentity("");
+          message.Send(*address_to_socket_[addr]);
+        } else {
+          SendToTargetChannel(message);
+        }
       }
     }
+
+  } // while-loop
+}
+
+void Broker::SendToTargetChannel(const MMessage& msg) {
+  const auto& target_channel = msg.GetChannel();
+  if (channels_.count(target_channel) == 0) {
+    LOG(ERROR) << "Unknown channel: \"" << target_channel << "\". Dropping message";
+  } else {
+    channels_[target_channel]->SendToListener(msg);
   }
 }
+
 
 } // namespace slog

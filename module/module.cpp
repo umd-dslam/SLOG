@@ -16,11 +16,17 @@ Module::~Module() {
 }
 
 std::thread Module::StartInNewThread() {
+  if (running_) {
+    throw std::runtime_error("The module has already started");
+  }
   running_ = true;
   return std::thread(&Module::Run, this);
 }
 
 void Module::Start() {
+  if (running_) {
+    return;
+  }
   running_ = true;
   Run();
 }

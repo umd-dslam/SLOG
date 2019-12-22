@@ -53,6 +53,10 @@ const string& MMessage::GetIdentity() const {
   return identity_;
 }
 
+bool MMessage::HasIdentity() const {
+  return !identity_.empty();
+}
+
 void MMessage::SetChannel(const string& channel) {
   channel_ = channel;
 }

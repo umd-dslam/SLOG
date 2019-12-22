@@ -74,6 +74,8 @@ private:
   
   void Run();
 
+  void SendToTargetChannel(const MMessage& msg);
+
   shared_ptr<Configuration> config_;
   shared_ptr<zmq::context_t> context_;
   zmq::socket_t router_;
@@ -89,6 +91,9 @@ private:
   // Map from connection ids (zmq identities) to serialized-to-string SlogIdentifiers
   // Used to translate the identities of incoming messages
   unordered_map<string, string> connection_id_to_slog_id_;
+  // Cache this to detect that a message comes from the local machine (loop-back)
+  std::string loopback_connection_id_;
+
   // Map from serialized-to-string SlogIdentifiers to IP addresses
   // Used to translate the identities of outgoing messages
   unordered_map<string, string> slog_id_to_address_;

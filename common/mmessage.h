@@ -25,6 +25,7 @@ public:
   void SetIdentity(const string& identity);
   void SetIdentity(string&& identity);
   const string& GetIdentity() const;
+  bool HasIdentity() const;
 
   void SetChannel(const string& channel);
   void SetChannel(string&& channel);
