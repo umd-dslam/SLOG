@@ -13,8 +13,11 @@ using std::string;
 namespace slog {
 
 /**
- * Encapsulates a multi-part zmq message. 
- * [identity of connection][empty frame][is response or not][body]
+ * Encapsulates a multi-part zmq message:
+ * 
+ * [source id][empty frame][channel][body]
+ * 
+ * Source id (called 'identity' in ZMQ) is optional
  */
 class MMessage {
 public:
