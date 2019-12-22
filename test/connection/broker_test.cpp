@@ -62,8 +62,9 @@ TEST(BrokerTest, PingPong) {
     broker.Start();
 
     // Send ping
-    MMessage msg(MakeEchoRequest("ping"));
-    msg.SetChannel(RECEIVER);
+    MMessage msg;
+    msg.Add(MakeEchoRequest("ping"));
+    msg.Add(RECEIVER);
     msg.SetIdentity(
         SlogIdToString(MakeSlogId(0, 1)));
     channel->SendMessage(std::move(msg));
@@ -71,7 +72,7 @@ TEST(BrokerTest, PingPong) {
     // Wait for pong
     ASSERT_TRUE(channel->PollMessage(msg, 2000));
     proto::Response res;
-    ASSERT_TRUE(msg.ToResponse(res));
+    ASSERT_TRUE(msg.GetProto(res));
     ASSERT_EQ("pong", res.echo_res().data());
   });
 
@@ -87,14 +88,14 @@ TEST(BrokerTest, PingPong) {
     MMessage msg;
     ASSERT_TRUE(channel->PollMessage(msg, 2000));
     proto::Request req;
-    ASSERT_TRUE(msg.ToRequest(req));
+    ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ("ping", req.echo_req().data());
 
     // Send pong
     proto::Response res;
     res.mutable_echo_res()->set_data("pong");
-    msg.SetChannel(SENDER);
-    msg.SetResponse(res);
+    msg.Set(0, res);
+    msg.Set(1, SENDER);
     channel->SendMessage(msg);
 
     this_thread::sleep_for(1s);
@@ -116,14 +117,15 @@ TEST(BrokerTest, InterchannelPingPong) {
     unique_ptr<ChannelListener> channel(listener);
 
     // Send ping
-    MMessage msg(MakeEchoRequest("ping"));
-    msg.SetChannel(RECEIVER);
+    MMessage msg;
+    msg.Add(MakeEchoRequest("ping"));
+    msg.Add(RECEIVER);
     channel->SendMessage(std::move(msg));
 
     // Wait for pong
     ASSERT_TRUE(channel->PollMessage(msg));
     proto::Response res;
-    ASSERT_TRUE(msg.ToResponse(res));
+    ASSERT_TRUE(msg.GetProto(res));
     ASSERT_EQ("pong", res.echo_res().data());
   };
 
@@ -134,15 +136,15 @@ TEST(BrokerTest, InterchannelPingPong) {
     MMessage msg;
     ASSERT_TRUE(channel->PollMessage(msg));
     proto::Request req;
-    ASSERT_TRUE(msg.ToRequest(req));
+    ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ("ping", req.echo_req().data());
 
     // Send pong
     proto::Response res;
     res.mutable_echo_res()->set_data("pong");
     msg.SetIdentity("");
-    msg.SetChannel(SENDER);
-    msg.SetResponse(res);
+    msg.Set(0, res);
+    msg.Set(1, SENDER);
     channel->SendMessage(msg);
 
     this_thread::sleep_for(1s);

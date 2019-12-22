@@ -33,10 +33,6 @@ bool ReceiveSingleMessage(
 
 } // namespace
 
-MMessage::MMessage(const proto::Request& request) {
-  FromRequest(request);
-}
-
 MMessage::MMessage(zmq::socket_t& socket) {
   Receive(socket);
 }
@@ -57,16 +53,44 @@ bool MMessage::HasIdentity() const {
   return !identity_.empty();
 }
 
-void MMessage::SetChannel(const string& channel) {
-  channel_ = channel;
+void MMessage::Add(const MessageLite& data) {
+  string buf;
+  data.SerializeToString(&buf);
+  body_.push_back(std::move(buf));
 }
 
-void MMessage::SetChannel(string&& channel) {
-  channel_ = std::move(channel);
+void MMessage::Add(const string& data) {
+  body_.push_back(data);
 }
 
-const string& MMessage::GetChannel() const {
-  return channel_;
+void MMessage::Add(string&& data) {
+  body_.push_back(std::move(data));
+}
+
+void MMessage::Set(size_t index, const MessageLite& data) {
+  CHECK(index < body_.size()) << "Index out of bound";
+  string buf;
+  data.SerializeToString(&buf);
+  body_[index] = std::move(buf);
+}
+
+void MMessage::Set(size_t index, const string& data) {
+  body_[index] = data;
+}
+
+void MMessage::Set(size_t index, string&& data) {
+  body_[index] = std::move(data);
+}
+
+bool MMessage::GetProto(MessageLite& out, size_t index) const {
+  CHECK(index < body_.size()) << "Index out of bound";
+  return out.ParseFromString(body_[index]);
+}
+
+bool MMessage::GetString(string& out, size_t index) const {
+  CHECK(index < body_.size()) << "Index out of bound";
+  out = body_[index];
+  return true;
 }
 
 void MMessage::Send(zmq::socket_t& socket) const {
@@ -74,9 +98,11 @@ void MMessage::Send(zmq::socket_t& socket) const {
     SendSingleMessage(socket, identity_, true);
   }
   SendSingleMessage(socket, "", true);
-  SendSingleMessage(socket, channel_, true);
-  SendSingleMessage(socket, std::to_string((int)is_response_), true);
-  SendSingleMessage(socket, body_, false);
+  size_t remaining = body_.size();
+  for (const auto& part : body_) {
+    SendSingleMessage(socket, part, remaining - 1 > 0);
+    remaining--;
+  }
 }
 
 void MMessage::Receive(zmq::socket_t& socket) {
@@ -93,55 +119,16 @@ void MMessage::Receive(zmq::socket_t& socket) {
       return;
     }
   }
-  
-  if (!ReceiveSingleMessage(channel_, socket)) {
-    return;
-  }
 
-  bool more = ReceiveSingleMessage(tmp, socket);
-  is_response_ = tmp == "1";
-  if (!more) { return; }
-
-  if (!ReceiveSingleMessage(body_, socket)) {
-    return;
-  }
-
-  // Ignore the rest, if any
-  while (ReceiveSingleMessage(tmp, socket)) {}
-}
-
-void MMessage::FromRequest(const proto::Request& request) {
-  Clear();
-  is_response_ = false;
-  request.SerializeToString(&body_);
-}
-
-bool MMessage::ToRequest(proto::Request& request) const {
-  if (is_response_ || body_.empty()) {
-    return false;
-  }
-  return request.ParseFromString(body_);
-}
-
-void MMessage::SetResponse(const proto::Response& response) {
-  is_response_ = true;
-  response.SerializeToString(&body_);
-}
-
-bool MMessage::ToResponse(proto::Response& response) const {
-  if (!is_response_ || body_.empty()) {
-    return false;
-  }
-  return response.ParseFromString(body_);
-}
-
-bool MMessage::IsResponse() const {
-  return is_response_;
+  bool more;
+  do {
+    more = ReceiveSingleMessage(tmp, socket);
+    body_.push_back(tmp);
+  } while (more);
 }
 
 void MMessage::Clear() {
   identity_.clear();
-  is_response_ = false;
   body_.clear();
 }
 

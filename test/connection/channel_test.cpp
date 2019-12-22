@@ -25,11 +25,12 @@ TEST_F(ChannelTest, ListenToChannel) {
     MMessage message;
     listener->PollMessage(message);
     proto::Request req;
-    ASSERT_TRUE(message.ToRequest(req));
+    ASSERT_TRUE(message.GetProto(req));
     ASSERT_EQ("test", req.echo_req().data());
   });
 
-  MMessage message(MakeEchoRequest("test"));
+  MMessage message;
+  message.Add(MakeEchoRequest("test"));
   message.SetIdentity("zZz");
   channel_->SendToListener(message);
   th.join();
@@ -40,7 +41,7 @@ TEST_F(ChannelTest, SendToChannel) {
     std::unique_ptr<ChannelListener> listener(channel_->GetListener());
     MMessage message;
     message.SetIdentity("zZz");
-    message.SetResponse(MakeEchoResponse("test"));
+    message.Add(MakeEchoResponse("test"));
     listener->SendMessage(message);
   });
 
@@ -51,7 +52,7 @@ TEST_F(ChannelTest, SendToChannel) {
   MMessage message;
   channel_->ReceiveFromListener(message);
   proto::Response res;
-  ASSERT_TRUE(message.ToResponse(res));
+  ASSERT_TRUE(message.GetProto(res));
   ASSERT_EQ("test", res.echo_res().data());
 
   th.join();

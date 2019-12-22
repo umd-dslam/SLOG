@@ -89,7 +89,8 @@ bool Broker::InitializeConnection() {
   auto ready = request.mutable_ready_req();
   ready->set_ip_address(config_->GetLocalAddress());
   *ready->mutable_slog_id() = config_->GetLocalSlogId();
-  MMessage ready_msg(request);
+  MMessage ready_msg;
+  ready_msg.Add(request);
 
   // Connect to all other machines and send the READY message
   for (const auto& pair : address_to_socket_) {
@@ -120,7 +121,7 @@ bool Broker::InitializeConnection() {
       ready_msg.Receive(router_);
       
       // The message must be a Request
-      if (!ready_msg.ToRequest(request)) {
+      if (!ready_msg.GetProto(request)) {
         continue;
       }
       
@@ -229,7 +230,8 @@ void Broker::Run() {
 }
 
 void Broker::SendToTargetChannel(const MMessage& msg) {
-  const auto& target_channel = msg.GetChannel();
+  string target_channel;
+  msg.GetString(target_channel, 1);
   if (channels_.count(target_channel) == 0) {
     LOG(ERROR) << "Unknown channel: \"" << target_channel << "\". Dropping message";
   } else {

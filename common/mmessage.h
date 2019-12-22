@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include <glog/logging.h>
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
 
@@ -9,6 +10,8 @@
 #include "proto/response.pb.h"
 
 using std::string;
+using std::vector;
+using google::protobuf::MessageLite;
 
 namespace slog {
 
@@ -22,7 +25,6 @@ namespace slog {
 class MMessage {
 public:
   MMessage() = default;
-  MMessage(const proto::Request& request);
   MMessage(zmq::socket_t& socket);
 
   void SetIdentity(const string& identity);
@@ -30,17 +32,17 @@ public:
   const string& GetIdentity() const;
   bool HasIdentity() const;
 
-  void SetChannel(const string& channel);
-  void SetChannel(string&& channel);
-  const string& GetChannel() const;
+  void Add(const MessageLite& data);
+  void Add(const string& data);
+  void Add(string&& data);
 
-  void FromRequest(const proto::Request& request);
-  bool ToRequest(proto::Request& request) const;
+  void Set(size_t index, const MessageLite& data);
+  void Set(size_t index, const string& data);
+  void Set(size_t index, string&& data);
 
-  void SetResponse(const proto::Response& response);
-  bool ToResponse(proto::Response& response) const;
+  bool GetProto(MessageLite& out, size_t index = 0) const;
 
-  bool IsResponse() const;
+  bool GetString(string& out, size_t index = 0) const;
 
   void Send(zmq::socket_t& socket) const;
   void Receive(zmq::socket_t& socket);
@@ -49,9 +51,7 @@ public:
 
 private:
   string identity_;
-  string channel_;
-  bool is_response_;
-  string body_;
+  vector<string> body_;
 };
 
 } // namespace slog

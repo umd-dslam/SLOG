@@ -9,10 +9,9 @@ Server::Server(ChannelListener* listener)
   : Module(listener) {}
 
 void Server::HandleMessage(MMessage message) {
-  if (!message.IsResponse()) {
-    proto::Request request;
-    message.ToRequest(request);
-    waiting_requests_[request.stream_id()] = std::move(request);
+  proto::Request request;
+  if (message.GetProto(request)) {
+    waiting_requests_[request.stream_id()] = std::move(message);
   } else {
     
   }
