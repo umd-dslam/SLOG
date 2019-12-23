@@ -57,7 +57,7 @@ public:
 
   void Start();
 
-  ChannelListener* AddChannel(const string& name);
+  Channel* AddChannel(const string& name);
 
 private:
   string MakeEndpoint(const string& addr = "") const;

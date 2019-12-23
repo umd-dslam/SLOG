@@ -51,7 +51,7 @@ void Broker::Start() {
   thread_ = std::thread(&Broker::Run, this);
 }
 
-ChannelListener* Broker::AddChannel(const std::string& name) {
+Channel* Broker::AddChannel(const std::string& name) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
   CHECK(channels_.count(name) == 0) << "Channel \"" << name << "\" already exists";
 
@@ -208,7 +208,7 @@ void Broker::Run() {
       if (items[i].revents & ZMQ_POLLIN) {
         const auto& name = channel_names[i];
         MMessage message;
-        channels_[name]->ReceiveFromListener(message);
+        channels_[name]->Receive(message);
 
         // If a message has an identity, it is sent out to the DEALER socket
         // corresponding to the identity. Otherwise, it is routed to another
@@ -235,7 +235,7 @@ void Broker::SendToTargetChannel(const MMessage& msg) {
   if (channels_.count(target_channel) == 0) {
     LOG(ERROR) << "Unknown channel: \"" << target_channel << "\". Dropping message";
   } else {
-    channels_[target_channel]->SendToListener(msg);
+    channels_[target_channel]->Send(msg);
   }
 }
 

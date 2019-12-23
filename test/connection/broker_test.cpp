@@ -56,7 +56,7 @@ TEST(BrokerTest, PingPong) {
     auto context = std::make_shared<zmq::context_t>(1);
     Broker broker(configs[0], context);
 
-    unique_ptr<ChannelListener> channel(
+    unique_ptr<Channel> channel(
         broker.AddChannel(SENDER));
 
     broker.Start();
@@ -67,10 +67,10 @@ TEST(BrokerTest, PingPong) {
     msg.Add(RECEIVER);
     msg.SetIdentity(
         SlogIdToString(MakeSlogId(0, 1)));
-    channel->SendMessage(std::move(msg));
+    channel->Send(std::move(msg));
 
     // Wait for pong
-    ASSERT_TRUE(channel->PollMessage(msg, 2000));
+    channel->Receive(msg);
     proto::Response res;
     ASSERT_TRUE(msg.GetProto(res));
     ASSERT_EQ("pong", res.echo_res().data());
@@ -79,14 +79,14 @@ TEST(BrokerTest, PingPong) {
   auto receiver = thread([&]() {
     auto context = std::make_shared<zmq::context_t>(1);
     Broker broker(configs[1], context);
-    std::unique_ptr<ChannelListener> channel(
+    std::unique_ptr<Channel> channel(
         broker.AddChannel(RECEIVER));
 
     broker.Start();
 
     // Wait for ping
     MMessage msg;
-    ASSERT_TRUE(channel->PollMessage(msg, 2000));
+    channel->Receive(msg);
     proto::Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ("ping", req.echo_req().data());
@@ -96,7 +96,7 @@ TEST(BrokerTest, PingPong) {
     res.mutable_echo_res()->set_data("pong");
     msg.Set(0, res);
     msg.Set(1, SENDER);
-    channel->SendMessage(msg);
+    channel->Send(msg);
 
     this_thread::sleep_for(1s);
   });
@@ -113,28 +113,28 @@ TEST(BrokerTest, InterchannelPingPong) {
   auto context = std::make_shared<zmq::context_t>(1);
   Broker broker(configs[0], context);
   
-  auto sender = [&](ChannelListener* listener) {
-    unique_ptr<ChannelListener> channel(listener);
+  auto sender = [&](Channel* listener) {
+    unique_ptr<Channel> channel(listener);
 
     // Send ping
     MMessage msg;
     msg.Add(MakeEchoRequest("ping"));
     msg.Add(RECEIVER);
-    channel->SendMessage(std::move(msg));
+    channel->Send(std::move(msg));
 
     // Wait for pong
-    ASSERT_TRUE(channel->PollMessage(msg));
+    channel->Receive(msg);
     proto::Response res;
     ASSERT_TRUE(msg.GetProto(res));
     ASSERT_EQ("pong", res.echo_res().data());
   };
 
-  auto receiver = [&](ChannelListener* listener) {
-    unique_ptr<ChannelListener> channel(listener);
+  auto receiver = [&](Channel* listener) {
+    unique_ptr<Channel> channel(listener);
 
     // Wait for ping
     MMessage msg;
-    ASSERT_TRUE(channel->PollMessage(msg));
+    channel->Receive(msg);
     proto::Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ("ping", req.echo_req().data());
@@ -145,7 +145,7 @@ TEST(BrokerTest, InterchannelPingPong) {
     msg.SetIdentity("");
     msg.Set(0, res);
     msg.Set(1, SENDER);
-    channel->SendMessage(msg);
+    channel->Send(msg);
 
     this_thread::sleep_for(1s);
   };

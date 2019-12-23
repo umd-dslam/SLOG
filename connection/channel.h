@@ -26,21 +26,19 @@ public:
   const std::string& GetName() const;
 
   /**
-   * Returns a zmq pollitem data structure for this channel. This method is
-   * used by the Broker
+   * Returns a zmq pollitem data structure for this channel.
    */
   zmq::pollitem_t GetPollItem();
 
   /**
-   * Passes a message to this channel. That message would be received by the
-   * listener
+   * Passes a message to this channel
    */
-  void SendToListener(const MMessage& msg);
+  void Send(const MMessage& msg);
 
   /**
-   * Receives a message from the listener
+   * Receives a message from this channel
    */
-  void ReceiveFromListener(MMessage& msg);
+  void Receive(MMessage& msg);
 
   /**
    * Returns a pointer to the listener corresponding to this channel.
@@ -48,40 +46,16 @@ public:
    * Broker thread. Whoever owns this pointer later needs to free it up 
    * otherwise the socket inside the listener would prevent a thread to exit.
    */
-  ChannelListener* GetListener();
+  Channel* GetListener();
 
 private:
+  Channel(std::shared_ptr<zmq::context_t> context, const std::string& name, bool is_listener);
+
   std::shared_ptr<zmq::context_t> context_;
   const std::string name_;
   zmq::socket_t socket_;
+  bool is_listener_;
   std::atomic<bool> listener_created_;
-};
-
-/**
- * A ChannelListener corresponds to a Channel and is used by a module to get and send
- * message from and to a channel
- */
-class ChannelListener {
-public:
-  ChannelListener(std::shared_ptr<zmq::context_t> context, const std::string& name);
-
-  /**
-   * Blocks until a message arrived at the channel.
-   * @param msg To be filled with the next message in the channel
-   * @param timeout_ms If no message is received by the channel in after timeout_ms 
-   * milliseconds, the method returns with false.
-   * @return true if a message is received, false if timed out.
-   */
-  bool PollMessage(MMessage& msg, long timeout_ms = -1);
-
-  /**
-   * Sends a message to this channel.
-   * @param msg Message to be sent
-   */
-  void SendMessage(const MMessage& msg);
-
-private:
-  zmq::socket_t socket_;
 };
 
 } // namespace slog

@@ -13,7 +13,7 @@ namespace slog {
 
 class Server : public Module {
 public:
-  Server(ChannelListener* listener);
+  Server(Channel* listener);
 
   void HandleMessage(MMessage message) final;
 

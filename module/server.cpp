@@ -5,7 +5,7 @@
 
 namespace slog {
 
-Server::Server(ChannelListener* listener) 
+Server::Server(Channel* listener) 
   : Module(listener) {}
 
 void Server::HandleMessage(MMessage message) {
