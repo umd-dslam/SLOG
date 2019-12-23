@@ -15,9 +15,6 @@ class Server : public Module {
 public:
   Server(Channel* listener);
 
-  void HandleMessage(MMessage message) final;
-
-  void PostProcessing() final;
 
 private:
   unordered_map<uint32_t, MMessage> waiting_requests_;

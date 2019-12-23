@@ -9,8 +9,7 @@ namespace slog {
 
 class Module {
 public:
-  Module(Channel* listener);
-  
+  Module();
   Module(const Module&) = delete;
   const Module& operator=(const Module&) = delete;
 
@@ -20,8 +19,18 @@ public:
   void Start();
 
 protected:
-  void AddPollItem(zmq::pollitem_t&& poll_item);
+  virtual void Loop() = 0;
 
+private:
+  void Run();
+  std::atomic<bool> running_;
+};
+
+class ChanneledModule : public Module {
+public:
+  ChanneledModule(Channel* listener);
+  
+protected:
   void Send(const MMessage& message);
 
   virtual void HandleMessage(MMessage message) = 0;
@@ -31,10 +40,10 @@ protected:
   virtual void PostProcessing() {};
 
 private:
-  void Run();
+  void Loop() final;
+
   std::unique_ptr<Channel> listener_;
-  std::atomic<bool> running_;
-  std::vector<zmq::pollitem_t> poll_items_;
+  zmq::pollitem_t poll_item_;
 };
 
 } // namespace slog
