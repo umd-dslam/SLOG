@@ -61,7 +61,7 @@ TEST(BrokerTest, PingPong) {
     unique_ptr<Channel> channel(
         broker.AddChannel(SENDER));
 
-    broker.Start();
+    broker.StartInNewThread();
 
     // Send ping
     MMessage msg;
@@ -84,7 +84,7 @@ TEST(BrokerTest, PingPong) {
     std::unique_ptr<Channel> channel(
         broker.AddChannel(RECEIVER));
 
-    broker.Start();
+    broker.StartInNewThread();
 
     // Wait for ping
     MMessage msg;
@@ -155,7 +155,7 @@ TEST(BrokerTest, InterchannelPingPong) {
   std::thread sender_thread(sender, broker.AddChannel(SENDER));
   std::thread receiver_thread(receiver, broker.AddChannel(RECEIVER));
 
-  broker.Start();
+  broker.StartInNewThread();
 
   sender_thread.join();
   receiver_thread.join();

@@ -1,9 +1,5 @@
-#include <iostream>
-
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-
 #include "common/proto_utils.h"
+#include "common/service_utils.h"
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "module/server.h"
@@ -18,13 +14,8 @@ using namespace slog;
 using namespace std;
 
 int main(int argc, char* argv[]) {
-  google::InitGoogleLogging(argv[0]);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-  // Verify that the version of the library that we linked against is
-  // compatible with the version of the headers we compiled against
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-
+  InitializeService(argc, argv);
+  
   auto slog_id = MakeSlogId(FLAGS_replica, FLAGS_partition);
   auto config = Configuration::FromFile(
       "slog.conf", 
@@ -33,10 +24,11 @@ int main(int argc, char* argv[]) {
   auto context = std::make_shared<zmq::context_t>(1);
 
   Broker broker(config, context);
-  broker.Start();
-  LOG(INFO) << "Broker started";
-  
-  while (true) {}
+  Server server(config, context, broker);
+
+  broker.StartInNewThread();
+
+  server.Start();
 
   return 0;
 }

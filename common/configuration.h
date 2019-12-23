@@ -27,20 +27,22 @@ public:
   const string& GetProtocol() const;
   const vector<string>& GetAllAddresses() const;
   uint32_t GetBrokerPort() const;
+  uint32_t GetServerPort() const;
   uint32_t GetNumReplicas() const;
   uint32_t GetNumPartitions() const;
   const string& GetLocalAddress() const;
   const SlogIdentifier& GetLocalSlogId() const;
+  uint32_t GetLocalNumericId() const;
 
 private:
   string protocol_;
   uint32_t broker_port_;
+  uint32_t server_port_;
   uint32_t num_replicas_;
   uint32_t num_partitions_;
   vector<string> all_addresses_;
   string local_address_;
   SlogIdentifier local_id_;
-
 };
 
 } // namespace slog

@@ -1,6 +1,7 @@
 project(module)
 
 set(SOURCES
+  client.cpp
   module.cpp
   server.cpp
 )

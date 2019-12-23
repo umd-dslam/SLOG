@@ -34,6 +34,7 @@ Configuration::Configuration(
     const SlogIdentifier& local_id) 
   : protocol_(config.protocol()),
     broker_port_(config.broker_port()),
+    server_port_(config.server_port()),
     num_replicas_(config.num_replicas()),
     num_partitions_(config.num_partitions()),
     local_address_(local_address),
@@ -69,11 +70,20 @@ uint32_t Configuration::GetBrokerPort() const {
   return broker_port_;
 }
 
+uint32_t Configuration::GetServerPort() const {
+  return server_port_;
+}
+
 const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
+
 const SlogIdentifier& Configuration::GetLocalSlogId() const {
   return local_id_;
+}
+
+uint32_t Configuration::GetLocalNumericId() const {
+  return local_id_.partition() * 100 + local_id_.replica();
 }
 
 } // namespace slog

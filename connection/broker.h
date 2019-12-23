@@ -46,16 +46,12 @@ namespace slog {
  */
 class Broker {
 public:
-  static const std::string SERVER_CHANNEL;
-  static const std::string SEQUENCER_CHANNEL;
-  static const std::string SCHEDULER_CHANNEL;
-
   Broker(
       shared_ptr<Configuration> config, 
       shared_ptr<zmq::context_t> context);
   ~Broker();
 
-  void Start();
+  void StartInNewThread();
 
   Channel* AddChannel(const string& name);
 

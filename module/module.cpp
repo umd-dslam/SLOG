@@ -2,9 +2,6 @@
 
 namespace slog {
 
-namespace {
-const long MODULE_POLL_TIMEOUT_MS = 1000;
-}
 
 Module::Module() : running_(false) {}
 
@@ -29,14 +26,16 @@ void Module::Start() {
 }
 
 void Module::Run() {
+  SetUp();
   while (running_) {
     Loop();
   }
 }
 
-ChanneledModule::ChanneledModule(Channel* listener) 
+ChanneledModule::ChanneledModule(Channel* listener, long poll_timeout_ms) 
   : listener_(listener),
-    poll_item_(listener->GetPollItem()) {}
+    poll_item_(listener->GetPollItem()),
+    poll_timeout_ms_(poll_timeout_ms) {}
 
 void ChanneledModule::Send(const MMessage& message) {
   listener_->Send(message);
@@ -44,14 +43,16 @@ void ChanneledModule::Send(const MMessage& message) {
 
 void ChanneledModule::Loop() {
   MMessage message;
-  int rc = zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS);
-  if (rc == 0) {
-    HandlePollTimedOut();
-  } else if (rc > 0) {
-    if (poll_item_.revents & ZMQ_POLLIN) {
-      listener_->Receive(message);
-      HandleMessage(message);
-    }
+  switch (zmq::poll(&poll_item_, 1, poll_timeout_ms_)) {
+    case 0: // Timed out. No event signaled during poll
+      HandlePollTimedOut();
+      break;
+    default:
+      if (poll_item_.revents & ZMQ_POLLIN) {
+        listener_->Receive(message);
+        HandleMessage(message);
+      }
+      break;
   }
   PostProcessing();
 }

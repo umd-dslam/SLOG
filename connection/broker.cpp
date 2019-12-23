@@ -17,10 +17,6 @@ namespace {
 const long BROKER_POLL_TIMEOUT_MS = 1000;
 }
 
-const std::string Broker::SERVER_CHANNEL = "server";
-const std::string Broker::SEQUENCER_CHANNEL = "sequencer";
-const std::string Broker::SCHEDULER_CHANNEL = "scheduler";
-
 Broker::Broker(
     shared_ptr<Configuration> config, 
     shared_ptr<zmq::context_t> context) 
@@ -43,7 +39,7 @@ Broker::~Broker() {
   thread_.join();
 }
 
-void Broker::Start() {
+void Broker::StartInNewThread() {
   if (running_) {
     return;
   }
@@ -88,7 +84,7 @@ bool Broker::InitializeConnection() {
   internal::Request request;
   auto ready = request.mutable_ready();
   ready->set_ip_address(config_->GetLocalAddress());
-  *ready->mutable_slog_id() = config_->GetLocalSlogId();
+  ready->mutable_slog_id()->CopyFrom(config_->GetLocalSlogId());
   MMessage ready_msg;
   ready_msg.Add(request);
 

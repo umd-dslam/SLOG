@@ -15,10 +15,12 @@ message Configuration {
     // Port for the zmq sockets in the broker. This is ignored if
     // the icp protocol is used
     uint32 broker_port = 3;
+    // Port for the server
+    uint32 server_port = 4;
     // Number of replicas of the database
-    uint32 num_replicas = 4;
+    uint32 num_replicas = 5;
     // Number of partitions per replica
-    uint32 num_partitions = 5;
+    uint32 num_partitions = 6;
 }
 
 message SlogIdentifier {

@@ -43,11 +43,11 @@ add_subdirectory(connection)
 add_subdirectory(storage)
 add_subdirectory(module)
 set(SLOG_LIBS
+  storage
+  module
   connection
   common
-  proto
-  storage
-  module)
+  proto)
 
 # All libraries to be linked to executables
 set(ALL_LIBRARIES
@@ -58,9 +58,12 @@ set(ALL_LIBRARIES
     ${GLOG_LIBRARIES}
     ${GFLAGS_LIBRARIES})
 
-# Create an executable for the service
+# Create an executable for the services
 add_executable(slog service/slog.cpp)
 target_link_libraries(slog ${ALL_LIBRARIES})
+
+add_executable(slog_client service/slog_client.cpp)
+target_link_libraries(slog_client ${ALL_LIBRARIES})
 
 # =================================== Tests =============================================
 

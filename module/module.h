@@ -19,6 +19,7 @@ public:
   void Start();
 
 protected:
+  virtual void SetUp() {};
   virtual void Loop() = 0;
 
 private:
@@ -28,7 +29,7 @@ private:
 
 class ChanneledModule : public Module {
 public:
-  ChanneledModule(Channel* listener);
+  ChanneledModule(Channel* listener, long poll_timeout_ms = 1000);
   
 protected:
   void Send(const MMessage& message);
@@ -44,6 +45,7 @@ private:
 
   std::unique_ptr<Channel> listener_;
   zmq::pollitem_t poll_item_;
+  long poll_timeout_ms_;
 };
 
 } // namespace slog
