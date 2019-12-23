@@ -1,6 +1,6 @@
-#include <glog/logging.h>
-
 #include "common/mmessage.h"
+
+#include <glog/logging.h>
 
 namespace slog {
 
@@ -53,10 +53,9 @@ bool MMessage::HasIdentity() const {
   return !identity_.empty();
 }
 
-void MMessage::Add(const MessageLite& data) {
-  string buf;
-  data.SerializeToString(&buf);
-  body_.push_back(std::move(buf));
+void MMessage::Add(const Message& data) {
+  body_.push_back("");
+  Set(body_.size() - 1, data);
 }
 
 void MMessage::Add(const string& data) {
@@ -67,11 +66,11 @@ void MMessage::Add(string&& data) {
   body_.push_back(std::move(data));
 }
 
-void MMessage::Set(size_t index, const MessageLite& data) {
+void MMessage::Set(size_t index, const Message& data) {
   CHECK(index < body_.size()) << "Index out of bound";
-  string buf;
-  data.SerializeToString(&buf);
-  body_[index] = std::move(buf);
+  Any any;
+  any.PackFrom(data);
+  body_[index] = any.SerializeAsString();
 }
 
 void MMessage::Set(size_t index, const string& data) {
@@ -80,11 +79,6 @@ void MMessage::Set(size_t index, const string& data) {
 
 void MMessage::Set(size_t index, string&& data) {
   body_[index] = std::move(data);
-}
-
-bool MMessage::GetProto(MessageLite& out, size_t index) const {
-  CHECK(index < body_.size()) << "Index out of bound";
-  return out.ParseFromString(body_[index]);
 }
 
 bool MMessage::GetString(string& out, size_t index) const {

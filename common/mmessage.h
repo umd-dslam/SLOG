@@ -3,15 +3,14 @@
 #include <vector>
 
 #include <glog/logging.h>
+#include <google/protobuf/any.pb.h>
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
 
-#include "proto/request.pb.h"
-#include "proto/response.pb.h"
-
 using std::string;
 using std::vector;
-using google::protobuf::MessageLite;
+using google::protobuf::Any;
+using google::protobuf::Message;
 
 namespace slog {
 
@@ -32,15 +31,26 @@ public:
   const string& GetIdentity() const;
   bool HasIdentity() const;
 
-  void Add(const MessageLite& data);
+  void Add(const Message& data);
   void Add(const string& data);
   void Add(string&& data);
 
-  void Set(size_t index, const MessageLite& data);
+  void Set(size_t index, const Message& data);
   void Set(size_t index, const string& data);
   void Set(size_t index, string&& data);
 
-  bool GetProto(MessageLite& out, size_t index = 0) const;
+  template<typename T>
+  bool GetProto(T& out, size_t index = 0) const {
+    CHECK(index < body_.size()) << "Index out of bound";
+    Any any;
+    if (!any.ParseFromString(body_[index])) {
+      return false;
+    }
+    if (any.Is<T>()) {
+      return any.UnpackTo(&out);
+    }
+    return false;
+  }
 
   bool GetString(string& out, size_t index = 0) const;
 

@@ -15,6 +15,9 @@ TEST(MMessageTest, AddThenGetRequestProto) {
   proto::Request request;
   ASSERT_TRUE(message.GetProto(request));
 
+  proto::Response response;
+  ASSERT_FALSE(message.GetProto(response));
+
   ASSERT_TRUE(request.has_echo_req());
   auto echo = request.echo_req();
   ASSERT_EQ(TEST_STRING, echo.data());
@@ -26,6 +29,9 @@ TEST(MMessageTest, FromAndToResponseProto) {
 
   proto::Response response;
   ASSERT_TRUE(message.GetProto(response));
+
+  proto::Request request;
+  ASSERT_FALSE(message.GetProto(request));
 
   ASSERT_TRUE(response.has_echo_res());
   auto echo = response.echo_res();
