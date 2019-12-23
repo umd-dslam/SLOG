@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
 
 #include <glog/logging.h>
 #include <google/protobuf/any.pb.h>
@@ -9,6 +10,7 @@
 
 using std::string;
 using std::vector;
+using std::unordered_map;
 using google::protobuf::Any;
 using google::protobuf::Message;
 
@@ -41,15 +43,18 @@ public:
 
   template<typename T>
   bool GetProto(T& out, size_t index = 0) const {
-    CHECK(index < body_.size()) << "Index out of bound";
-    Any any;
-    if (!any.ParseFromString(body_[index])) {
-      return false;
-    }
-    if (any.Is<T>()) {
-      return any.UnpackTo(&out);
+    if (IsProto<T>(index)) {
+      const auto any = GetAny(index);
+      return (*any).UnpackTo(&out);
     }
     return false;
+  }
+
+  template<typename T>
+  bool IsProto(size_t index = 0) const {
+    CHECK(index < body_.size()) << "Index out of bound";
+    const auto any = GetAny(index);
+    return any != nullptr && (*any).Is<T>();
   }
 
   bool GetString(string& out, size_t index = 0) const;
@@ -60,8 +65,12 @@ public:
   void Clear();
 
 private:
+  const Any* GetAny(size_t index) const;
+
   string identity_;
   vector<string> body_;
+
+  mutable unordered_map<size_t, Any> body_to_any_cache_;
 };
 
 } // namespace slog

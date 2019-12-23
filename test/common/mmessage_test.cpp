@@ -60,3 +60,16 @@ TEST(MMessageTest, SendAndReceive) {
   auto echo = request.echo();
   ASSERT_EQ(TEST_STRING, echo.data());
 }
+
+TEST(MMessageTest, IsProto) {
+  MMessage message;
+  message.Add(MakeEchoRequest(TEST_STRING));
+  message.Add("test_string");
+
+  ASSERT_TRUE(message.IsProto<Request>());
+  ASSERT_FALSE(message.IsProto<Response>());
+  ASSERT_FALSE(message.IsProto<Request>(1));
+
+  message.Set(0, MakeEchoResponse(TEST_STRING));
+  ASSERT_TRUE(message.IsProto<Response>());
+}

@@ -60,10 +60,12 @@ void MMessage::Add(const Message& data) {
 
 void MMessage::Add(const string& data) {
   body_.push_back(data);
+  body_to_any_cache_.clear();
 }
 
 void MMessage::Add(string&& data) {
   body_.push_back(std::move(data));
+  body_to_any_cache_.clear();
 }
 
 void MMessage::Set(size_t index, const Message& data) {
@@ -71,14 +73,17 @@ void MMessage::Set(size_t index, const Message& data) {
   Any any;
   any.PackFrom(data);
   body_[index] = any.SerializeAsString();
+  body_to_any_cache_.clear();
 }
 
 void MMessage::Set(size_t index, const string& data) {
   body_[index] = data;
+  body_to_any_cache_.clear();
 }
 
 void MMessage::Set(size_t index, string&& data) {
   body_[index] = std::move(data);
+  body_to_any_cache_.clear();
 }
 
 bool MMessage::GetString(string& out, size_t index) const {
@@ -117,13 +122,24 @@ void MMessage::Receive(zmq::socket_t& socket) {
   bool more;
   do {
     more = ReceiveSingleMessage(tmp, socket);
-    body_.push_back(tmp);
+    Add(tmp);
   } while (more);
 }
 
 void MMessage::Clear() {
   identity_.clear();
   body_.clear();
+  body_to_any_cache_.clear();
+}
+
+const Any* MMessage::GetAny(size_t index) const {
+  if (body_to_any_cache_.count(index) == 0) {
+    auto& any = body_to_any_cache_[index];
+    if (!any.ParseFromString(body_[index])) {
+      return nullptr;
+    }
+  }
+  return &body_to_any_cache_.at(index);
 }
 
 } // namespace slog
