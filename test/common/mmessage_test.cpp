@@ -6,20 +6,23 @@
 using namespace std;
 using namespace slog;
 
+using internal::Request;
+using internal::Response;
+
 const std::string TEST_STRING = "test";
 
 TEST(MMessageTest, AddThenGetRequestProto) {
   MMessage message;
   message.Add(MakeEchoRequest(TEST_STRING));
 
-  proto::Request request;
+  Request request;
   ASSERT_TRUE(message.GetProto(request));
 
-  proto::Response response;
+  Response response;
   ASSERT_FALSE(message.GetProto(response));
 
-  ASSERT_TRUE(request.has_echo_req());
-  auto echo = request.echo_req();
+  ASSERT_TRUE(request.has_echo());
+  auto echo = request.echo();
   ASSERT_EQ(TEST_STRING, echo.data());
 }
 
@@ -27,14 +30,14 @@ TEST(MMessageTest, FromAndToResponseProto) {
   MMessage message;
   message.Add(MakeEchoResponse(TEST_STRING));
 
-  proto::Response response;
+  Response response;
   ASSERT_TRUE(message.GetProto(response));
 
-  proto::Request request;
+  Request request;
   ASSERT_FALSE(message.GetProto(request));
 
-  ASSERT_TRUE(response.has_echo_res());
-  auto echo = response.echo_res();
+  ASSERT_TRUE(response.has_echo());
+  auto echo = response.echo();
   ASSERT_EQ(TEST_STRING, echo.data());
 }
 
@@ -51,9 +54,9 @@ TEST(MMessageTest, SendAndReceive) {
   message.Send(dealer);
   MMessage recv_msg(router);
 
-  proto::Request request;
+  Request request;
   ASSERT_TRUE(recv_msg.GetProto(request));
-  ASSERT_TRUE(request.has_echo_req());
-  auto echo = request.echo_req();
+  ASSERT_TRUE(request.has_echo());
+  auto echo = request.echo();
   ASSERT_EQ(TEST_STRING, echo.data());
 }

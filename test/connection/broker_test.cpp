@@ -7,10 +7,12 @@
 #include "common/proto_utils.h"
 #include "common/test_utils.h"
 #include "connection/broker.h"
-#include "proto/config.pb.h"
+#include "proto/internal.pb.h"
 
 using namespace std;
 using namespace slog;
+using internal::Request;
+using internal::Response;
 
 using ConfigVec = vector<shared_ptr<Configuration>>;
 
@@ -21,7 +23,7 @@ ConfigVec MakeTestConfigurations(
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;
 
-  proto::Configuration common_config;
+  internal::Configuration common_config;
   common_config.set_protocol("ipc");
   common_config.set_broker_port(0);
   common_config.set_num_replicas(num_replicas);
@@ -71,9 +73,9 @@ TEST(BrokerTest, PingPong) {
 
     // Wait for pong
     channel->Receive(msg);
-    proto::Response res;
+    Response res;
     ASSERT_TRUE(msg.GetProto(res));
-    ASSERT_EQ("pong", res.echo_res().data());
+    ASSERT_EQ("pong", res.echo().data());
   });
 
   auto receiver = thread([&]() {
@@ -87,13 +89,13 @@ TEST(BrokerTest, PingPong) {
     // Wait for ping
     MMessage msg;
     channel->Receive(msg);
-    proto::Request req;
+    Request req;
     ASSERT_TRUE(msg.GetProto(req));
-    ASSERT_EQ("ping", req.echo_req().data());
+    ASSERT_EQ("ping", req.echo().data());
 
     // Send pong
-    proto::Response res;
-    res.mutable_echo_res()->set_data("pong");
+    Response res;
+    res.mutable_echo()->set_data("pong");
     msg.Set(0, res);
     msg.Set(1, SENDER);
     channel->Send(msg);
@@ -124,9 +126,9 @@ TEST(BrokerTest, InterchannelPingPong) {
 
     // Wait for pong
     channel->Receive(msg);
-    proto::Response res;
+    Response res;
     ASSERT_TRUE(msg.GetProto(res));
-    ASSERT_EQ("pong", res.echo_res().data());
+    ASSERT_EQ("pong", res.echo().data());
   };
 
   auto receiver = [&](Channel* listener) {
@@ -135,13 +137,13 @@ TEST(BrokerTest, InterchannelPingPong) {
     // Wait for ping
     MMessage msg;
     channel->Receive(msg);
-    proto::Request req;
+    Request req;
     ASSERT_TRUE(msg.GetProto(req));
-    ASSERT_EQ("ping", req.echo_req().data());
+    ASSERT_EQ("ping", req.echo().data());
 
     // Send pong
-    proto::Response res;
-    res.mutable_echo_res()->set_data("pong");
+    Response res;
+    res.mutable_echo()->set_data("pong");
     msg.SetIdentity("");
     msg.Set(0, res);
     msg.Set(1, SENDER);

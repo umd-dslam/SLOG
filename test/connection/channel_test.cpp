@@ -8,6 +8,9 @@
 using namespace std;
 using namespace slog;
 
+using internal::Request;
+using internal::Response;
+
 class ChannelTest : public ::testing::Test {
 protected:
 
@@ -24,9 +27,9 @@ TEST_F(ChannelTest, ListenToChannel) {
     std::unique_ptr<Channel> listener(channel_->GetListener());
     MMessage message;
     listener->Receive(message);
-    proto::Request req;
+    Request req;
     ASSERT_TRUE(message.GetProto(req));
-    ASSERT_EQ("test", req.echo_req().data());
+    ASSERT_EQ("test", req.echo().data());
   });
 
   MMessage message;
@@ -51,9 +54,9 @@ TEST_F(ChannelTest, SendToChannel) {
 
   MMessage message;
   channel_->Receive(message);
-  proto::Response res;
+  Response res;
   ASSERT_TRUE(message.GetProto(res));
-  ASSERT_EQ("test", res.echo_res().data());
+  ASSERT_EQ("test", res.echo().data());
 
   th.join();
 }

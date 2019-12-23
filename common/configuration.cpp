@@ -14,14 +14,14 @@ using std::runtime_error;
 std::shared_ptr<Configuration> Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
-    const proto::SlogIdentifier& local_id) {
+    const SlogIdentifier& local_id) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
   std::stringstream ss;
   ss << ifs.rdbuf();
 
-  proto::Configuration config;
+  internal::Configuration config;
   std::string str = ss.str();
   google::protobuf::TextFormat::ParseFromString(str, &config);
 
@@ -29,9 +29,9 @@ std::shared_ptr<Configuration> Configuration::FromFile(
 }
 
 Configuration::Configuration(
-    const proto::Configuration& config, 
+    const internal::Configuration& config, 
     const std::string& local_address,
-    const proto::SlogIdentifier& local_id) 
+    const SlogIdentifier& local_id) 
   : protocol_(config.protocol()),
     broker_port_(config.broker_port()),
     num_replicas_(config.num_replicas()),
@@ -72,7 +72,7 @@ uint32_t Configuration::GetBrokerPort() const {
 const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
-const proto::SlogIdentifier& Configuration::GetLocalSlogId() const {
+const SlogIdentifier& Configuration::GetLocalSlogId() const {
   return local_id_;
 }
 

@@ -12,6 +12,7 @@ include_directories(${ZeroMQ_INCLUDE_DIR})
 find_package(cppzmq REQUIRED)
 include_directories(${cppzmq_INCLUDE_DIR})
 
+# Set this so that proto filenames do not have to be unique across directories
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 if (protobuf_VERBOSE)

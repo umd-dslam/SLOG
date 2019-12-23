@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+import "transaction.proto";
+
+package slog.api;
+
+message Request {
+    uint32 stream_id = 1;
+    oneof type {
+        TransactionRequest txn = 2;
+    }
+}
+
+message TransactionRequest {
+    Transaction txn = 1;
+}
+
+message Response {
+    uint32 stream_id = 1;
+    oneof type {
+        TransactionResponse txn = 2;
+    }
+}
+
+// For debugging and testing purposes
+message TransactionResponse {
+    Transaction txn = 1;
+}

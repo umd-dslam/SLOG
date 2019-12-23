@@ -1,7 +1,8 @@
 syntax = "proto3";
-package slog.proto;
+package slog;
 
 message Transaction {
-    repeated bytes read_set = 1;
-    repeated bytes write_set = 2;
+    uint32 id = 1;
+    repeated bytes read_set = 2;
+    repeated bytes write_set = 3;
 }

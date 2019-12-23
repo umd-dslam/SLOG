@@ -1,11 +1,10 @@
 #pragma once
 
-#include "proto/request.pb.h"
-#include "proto/response.pb.h"
+#include "proto/internal.pb.h"
 
 namespace slog {
 
-proto::Request MakeEchoRequest(const std::string& data);
-proto::Response MakeEchoResponse(const std::string& data);
+internal::Request MakeEchoRequest(const std::string& data);
+internal::Response MakeEchoResponse(const std::string& data);
 
 } // namespace slog

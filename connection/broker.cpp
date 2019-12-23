@@ -7,7 +7,7 @@
 
 #include "common/mmessage.h"
 #include "common/proto_utils.h"
-#include "proto/request.pb.h"
+#include "proto/internal.pb.h"
 
 using std::pair;
 using std::unordered_set;
@@ -85,8 +85,8 @@ bool Broker::InitializeConnection() {
   LOG(INFO) << "Bound broker to: " << MakeEndpoint();
 
   // Prepare a READY message
-  proto::Request request;
-  auto ready = request.mutable_ready_req();
+  internal::Request request;
+  auto ready = request.mutable_ready();
   ready->set_ip_address(config_->GetLocalAddress());
   *ready->mutable_slog_id() = config_->GetLocalSlogId();
   MMessage ready_msg;
@@ -126,13 +126,13 @@ bool Broker::InitializeConnection() {
       }
       
       // The request message must be READY
-      if (!request.has_ready_req()) {
+      if (!request.has_ready()) {
         continue;
       }
 
       // Use the information in each READY message to build up the translation maps
       const auto& conn_id = ready_msg.GetIdentity();
-      const auto& ready = request.ready_req();
+      const auto& ready = request.ready();
       const auto& addr = ready.ip_address();
       const auto& slog_id = ready.slog_id();
       auto slog_id_str = SlogIdToString(slog_id);

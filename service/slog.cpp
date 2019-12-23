@@ -7,7 +7,7 @@
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "module/server.h"
-#include "proto/slog_identifier.pb.h"
+#include "proto/internal.pb.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
