@@ -19,7 +19,7 @@ namespace slog {
 /**
  * Encapsulates a multi-part zmq message:
  * 
- * [source id][empty frame][channel][body]
+ * [source id][empty frame][body_0][body_1]...
  * 
  * Source id (called 'identity' in ZMQ) is optional
  */
