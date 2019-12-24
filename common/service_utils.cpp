@@ -2,6 +2,8 @@
 
 #include "google/protobuf/stubs/common.h"
 
+namespace slog {
+
 void InitializeService(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -10,3 +12,5 @@ void InitializeService(int argc, char* argv[]) {
   // compatible with the version of the headers we compiled against
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 }
+
+} // namespace slog

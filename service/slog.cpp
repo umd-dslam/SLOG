@@ -25,7 +25,6 @@ int main(int argc, char* argv[]) {
       FLAGS_address,
       slog_id);
   auto context = make_shared<zmq::context_t>(1);
-
   auto storage = make_shared<MemOnlyStorage>();
   Broker broker(config, context);
   auto server = MakeRunnerFor<Server>(config, context, broker, storage);
