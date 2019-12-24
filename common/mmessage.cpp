@@ -34,7 +34,11 @@ bool ReceiveSingleMessage(
 } // namespace
 
 MMessage::MMessage(zmq::socket_t& socket) {
-  Receive(socket);
+  ReceiveFrom(socket);
+}
+
+size_t MMessage::Size() const {
+  return body_.size();
 }
 
 void MMessage::SetIdentity(const string& identity) {
@@ -53,19 +57,25 @@ bool MMessage::HasIdentity() const {
   return !identity_.empty();
 }
 
-void MMessage::Add(const Message& data) {
+void MMessage::Push(const Message& data) {
   body_.push_back("");
   Set(body_.size() - 1, data);
 }
 
-void MMessage::Add(const string& data) {
+void MMessage::Push(const string& data) {
   body_.push_back(data);
   body_to_any_cache_.clear();
 }
 
-void MMessage::Add(string&& data) {
+void MMessage::Push(string&& data) {
   body_.push_back(std::move(data));
   body_to_any_cache_.clear();
+}
+
+string MMessage::Pop() {
+  string back = body_.back();
+  body_.pop_back();
+  return back;
 }
 
 void MMessage::Set(size_t index, const Message& data) {
@@ -87,12 +97,13 @@ void MMessage::Set(size_t index, string&& data) {
 }
 
 bool MMessage::GetString(string& out, size_t index) const {
-  CHECK(index < body_.size()) << "Index out of bound";
+  CHECK(index < body_.size()) 
+      << "Index out of bound. Size: " << body_.size() << ". Index: " << index;
   out = body_[index];
   return true;
 }
 
-void MMessage::Send(zmq::socket_t& socket) const {
+void MMessage::SendTo(zmq::socket_t& socket) const {
   if (!identity_.empty()) {
     SendSingleMessage(socket, identity_, true);
   }
@@ -104,7 +115,7 @@ void MMessage::Send(zmq::socket_t& socket) const {
   }
 }
 
-void MMessage::Receive(zmq::socket_t& socket) {
+void MMessage::ReceiveFrom(zmq::socket_t& socket) {
   Clear();
 
   string tmp;
@@ -122,7 +133,7 @@ void MMessage::Receive(zmq::socket_t& socket) {
   bool more;
   do {
     more = ReceiveSingleMessage(tmp, socket);
-    Add(tmp);
+    Push(tmp);
   } while (more);
 }
 

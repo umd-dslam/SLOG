@@ -24,14 +24,13 @@ void Client::SetUp() {
   LOG(INFO) << "Connected to " << endpoint;
   api::Request req;
   auto txn = req.mutable_txn()->mutable_txn();
-  txn->add_read_set("read0");
-  txn->add_read_set("read1");
-  txn->add_write_set("write0");
+  txn->mutable_read_set()->insert({string{"read0"}, string{""}});
+  txn->mutable_write_set()->insert({string{"write0"}, string{"zzz"}});
   for (int i = 0; i < NUM_TXN; i++) {
     req.set_stream_id(i);
     MMessage msg;
-    msg.Add(req);
-    msg.Send(socket_);
+    msg.Push(req);
+    msg.SendTo(socket_);
   }
 }
 

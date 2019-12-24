@@ -4,7 +4,8 @@ set(ALL_TESTS
   mmessage_test
   broker_test
   channel_test
-  mem_only_storage_test)
+  mem_only_storage_test
+  server_test)
 
 add_executable(mmessage_test common/mmessage_test.cpp)
 target_link_libraries(mmessage_test 
@@ -23,6 +24,14 @@ target_link_libraries(channel_test
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
 target_link_libraries(mem_only_storage_test 
   storage)
+
+add_executable(server_test module/server_test.cpp)
+target_link_libraries(server_test
+  common
+  connection
+  module
+  storage
+  proto)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

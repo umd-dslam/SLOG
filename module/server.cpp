@@ -1,20 +1,21 @@
 #include "module/server.h"
 
 #include "common/constants.h"
+#include "common/proto_utils.h"
 #include "proto/api.pb.h"
 #include "proto/internal.pb.h"
 
 namespace slog {
 
 Server::Server(
-    std::shared_ptr<const Configuration> config,
-    std::shared_ptr<zmq::context_t> context,
-    Broker& broker)
+    shared_ptr<const Configuration> config,
+    shared_ptr<zmq::context_t> context,
+    Broker& broker,
+    shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)
   : config_(config),
     socket_(*context, ZMQ_ROUTER),
     listener_(broker.AddChannel(SERVER_CHANNEL)),
-    rand_eng_(std::random_device{}()),
-    dist_(100, 5000),
+    lookup_master_index_(lookup_master_index),
     counter_(0) {
   poll_items_.push_back(listener_->GetPollItem());
   poll_items_.push_back({ 
@@ -23,7 +24,6 @@ Server::Server(
     ZMQ_POLLIN,
     0 /* revent */
   });
-
 }
 
 void Server::SetUp() {
@@ -34,7 +34,7 @@ void Server::SetUp() {
 
 void Server::Loop() {
   MMessage msg;
-  switch (zmq::poll(poll_items_, 1000)) {
+  switch (zmq::poll(poll_items_, SERVER_POLL_TIMEOUT_MS)) {
     case 0: // Timed out. No event signaled during poll
       break;
     default:
@@ -47,7 +47,7 @@ void Server::Loop() {
         }
       }
       if (poll_items_[1].revents & ZMQ_POLLIN) {
-        msg.Receive(socket_);
+        msg.ReceiveFrom(socket_);
         if (msg.IsProto<api::Request>()) {
           HandleAPIRequest(std::move(msg));
         }
@@ -60,8 +60,8 @@ void Server::Loop() {
     if (top->first <= Clock::now()) {
       auto txn_id = top->second;
       auto& response = pending_response_[txn_id];
-      
-      response.Send(socket_);
+
+      response.SendTo(socket_);
 
       pending_response_.erase(txn_id);
       response_time_.erase(top);
@@ -73,33 +73,51 @@ void Server::Loop() {
 
 void Server::HandleAPIRequest(MMessage&& msg) {
   api::Request request;
-  CHECK(msg.GetProto(request));
-
   api::Response response;
-  response.set_stream_id(request.stream_id());
-
+  GetRequestAndPrepareResponse(request, response, msg);
+  
   if (request.type_case() == api::Request::kTxn) {
     auto txn_response = response.mutable_txn();
     auto txn = txn_response->mutable_txn();
-    txn->CopyFrom(request.txn().txn());
-
     auto txn_id = NextTxnId();
+    txn->CopyFrom(request.txn().txn());
     txn->set_id(txn_id);
 
     msg.Set(0, response);
     pending_response_[txn_id] = msg;
 
-    auto deadline = Clock::now() + milliseconds(dist_(rand_eng_));
-    response_time_.emplace(deadline, txn_id);
+    response_time_.emplace(
+        Clock::now() + 100ms, txn_id);
   }
 }
 
 void Server::HandleInternalRequest(MMessage&& msg) {
+  internal::Request request;
+  internal::Response response;
+  GetRequestAndPrepareResponse(request, response, msg);
 
+  if (request.type_case() == internal::Request::kLookupMaster) {
+    auto& lookup_request = request.lookup_master();
+    auto lookup_response = response.mutable_lookup_master();
+    auto metadata_map = lookup_response->mutable_master_metadata();
+
+    for (const auto& key : lookup_request.keys()) {
+      Metadata metadata;
+      if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
+        internal::LookupMasterResponse_MasterMetadata response_metadata;
+        response_metadata.set_master(metadata.master);
+        response_metadata.set_counter(metadata.counter);
+        metadata_map->insert({key, response_metadata});
+      }
+    }
+    lookup_response->set_txn_id(lookup_request.txn_id());
+
+    msg.Set(0, response);
+    listener_->Send(msg);
+  }
 }
 
-void Server::HandleInternalResponse(MMessage&& msg) {
-
+void Server::HandleInternalResponse(MMessage&&) {
 }
 
 uint32_t Server::NextTxnId() {

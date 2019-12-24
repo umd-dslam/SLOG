@@ -40,11 +40,11 @@ zmq::pollitem_t Channel::GetPollItem() {
 }
 
 void Channel::Send(const MMessage& msg) {
-  msg.Send(socket_);
+  msg.SendTo(socket_);
 }
 
 void Channel::Receive(MMessage& msg) {
-  msg.Receive(socket_);
+  msg.ReceiveFrom(socket_);
 }
 
 Channel* Channel::GetListener() {

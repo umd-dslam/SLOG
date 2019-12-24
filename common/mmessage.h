@@ -28,14 +28,18 @@ public:
   MMessage() = default;
   MMessage(zmq::socket_t& socket);
 
+  size_t Size() const;
+
   void SetIdentity(const string& identity);
   void SetIdentity(string&& identity);
   const string& GetIdentity() const;
   bool HasIdentity() const;
 
-  void Add(const Message& data);
-  void Add(const string& data);
-  void Add(string&& data);
+  void Push(const Message& data);
+  void Push(const string& data);
+  void Push(string&& data);
+
+  string Pop();
 
   void Set(size_t index, const Message& data);
   void Set(size_t index, const string& data);
@@ -59,8 +63,8 @@ public:
 
   bool GetString(string& out, size_t index = 0) const;
 
-  void Send(zmq::socket_t& socket) const;
-  void Receive(zmq::socket_t& socket);
+  void SendTo(zmq::socket_t& socket) const;
+  void ReceiveFrom(zmq::socket_t& socket);
 
   void Clear();
 

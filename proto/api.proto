@@ -4,6 +4,10 @@ import "transaction.proto";
 
 package slog.api;
 
+/***********************************************
+                    REQUESTS
+***********************************************/
+
 message Request {
     uint32 stream_id = 1;
     oneof type {
@@ -14,6 +18,10 @@ message Request {
 message TransactionRequest {
     Transaction txn = 1;
 }
+
+/***********************************************
+                    RESPONSES
+***********************************************/
 
 message Response {
     uint32 stream_id = 1;

@@ -4,6 +4,7 @@
 #include "connection/broker.h"
 #include "module/server.h"
 #include "proto/internal.pb.h"
+#include "storage/mem_only_storage.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
@@ -13,6 +14,8 @@ DEFINE_uint32(partition, 0, "Partition number of the local machine");
 using namespace slog;
 using namespace std;
 
+using std::make_shared;
+
 int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
   
@@ -21,14 +24,14 @@ int main(int argc, char* argv[]) {
       "slog.conf", 
       FLAGS_address,
       slog_id);
-  auto context = std::make_shared<zmq::context_t>(1);
+  auto context = make_shared<zmq::context_t>(1);
 
+  auto storage = make_shared<MemOnlyStorage>();
   Broker broker(config, context);
-  Server server(config, context, broker);
+  auto server = MakeRunnerFor<Server>(config, context, broker, storage);
 
   broker.StartInNewThread();
-
-  server.Start();
+  server->Start();
 
   return 0;
 }

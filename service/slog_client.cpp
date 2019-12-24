@@ -10,8 +10,9 @@ int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
 
   auto context = std::make_shared<zmq::context_t>(1);
-  Client client(context, FLAGS_host, FLAGS_port);
-  client.Start();
+  auto client = MakeRunnerFor<Client>(context, FLAGS_host, FLAGS_port);
+
+  client->Start();
  
   return 0;
 }

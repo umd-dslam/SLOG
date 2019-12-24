@@ -28,12 +28,17 @@ message SlogIdentifier {
     uint32 partition = 2;
 }
 
+/***********************************************
+                    REQUESTS
+***********************************************/
+
 message Request {
     uint32 stream_id = 1;
     oneof type {
         EchoRequest echo = 2;
         ReadyRequest ready = 3;
         ForwardRequest forward = 4;
+        LookupMasterRequest lookup_master = 5;
     }
 }
 
@@ -51,14 +56,34 @@ message ForwardRequest {
     Transaction txn = 1;
 }
 
+message LookupMasterRequest {
+    uint32 txn_id = 1;
+    repeated string keys = 2;
+}
+
+/***********************************************
+                    RESPONSES
+***********************************************/
+
 message Response {
     uint32 stream_id = 1;
     oneof type {
         EchoResponse echo = 2;
+        LookupMasterResponse lookup_master = 3;
     }
 }
 
 // For debugging and testing purposes
 message EchoResponse {
     bytes data = 1;
+}
+
+message LookupMasterResponse {
+    message MasterMetadata {
+        uint32 master = 1;
+        uint32 counter = 2;
+    }
+
+    uint32 txn_id = 1;
+    map<string, MasterMetadata> master_metadata = 2;
 }

@@ -13,7 +13,7 @@ const std::string TEST_STRING = "test";
 
 TEST(MMessageTest, AddThenGetRequestProto) {
   MMessage message;
-  message.Add(MakeEchoRequest(TEST_STRING));
+  message.Push(MakeEchoRequest(TEST_STRING));
 
   Request request;
   ASSERT_TRUE(message.GetProto(request));
@@ -28,7 +28,7 @@ TEST(MMessageTest, AddThenGetRequestProto) {
 
 TEST(MMessageTest, FromAndToResponseProto) {
   MMessage message;
-  message.Add(MakeEchoResponse(TEST_STRING));
+  message.Push(MakeEchoResponse(TEST_STRING));
 
   Response response;
   ASSERT_TRUE(message.GetProto(response));
@@ -50,8 +50,8 @@ TEST(MMessageTest, SendAndReceive) {
   dealer.connect("ipc:///tmp/test_mmessage");
 
   MMessage message;
-  message.Add(MakeEchoRequest(TEST_STRING));
-  message.Send(dealer);
+  message.Push(MakeEchoRequest(TEST_STRING));
+  message.SendTo(dealer);
   MMessage recv_msg(router);
 
   Request request;
@@ -63,8 +63,8 @@ TEST(MMessageTest, SendAndReceive) {
 
 TEST(MMessageTest, IsProto) {
   MMessage message;
-  message.Add(MakeEchoRequest(TEST_STRING));
-  message.Add("test_string");
+  message.Push(MakeEchoRequest(TEST_STRING));
+  message.Push("test_string");
 
   ASSERT_TRUE(message.IsProto<Request>());
   ASSERT_FALSE(message.IsProto<Response>());

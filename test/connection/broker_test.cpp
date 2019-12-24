@@ -14,41 +14,6 @@ using namespace slog;
 using internal::Request;
 using internal::Response;
 
-using ConfigVec = vector<shared_ptr<Configuration>>;
-
-ConfigVec MakeTestConfigurations(
-    string&& prefix,
-    int num_replicas, 
-    int num_partitions) {
-  int num_machines = num_replicas * num_partitions;
-  string addr = "/tmp/test_" + prefix;
-
-  internal::Configuration common_config;
-  common_config.set_protocol("ipc");
-  common_config.set_broker_port(0);
-  common_config.set_num_replicas(num_replicas);
-  common_config.set_num_partitions(num_partitions);
-  for (int i = 0; i < num_machines; i++) {
-    common_config.add_addresses(addr + to_string(i));
-  }
-
-  ConfigVec configs;
-  configs.reserve(num_machines);
-
-  for (int rep = 0; rep < num_replicas; rep++) {
-    for (int part = 0; part < num_partitions; part++) {
-      int i = rep * num_partitions + part;
-      string local_addr = addr + to_string(i);
-      configs.push_back(make_shared<Configuration>(
-          common_config,
-          local_addr,
-          MakeSlogId(rep, part)));
-    }
-  }
-  
-  return configs;
-}
-
 TEST(BrokerTest, PingPong) {
   const string SENDER("sender");
   const string RECEIVER("receiver");
@@ -65,8 +30,9 @@ TEST(BrokerTest, PingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Add(MakeEchoRequest("ping"));
-    msg.Add(RECEIVER);
+    msg.Push(MakeEchoRequest("ping"));
+    msg.Push(SENDER);
+    msg.Push(RECEIVER);
     msg.SetIdentity(
         SlogIdToString(MakeSlogId(0, 1)));
     channel->Send(std::move(msg));
@@ -97,10 +63,9 @@ TEST(BrokerTest, PingPong) {
     Response res;
     res.mutable_echo()->set_data("pong");
     msg.Set(0, res);
-    msg.Set(1, SENDER);
     channel->Send(msg);
 
-    this_thread::sleep_for(1s);
+    this_thread::sleep_for(200ms);
   });
 
   sender.join();
@@ -120,8 +85,9 @@ TEST(BrokerTest, InterchannelPingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Add(MakeEchoRequest("ping"));
-    msg.Add(RECEIVER);
+    msg.Push(MakeEchoRequest("ping"));
+    msg.Push(SENDER);
+    msg.Push(RECEIVER);
     channel->Send(std::move(msg));
 
     // Wait for pong
@@ -146,10 +112,9 @@ TEST(BrokerTest, InterchannelPingPong) {
     res.mutable_echo()->set_data("pong");
     msg.SetIdentity("");
     msg.Set(0, res);
-    msg.Set(1, SENDER);
     channel->Send(msg);
 
-    this_thread::sleep_for(1s);
+    this_thread::sleep_for(200ms);
   };
 
   std::thread sender_thread(sender, broker.AddChannel(SENDER));

@@ -33,7 +33,7 @@ TEST_F(ChannelTest, ListenToChannel) {
   });
 
   MMessage message;
-  message.Add(MakeEchoRequest("test"));
+  message.Push(MakeEchoRequest("test"));
   message.SetIdentity("zZz");
   channel_->Send(message);
   th.join();
@@ -44,7 +44,7 @@ TEST_F(ChannelTest, SendToChannel) {
     std::unique_ptr<Channel> listener(channel_->GetListener());
     MMessage message;
     message.SetIdentity("zZz");
-    message.Add(MakeEchoResponse("test"));
+    message.Push(MakeEchoResponse("test"));
     listener->Send(message);
   });
 

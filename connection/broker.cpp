@@ -5,6 +5,7 @@
 
 #include <glog/logging.h>
 
+#include "common/constants.h"
 #include "common/mmessage.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
@@ -13,12 +14,8 @@ using std::pair;
 using std::unordered_set;
 namespace slog {
 
-namespace {
-const long BROKER_POLL_TIMEOUT_MS = 1000;
-}
-
 Broker::Broker(
-    shared_ptr<Configuration> config, 
+    shared_ptr<const Configuration> config, 
     shared_ptr<zmq::context_t> context) 
   : config_(config),
     context_(context),
@@ -86,7 +83,7 @@ bool Broker::InitializeConnection() {
   ready->set_ip_address(config_->GetLocalAddress());
   ready->mutable_slog_id()->CopyFrom(config_->GetLocalSlogId());
   MMessage ready_msg;
-  ready_msg.Add(request);
+  ready_msg.Push(request);
 
   // Connect to all other machines and send the READY message
   for (const auto& pair : address_to_socket_) {
@@ -94,7 +91,7 @@ bool Broker::InitializeConnection() {
     const auto& socket = pair.second;
     auto endpoint = MakeEndpoint(addr);
     socket->connect(endpoint);
-    ready_msg.Send(*socket);
+    ready_msg.SendTo(*socket);
     LOG(INFO) << "Connected and sent READY message to " << endpoint;
   }
 
@@ -114,7 +111,7 @@ bool Broker::InitializeConnection() {
   while (running_) {
     zmq::poll(&item, 1, BROKER_POLL_TIMEOUT_MS);
     if (item.revents & ZMQ_POLLIN) {
-      ready_msg.Receive(router_);
+      ready_msg.ReceiveFrom(router_);
       
       // The message must be a Request
       if (!ready_msg.GetProto(request)) {
@@ -196,7 +193,7 @@ void Broker::Run() {
       } else {
         message.SetIdentity(connection_id_to_slog_id_[conn_id]);
       }
-      SendToTargetChannel(message);
+      SendToTargetChannel(std::move(message));
     }
 
     for (size_t i = 0; i < items.size() - 1; i++) {
@@ -215,9 +212,9 @@ void Broker::Run() {
           const auto& slog_id = message.GetIdentity();
           const auto& addr = slog_id_to_address_[slog_id];
           message.SetIdentity("");
-          message.Send(*address_to_socket_[addr]);
+          message.SendTo(*address_to_socket_[addr]);
         } else {
-          SendToTargetChannel(message);
+          SendToTargetChannel(std::move(message));
         }
       }
     }
@@ -225,9 +222,9 @@ void Broker::Run() {
   } // while-loop
 }
 
-void Broker::SendToTargetChannel(const MMessage& msg) {
-  string target_channel;
-  msg.GetString(target_channel, 1);
+void Broker::SendToTargetChannel(MMessage&& msg) {
+  CHECK(msg.Size() >= 2) << "Insufficient information to broker to a channel";
+  auto target_channel = msg.Pop();
   if (channels_.count(target_channel) == 0) {
     LOG(ERROR) << "Unknown channel: \"" << target_channel << "\". Dropping message";
   } else {

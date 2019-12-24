@@ -3,7 +3,6 @@
 #include <chrono>
 #include <thread>
 #include <set>
-#include <random>
 #include <unordered_map>
 
 #include <zmq.hpp>
@@ -12,7 +11,9 @@
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/module.h"
+#include "storage/lookup_master_index.h"
 
+using std::shared_ptr;
 using std::unordered_map;
 
 namespace slog {
@@ -20,9 +21,10 @@ namespace slog {
 class Server : public Module {
 public:
   Server(
-      std::shared_ptr<const Configuration> config,
-      std::shared_ptr<zmq::context_t> context,
-      Broker& broker);
+      shared_ptr<const Configuration> config,
+      shared_ptr<zmq::context_t> context,
+      Broker& broker,
+      shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index);
 
 private:
   void SetUp() final;
@@ -34,13 +36,12 @@ private:
 
   uint32_t NextTxnId();
 
-  std::shared_ptr<const Configuration> config_;
+  shared_ptr<const Configuration> config_;
   zmq::socket_t socket_;
   std::unique_ptr<Channel> listener_;
   std::vector<zmq::pollitem_t> poll_items_;
 
-  std::mt19937_64 rand_eng_;
-  std::uniform_int_distribution<> dist_;
+  shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
 
   uint32_t server_id_;
   uint32_t counter_;

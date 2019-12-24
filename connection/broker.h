@@ -47,7 +47,7 @@ namespace slog {
 class Broker {
 public:
   Broker(
-      shared_ptr<Configuration> config, 
+      shared_ptr<const Configuration> config, 
       shared_ptr<zmq::context_t> context);
   ~Broker();
 
@@ -70,9 +70,9 @@ private:
   
   void Run();
 
-  void SendToTargetChannel(const MMessage& msg);
+  void SendToTargetChannel(MMessage&& msg);
 
-  shared_ptr<Configuration> config_;
+  shared_ptr<const Configuration> config_;
   shared_ptr<zmq::context_t> context_;
   zmq::socket_t router_;
   std::atomic<bool> running_;
