@@ -6,3 +6,7 @@ set(SOURCES
 )
 
 add_library(connection ${SOURCES})
+
+target_link_libraries(connection 
+    common
+    proto)

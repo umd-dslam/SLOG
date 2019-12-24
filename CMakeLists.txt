@@ -37,52 +37,34 @@ include_directories(${CMAKE_BINARY_DIR})
 
 # Proto needs to be added before everything else so that protobuf gets to generate files
 # needed in subsequent libraries
-add_subdirectory(proto)
 add_subdirectory(common)
 add_subdirectory(connection)
-add_subdirectory(storage)
 add_subdirectory(module)
+add_subdirectory(proto)
+add_subdirectory(storage)
 set(SLOG_LIBS
-  storage
-  module
-  connection
   common
+  connection
+  module
+  storage
   proto)
 
 # All libraries to be linked to executables
-set(ALL_LIBRARIES
-    ${SLOG_LIBS} 
-    ${Protobuf_LIBRARIES}
-    ${ZeroMQ_STATIC_LIBRARY}
-    ${cppzmq_STATIC_LIBRARY}
-    ${GLOG_LIBRARIES}
-    ${GFLAGS_LIBRARIES})
+set(EXTERNAL_LIBS
+  ${Protobuf_LIBRARIES}
+  ${ZeroMQ_STATIC_LIBRARY}
+  ${cppzmq_STATIC_LIBRARY}
+  ${GLOG_LIBRARIES}
+  ${GFLAGS_LIBRARIES})
 
 # Create an executable for the services
 add_executable(slog service/slog.cpp)
-target_link_libraries(slog ${ALL_LIBRARIES})
+target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
 add_executable(slog_client service/slog_client.cpp)
-target_link_libraries(slog_client ${ALL_LIBRARIES})
+target_link_libraries(slog_client ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
 # =================================== Tests =============================================
 
 enable_testing()
-
-# Add tests
-file(GLOB_RECURSE TEST_SRCS RELATIVE ${PROJECT_SOURCE_DIR} "test/*.cpp")
-foreach(TEST ${TEST_SRCS})
-  # Extract file names (w/o extension)
-  get_filename_component(TEST_NAME ${TEST} NAME_WE)
-  # Set compile target
-  add_executable(${TEST_NAME} ${TEST})
-
-  #link to libraries
-  target_link_libraries(${TEST_NAME} ${ALL_LIBRARIES} GTest::GTest GTest::Main)
-
-  add_test(
-    NAME ${TEST_NAME}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${TEST_NAME})
-
-endforeach(TEST)
+add_subdirectory(test)

@@ -9,3 +9,5 @@ set(SOURCES
 )
 
 add_library(common ${SOURCES})
+
+target_link_libraries(common proto)
