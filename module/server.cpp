@@ -104,10 +104,9 @@ void Server::HandleInternalRequest(MMessage&& msg) {
     for (const auto& key : lookup_request.keys()) {
       Metadata metadata;
       if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
-        internal::LookupMasterResponse_MasterMetadata response_metadata;
+        auto& response_metadata = (*metadata_map)[key];
         response_metadata.set_master(metadata.master);
         response_metadata.set_counter(metadata.counter);
-        metadata_map->insert({key, response_metadata});
       }
     }
     lookup_response->set_txn_id(lookup_request.txn_id());

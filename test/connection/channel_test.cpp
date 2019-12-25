@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "common/constants.h"
 #include "common/test_utils.h"
 #include "connection/channel.h"
 
@@ -33,7 +34,7 @@ TEST_F(ChannelTest, ListenToChannel) {
   });
 
   MMessage message;
-  message.Push(MakeEchoRequest("test"));
+  message.Set(MM_REQUEST, MakeEchoRequest("test"));
   message.SetIdentity("zZz");
   channel_->Send(message);
   th.join();
@@ -44,7 +45,7 @@ TEST_F(ChannelTest, SendToChannel) {
     std::unique_ptr<Channel> listener(channel_->GetListener());
     MMessage message;
     message.SetIdentity("zZz");
-    message.Push(MakeEchoResponse("test"));
+    message.Set(MM_RESPONSE, MakeEchoResponse("test"));
     listener->Send(message);
   });
 

@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "common/configuration.h"
+#include "common/constants.h"
 #include "common/proto_utils.h"
 #include "common/test_utils.h"
 #include "connection/broker.h"
@@ -30,9 +31,9 @@ TEST(BrokerTest, PingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Push(MakeEchoRequest("ping"));
-    msg.Push(SENDER);
-    msg.Push(RECEIVER);
+    msg.Set(MM_REQUEST, MakeEchoRequest("ping"));
+    msg.Set(MM_FROM_CHANNEL, SENDER);
+    msg.Set(MM_TO_CHANNEL, RECEIVER);
     msg.SetIdentity(
         SlogIdToString(MakeSlogId(0, 1)));
     channel->Send(std::move(msg));
@@ -85,9 +86,9 @@ TEST(BrokerTest, InterchannelPingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Push(MakeEchoRequest("ping"));
-    msg.Push(SENDER);
-    msg.Push(RECEIVER);
+    msg.Set(MM_REQUEST, MakeEchoRequest("ping"));
+    msg.Set(MM_FROM_CHANNEL, SENDER);
+    msg.Set(MM_TO_CHANNEL, RECEIVER);
     channel->Send(std::move(msg));
 
     // Wait for pong

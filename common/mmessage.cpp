@@ -58,8 +58,7 @@ bool MMessage::HasIdentity() const {
 }
 
 void MMessage::Push(const Message& data) {
-  body_.push_back("");
-  Set(body_.size() - 1, data);
+  Set(body_.size(), data);
 }
 
 void MMessage::Push(const string& data) {
@@ -79,7 +78,7 @@ string MMessage::Pop() {
 }
 
 void MMessage::Set(size_t index, const Message& data) {
-  CHECK(index < body_.size()) << "Index out of bound";
+  EnsureBodySize(index + 1);
   Any any;
   any.PackFrom(data);
   body_[index] = any.SerializeAsString();
@@ -87,11 +86,13 @@ void MMessage::Set(size_t index, const Message& data) {
 }
 
 void MMessage::Set(size_t index, const string& data) {
+  EnsureBodySize(index + 1);
   body_[index] = data;
   body_to_any_cache_.clear();
 }
 
 void MMessage::Set(size_t index, string&& data) {
+  EnsureBodySize(index + 1);
   body_[index] = std::move(data);
   body_to_any_cache_.clear();
 }
@@ -141,6 +142,12 @@ void MMessage::Clear() {
   identity_.clear();
   body_.clear();
   body_to_any_cache_.clear();
+}
+
+void MMessage::EnsureBodySize(size_t sz) {
+  while (body_.size() < sz) {
+    body_.push_back("");
+  }
 }
 
 const Any* MMessage::GetAny(size_t index) const {

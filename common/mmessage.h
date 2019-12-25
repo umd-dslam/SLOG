@@ -20,8 +20,14 @@ namespace slog {
  * Encapsulates a multi-part zmq message:
  * 
  * [source id][empty frame][body_0][body_1]...
- * 
+ *
  * Source id (called 'identity' in ZMQ) is optional
+ * 
+ * Typical messages are like:
+ * 
+ * [source id][empty frame][request][from channel][to channel]
+ * 
+ * [source id][empty frame][response][to channel]
  */
 class MMessage {
 public:
@@ -69,6 +75,7 @@ public:
   void Clear();
 
 private:
+  void EnsureBodySize(size_t sz);
   const Any* GetAny(size_t index) const;
 
   string identity_;

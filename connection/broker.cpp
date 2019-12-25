@@ -83,7 +83,7 @@ bool Broker::InitializeConnection() {
   ready->set_ip_address(config_->GetLocalAddress());
   ready->mutable_slog_id()->CopyFrom(config_->GetLocalSlogId());
   MMessage ready_msg;
-  ready_msg.Push(request);
+  ready_msg.Set(MM_REQUEST, request);
 
   // Connect to all other machines and send the READY message
   for (const auto& pair : address_to_socket_) {

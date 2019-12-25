@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "common/configuration.h"
+#include "common/constants.h"
 #include "common/proto_utils.h"
 #include "common/test_utils.h"
 #include "connection/broker.h"
@@ -39,9 +40,9 @@ TEST(ServerTest, LookupMaster) {
   lookup->add_keys("B");
   lookup->add_keys("D");
   MMessage msg;
-  msg.Push(req);
-  msg.Push("client");
-  msg.Push("server");
+  msg.Set(MM_REQUEST, req);
+  msg.Set(MM_FROM_CHANNEL, "client");
+  msg.Set(MM_TO_CHANNEL, "server");
   client->Send(msg);
 
   client->Receive(msg);
