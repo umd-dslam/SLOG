@@ -2,6 +2,8 @@ project(module)
 
 set(SOURCES
   client.cpp
+  basic_module.cpp
+  forwarder.cpp
   module.cpp
   server.cpp
 )

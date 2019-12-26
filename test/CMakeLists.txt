@@ -1,5 +1,7 @@
 project(test)
 
+# Don't forget to add all of the tests here so that they
+# are linked properly
 set(ALL_TESTS
   mmessage_test
   broker_test

@@ -1,32 +1,9 @@
 #include "module/module.h"
 
+#include "common/constants.h"
+#include "common/mmessage.h"
+
 namespace slog {
-
-ChanneledModule::ChanneledModule(Channel* listener, long poll_timeout_ms) 
-  : listener_(listener),
-    poll_item_(listener->GetPollItem()),
-    poll_timeout_ms_(poll_timeout_ms) {}
-
-
-void ChanneledModule::Send(const MMessage& message) {
-  listener_->Send(message);
-}
-
-void ChanneledModule::Loop() {
-  MMessage message;
-  switch (zmq::poll(&poll_item_, 1, poll_timeout_ms_)) {
-    case 0: // Timed out. No event signaled during poll
-      HandlePollTimedOut();
-      break;
-    default:
-      if (poll_item_.revents & ZMQ_POLLIN) {
-        listener_->Receive(message);
-        HandleMessage(message);
-      }
-      break;
-  }
-  PostProcessing();
-}
 
 ModuleRunner::ModuleRunner(Module* module) 
   : module_(module),
@@ -53,12 +30,49 @@ void ModuleRunner::Start() {
   Run();
 }
 
-
 void ModuleRunner::Run() {
   module_->SetUp();
   while (running_) {
     module_->Loop();
   }
 }
+
+ChannelHolder::ChannelHolder(Channel* listener) 
+  : listener_(listener) {}
+
+void ChannelHolder::Send(
+    const google::protobuf::Message& request_or_response,
+    const string& to_machine_id,
+    const string& to_channel) {
+  MMessage message;
+  message.SetIdentity(to_machine_id);
+  message.Set(MM_PROTO, request_or_response);
+  message.Set(MM_FROM_CHANNEL, listener_->GetName());
+  message.Set(MM_TO_CHANNEL, to_channel);
+  Send(std::move(message));
+}
+
+void ChannelHolder::Send(
+    const google::protobuf::Message& request_or_response,
+    const string& to_channel) {
+  MMessage message;
+  message.Set(MM_PROTO, request_or_response);
+  message.Set(MM_FROM_CHANNEL, listener_->GetName());
+  message.Set(MM_TO_CHANNEL, to_channel);
+  Send(std::move(message));
+}
+
+void ChannelHolder::Send(MMessage&& message) {
+  listener_->Send(message);
+}
+
+void ChannelHolder::ReceiveFromChannel(MMessage& message) {
+  listener_->Receive(message);
+}
+
+zmq::pollitem_t ChannelHolder::GetChannelPollItem() const {
+  return listener_->GetPollItem();
+}
+
 
 } // namespace slog

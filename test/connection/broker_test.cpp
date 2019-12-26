@@ -31,7 +31,7 @@ TEST(BrokerTest, PingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Set(MM_REQUEST, MakeEchoRequest("ping"));
+    msg.Set(MM_PROTO, MakeEchoRequest("ping"));
     msg.Set(MM_FROM_CHANNEL, SENDER);
     msg.Set(MM_TO_CHANNEL, RECEIVER);
     msg.SetIdentity(MakeMachineId(0, 1));
@@ -85,7 +85,7 @@ TEST(BrokerTest, InterchannelPingPong) {
 
     // Send ping
     MMessage msg;
-    msg.Set(MM_REQUEST, MakeEchoRequest("ping"));
+    msg.Set(MM_PROTO, MakeEchoRequest("ping"));
     msg.Set(MM_FROM_CHANNEL, SENDER);
     msg.Set(MM_TO_CHANNEL, RECEIVER);
     channel->Send(std::move(msg));
@@ -117,8 +117,8 @@ TEST(BrokerTest, InterchannelPingPong) {
     this_thread::sleep_for(200ms);
   };
 
-  std::thread sender_thread(sender, broker.AddChannel(SENDER));
-  std::thread receiver_thread(receiver, broker.AddChannel(RECEIVER));
+  thread sender_thread(sender, broker.AddChannel(SENDER));
+  thread receiver_thread(receiver, broker.AddChannel(RECEIVER));
 
   broker.StartInNewThread();
 

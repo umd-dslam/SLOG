@@ -42,19 +42,21 @@ public:
 
   /**
    * Returns a pointer to the listener corresponding to this channel.
-   * This methods should be called on a different thread other than the 
-   * Broker thread. Whoever owns this pointer later needs to free it up 
-   * otherwise the socket inside the listener would prevent a thread to exit.
+   * Whoever owns this pointer later needs to free it up otherwise the 
+   * socket inside the listener would prevent the thread to exit.
    */
   Channel* GetListener();
 
 private:
-  Channel(std::shared_ptr<zmq::context_t> context, const std::string& name, bool is_listener);
+  Channel(
+      std::shared_ptr<zmq::context_t> context,
+      const std::string& name,
+      bool is_listener);
 
   std::shared_ptr<zmq::context_t> context_;
   const std::string name_;
   zmq::socket_t socket_;
-  bool is_listener_;
+  const bool is_listener_;
   std::atomic<bool> listener_created_;
 };
 

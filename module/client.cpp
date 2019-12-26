@@ -4,6 +4,7 @@
 
 #include <glog/logging.h>
 
+#include "common/mmessage.h"
 #include "proto/api.pb.h"
 
 namespace slog {

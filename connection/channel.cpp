@@ -18,7 +18,7 @@ Channel::Channel(
     socket_(*context, ZMQ_PAIR),
     is_listener_(is_listener),
     listener_created_(false) {
-  string endpoint = "inproc://" + name + ".ipc";
+  string endpoint = "inproc://" + name;
   if (is_listener) {
     socket_.bind(endpoint);
   } else {

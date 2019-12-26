@@ -84,6 +84,14 @@ const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
 
+uint32_t Configuration::GetLocalReplica() const {
+  return local_replica_;
+}
+
+uint32_t Configuration::GetLocalPartition() const {
+  return local_partition_;
+}
+
 MachineId Configuration::GetLocalMachineIdAsProto() const {
   return MakeMachineIdProto(local_replica_, local_partition_);
 }

@@ -79,11 +79,6 @@ message EchoResponse {
 }
 
 message LookupMasterResponse {
-    message MasterMetadata {
-        uint32 master = 1;
-        uint32 counter = 2;
-    }
-
     uint32 txn_id = 1;
     map<string, MasterMetadata> master_metadata = 2;
 }

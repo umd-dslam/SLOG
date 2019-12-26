@@ -1,8 +1,27 @@
 syntax = "proto3";
 package slog;
 
+enum TransactionType {
+    SINGLE_HOME = 0;
+    MULTI_HOME = 1;
+    UNKNOWN = 2;
+}
+
+message MasterMetadata {
+    uint32 master = 1;
+    uint32 counter = 2;
+}
+
+message TransactionInternal {
+    map<string, MasterMetadata> master_metadata = 1;
+    TransactionType type = 2;
+}
+
 message Transaction {
     uint32 id = 1;
     map<string, string> read_set = 2;
     map<string, string> write_set = 3;
+    string code = 4;
+
+    TransactionInternal internal = 5;
 }

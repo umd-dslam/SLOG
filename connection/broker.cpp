@@ -84,7 +84,7 @@ bool Broker::InitializeConnection() {
   ready->mutable_machine_id()->CopyFrom(
       config_->GetLocalMachineIdAsProto());
   MMessage ready_msg;
-  ready_msg.Set(MM_REQUEST, request);
+  ready_msg.Set(MM_PROTO, request);
 
   // Connect to all other machines and send the READY message
   for (const auto& pair : address_to_socket_) {
@@ -128,7 +128,8 @@ bool Broker::InitializeConnection() {
       const auto& ready = request.ready();
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
-      auto machine_id_str = MakeMachineId(machine_id.replica(), machine_id.partition());
+      auto machine_id_str = MakeMachineId(
+            machine_id.replica(), machine_id.partition());
 
       if (needed_machine_ids.count(machine_id_str) == 0) {
         continue;
@@ -180,7 +181,7 @@ void Broker::Run() {
     // Wait until a message arrived at one of the sockets
     zmq::poll(items, BROKER_POLL_TIMEOUT_MS);
 
-    // Router received a message
+    // Router just received a message
     if (items.back().revents & ZMQ_POLLIN) {
 
       MMessage message(router_);
@@ -197,7 +198,7 @@ void Broker::Run() {
     }
 
     for (size_t i = 0; i < items.size() - 1; i++) {
-      // A channel sent a message. Pass this message to the router to send it out.
+      // A channel just sent a message
       if (items[i].revents & ZMQ_POLLIN) {
         const auto& name = channel_names[i];
         MMessage message;

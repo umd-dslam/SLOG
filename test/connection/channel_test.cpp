@@ -14,18 +14,17 @@ using internal::Response;
 
 class ChannelTest : public ::testing::Test {
 protected:
-
   void SetUp() override {
-    auto context = std::make_shared<zmq::context_t>(1);
-    channel_ = std::make_unique<Channel>(context, "test_channel");
+    auto context = make_shared<zmq::context_t>(1);
+    channel_ = make_unique<Channel>(context, "test_channel");
   }
 
-  std::unique_ptr<Channel> channel_;
+  unique_ptr<Channel> channel_;
 };
 
 TEST_F(ChannelTest, ListenToChannel) {
-  std::thread th([this](){
-    std::unique_ptr<Channel> listener(channel_->GetListener());
+  thread th([this](){
+    unique_ptr<Channel> listener(channel_->GetListener());
     MMessage message;
     listener->Receive(message);
     Request req;
@@ -34,18 +33,18 @@ TEST_F(ChannelTest, ListenToChannel) {
   });
 
   MMessage message;
-  message.Set(MM_REQUEST, MakeEchoRequest("test"));
+  message.Set(MM_PROTO, MakeEchoRequest("test"));
   message.SetIdentity("zZz");
   channel_->Send(message);
   th.join();
 }
 
 TEST_F(ChannelTest, SendToChannel) {
-  std::thread th([this](){
-    std::unique_ptr<Channel> listener(channel_->GetListener());
+  thread th([this](){
+    unique_ptr<Channel> listener(channel_->GetListener());
     MMessage message;
     message.SetIdentity("zZz");
-    message.Set(MM_RESPONSE, MakeEchoResponse("test"));
+    message.Set(MM_PROTO, MakeEchoResponse("test"));
     listener->Send(message);
   });
 

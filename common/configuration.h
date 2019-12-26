@@ -32,8 +32,10 @@ public:
   uint32_t GetServerPort() const;
   uint32_t GetNumReplicas() const;
   uint32_t GetNumPartitions() const;
-  const string& GetLocalAddress() const;
 
+  const string& GetLocalAddress() const;
+  uint32_t GetLocalReplica() const;
+  uint32_t GetLocalPartition() const;
   string GetLocalMachineIdAsString() const;
   MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;

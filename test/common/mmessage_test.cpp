@@ -10,11 +10,11 @@ using namespace slog;
 using internal::Request;
 using internal::Response;
 
-const std::string TEST_STRING = "test";
+const string TEST_STRING = "test";
 
 TEST(MMessageTest, AddThenGetRequestProto) {
   MMessage message;
-  message.Set(MM_REQUEST, MakeEchoRequest(TEST_STRING));
+  message.Set(MM_PROTO, MakeEchoRequest(TEST_STRING));
 
   Request request;
   ASSERT_TRUE(message.GetProto(request));
@@ -29,7 +29,7 @@ TEST(MMessageTest, AddThenGetRequestProto) {
 
 TEST(MMessageTest, FromAndToResponseProto) {
   MMessage message;
-  message.Set(MM_RESPONSE, MakeEchoResponse(TEST_STRING));
+  message.Set(MM_PROTO, MakeEchoResponse(TEST_STRING));
 
   Response response;
   ASSERT_TRUE(message.GetProto(response));
@@ -51,7 +51,7 @@ TEST(MMessageTest, SendAndReceive) {
   dealer.connect("ipc:///tmp/test_mmessage");
 
   MMessage message;
-  message.Set(MM_REQUEST, MakeEchoRequest(TEST_STRING));
+  message.Set(MM_PROTO, MakeEchoRequest(TEST_STRING));
   message.SendTo(dealer);
   MMessage recv_msg(router);
 

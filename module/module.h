@@ -1,14 +1,23 @@
 #pragma once
 
+#include <atomic>
 #include <thread>
 #include <vector>
 
 #include "connection/channel.h"
 
 using std::unique_ptr;
+using std::string;
 
 namespace slog {
 
+/**
+ * An interface for a module in SLOG. Most modules only need
+ * to connect to a single channel from the broker so they usually
+ * extend from BasicModule. Extending from this class is
+ * only needed if a module needs more than one socket or
+ * needs more flexibility in implementation (for example: Server)
+ */
 class Module {
 public:
   Module() {};
@@ -18,27 +27,6 @@ public:
 
   virtual void SetUp() {};
   virtual void Loop() = 0;
-};
-
-class ChanneledModule : public Module {
-public:
-  ChanneledModule(Channel* listener, long poll_timeout_ms = 1000);
-
-protected:
-  void Send(const MMessage& message);
-
-  virtual void HandleMessage(MMessage message) = 0;
-
-  virtual void HandlePollTimedOut() {};
-
-  virtual void PostProcessing() {};
-
-private:
-  void Loop() final;
-
-  std::unique_ptr<Channel> listener_;
-  zmq::pollitem_t poll_item_;
-  long poll_timeout_ms_;
 };
 
 class ModuleRunner {
@@ -64,5 +52,29 @@ MakeRunnerFor(Args&&... args)
   typedef typename std::remove_cv<T>::type T_nc;
   return std::make_unique<ModuleRunner>(new T_nc(std::forward<Args>(args)...));
 }
+
+class ChannelHolder {
+public:
+  ChannelHolder(Channel* listener_);
+
+protected:
+  void Send(
+      const google::protobuf::Message& request_or_response,
+      const string& to_machine_id,
+      const string& to_channel);
+
+  void Send(
+      const google::protobuf::Message& request_or_response,
+      const string& to_channel);
+
+  void Send(MMessage&& message);
+
+  zmq::pollitem_t GetChannelPollItem() const;
+
+  void ReceiveFromChannel(MMessage& message);
+
+private:
+  unique_ptr<Channel> listener_;
+};
 
 } // namespace slog
