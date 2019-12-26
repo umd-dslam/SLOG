@@ -19,11 +19,11 @@ using std::make_shared;
 int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
   
-  auto slog_id = MakeSlogId(FLAGS_replica, FLAGS_partition);
+  auto machine_id = MakeMachineId(FLAGS_replica, FLAGS_partition);
   auto config = Configuration::FromFile(
       "slog.conf", 
       FLAGS_address,
-      slog_id);
+      machine_id);
   auto context = make_shared<zmq::context_t>(1);
   auto storage = make_shared<MemOnlyStorage>();
   Broker broker(config, context);

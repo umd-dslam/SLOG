@@ -7,6 +7,8 @@
 #include <google/protobuf/text_format.h>
 #include <glog/logging.h>
 
+#include "common/proto_utils.h"
+
 namespace slog {
 
 using std::runtime_error;
@@ -14,7 +16,7 @@ using std::runtime_error;
 std::shared_ptr<Configuration> Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
-    const SlogIdentifier& local_id) {
+    const MachineId& local_id) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
@@ -31,7 +33,7 @@ std::shared_ptr<Configuration> Configuration::FromFile(
 Configuration::Configuration(
     const internal::Configuration& config, 
     const std::string& local_address,
-    const SlogIdentifier& local_id) 
+    const MachineId& local_id) 
   : protocol_(config.protocol()),
     broker_port_(config.broker_port()),
     server_port_(config.server_port()),
@@ -78,12 +80,16 @@ const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
 
-const SlogIdentifier& Configuration::GetLocalSlogId() const {
+const MachineId& Configuration::GetLocalMachineId() const {
   return local_id_;
 }
 
-uint32_t Configuration::GetLocalNumericId() const {
+uint32_t Configuration::GetLocalMachineIdAsNumber() const {
   return local_id_.partition() * 100 + local_id_.replica();
+}
+
+string Configuration::GetLocalMachineIdAsString() const {
+  return MachineIdToString(local_id_);
 }
 
 } // namespace slog

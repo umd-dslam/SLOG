@@ -10,19 +10,19 @@ using std::vector;
 
 namespace slog {
 
-using internal::SlogIdentifier;
+using internal::MachineId;
 
 class Configuration {
 public:
   static std::shared_ptr<Configuration> FromFile(
       const string& file_path,
       const string& local_address,
-      const SlogIdentifier& local_identifier);
+      const MachineId& local_id);
 
   Configuration(
       const internal::Configuration& config,
       const string& local_address,
-      const SlogIdentifier& local_identifier);
+      const MachineId& local_identifier);
 
   const string& GetProtocol() const;
   const vector<string>& GetAllAddresses() const;
@@ -31,8 +31,9 @@ public:
   uint32_t GetNumReplicas() const;
   uint32_t GetNumPartitions() const;
   const string& GetLocalAddress() const;
-  const SlogIdentifier& GetLocalSlogId() const;
-  uint32_t GetLocalNumericId() const;
+  const MachineId& GetLocalMachineId() const;
+  uint32_t GetLocalMachineIdAsNumber() const;
+  string GetLocalMachineIdAsString() const;
 
 private:
   string protocol_;
@@ -42,7 +43,7 @@ private:
   uint32_t num_partitions_;
   vector<string> all_addresses_;
   string local_address_;
-  SlogIdentifier local_id_;
+  MachineId local_id_;
 };
 
 } // namespace slog

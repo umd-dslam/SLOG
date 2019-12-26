@@ -121,7 +121,7 @@ void Server::HandleInternalResponse(MMessage&&) {
 
 uint32_t Server::NextTxnId() {
   counter_ = (counter_ + 1) % MAX_TXN_COUNT;
-  return config_->GetLocalNumericId() * MAX_TXN_COUNT + counter_;
+  return config_->GetLocalMachineIdAsNumber() * MAX_TXN_COUNT + counter_;
 }
 
 } // namespace slog

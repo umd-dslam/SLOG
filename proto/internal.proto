@@ -23,7 +23,7 @@ message Configuration {
     uint32 num_partitions = 6;
 }
 
-message SlogIdentifier {
+message MachineId {
     uint32 replica = 1;
     uint32 partition = 2;
 }
@@ -49,7 +49,7 @@ message EchoRequest {
 
 message ReadyRequest {
     bytes ip_address = 1;
-    SlogIdentifier slog_id = 2;
+    MachineId machine_id = 2;
 }
 
 message ForwardRequest {

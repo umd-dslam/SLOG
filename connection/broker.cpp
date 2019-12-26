@@ -81,7 +81,7 @@ bool Broker::InitializeConnection() {
   internal::Request request;
   auto ready = request.mutable_ready();
   ready->set_ip_address(config_->GetLocalAddress());
-  ready->mutable_slog_id()->CopyFrom(config_->GetLocalSlogId());
+  ready->mutable_machine_id()->CopyFrom(config_->GetLocalMachineId());
   MMessage ready_msg;
   ready_msg.Set(MM_REQUEST, request);
 
@@ -98,11 +98,11 @@ bool Broker::InitializeConnection() {
   // This set represents the membership of all machines in the network.
   // Each machine is identified with its replica and partition. Each broker
   // needs to receive the READY message from all other machines to start working.
-  unordered_set<string> needed_slog_ids;
+  unordered_set<string> needed_machine_ids;
   for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
     for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-      auto slog_id = MakeSlogId(rep, part);
-      needed_slog_ids.insert(SlogIdToString(slog_id));
+      auto machine_id = MakeMachineId(rep, part);
+      needed_machine_ids.insert(MachineIdToString(machine_id));
     }
   }
 
@@ -127,27 +127,27 @@ bool Broker::InitializeConnection() {
       const auto& conn_id = ready_msg.GetIdentity();
       const auto& ready = request.ready();
       const auto& addr = ready.ip_address();
-      const auto& slog_id = ready.slog_id();
-      auto slog_id_str = SlogIdToString(slog_id);
+      const auto& machine_id = ready.machine_id();
+      auto machine_id_str = MachineIdToString(machine_id);
 
-      if (needed_slog_ids.count(slog_id_str) == 0) {
+      if (needed_machine_ids.count(machine_id_str) == 0) {
         continue;
       }
 
       LOG(INFO) << "Received READY message from " << addr 
-                << " (rep: " << slog_id.replica() 
-                << ", part: " << slog_id.partition() << ")";
+                << " (rep: " << machine_id.replica() 
+                << ", part: " << machine_id.partition() << ")";
 
-      slog_id_to_address_[slog_id_str] = addr;
-      connection_id_to_slog_id_[conn_id] = slog_id_str;
-      if (slog_id_str == SlogIdToString(config_->GetLocalSlogId())) {
+      machine_id_to_address_[machine_id_str] = addr;
+      connection_id_to_machine_id_[conn_id] = machine_id_str;
+      if (machine_id_str == config_->GetLocalMachineIdAsString()) {
         loopback_connection_id_ = conn_id;
       }
 
-      needed_slog_ids.erase(slog_id_str);
+      needed_machine_ids.erase(machine_id_str);
     }
 
-    if (needed_slog_ids.empty()) {
+    if (needed_machine_ids.empty()) {
       LOG(INFO) << "All READY messages received";
       return true;
     }
@@ -191,7 +191,7 @@ void Broker::Run() {
       if (conn_id == loopback_connection_id_) {
         message.SetIdentity("");
       } else {
-        message.SetIdentity(connection_id_to_slog_id_[conn_id]);
+        message.SetIdentity(connection_id_to_machine_id_[conn_id]);
       }
       SendToTargetChannel(std::move(message));
     }
@@ -209,8 +209,8 @@ void Broker::Run() {
         if (message.HasIdentity()) {
           // Remove the identity part of the message before sending 
           // out to a DEALER socket
-          const auto& slog_id = message.GetIdentity();
-          const auto& addr = slog_id_to_address_[slog_id];
+          const auto& machine_id = message.GetIdentity();
+          const auto& addr = machine_id_to_address_[machine_id];
           message.SetIdentity("");
           message.SendTo(*address_to_socket_[addr]);
         } else {

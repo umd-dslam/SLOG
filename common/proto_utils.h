@@ -5,10 +5,10 @@
 
 namespace slog {
 
-using internal::SlogIdentifier;
+using internal::MachineId;
 
-SlogIdentifier MakeSlogId(uint32_t replica, uint32_t partition);
-std::string SlogIdToString(const SlogIdentifier slog_id);
+MachineId MakeMachineId(uint32_t replica, uint32_t partition);
+std::string MachineIdToString(const MachineId machine_id);
 
 template<typename Req, typename Res>
 void GetRequestAndPrepareResponse(Req& request, Res& response, const MMessage& msg) {

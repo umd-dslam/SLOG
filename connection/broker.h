@@ -84,15 +84,15 @@ private:
   // Map from ip addresses to sockets
   unordered_map<string, unique_ptr<zmq::socket_t>> address_to_socket_;
 
-  // Map from connection ids (zmq identities) to serialized-to-string SlogIdentifiers
+  // Map from connection ids (zmq identities) to serialized-to-string MachineIds
   // Used to translate the identities of incoming messages
-  unordered_map<string, string> connection_id_to_slog_id_;
+  unordered_map<string, string> connection_id_to_machine_id_;
   // Cache this to detect that a message comes from the local machine (loop-back)
   std::string loopback_connection_id_;
 
-  // Map from serialized-to-string SlogIdentifiers to IP addresses
+  // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages
-  unordered_map<string, string> slog_id_to_address_;
+  unordered_map<string, string> machine_id_to_address_;
 };
 
 } // namespace slog
