@@ -81,7 +81,8 @@ bool Broker::InitializeConnection() {
   internal::Request request;
   auto ready = request.mutable_ready();
   ready->set_ip_address(config_->GetLocalAddress());
-  ready->mutable_machine_id()->CopyFrom(config_->GetLocalMachineId());
+  ready->mutable_machine_id()->CopyFrom(
+      config_->GetLocalMachineIdAsProto());
   MMessage ready_msg;
   ready_msg.Set(MM_REQUEST, request);
 
@@ -101,8 +102,7 @@ bool Broker::InitializeConnection() {
   unordered_set<string> needed_machine_ids;
   for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
     for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-      auto machine_id = MakeMachineId(rep, part);
-      needed_machine_ids.insert(MachineIdToString(machine_id));
+      needed_machine_ids.insert(MakeMachineId(rep, part));
     }
   }
 
@@ -128,7 +128,7 @@ bool Broker::InitializeConnection() {
       const auto& ready = request.ready();
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
-      auto machine_id_str = MachineIdToString(machine_id);
+      auto machine_id_str = MakeMachineId(machine_id.replica(), machine_id.partition());
 
       if (needed_machine_ids.count(machine_id_str) == 0) {
         continue;

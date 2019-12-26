@@ -17,12 +17,14 @@ public:
   static std::shared_ptr<Configuration> FromFile(
       const string& file_path,
       const string& local_address,
-      const MachineId& local_id);
+      uint32_t local_replica,
+      uint32_t local_partition);
 
   Configuration(
       const internal::Configuration& config,
       const string& local_address,
-      const MachineId& local_identifier);
+      uint32_t local_replica,
+      uint32_t local_partition);
 
   const string& GetProtocol() const;
   const vector<string>& GetAllAddresses() const;
@@ -31,9 +33,10 @@ public:
   uint32_t GetNumReplicas() const;
   uint32_t GetNumPartitions() const;
   const string& GetLocalAddress() const;
-  const MachineId& GetLocalMachineId() const;
-  uint32_t GetLocalMachineIdAsNumber() const;
+
   string GetLocalMachineIdAsString() const;
+  MachineId GetLocalMachineIdAsProto() const;
+  uint32_t GetLocalMachineIdAsNumber() const;
 
 private:
   string protocol_;
@@ -43,7 +46,8 @@ private:
   uint32_t num_partitions_;
   vector<string> all_addresses_;
   string local_address_;
-  MachineId local_id_;
+  uint32_t local_replica_;
+  uint32_t local_partition_;
 };
 
 } // namespace slog

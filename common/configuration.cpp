@@ -16,7 +16,8 @@ using std::runtime_error;
 std::shared_ptr<Configuration> Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
-    const MachineId& local_id) {
+    uint32_t local_replica,
+    uint32_t local_partition) {
   std::ifstream ifs(file_path);
   CHECK(ifs.is_open()) << "Configuration file not found";
 
@@ -27,20 +28,23 @@ std::shared_ptr<Configuration> Configuration::FromFile(
   std::string str = ss.str();
   google::protobuf::TextFormat::ParseFromString(str, &config);
 
-  return std::make_shared<Configuration>(config, local_address, local_id);
+  return std::make_shared<Configuration>(
+      config, local_address, local_replica, local_partition);
 }
 
 Configuration::Configuration(
     const internal::Configuration& config, 
     const std::string& local_address,
-    const MachineId& local_id) 
+    uint32_t local_replica,
+    uint32_t local_partition) 
   : protocol_(config.protocol()),
     broker_port_(config.broker_port()),
     server_port_(config.server_port()),
     num_replicas_(config.num_replicas()),
     num_partitions_(config.num_partitions()),
     local_address_(local_address),
-    local_id_(local_id) {
+    local_replica_(local_replica),
+    local_partition_(local_partition) {
 
   for (int i = 0; i < config.addresses_size(); i++) {
     all_addresses_.push_back(config.addresses(i));
@@ -80,16 +84,16 @@ const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }
 
-const MachineId& Configuration::GetLocalMachineId() const {
-  return local_id_;
+MachineId Configuration::GetLocalMachineIdAsProto() const {
+  return MakeMachineIdProto(local_replica_, local_partition_);
 }
 
 uint32_t Configuration::GetLocalMachineIdAsNumber() const {
-  return local_id_.partition() * 100 + local_id_.replica();
+  return local_partition_ * 100 + local_replica_;
 }
 
 string Configuration::GetLocalMachineIdAsString() const {
-  return MachineIdToString(local_id_);
+  return MakeMachineId(local_replica_, local_partition_);
 }
 
 } // namespace slog

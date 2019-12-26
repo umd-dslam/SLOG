@@ -46,7 +46,8 @@ ConfigVec MakeTestConfigurations(
       configs.push_back(std::make_shared<Configuration>(
           common_config,
           local_addr,
-          MakeMachineId(rep, part)));
+          rep, 
+          part));
     }
   }
   
