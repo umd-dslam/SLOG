@@ -22,11 +22,11 @@ void BasicModule::Loop() {
         ReceiveFromChannel(message);
 
         auto from_machine_id = message.GetIdentity();
-        string from_channel;
-        message.GetString(from_channel, MM_FROM_CHANNEL);
         if (message.IsProto<internal::Request>()) {
           internal::Request req;
-          message.GetProto<internal::Request>(req),
+          message.GetProto<internal::Request>(req);
+          string from_channel;
+          message.GetString(from_channel, MM_FROM_CHANNEL);
           HandleInternalRequest(
               move(req),
               move(from_machine_id),
@@ -36,8 +36,7 @@ void BasicModule::Loop() {
           message.GetProto<internal::Response>(res),
           HandleInternalResponse(
               move(res),
-              move(from_machine_id),
-              move(from_channel));
+              move(from_machine_id));
         }
       }
       break;

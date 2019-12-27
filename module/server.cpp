@@ -18,12 +18,12 @@ void GetRequestAndPrepareResponse(Req& request, Res& response, const MMessage& m
 
 Server::Server(
     shared_ptr<const Configuration> config,
-    shared_ptr<zmq::context_t> context,
+    zmq::context_t& context,
     Broker& broker,
     shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)
   : ChannelHolder(broker.AddChannel(SERVER_CHANNEL)), 
     config_(config),
-    socket_(*context, ZMQ_ROUTER),
+    socket_(context, ZMQ_ROUTER),
     lookup_master_index_(lookup_master_index),
     txn_id_counter_(0) {
   poll_items_.push_back(GetChannelPollItem());

@@ -16,20 +16,19 @@ using namespace std;
 using namespace slog;
 
 TEST(ServerTest, LookupMaster) {
+  const string REQUESTER_CHANNEL("requester");
   ConfigVec configs = MakeTestConfigurations("lookup", 1, 1);
-  auto context = make_shared<zmq::context_t>(1);
-  auto storage = make_shared<MemOnlyStorage>();
-  storage->Write("A", Record("vzxcv", 0, 1));
-  storage->Write("B", Record("fbczx", 1, 1));
-  storage->Write("C", Record("bzxcv", 2, 2));
+  TestSlog test_slog(configs[0]);
+  test_slog
+    .WithServerAndClient()
+    .Data("A", {"vzxcv", 0, 1})
+    .Data("B", {"fbczx", 1, 1})
+    .Data("C", {"bzxcv", 2, 2});
 
-  Broker broker(configs[0], context);
-  auto server = MakeRunnerFor<Server>(configs[0], context, broker, storage);
+  unique_ptr<Channel> requester(
+      test_slog.AddChannel(REQUESTER_CHANNEL));
 
-  unique_ptr<Channel> client(broker.AddChannel("client"));
-
-  broker.StartInNewThread();
-  server->StartInNewThread();
+  test_slog.StartInNewThreads();
 
   internal::Request req;
   auto lookup = req.mutable_lookup_master();
@@ -39,11 +38,11 @@ TEST(ServerTest, LookupMaster) {
   lookup->add_keys("D");
   MMessage msg;
   msg.Set(MM_PROTO, req);
-  msg.Set(MM_FROM_CHANNEL, "client");
-  msg.Set(MM_TO_CHANNEL, "server");
-  client->Send(msg);
+  msg.Set(MM_FROM_CHANNEL, REQUESTER_CHANNEL);
+  msg.Set(MM_TO_CHANNEL, SERVER_CHANNEL);
+  requester->Send(msg);
 
-  client->Receive(msg);
+  requester->Receive(msg);
   internal::Response res;
   ASSERT_TRUE(msg.GetProto(res));
   ASSERT_TRUE(res.has_lookup_master());

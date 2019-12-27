@@ -5,6 +5,7 @@
 
 #include "common/configuration.h"
 #include "common/types.h"
+#include "connection/broker.h"
 #include "module/basic_module.h"
 #include "proto/transaction.pb.h"
 
@@ -17,7 +18,7 @@ class Forwarder : public BasicModule {
 public:
   Forwarder(
       shared_ptr<Configuration> config,
-      Channel* listener);
+      Broker& broker);
 
 protected:
   void HandleInternalRequest(
@@ -27,11 +28,14 @@ protected:
 
   void HandleInternalResponse(
       internal::Response&& res,
-      string&& from_machine_id,
-      string&& from_channel) final;
+      string&& from_machine_id) final;
 
 private:
   void FillLookupMasterRequest(internal::Request& req, const Transaction& txn);
+
+  /**
+   * Pre-condition: transaction type is not UNKNOWN
+   */
   void Forward(const Transaction& txn);
 
   shared_ptr<Configuration> config_;

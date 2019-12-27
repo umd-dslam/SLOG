@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include "common/mmessage.h"
+#include "common/proto_utils.h"
 #include "proto/api.pb.h"
 
 namespace slog {
@@ -24,9 +25,13 @@ void Client::SetUp() {
   socket_.connect(endpoint);
   LOG(INFO) << "Connected to " << endpoint;
   api::Request req;
-  auto txn = req.mutable_txn()->mutable_txn();
-  txn->mutable_read_set()->insert({string{"read0"}, string{""}});
-  txn->mutable_write_set()->insert({string{"write0"}, string{"zzz"}});
+  auto txn = MakeTransaction(
+      {"read0", "read1"},
+      {{"write0", "bcasb"}, {"write1", "basdf"}});
+  
+  req.mutable_txn()
+      ->mutable_txn()
+      ->CopyFrom(txn);
   for (int i = 0; i < NUM_TXN; i++) {
     req.set_stream_id(i);
     MMessage msg;

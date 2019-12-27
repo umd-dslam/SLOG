@@ -9,8 +9,8 @@ namespace slog {
 
 Forwarder::Forwarder(
     shared_ptr<Configuration> config,
-    Channel* listener) 
-  : BasicModule(listener),
+    Broker& broker) 
+  : BasicModule(broker.AddChannel(FORWARDER_CHANNEL)),
     config_(config),
     re_(rd_()) {
 }
@@ -22,25 +22,25 @@ void Forwarder::HandleInternalRequest(
   if (req.type_case() != internal::Request::kForward) {
     return;
   }
-  const auto& txn = req.forward().txn();
-  if (txn.internal().type() == TransactionType::UNKNOWN) {
-    pending_transaction_[txn.id()] = txn;
+  auto txn = req.mutable_forward()->mutable_txn();
+  auto type = SetTransactionType(*txn);
+  if (type == TransactionType::UNKNOWN) {
+    pending_transaction_[txn->id()] = *txn;
     // Send a look up master request for each partition in the same region
     internal::Request lookup_master_request;
-    FillLookupMasterRequest(lookup_master_request, txn);
+    FillLookupMasterRequest(lookup_master_request, *txn);
     auto rep = config_->GetLocalReplica();
     for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
       Send(lookup_master_request, MakeMachineId(rep, part), SERVER_CHANNEL);
     }
   } else {
-    Send(req, SEQUENCER_CHANNEL);
+    Forward(*txn);
   }
 }
 
 void Forwarder::HandleInternalResponse(
     internal::Response&& res,
-    string&& /* from_machine_id */,
-    string&& /* from_channel */) {
+    string&& /* from_machine_id */) {
   if (res.type_case() != internal::Response::kLookupMaster) {
     return;
   }
@@ -60,11 +60,8 @@ void Forwarder::HandleInternalResponse(
     }
   }
 
-  auto total_num_keys = static_cast<size_t>(
-      txn.read_set_size() + txn.write_set_size());
-  // If the transaction has all master info it needs, 
-  // forward it to the appropriate sequencer
-  if (txn_master_metadata->size() == total_num_keys) {
+  auto txn_type = SetTransactionType(txn);
+  if (txn_type != TransactionType::UNKNOWN) {
     Forward(txn);
     pending_transaction_.erase(txn_id);
   }
@@ -83,29 +80,16 @@ void Forwarder::FillLookupMasterRequest(
 }
 
 void Forwarder::Forward(const Transaction& txn) {
-  auto& txn_master_metadata = txn.internal().master_metadata();
-
-  bool is_single_home = true;
-  const auto& any_key = txn_master_metadata.begin()->first;
-  for (const auto& pair : txn_master_metadata) {
-    if (pair.first != any_key) {
-      is_single_home = false;
-      break;
-    }
-  }
+  auto txn_type = txn.internal().type();
+  auto& master_metadata = txn.internal().master_metadata();
+  auto home_replica = master_metadata.begin()->second.master();
 
   // Prepare a request to be forwarded to a sequencer
   internal::Request forward_request;
   auto forwarded_txn = forward_request.mutable_forward()->mutable_txn();
   forwarded_txn->CopyFrom(txn);
 
-  if (is_single_home) {
-    forwarded_txn
-        ->mutable_internal()
-        ->set_type(TransactionType::SINGLE_HOME);
-
-    // Get master of the first key since it is the same for all keys
-    auto home_replica = txn_master_metadata.at(any_key).master();
+  if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     if (home_replica == config_->GetLocalReplica()) {
@@ -114,12 +98,11 @@ void Forwarder::Forward(const Transaction& txn) {
       std::uniform_int_distribution<> dist(0, config_->GetNumPartitions() - 1);
       auto random_machine_in_home_replica = MakeMachineId(home_replica, dist(re_));
       Send(
-          forward_request, random_machine_in_home_replica, SCHEDULER_CHANNEL);
+          forward_request,
+          random_machine_in_home_replica,
+          SEQUENCER_CHANNEL);
     }
-  } else {
-    forwarded_txn
-        ->mutable_internal()
-        ->set_type(TransactionType::MULTI_HOME);
+  } else if (txn_type == TransactionType::MULTI_HOME) {
     // TODO: send to a multi-home transaction ordering module
   }
 }

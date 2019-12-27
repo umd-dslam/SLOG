@@ -1,12 +1,16 @@
 project(common)
 
-set(SOURCES
+add_library(common
   configuration.cpp
   mmessage.cpp
-  test_utils.cpp
-  service_utils.cpp
-)
-
-add_library(common ${SOURCES})
-
+  proto_utils.cpp
+  service_utils.cpp)
 target_link_libraries(common proto)
+
+add_library(test_utils test_utils.cpp)
+target_link_libraries(test_utils
+  common
+  connection
+  module
+  storage
+  proto)

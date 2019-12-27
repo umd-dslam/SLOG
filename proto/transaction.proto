@@ -2,9 +2,9 @@ syntax = "proto3";
 package slog;
 
 enum TransactionType {
-    SINGLE_HOME = 0;
-    MULTI_HOME = 1;
-    UNKNOWN = 2;
+    UNKNOWN = 0; // default
+    SINGLE_HOME = 1;
+    MULTI_HOME = 2;
 }
 
 message MasterMetadata {

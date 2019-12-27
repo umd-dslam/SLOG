@@ -12,7 +12,7 @@ namespace slog {
  */
 class BasicModule : public Module, public ChannelHolder {
 public:
-  BasicModule(Channel* listener, long poll_timeout_ms = 1000);
+  BasicModule(Channel* listener, long poll_timeout_ms = 100);
 
 protected:
   virtual void HandleInternalRequest(
@@ -22,8 +22,7 @@ protected:
 
   virtual void HandleInternalResponse(
       internal::Response&& res,
-      string&& from_machine_id,
-      string&& to_machine) = 0;
+      string&& from_machine_id) = 0;
 
   virtual void HandlePollTimedOut() {};
 

@@ -22,7 +22,7 @@ class Server : public Module, public ChannelHolder {
 public:
   Server(
       shared_ptr<const Configuration> config,
-      shared_ptr<zmq::context_t> context,
+      zmq::context_t& context,
       Broker& broker,
       shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index);
 
