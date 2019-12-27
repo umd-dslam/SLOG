@@ -12,6 +12,8 @@
 
 using std::pair;
 using std::unordered_set;
+using std::move;
+
 namespace slog {
 
 Broker::Broker(
@@ -75,7 +77,7 @@ string Broker::MakeEndpoint(const string& addr) const {
 bool Broker::InitializeConnection() {
   // Bind the router to its endpoint
   router_.bind(MakeEndpoint());
-  LOG(INFO) << "Bound broker to: " << MakeEndpoint();
+  LOG(INFO) << "Bound Broker to: " << MakeEndpoint();
 
   // Prepare a READY message
   internal::Request request;
@@ -114,15 +116,11 @@ bool Broker::InitializeConnection() {
       MMessage msg;
       msg.ReceiveFrom(router_);
       
-      // The message must be a Request
-      if (!msg.GetProto(request)) {
-        unhandled_incoming_messages_.push_back(std::move(msg));
-        continue;
-      }
-      
-      // The request message must be READY
-      if (!request.has_ready()) {
-        unhandled_incoming_messages_.push_back(std::move(msg));
+      // The message must be a Request and it must be a READY request
+      if (!msg.GetProto(request) || !request.has_ready()) {
+        LOG(INFO) << "Received a message while broker is not READY. "
+                  << "Saving for later";
+        unhandled_incoming_messages_.push_back(move(msg));
         continue;
       }
 
@@ -168,7 +166,7 @@ void Broker::Run() {
   // Handle the unhandled messages
   while (running_ && !unhandled_incoming_messages_.empty()) {
     HandleIncomingMessage(
-        std::move(unhandled_incoming_messages_.back()));
+        move(unhandled_incoming_messages_.back()));
     unhandled_incoming_messages_.pop_back();
   }
 
@@ -192,7 +190,7 @@ void Broker::Run() {
     // Router just received a message
     if (items.back().revents & ZMQ_POLLIN) {
       MMessage message(router_);
-      HandleIncomingMessage(std::move(message));
+      HandleIncomingMessage(move(message));
     }
 
     for (size_t i = 0; i < items.size() - 1; i++) {
@@ -200,7 +198,7 @@ void Broker::Run() {
       if (items[i].revents & ZMQ_POLLIN) {
         MMessage message;
         channels_[channel_names[i]]->Receive(message);
-        HandleOutgoingMessage(std::move(message));
+        HandleOutgoingMessage(move(message));
       }
     }
 
@@ -216,7 +214,7 @@ void Broker::HandleIncomingMessage(MMessage&& message) {
   } else {
     message.SetIdentity(connection_id_to_machine_id_[conn_id]);
   }
-  SendToTargetChannel(std::move(message));
+  SendToTargetChannel(move(message));
 }
 
 void Broker::HandleOutgoingMessage(MMessage&& message) {
@@ -231,7 +229,7 @@ void Broker::HandleOutgoingMessage(MMessage&& message) {
     message.SetIdentity("");
     message.SendTo(*address_to_socket_[addr]);
   } else {
-    SendToTargetChannel(std::move(message));
+    SendToTargetChannel(move(message));
   }
 }
 

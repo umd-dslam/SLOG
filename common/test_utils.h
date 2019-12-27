@@ -29,12 +29,13 @@ ConfigVec MakeTestConfigurations(
 class TestSlog {
 public:
   TestSlog(shared_ptr<Configuration> config);
-  TestSlog& Data(Key&& key, Record&& record);
-  TestSlog& WithServerAndClient();
-  TestSlog& WithForwarder();
+  void Data(Key&& key, Record&& record);
+  void AddServerAndClient();
+  void AddForwarder();
   Channel* AddChannel(const string& name);
 
   void StartInNewThreads();
+  void SendTxn(const Transaction& txn);
 
 private:
   shared_ptr<Configuration> config_;

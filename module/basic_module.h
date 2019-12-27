@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/constants.h"
 #include "module/module.h"
 #include "connection/channel.h"
 #include "proto/internal.pb.h"
@@ -12,7 +13,7 @@ namespace slog {
  */
 class BasicModule : public Module, public ChannelHolder {
 public:
-  BasicModule(Channel* listener, long poll_timeout_ms = 100);
+  BasicModule(Channel* listener, long poll_timeout_ms = BASIC_MODULE_POLL_TIMEOUT_MS);
 
 protected:
   virtual void HandleInternalRequest(

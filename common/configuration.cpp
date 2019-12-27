@@ -97,7 +97,7 @@ MachineId Configuration::GetLocalMachineIdAsProto() const {
 }
 
 uint32_t Configuration::GetLocalMachineIdAsNumber() const {
-  return local_partition_ * 100 + local_replica_;
+  return local_replica_ * num_partitions_ + local_partition_;
 }
 
 string Configuration::GetLocalMachineIdAsString() const {

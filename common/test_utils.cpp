@@ -3,6 +3,7 @@
 #include <random>
 
 #include "common/proto_utils.h"
+#include "proto/api.pb.h"
 
 using std::to_string;
 
@@ -28,7 +29,7 @@ ConfigVec MakeTestConfigurations(
     int num_partitions) {
   std::random_device rd;
   std::mt19937 re(rd());
-  std::uniform_int_distribution<> dis(5000, 30000);
+  std::uniform_int_distribution<> dis(20000, 30000);
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;
 
@@ -39,7 +40,6 @@ ConfigVec MakeTestConfigurations(
   common_config.set_num_partitions(num_partitions);
   for (int i = 0; i < num_machines; i++) {
     common_config.add_addresses(addr + to_string(i));
-    common_config.set_server_port(dis(re));
   }
 
   ConfigVec configs;
@@ -47,6 +47,9 @@ ConfigVec MakeTestConfigurations(
 
   for (int rep = 0; rep < num_replicas; rep++) {
     for (int part = 0; part < num_partitions; part++) {
+      // Generate different server ports because tests 
+      // run on the same machine
+      common_config.set_server_port(dis(re));
       int i = rep * num_partitions + part;
       string local_addr = addr + to_string(i);
       configs.push_back(std::make_shared<Configuration>(
@@ -68,20 +71,17 @@ TestSlog::TestSlog(shared_ptr<Configuration> config)
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {}
 
-TestSlog& TestSlog::Data(Key&& key, Record&& record) {
+void TestSlog::Data(Key&& key, Record&& record) {
   storage_->Write(key, record);
-  return *this;
 }
 
-TestSlog& TestSlog::WithServerAndClient() {
+void TestSlog::AddServerAndClient() {
   server_ = MakeRunnerFor<Server>(
       config_, *server_context_, broker_, storage_);
-  return *this;
 }
 
-TestSlog& TestSlog::WithForwarder() {
+void TestSlog::AddForwarder() {
   forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_);
-  return *this;
 }
 
 Channel* TestSlog::AddChannel(const string& name) {
@@ -99,6 +99,16 @@ void TestSlog::StartInNewThreads() {
   if (forwarder_) {
     forwarder_->StartInNewThread();
   }
+}
+
+void TestSlog::SendTxn(const Transaction& txn) {
+  CHECK(server_ != nullptr) << "TestSlog does not have a server";
+  api::Request request;
+  auto txn_req = request.mutable_txn();
+  txn_req->mutable_txn()->CopyFrom(txn);
+  MMessage msg;
+  msg.Push(request);
+  msg.SendTo(client_socket_);
 }
 
 } // namespace slog

@@ -18,61 +18,65 @@ using namespace slog;
 
 class ForwarderTest : public ::testing::Test {
 protected:
-  void SetUp(string&& prefix, uint32_t num_replicas, uint32_t num_partitions) {
-    storage_ = make_shared<MemOnlyStorage>();
-    storage_->Write("A", {"vzxcv", 0, 1});
-    storage_->Write("B", {"fbczx", 0, 2});
-    storage_->Write("C", {"bzxcv", 1, 2});
-    storage_->Write("D", {"naeqw", 2, 1});
-
+  void SetUp() {
     ConfigVec configs = MakeTestConfigurations(
-        move(prefix), num_replicas, num_partitions);
-    auto server_context = make_shared<zmq::context_t>(1);
-    broker_ = make_unique<Broker>(configs[0], server_context);
-    server_ = MakeRunnerFor<Server>(configs[0], *server_context, *broker_, storage_);
-    forwarder_ = MakeRunnerFor<Forwarder>(configs[0], *broker_);
+        "forwarder", 2 /* num_replicas */, 2 /* num_partitions */);
 
-    sink_.reset(broker_->AddChannel(SEQUENCER_CHANNEL));
+    for (int i = 0; i < 4; i++) {
+      test_slogs_[i] = make_unique<TestSlog>(configs[i]);
+      test_slogs_[i]->AddServerAndClient();
+      test_slogs_[i]->AddForwarder();
+      sinks_[i].reset(test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL));
+    }
+    // Replica 0
+    test_slogs_[0]->Data("A", {"vzxcv", 0, 0});
+    test_slogs_[0]->Data("B", {"fbczx", 1, 1});
+    test_slogs_[1]->Data("C", {"bzxcv", 0, 1});
+    test_slogs_[1]->Data("D", {"naeqw", 1, 0});
+    // Replica 1
+    test_slogs_[2]->Data("A", {"vzxcv", 0, 0});
+    test_slogs_[2]->Data("B", {"fbczx", 1, 1});
+    test_slogs_[3]->Data("C", {"bzxcv", 0, 1});
+    test_slogs_[3]->Data("D", {"naeqw", 1, 0});
 
-    broker_->StartInNewThread();
-    server_->StartInNewThread();
-    forwarder_->StartInNewThread();
+    for (const auto& test_slog : test_slogs_) {
+      test_slog->StartInNewThreads();
+    }
+   }
 
-    client_context_ = make_unique<zmq::context_t>(1);
-    client_socket_ = make_unique<zmq::socket_t>(*client_context_, ZMQ_DEALER);
-    string endpoint = "tcp://localhost:" + to_string(configs[0]->GetServerPort());
-    client_socket_->connect(endpoint);
-  }
+  void Receive(MMessage& msg, vector<size_t> indices) {
+    CHECK(!indices.empty());
+    vector<zmq::pollitem_t> poll_items;
+    for (auto i : indices) {
+      poll_items.push_back(sinks_[i]->GetPollItem());
+    }
+    auto rc = zmq::poll(poll_items, 1000);
+    ASSERT_GT(rc, 0) << "Polling timed out";
+    for (size_t i = 0; i < poll_items.size(); i++) {
+      if (poll_items[i].revents & ZMQ_POLLIN) {
+        auto& sink = sinks_[indices[i]];
+        sink->Receive(msg);
+        return;
+      }
+    }
+   }
 
-  void SendTxn(const Transaction& txn) {
-    api::Request request;
-    auto txn_req = request.mutable_txn();
-    txn_req->mutable_txn()->CopyFrom(txn);
-    MMessage msg;
-    msg.Push(request);
-    msg.SendTo(*client_socket_);
-  }
-
-  void Receive(MMessage& msg) {
-    sink_->Receive(msg);
-  }
-
-  unique_ptr<zmq::context_t> client_context_;
-  shared_ptr<MemOnlyStorage> storage_;
-  unique_ptr<Broker> broker_;
-  unique_ptr<ModuleRunner> server_;
-  unique_ptr<ModuleRunner> forwarder_;
-  unique_ptr<zmq::socket_t> client_socket_;
-  unique_ptr<Channel> sink_;
+  unique_ptr<TestSlog> test_slogs_[4];
+  unique_ptr<Channel> sinks_[4];
 };
 
-TEST_F(ForwarderTest, SingleRegionSinglePartition) {
-  SetUp("single_forwarder", 1, 1);
-  auto txn = MakeTransaction({"A"}, {{"B", "data"}});
-  SendTxn(txn);
+TEST_F(ForwarderTest, ForwardToSameRegion) {
+  // This txn needs to lookup from both partitions in a region
+  auto txn = MakeTransaction(
+      {"A"},            /* read_set */
+      {{"C", "zxcvb"}}  /* write_set */);
+  // Send to partition 0 of replica 0
+  test_slogs_[0]->SendTxn(txn);
 
   MMessage msg;
-  Receive(msg);
+  // The txn should be forwarded to the scheduler of the same machine
+  Receive(msg, {0});
+
   internal::Request req;
   ASSERT_TRUE(msg.GetProto(req));
   ASSERT_TRUE(req.has_forward());
@@ -82,21 +86,25 @@ TEST_F(ForwarderTest, SingleRegionSinglePartition) {
   const auto& master_metadata =
       forwarded_txn.internal().master_metadata();
   ASSERT_EQ(0, master_metadata.at("A").master());
-  ASSERT_EQ(0, master_metadata.at("B").master());
+  ASSERT_EQ(0, master_metadata.at("A").counter());
+  ASSERT_EQ(0, master_metadata.at("C").master());
+  ASSERT_EQ(1, master_metadata.at("C").counter());
 }
 
-TEST_F(ForwarderTest, SingleRegionSinglePartitionKnownMaster) {
-  SetUp("known_master", 1, 1);
+TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
   auto txn = MakeTransaction(
-      {"A"},           /* read_set*/
-      {{"B", "data"}}, /* write set */
-      "",              /* code */
-      {{"A", {0, 0}},  /* master_metadata */
-       {"B", {0, 0}}});
-  SendTxn(txn);
+      {"A"},            /* read_set*/
+      {{"C", "bzxcv"}},  /* write_set */
+      "",               /* code */
+      {{"A", {0, 0}},   /* master_metadata */
+       {"C", {0, 1}}});
+  // Send to partition 0 of replica 0
+  test_slogs_[0]->SendTxn(txn);
 
   MMessage msg;
-  Receive(msg);
+  // The txn should be forwarded to the scheduler of the same machine
+  Receive(msg, {0});
+  ASSERT_GT(msg.Size(), 0);
   internal::Request req;
   ASSERT_TRUE(msg.GetProto(req));
   ASSERT_TRUE(req.has_forward());
@@ -106,5 +114,59 @@ TEST_F(ForwarderTest, SingleRegionSinglePartitionKnownMaster) {
   const auto& master_metadata =
       forwarded_txn.internal().master_metadata();
   ASSERT_EQ(0, master_metadata.at("A").master());
-  ASSERT_EQ(0, master_metadata.at("B").master());
+  ASSERT_EQ(0, master_metadata.at("A").counter());
+  ASSERT_EQ(0, master_metadata.at("C").master());
+  ASSERT_EQ(1, master_metadata.at("C").counter());
+}
+
+TEST_F(ForwarderTest, ForwardToAnotherRegion) {
+  // Send to partition 1 of replica 0. This txn needs to lookup
+  // from both partitions and later forwarded to replica 1
+  test_slogs_[1]->SendTxn(
+      MakeTransaction(
+          {"B"},            /* read_set */
+          {{"D", "hrtjd"}}  /* write_set */));
+
+  // Send to partition 0 of replica 1. This txn needs to lookup
+  // from partition 0 only and later forwarded to replica 0
+  test_slogs_[2]->SendTxn(
+      MakeTransaction({"A"} /* read_set */, {}));
+
+  {
+    MMessage msg;
+    internal::Request req;
+    // A txn should be forwarded to one of the two schedulers in
+    // replica 1
+    Receive(msg, {2, 3});
+    ASSERT_GT(msg.Size(), 0);
+    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_TRUE(req.has_forward());
+    const auto& forwarded_txn = req.forward().txn();
+    ASSERT_EQ(
+        TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
+    const auto& master_metadata =
+        forwarded_txn.internal().master_metadata();
+    ASSERT_EQ(1, master_metadata.at("B").master());
+    ASSERT_EQ(1, master_metadata.at("B").counter());
+    ASSERT_EQ(1, master_metadata.at("D").master());
+    ASSERT_EQ(0, master_metadata.at("D").counter());
+  }
+
+  {
+    MMessage msg;
+    internal::Request req;
+    // A txn should be forwarded to one of the two schedulers in
+    // replica 0
+    Receive(msg, {0, 1});
+    ASSERT_GT(msg.Size(), 0);
+    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_TRUE(req.has_forward());
+    const auto& forwarded_txn = req.forward().txn();
+    ASSERT_EQ(
+        TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
+    const auto& master_metadata =
+        forwarded_txn.internal().master_metadata();
+    ASSERT_EQ(0, master_metadata.at("A").master());
+    ASSERT_EQ(0, master_metadata.at("A").counter());
+  }
 }

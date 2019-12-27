@@ -19,6 +19,7 @@ void Forwarder::HandleInternalRequest(
     internal::Request&& req,
     string&& /* from_machine_id */,
     string&& /* from_channel */) {
+  // The forwarder only cares about Forward requests
   if (req.type_case() != internal::Request::kForward) {
     return;
   }
@@ -38,12 +39,26 @@ void Forwarder::HandleInternalRequest(
   }
 }
 
+void Forwarder::FillLookupMasterRequest(
+    internal::Request& req, const Transaction& txn) {
+  auto lookup_master = req.mutable_lookup_master();
+  for (const auto& pair : txn.read_set()) {
+    lookup_master->add_keys(pair.first);
+  }
+  for (const auto& pair : txn.write_set()) {
+    lookup_master->add_keys(pair.first);
+  }
+  lookup_master->set_txn_id(txn.id());
+}
+
 void Forwarder::HandleInternalResponse(
     internal::Response&& res,
     string&& /* from_machine_id */) {
+  // The forwarder only cares about lookup master response
   if (res.type_case() != internal::Response::kLookupMaster) {
     return;
   }
+
   const auto& lookup_master = res.lookup_master();
   auto txn_id = lookup_master.txn_id();
   if (pending_transaction_.count(txn_id) == 0) {
@@ -67,18 +82,6 @@ void Forwarder::HandleInternalResponse(
   }
 }
 
-void Forwarder::FillLookupMasterRequest(
-    internal::Request& req, const Transaction& txn) {
-  auto lookup_master = req.mutable_lookup_master();
-  for (const auto& pair : txn.read_set()) {
-    lookup_master->add_keys(pair.first);
-  }
-  for (const auto& pair : txn.write_set()) {
-    lookup_master->add_keys(pair.first);
-  }
-  lookup_master->set_txn_id(txn.id());
-}
-
 void Forwarder::Forward(const Transaction& txn) {
   auto txn_type = txn.internal().type();
   auto& master_metadata = txn.internal().master_metadata();
@@ -96,7 +99,12 @@ void Forwarder::Forward(const Transaction& txn) {
       Send(forward_request, SEQUENCER_CHANNEL);
     } else {
       std::uniform_int_distribution<> dist(0, config_->GetNumPartitions() - 1);
-      auto random_machine_in_home_replica = MakeMachineId(home_replica, dist(re_));
+      auto partition = dist(re_);
+      auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
+
+      DLOG(INFO) << "Forwarding txn " << txn.id() << " to its home region (rep: "
+                 << home_replica << ", part: " << partition << ")";
+
       Send(
           forward_request,
           random_machine_in_home_replica,

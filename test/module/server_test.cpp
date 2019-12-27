@@ -19,17 +19,15 @@ TEST(ServerTest, LookupMaster) {
   const string REQUESTER_CHANNEL("requester");
   ConfigVec configs = MakeTestConfigurations("lookup", 1, 1);
   TestSlog test_slog(configs[0]);
-  test_slog
-    .WithServerAndClient()
-    .Data("A", {"vzxcv", 0, 1})
-    .Data("B", {"fbczx", 1, 1})
-    .Data("C", {"bzxcv", 2, 2});
-
+  test_slog.AddServerAndClient();
+  test_slog.Data("A", {"vzxcv", 0, 1});
+  test_slog.Data("B", {"fbczx", 1, 1});
+  test_slog.Data("C", {"bzxcv", 2, 2});
   unique_ptr<Channel> requester(
       test_slog.AddChannel(REQUESTER_CHANNEL));
-
   test_slog.StartInNewThreads();
 
+  // Send a lookup request to the server
   internal::Request req;
   auto lookup = req.mutable_lookup_master();
   lookup->set_txn_id(1234);
@@ -42,6 +40,7 @@ TEST(ServerTest, LookupMaster) {
   msg.Set(MM_TO_CHANNEL, SERVER_CHANNEL);
   requester->Send(msg);
 
+  // Wait and receive the response
   requester->Receive(msg);
   internal::Response res;
   ASSERT_TRUE(msg.GetProto(res));

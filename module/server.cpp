@@ -39,6 +39,7 @@ void Server::SetUp() {
   string endpoint = 
       "tcp://*:" + std::to_string(config_->GetServerPort());
   socket_.bind(endpoint);
+  LOG(INFO) << "Bound Server to: " << endpoint;
 }
 
 void Server::Loop() {

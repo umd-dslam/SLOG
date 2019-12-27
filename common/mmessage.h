@@ -62,7 +62,8 @@ public:
 
   template<typename T>
   bool IsProto(size_t index = 0) const {
-    CHECK(index < body_.size()) << "Index out of bound";
+    CHECK(index < body_.size()) 
+        << "Index out of bound. Size: " << body_.size() << ". Index: " << index;
     const auto any = GetAny(index);
     return any != nullptr && (*any).Is<T>();
   }
