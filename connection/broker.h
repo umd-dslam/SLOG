@@ -70,7 +70,13 @@ private:
   
   void Run();
 
+  void HandleIncomingMessage(MMessage&& msg);
+
+  void HandleOutgoingMessage(MMessage && msg);
+
   void SendToTargetChannel(MMessage&& msg);
+
+  zmq::pollitem_t GetRouterPollItem();
 
   shared_ptr<const Configuration> config_;
   shared_ptr<zmq::context_t> context_;
@@ -79,6 +85,8 @@ private:
 
   std::thread thread_;
 
+  // Messages that are sent to this broker when it is not READY yet
+  vector<MMessage> unhandled_incoming_messages_;
   // Map from channel name to the channel
   unordered_map<string, unique_ptr<Channel>> channels_;
   // Map from ip addresses to sockets
@@ -88,7 +96,7 @@ private:
   // Used to translate the identities of incoming messages
   unordered_map<string, string> connection_id_to_machine_id_;
   // Cache this to detect that a message comes from the local machine (loop-back)
-  std::string loopback_connection_id_;
+  string loopback_connection_id_;
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages

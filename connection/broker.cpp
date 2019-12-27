@@ -107,24 +107,27 @@ bool Broker::InitializeConnection() {
   }
 
   LOG(INFO) << "Waiting for READY messages from other machines...";
-  zmq::pollitem_t item = { static_cast<void*>(router_), 0, ZMQ_POLLIN, 0 };
+  zmq::pollitem_t item = GetRouterPollItem();
   while (running_) {
     zmq::poll(&item, 1, BROKER_POLL_TIMEOUT_MS);
     if (item.revents & ZMQ_POLLIN) {
-      ready_msg.ReceiveFrom(router_);
+      MMessage msg;
+      msg.ReceiveFrom(router_);
       
       // The message must be a Request
-      if (!ready_msg.GetProto(request)) {
+      if (!msg.GetProto(request)) {
+        unhandled_incoming_messages_.push_back(std::move(msg));
         continue;
       }
       
       // The request message must be READY
       if (!request.has_ready()) {
+        unhandled_incoming_messages_.push_back(std::move(msg));
         continue;
       }
 
       // Use the information in each READY message to build up the translation maps
-      const auto& conn_id = ready_msg.GetIdentity();
+      const auto& conn_id = msg.GetIdentity();
       const auto& ready = request.ready();
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
@@ -162,20 +165,25 @@ void Broker::Run() {
     return;
   }
 
+  // Handle the unhandled messages
+  while (running_ && !unhandled_incoming_messages_.empty()) {
+    HandleIncomingMessage(
+        std::move(unhandled_incoming_messages_.back()));
+    unhandled_incoming_messages_.pop_back();
+  }
+
   // Set up poll items
   vector<zmq::pollitem_t> items;
   items.reserve(channels_.size() + 1);
-
   vector<std::string> channel_names;
   channel_names.reserve(channels_.size());
-
   for (const auto& pair : channels_) {
     items.push_back(pair.second->GetPollItem());
     channel_names.push_back(pair.first);
   }
-  // NOTE: always push this item at the end so that the channel indices
-  // start from 0
-  items.push_back({static_cast<void*>(router_), 0, ZMQ_POLLIN, 0});
+  // NOTE: always push this item at the end 
+  // so that the channel indices start from 0
+  items.push_back(GetRouterPollItem());
 
   while (running_) {
     // Wait until a message arrived at one of the sockets
@@ -183,44 +191,48 @@ void Broker::Run() {
 
     // Router just received a message
     if (items.back().revents & ZMQ_POLLIN) {
-
       MMessage message(router_);
-
-      // Translate connection id to slog id (replica, partition) 
-      // before sending to the channel
-      const auto& conn_id = message.GetIdentity();
-      if (conn_id == loopback_connection_id_) {
-        message.SetIdentity("");
-      } else {
-        message.SetIdentity(connection_id_to_machine_id_[conn_id]);
-      }
-      SendToTargetChannel(std::move(message));
+      HandleIncomingMessage(std::move(message));
     }
 
     for (size_t i = 0; i < items.size() - 1; i++) {
       // A channel just sent a message
       if (items[i].revents & ZMQ_POLLIN) {
-        const auto& name = channel_names[i];
         MMessage message;
-        channels_[name]->Receive(message);
-
-        // If a message has an identity, it is sent out to the DEALER socket
-        // corresponding to the identity. Otherwise, it is routed to another
-        // channel on the same machine.
-        if (message.HasIdentity()) {
-          // Remove the identity part of the message before sending 
-          // out to a DEALER socket
-          const auto& machine_id = message.GetIdentity();
-          const auto& addr = machine_id_to_address_[machine_id];
-          message.SetIdentity("");
-          message.SendTo(*address_to_socket_[addr]);
-        } else {
-          SendToTargetChannel(std::move(message));
-        }
+        channels_[channel_names[i]]->Receive(message);
+        HandleOutgoingMessage(std::move(message));
       }
     }
 
   } // while-loop
+}
+
+void Broker::HandleIncomingMessage(MMessage&& message) {
+  // Translate connection id to slog id (replica, partition) 
+  // before sending to the channel
+  const auto& conn_id = message.GetIdentity();
+  if (conn_id == loopback_connection_id_) {
+    message.SetIdentity("");
+  } else {
+    message.SetIdentity(connection_id_to_machine_id_[conn_id]);
+  }
+  SendToTargetChannel(std::move(message));
+}
+
+void Broker::HandleOutgoingMessage(MMessage&& message) {
+  // If a message has an identity, it is sent out to the DEALER socket
+  // corresponding to the identity. Otherwise, it is routed to another
+  // channel on the same machine.
+  if (message.HasIdentity()) {
+    // Remove the identity part of the message before pop_backsending 
+    // out to a DEALER socket
+    const auto& machine_id = message.GetIdentity();
+    const auto& addr = machine_id_to_address_[machine_id];
+    message.SetIdentity("");
+    message.SendTo(*address_to_socket_[addr]);
+  } else {
+    SendToTargetChannel(std::move(message));
+  }
 }
 
 void Broker::SendToTargetChannel(MMessage&& msg) {
@@ -231,6 +243,10 @@ void Broker::SendToTargetChannel(MMessage&& msg) {
   } else {
     channels_[target_channel]->Send(msg);
   }
+}
+
+zmq::pollitem_t Broker::GetRouterPollItem() {
+  return {static_cast<void*>(router_), 0, ZMQ_POLLIN, 0};
 }
 
 
