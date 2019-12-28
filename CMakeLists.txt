@@ -61,8 +61,8 @@ set(EXTERNAL_LIBS
 add_executable(slog service/slog.cpp)
 target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
-add_executable(slog_client service/slog_client.cpp)
-target_link_libraries(slog_client ${SLOG_LIBS} ${EXTERNAL_LIBS})
+add_executable(workload service/workload.cpp)
+target_link_libraries(workload ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
 # =================================== Tests =============================================
 
