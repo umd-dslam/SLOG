@@ -2,7 +2,10 @@
 #include "common/service_utils.h"
 #include "common/configuration.h"
 #include "connection/broker.h"
+#include "module/forwarder.h"
+#include "module/scheduler.h"
 #include "module/server.h"
+#include "module/sequencer.h"
 #include "proto/internal.pb.h"
 #include "storage/mem_only_storage.h"
 
@@ -20,7 +23,7 @@ int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
   
   auto config = Configuration::FromFile(
-      "slog.conf", 
+      FLAGS_config, 
       FLAGS_address,
       FLAGS_replica,
       FLAGS_partition);
@@ -28,8 +31,14 @@ int main(int argc, char* argv[]) {
   auto storage = make_shared<MemOnlyStorage>();
   Broker broker(config, context);
   auto server = MakeRunnerFor<Server>(config, *context, broker, storage);
+  auto forwarder = MakeRunnerFor<Forwarder>(config, broker);
+  auto sequencer = MakeRunnerFor<Sequencer>(config, broker);
+  auto scheduler = MakeRunnerFor<Scheduler>(config, broker);
 
   broker.StartInNewThread();
+  forwarder->StartInNewThread();
+  sequencer->StartInNewThread();
+  scheduler->StartInNewThread();
   server->Start();
 
   return 0;

@@ -22,8 +22,8 @@ protected:
       string&& from_channel) = 0;
 
   virtual void HandleInternalResponse(
-      internal::Response&& res,
-      string&& from_machine_id) = 0;
+      internal::Response&& /* res */,
+      string&& /* from_machine_id */) {};
 
   virtual void HandlePollTimedOut() {};
 

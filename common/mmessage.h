@@ -19,15 +19,15 @@ namespace slog {
 /**
  * Encapsulates a multi-part zmq message:
  * 
- * [source id][empty frame][body_0][body_1]...
+ * [identity][empty frame][body_0][body_1]...
  *
- * Source id (called 'identity' in ZMQ) is optional
+ * 'identity' stores the identity of the sender and is optional
  * 
  * Typical messages are like:
  * 
- * [source id][empty frame][request][from channel][to channel]
+ * [identity][empty frame][request][from channel][to channel]
  * 
- * [source id][empty frame][response][to channel]
+ * [identity][empty frame][response][to channel]
  */
 class MMessage {
 public:
@@ -82,6 +82,7 @@ private:
   string identity_;
   vector<string> body_;
 
+  // A cache to avoid deserializing a proto multiple times
   mutable unordered_map<size_t, Any> body_to_any_cache_;
 };
 

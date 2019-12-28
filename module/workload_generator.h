@@ -10,9 +10,9 @@ using std::string;
 
 namespace slog {
 
-class Client : public Module {
+class WorkloadGenerator : public Module {
 public:
-  Client(
+  WorkloadGenerator(
       std::shared_ptr<zmq::context_t> context,
       const std::string& host, 
       uint32_t port);

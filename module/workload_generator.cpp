@@ -1,4 +1,4 @@
-#include "module/client.h"
+#include "module/workload_generator.h"
 
 #include <random>
 
@@ -12,7 +12,7 @@ namespace slog {
 
 const int NUM_TXN = 100;
 
-Client::Client(
+WorkloadGenerator::WorkloadGenerator(
     std::shared_ptr<zmq::context_t> context,
     const std::string& host,
     uint32_t port)
@@ -20,7 +20,7 @@ Client::Client(
     host_(host),
     port_(port) {}
 
-void Client::SetUp() {
+void WorkloadGenerator::SetUp() {
   string endpoint = "tcp://" + host_ + ":" + std::to_string(port_);
   socket_.connect(endpoint);
   LOG(INFO) << "Connected to " << endpoint;
@@ -40,7 +40,7 @@ void Client::SetUp() {
   }
 }
 
-void Client::Loop() {
+void WorkloadGenerator::Loop() {
   MMessage msg(socket_);
   api::Response res;
   if (!msg.GetProto(res)) {

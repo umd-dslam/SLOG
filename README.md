@@ -1,6 +1,14 @@
 # SLOG: Serializable, Low-latency, Geo-replicated Transactions
 
+This is the implementation of the paper [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
+
+The following instructions work best on Ubuntu with CMake 3.13.4.
+
 ## How to Build
+
+You need to install the dependencies first by running `install_deps.sh`. This script installs all dependencies in the 
+`.dep` directory at the root of the project directory. After that, run the following commands from the root of the 
+project
 
 ```
 mkdir build
@@ -19,7 +27,8 @@ ctest
 
 ### As multiple processes on a single machine
 
-This set up is only for testing on the local machine. In the following example config file (slog.conf), we use 2 replicas, each of which has two partitions.
+This set up is only for testing on the local machine. In the following example config file (slog.conf), we use 2 
+replicas, each of which has two partitions.
 
 ```
 protocol: "icp"
@@ -32,7 +41,8 @@ num_replicas: 2
 num_partitions: 2
 ```
 
-Open 4 terminal windows and run each of the following commands in each of the terminal. The current directory should be the root of the project:
+Open 4 terminal windows and run each of the following commands in each of the terminal. The current directory should be 
+the root of the project:
 ```
 ./build/slog -address /tmp/test_0 -replica 0 -partition 0
 ```
@@ -46,4 +56,5 @@ Open 4 terminal windows and run each of the following commands in each of the te
 ./build/slog -address /tmp/test_3 -replica 1 -partition 1
 ```
 
-Note that there is no restriction in which address should run what replica or partition. As long as all partitions of all replicas are up then the whole system will work.
+Note that there is no restriction in which address should run what replica or partition. As long as all partitions of
+all replicas are up then the whole system will work.
