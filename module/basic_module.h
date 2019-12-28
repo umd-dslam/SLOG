@@ -29,6 +29,8 @@ protected:
 
   virtual void PostProcessing() {};
 
+  void SetPollTimeout(long poll_timeout_ms);
+
 private:
   void Loop() final;
 

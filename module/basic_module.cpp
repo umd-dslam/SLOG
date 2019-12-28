@@ -44,4 +44,8 @@ void BasicModule::Loop() {
   PostProcessing();
 }
 
+void BasicModule::SetPollTimeout(long poll_timeout_ms) {
+  poll_timeout_ms_ = poll_timeout_ms;
+}
+
 } // namespace slog
