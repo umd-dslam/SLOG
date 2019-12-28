@@ -115,7 +115,7 @@ bool Broker::InitializeConnection() {
     if (item.revents & ZMQ_POLLIN) {
       MMessage msg;
       msg.ReceiveFrom(router_);
-      
+
       // The message must be a Request and it must be a READY request
       if (!msg.GetProto(request) || !request.has_ready()) {
         LOG(INFO) << "Received a message while broker is not READY. "

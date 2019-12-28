@@ -33,10 +33,10 @@ std::shared_ptr<Configuration> Configuration::FromFile(
 }
 
 Configuration::Configuration(
-    const internal::Configuration& config, 
+    const internal::Configuration& config,
     const std::string& local_address,
     uint32_t local_replica,
-    uint32_t local_partition) 
+    uint32_t local_partition)
   : protocol_(config.protocol()),
     broker_port_(config.broker_port()),
     server_port_(config.server_port()),
@@ -50,11 +50,12 @@ Configuration::Configuration(
     all_addresses_.push_back(config.addresses(i));
   }
   CHECK(std::find(
-      all_addresses_.begin(), 
-      all_addresses_.end(), 
-      local_address) != all_addresses_.end()) 
-      << "Local machine ID is not present in the configuration";
-  }
+      all_addresses_.begin(),
+      all_addresses_.end(),
+      local_address) != all_addresses_.end())
+      << "The configuration does not contain the provided "
+      << "local machine ID: \"" << local_address << "\"";
+}
 
 const string& Configuration::GetProtocol() const {
   return protocol_;

@@ -28,14 +28,18 @@ int main(int argc, char* argv[]) {
       FLAGS_replica,
       FLAGS_partition);
   auto context = make_shared<zmq::context_t>(1);
-  auto storage = make_shared<MemOnlyStorage>();
   Broker broker(config, context);
+
+  auto storage = make_shared<MemOnlyStorage>();
+
   auto server = MakeRunnerFor<Server>(config, *context, broker, storage);
   auto forwarder = MakeRunnerFor<Forwarder>(config, broker);
   auto sequencer = MakeRunnerFor<Sequencer>(config, broker);
   auto scheduler = MakeRunnerFor<Scheduler>(config, broker);
 
+  // Only start the Broker after it is used to initialized all the modules
   broker.StartInNewThread();
+
   forwarder->StartInNewThread();
   sequencer->StartInNewThread();
   scheduler->StartInNewThread();
