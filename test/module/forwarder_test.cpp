@@ -79,8 +79,8 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
 
   internal::Request req;
   ASSERT_TRUE(msg.GetProto(req));
-  ASSERT_TRUE(req.has_forward());
-  const auto& forwarded_txn = req.forward().txn();
+  ASSERT_TRUE(req.has_forward_txn());
+  const auto& forwarded_txn = req.forward_txn().txn();
   ASSERT_EQ(
       TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
   const auto& master_metadata =
@@ -107,8 +107,8 @@ TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
   ASSERT_GT(msg.Size(), 0);
   internal::Request req;
   ASSERT_TRUE(msg.GetProto(req));
-  ASSERT_TRUE(req.has_forward());
-  const auto& forwarded_txn = req.forward().txn();
+  ASSERT_TRUE(req.has_forward_txn());
+  const auto& forwarded_txn = req.forward_txn().txn();
   ASSERT_EQ(
       TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
   const auto& master_metadata =
@@ -140,8 +140,8 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     Receive(msg, {2, 3});
     ASSERT_GT(msg.Size(), 0);
     ASSERT_TRUE(msg.GetProto(req));
-    ASSERT_TRUE(req.has_forward());
-    const auto& forwarded_txn = req.forward().txn();
+    ASSERT_TRUE(req.has_forward_txn());
+    const auto& forwarded_txn = req.forward_txn().txn();
     ASSERT_EQ(
         TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
     const auto& master_metadata =
@@ -160,8 +160,8 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     Receive(msg, {0, 1});
     ASSERT_GT(msg.Size(), 0);
     ASSERT_TRUE(msg.GetProto(req));
-    ASSERT_TRUE(req.has_forward());
-    const auto& forwarded_txn = req.forward().txn();
+    ASSERT_TRUE(req.has_forward_txn());
+    const auto& forwarded_txn = req.forward_txn().txn();
     ASSERT_EQ(
         TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
     const auto& master_metadata =

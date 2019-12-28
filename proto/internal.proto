@@ -4,6 +4,9 @@ import "transaction.proto";
 
 package slog.internal;
 
+/**
+ * The schema of a configuration file.
+ */
 message Configuration {
     // Protocol for the zmq sockets in the broker. Use "tcp" for
     // normal running and "icp" for unit and integration tests
@@ -31,28 +34,39 @@ message MachineId {
 /***********************************************
                     REQUESTS
 ***********************************************/
-
+/**
+ * The first message of a communication between two entities is
+ * always a Request. Some types of Request needs a Response
+ * (e.g. LookUpMaster), some other do not (one-way request).
+ */
 message Request {
-    uint32 stream_id = 1;
     oneof type {
-        EchoRequest echo = 2;
-        ReadyRequest ready = 3;
-        ForwardRequest forward = 4;
-        LookupMasterRequest lookup_master = 5;
+        EchoRequest echo = 1;
+        ReadyRequest ready = 2;
+        ForwardTransactionRequest forward_txn = 3;
+        LookupMasterRequest lookup_master = 4;
+        ForwardBatchRequest forward_batch = 5;
     }
 }
 
-// For debugging and testing purposes
+/**
+ * For debugging and testing purposes
+ */
 message EchoRequest {
     bytes data = 1;
 }
 
+/**
+ * Used by the Broker to notify others its presence. Some
+ * identifiers are included so that the receivers can build a
+ * map of the whole network.
+ */
 message ReadyRequest {
     bytes ip_address = 1;
     MachineId machine_id = 2;
 }
 
-message ForwardRequest {
+message ForwardTransactionRequest {
     Transaction txn = 1;
 }
 
@@ -61,19 +75,27 @@ message LookupMasterRequest {
     repeated string keys = 2;
 }
 
+message ForwardBatchRequest {
+    uint32 batch_id = 1;
+    repeated Transaction batch = 2;
+}
+
 /***********************************************
                     RESPONSES
 ***********************************************/
-
+/**
+ * A response is always preceeded by a Request
+ */
 message Response {
-    uint32 stream_id = 1;
     oneof type {
-        EchoResponse echo = 2;
-        LookupMasterResponse lookup_master = 3;
+        EchoResponse echo = 1;
+        LookupMasterResponse lookup_master = 2;
     }
 }
 
-// For debugging and testing purposes
+/**
+ * For debugging and testing purposes
+ */
 message EchoResponse {
     bytes data = 1;
 }

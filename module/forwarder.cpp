@@ -20,13 +20,13 @@ void Forwarder::HandleInternalRequest(
     string&& /* from_machine_id */,
     string&& /* from_channel */) {
   // The forwarder only cares about Forward requests
-  if (req.type_case() != internal::Request::kForward) {
+  if (req.type_case() != internal::Request::kForwardTxn) {
     return;
   }
-  auto txn = req.mutable_forward()->mutable_txn();
+  auto txn = req.mutable_forward_txn()->mutable_txn();
   auto type = SetTransactionType(*txn);
-  if (type == TransactionType::UNKNOWN) {
-    pending_transaction_[txn->id()] = *txn;
+  if (TransactionType::UNKNOWN == type) {
+    pending_transaction_[txn->internal().id()] = *txn;
     // Send a look up master request for each partition in the same region
     internal::Request lookup_master_request;
     FillLookupMasterRequest(lookup_master_request, *txn);
@@ -48,7 +48,7 @@ void Forwarder::FillLookupMasterRequest(
   for (const auto& pair : txn.write_set()) {
     lookup_master->add_keys(pair.first);
   }
-  lookup_master->set_txn_id(txn.id());
+  lookup_master->set_txn_id(txn.internal().id());
 }
 
 void Forwarder::HandleInternalResponse(
@@ -89,7 +89,7 @@ void Forwarder::Forward(const Transaction& txn) {
 
   // Prepare a request to be forwarded to a sequencer
   internal::Request forward_request;
-  auto forwarded_txn = forward_request.mutable_forward()->mutable_txn();
+  auto forwarded_txn = forward_request.mutable_forward_txn()->mutable_txn();
   forwarded_txn->CopyFrom(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
@@ -102,7 +102,7 @@ void Forwarder::Forward(const Transaction& txn) {
       auto partition = dist(re_);
       auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
 
-      DLOG(INFO) << "Forwarding txn " << txn.id() << " to its home region (rep: "
+      DLOG(INFO) << "Forwarding txn " << txn.internal().id() << " to its home region (rep: "
                  << home_replica << ", part: " << partition << ")";
 
       Send(

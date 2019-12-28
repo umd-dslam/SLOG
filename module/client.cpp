@@ -48,7 +48,7 @@ void Client::Loop() {
   } else {
     const auto& txn = res.txn().txn();
     LOG(INFO) << "Received response. Stream id: " << res.stream_id()
-              << ". Txn id: " << txn.id();
+              << ". Txn id: " << txn.internal().id();
   }
 }
 

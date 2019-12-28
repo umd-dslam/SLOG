@@ -7,15 +7,6 @@
 
 namespace slog {
 
-namespace {
-
-template<typename Req, typename Res>
-void GetRequestAndPrepareResponse(Req& request, Res& response, const MMessage& msg) {
-  CHECK(msg.GetProto(request));
-  response.set_stream_id(request.stream_id());
-}
-} // namespace
-
 Server::Server(
     shared_ptr<const Configuration> config,
     zmq::context_t& context,
@@ -85,7 +76,8 @@ void Server::Loop() {
 void Server::HandleAPIRequest(MMessage&& msg) {
   api::Request request;
   api::Response response;
-  GetRequestAndPrepareResponse(request, response, msg);
+  CHECK(msg.GetProto(request));
+  response.set_stream_id(request.stream_id());
   
   if (request.type_case() == api::Request::kTxn) {
     // TODO: reject transactions with empty read set and write set
@@ -94,9 +86,11 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     pending_response_[txn_id] = msg;
 
     internal::Request forward_request;
-    auto forwarded_txn = forward_request.mutable_forward()->mutable_txn();
+    auto forwarded_txn = forward_request
+        .mutable_forward_txn()
+        ->mutable_txn();
     forwarded_txn->CopyFrom(request.txn().txn());
-    forwarded_txn->set_id(txn_id);
+    forwarded_txn->mutable_internal()->set_id(txn_id);
 
     Send(forward_request, FORWARDER_CHANNEL);
 
@@ -109,7 +103,7 @@ void Server::HandleAPIRequest(MMessage&& msg) {
 void Server::HandleInternalRequest(MMessage&& msg) {
   internal::Request request;
   internal::Response response;
-  GetRequestAndPrepareResponse(request, response, msg);
+  CHECK(msg.GetProto(request));
 
   if (request.type_case() == internal::Request::kLookupMaster) {
     auto& lookup_request = request.lookup_master();
