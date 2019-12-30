@@ -84,7 +84,7 @@ void TestSlog::AddForwarder() {
   forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_);
 }
 
-Channel* TestSlog::AddChannel(const string& name) {
+unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
   return broker_.AddChannel(name);
 }
 

@@ -55,7 +55,7 @@ MakeRunnerFor(Args&&... args)
 
 class ChannelHolder {
 public:
-  ChannelHolder(Channel* listener_);
+  ChannelHolder(unique_ptr<Channel>&& listener_);
 
 protected:
   void Send(

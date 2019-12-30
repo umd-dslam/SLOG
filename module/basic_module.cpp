@@ -6,8 +6,10 @@ using std::move;
 
 namespace slog {
 
-BasicModule::BasicModule(Channel* listener, long poll_timeout_ms) 
-  : ChannelHolder(listener),
+BasicModule::BasicModule(
+    unique_ptr<Channel>&& listener,
+    long poll_timeout_ms) 
+  : ChannelHolder(move(listener)),
     poll_item_(GetChannelPollItem()),
     poll_timeout_ms_(poll_timeout_ms) {}
 

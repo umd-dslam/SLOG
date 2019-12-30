@@ -41,11 +41,10 @@ public:
   void Receive(MMessage& msg);
 
   /**
-   * Returns a pointer to the listener corresponding to this channel.
-   * Whoever owns this pointer later needs to free it up otherwise the 
-   * socket inside the listener would prevent the thread to exit.
+   * Returns a unique pointer to the listener corresponding to
+   * this channel.
    */
-  Channel* GetListener();
+  std::unique_ptr<Channel> GetListener();
 
 private:
   Channel(

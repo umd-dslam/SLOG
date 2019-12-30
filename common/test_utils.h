@@ -32,7 +32,7 @@ public:
   void Data(Key&& key, Record&& record);
   void AddServerAndClient();
   void AddForwarder();
-  Channel* AddChannel(const string& name);
+  unique_ptr<Channel> AddChannel(const string& name);
 
   void StartInNewThreads();
   void SendTxn(const Transaction& txn);

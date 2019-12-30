@@ -26,7 +26,7 @@ protected:
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddServerAndClient();
       test_slogs_[i]->AddForwarder();
-      sinks_[i].reset(test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL));
+      sinks_[i] = test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL);
     }
     // Replica 0
     test_slogs_[0]->Data("A", {"vzxcv", 0, 0});

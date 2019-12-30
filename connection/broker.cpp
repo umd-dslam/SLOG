@@ -46,7 +46,7 @@ void Broker::StartInNewThread() {
   thread_ = std::thread(&Broker::Run, this);
 }
 
-Channel* Broker::AddChannel(const std::string& name) {
+unique_ptr<Channel> Broker::AddChannel(const std::string& name) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
   CHECK(channels_.count(name) == 0) << "Channel \"" << name << "\" already exists";
 

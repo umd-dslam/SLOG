@@ -13,7 +13,9 @@ namespace slog {
  */
 class BasicModule : public Module, public ChannelHolder {
 public:
-  BasicModule(Channel* listener, long poll_timeout_ms = BASIC_MODULE_POLL_TIMEOUT_MS);
+  BasicModule(
+      unique_ptr<Channel>&& listener,
+      long poll_timeout_ms = BASIC_MODULE_POLL_TIMEOUT_MS);
 
 protected:
   virtual void HandleInternalRequest(

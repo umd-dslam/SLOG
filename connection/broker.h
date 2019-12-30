@@ -53,7 +53,7 @@ public:
 
   void StartInNewThread();
 
-  Channel* AddChannel(const string& name);
+  unique_ptr<Channel> AddChannel(const string& name);
 
 private:
   string MakeEndpoint(const string& addr = "") const;

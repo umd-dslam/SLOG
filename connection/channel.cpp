@@ -47,12 +47,12 @@ void Channel::Receive(MMessage& msg) {
   msg.ReceiveFrom(socket_);
 }
 
-Channel* Channel::GetListener() {
+std::unique_ptr<Channel> Channel::GetListener() {
   CHECK(!is_listener_) << "Cannot create a listener from a listener";
   CHECK(!listener_created_) << "Listener of channel \"" << name_ 
                             << "\" has already been created";
   listener_created_ = true;
-  return new Channel(context_, name_, true /* is_listener */);
+  return std::unique_ptr<Channel>(new Channel(context_, name_, true /* is_listener */));
 }
 
 } // namespace slog;

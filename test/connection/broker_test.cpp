@@ -80,9 +80,7 @@ TEST(BrokerTest, InterchannelPingPong) {
   auto context = std::make_shared<zmq::context_t>(1);
   Broker broker(configs[0], context);
   
-  auto sender = [&](Channel* listener) {
-    unique_ptr<Channel> channel(listener);
-
+  auto sender = [&](unique_ptr<Channel>&& channel) {
     // Send ping
     MMessage msg;
     msg.Set(MM_PROTO, MakeEchoRequest("ping"));
@@ -97,9 +95,7 @@ TEST(BrokerTest, InterchannelPingPong) {
     ASSERT_EQ("pong", res.echo().data());
   };
 
-  auto receiver = [&](Channel* listener) {
-    unique_ptr<Channel> channel(listener);
-
+  auto receiver = [&](unique_ptr<Channel>&& channel) {
     // Wait for ping
     MMessage msg;
     channel->Receive(msg);
