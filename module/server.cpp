@@ -92,7 +92,7 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     forwarded_txn->CopyFrom(request.txn().txn());
     forwarded_txn->mutable_internal()->set_id(txn_id);
 
-    Send(forward_request, FORWARDER_CHANNEL);
+    SendSameMachine(forward_request, FORWARDER_CHANNEL);
 
     // For testing the server. To be remove later
     response_time_.emplace(

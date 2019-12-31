@@ -104,7 +104,7 @@ void Forwarder::Forward(const Transaction& txn) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     if (home_replica == config_->GetLocalReplica()) {
-      Send(forward_request, SEQUENCER_CHANNEL);
+      SendSameMachine(forward_request, SEQUENCER_CHANNEL);
     } else {
       std::uniform_int_distribution<> dist(0, config_->GetNumPartitions() - 1);
       auto partition = dist(re_);
