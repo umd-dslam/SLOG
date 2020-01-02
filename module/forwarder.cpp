@@ -60,7 +60,7 @@ void Forwarder::FillLookupMasterRequest(
 void Forwarder::HandleInternalResponse(
     internal::Response&& res,
     string&& /* from_machine_id */) {
-  // The forwarder only cares about lookup master response
+  // The forwarder only cares about lookup master responses
   if (res.type_case() != internal::Response::kLookupMaster) {
     return;
   }
@@ -83,6 +83,8 @@ void Forwarder::HandleInternalResponse(
     }
   }
 
+  // If a transaction can be determined to be either SINGLE_HOME or MULTI_HOME,
+  // forward it to the appropriate sequencer
   auto txn_type = SetTransactionType(txn);
   if (txn_type != TransactionType::UNKNOWN) {
     Forward(txn);

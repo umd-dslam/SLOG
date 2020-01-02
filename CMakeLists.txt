@@ -41,14 +41,16 @@ include_directories(${CMAKE_BINARY_DIR})
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(module)
+add_subdirectory(paxos)
 add_subdirectory(proto)
 add_subdirectory(storage)
 set(SLOG_LIBS
   common
   connection
   module
-  storage
-  proto)
+  paxos
+  proto
+  storage)
 
 # All libraries to be linked to executables
 set(EXTERNAL_LIBS

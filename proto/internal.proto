@@ -31,6 +31,12 @@ message MachineId {
     uint32 partition = 2;
 }
 
+message PaxosTuple {
+    uint32 ballot = 1;
+    uint32 slot = 2;
+    uint32 value = 3;
+}
+
 /***********************************************
                     REQUESTS
 ***********************************************/
@@ -46,6 +52,11 @@ message Request {
         ForwardTransactionRequest forward_txn = 3;
         LookupMasterRequest lookup_master = 4;
         ForwardBatchRequest forward_batch = 5;
+        
+        PaxosProposeRequest paxos_propose = 6;
+        PaxosElectRequest paxos_elect = 7;
+        PaxosAcceptRequest paxos_accept = 8;
+        PaxosCommitRequest paxos_commit = 9;
     }
 }
 
@@ -80,6 +91,27 @@ message ForwardBatchRequest {
     repeated Transaction batch = 2;
 }
 
+message PaxosProposeRequest {
+    uint32 value = 1;
+}
+
+message PaxosElectRequest {
+    uint32 ballot = 1;
+    repeated uint32 gaps = 2;
+}
+
+message PaxosAcceptRequest {
+    uint32 ballot = 1;
+    uint32 slot = 2;
+    uint32 value = 3;
+}
+
+message PaxosCommitRequest {
+    uint32 ballot = 1;
+    uint32 slot = 2;
+    uint32 value = 3;
+}
+
 /***********************************************
                     RESPONSES
 ***********************************************/
@@ -90,6 +122,9 @@ message Response {
     oneof type {
         EchoResponse echo = 1;
         LookupMasterResponse lookup_master = 2;
+        PaxosElectResponse paxos_elect = 3;
+        PaxosAcceptResponse paxos_accept = 4;
+        PaxosCommitResponse paxos_commit = 5;
     }
 }
 
@@ -103,4 +138,19 @@ message EchoResponse {
 message LookupMasterResponse {
     uint32 txn_id = 1;
     map<string, MasterMetadata> master_metadata = 2;
+}
+
+message PaxosElectResponse {
+    uint32 ballot = 1;
+    // slot id ==> value
+    repeated PaxosTuple accepted = 2;
+}
+
+message PaxosAcceptResponse {
+    uint32 ballot = 1;
+    uint32 slot = 2;
+}
+
+message PaxosCommitResponse {
+    uint32 slot = 1;
 }

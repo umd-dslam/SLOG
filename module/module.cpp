@@ -37,8 +37,8 @@ void ModuleRunner::Run() {
   }
 }
 
-ChannelHolder::ChannelHolder(unique_ptr<Channel>&& listener) 
-  : channel_(std::move(listener)) {}
+ChannelHolder::ChannelHolder(unique_ptr<Channel>&& channel) 
+  : channel_(std::move(channel)) {}
 
 void ChannelHolder::Send(
     const google::protobuf::Message& request_or_response,
