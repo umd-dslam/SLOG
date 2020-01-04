@@ -15,9 +15,16 @@ class SimpleMultiPaxos : public BasicModule {
 public:
   static const string CHANNEL_PREFIX;
 
+  /**
+   * @param group_name  Name of the current paxos group. Used to differentiate messages 
+   *                    from other paxos groups
+   * @param broker      The broker for sending and receiving messages
+   * @param members     Machine Id of all members participating in this Paxos process
+   * @param me          Machine Id of the current machine
+   */
   SimpleMultiPaxos(
-      Broker& broker,
       const string& group_name,
+      Broker& broker,
       const vector<string>& group_members,
       const string& me);
 
@@ -41,13 +48,13 @@ private:
   friend class Acceptor;
 };
 
-class SimpleMultiPaxosClient : PaxosClient {
+class SimpleMultiPaxosClient : public PaxosClient {
 public:
   static const string CHANNEL_PREFIX;
 
   SimpleMultiPaxosClient(Broker& broker, const string& group_name);
 
-  void Append(uint32_t number) final;
+  void Propose(uint32_t value) final;
 
 private:
 

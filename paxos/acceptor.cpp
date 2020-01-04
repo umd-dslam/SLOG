@@ -7,14 +7,12 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-Acceptor::Acceptor(SimpleMultiPaxos* sender) : sender_(sender) {}
+Acceptor::Acceptor(SimpleMultiPaxos* sender) : sender_(sender), ballot_(0) {}
 
 void Acceptor::HandleRequest(
     const Request& req,
     const string& from_machine_id) {
   switch (req.type_case()) {
-    case Request::TypeCase::kPaxosElect:
-      HandleElectRequest(req.paxos_elect(), from_machine_id); break;
     case Request::TypeCase::kPaxosAccept:
       HandleAcceptRequest(req.paxos_accept(), from_machine_id); break;
     case Request::TypeCase::kPaxosCommit:
@@ -22,12 +20,6 @@ void Acceptor::HandleRequest(
     default:
       break;
   }
-}
-
-void HandleElectRequest(
-    const internal::PaxosElectRequest& /* req */,
-    const string& /* from_machine_id */) {
-
 }
 
 void Acceptor::HandleAcceptRequest(
@@ -47,6 +39,8 @@ void Acceptor::HandleAcceptRequest(
 void Acceptor::HandleCommitRequest(
     const internal::PaxosCommitRequest& req,
     const string& from_machine_id) {
+  // TODO: If leader election is implemented, this is where we erase
+  //       memory about an accepted value
   Response res;
   auto commit_response = res.mutable_paxos_commit();
   commit_response->set_slot(req.slot());

@@ -5,7 +5,7 @@
 
 namespace slog {
 
-ModuleRunner::ModuleRunner(Module* module) 
+ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) 
   : module_(module),
     running_(false) {}
 

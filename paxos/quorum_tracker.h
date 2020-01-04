@@ -42,27 +42,6 @@ private:
   QuorumState state_;
 };
 
-// TODO: Current assumption is that the machines won't fail so this is not neccessary. 
-//       Continue working on this after we change the assumption
-/*
-class ElectionTracker : public QuorumTracker {
-public:
-  ElectionTracker(
-      uint32_t num_members,
-      uint32_t ballot);
-
-  unordered_map<uint32_t, internal::PaxosTuple> accepted_slots;
-
-protected:
-  bool ResponseIsValid(
-      const internal::Response& res,
-      const string& from_machine_id) final;
-
-private:
-  uint32_t ballot_;
-};
-*/
-
 class AcceptanceTracker : public QuorumTracker {
 public:
   AcceptanceTracker(

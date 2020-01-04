@@ -8,8 +8,8 @@ using internal::Response;
 const string SimpleMultiPaxos::CHANNEL_PREFIX = "paxos_";
 
 SimpleMultiPaxos::SimpleMultiPaxos(
-    Broker& broker,
     const string& group_name,
+    Broker& broker,
     const vector<string>& members,
     const string& me)
   : BasicModule(broker.AddChannel(CHANNEL_PREFIX + group_name)),
@@ -30,20 +30,19 @@ void SimpleMultiPaxos::HandleInternalResponse(
   leader_.HandleResponse(res, from_machine_id);
 }
 
-
 const string SimpleMultiPaxosClient::CHANNEL_PREFIX = "paxos_client_";
 
 SimpleMultiPaxosClient::SimpleMultiPaxosClient(Broker& broker, const string& group_name)
   : channel_(broker.AddChannel(CHANNEL_PREFIX + group_name)),
     group_name_(group_name) {}
 
-void SimpleMultiPaxosClient::Append(uint32_t value) {
+void SimpleMultiPaxosClient::Propose(uint32_t value) {
   MMessage msg;
   Request req;
   auto paxos_propose = req.mutable_paxos_propose();
   paxos_propose->set_value(value);
   msg.Set(MM_PROTO, req);
-  msg.Set(MM_FROM_CHANNEL, CHANNEL_PREFIX + group_name_);
+  msg.Set(MM_FROM_CHANNEL, SimpleMultiPaxosClient::CHANNEL_PREFIX + group_name_);
   msg.Set(MM_TO_CHANNEL, SimpleMultiPaxos::CHANNEL_PREFIX + group_name_);
   channel_->Send(msg);
 }

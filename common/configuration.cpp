@@ -81,6 +81,17 @@ uint32_t Configuration::GetServerPort() const {
   return server_port_;
 }
 
+vector<string> Configuration::GetAllMachineIds() const {
+  vector<string> ret;
+  ret.reserve(num_replicas_ * num_partitions_);
+  for (size_t rep = 0; rep < num_replicas_; rep++) {
+    for (size_t part = 0; part < num_partitions_; part++) {
+      ret.push_back(MakeMachineId(rep, part));
+    }
+  }
+  return ret;
+}
+
 const string& Configuration::GetLocalAddress() const {
   return local_address_;
 }

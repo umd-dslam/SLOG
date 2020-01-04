@@ -17,18 +17,23 @@ class SimpleMultiPaxos;
 
 struct Proposal {
   Proposal()
-    : ballot(0), value(0), is_chosen(false) {}
+    : ballot(0), value(0), is_committed(false) {}
 
   Proposal(uint32_t ballot, uint32_t value)
-    : ballot(ballot), value(value), is_chosen(false) {}
+    : ballot(ballot), value(value), is_committed(false) {}
 
   uint32_t ballot;
   uint32_t value;
-  bool is_chosen;
+  bool is_committed;
 };
 
 class Leader {
 public:
+  /**
+   * @param sender  The enclosing Paxos class
+   * @param members Machine Id of all members participating in this Paxos process
+   * @param me      Machine Id of the current machine
+   */
   Leader(
       SimpleMultiPaxos* sender,
       const vector<string>& members,
@@ -43,15 +48,6 @@ public:
 private:
   void HandleCommitRequest(const internal::PaxosCommitRequest commit);
 
-  // TODO: Current assumption is that the machines won't fail so this is not neccessary. 
-  //       Continue working on this after we change the assumption
-  /*
-  void AdvanceBallot();
-
-  void StartNewElection();
-  void ElectionStateChanged(ElectionTracker* election);
-  */
-
   void StartNewAcceptance(uint32_t value);
   void AcceptanceStateChanged(AcceptanceTracker* acceptance);
 
@@ -59,7 +55,6 @@ private:
   void CommitStateChanged(CommitTracker* commit);
 
   void SendToAllMembers(const internal::Request& request);
-
 
   SimpleMultiPaxos* const sender_;
 
@@ -72,6 +67,6 @@ private:
   uint32_t next_empty_slot_;
   uint32_t ballot_;
   unordered_map<uint32_t, Proposal> proposals_;
-  unordered_set<unique_ptr<QuorumTracker>> quorum_trackers_;
+  vector<unique_ptr<QuorumTracker>> quorum_trackers_;
 };
 } // namespace slog

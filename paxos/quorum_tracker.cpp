@@ -40,46 +40,6 @@ QuorumState QuorumTracker::GetState() {
   return state_;
 }
 
-// TODO: Current assumption is that the machines won't fail so this is not neccessary. 
-//       Continue working on this after we change the assumption
-/*
-ElectionTracker::ElectionTracker(
-    uint32_t num_members,
-    uint32_t ballot)
-  : QuorumTracker(num_members),
-    ballot_(ballot) {}
-
-bool ElectionTracker::ResponseIsValid(
-    const Response& res,
-    const string& from_machine_id ) {
-  if (res.type_case() != Response::TypeCase::kPaxosElect) {
-    return false;
-  }
-  auto paxos_elect = res.paxos_elect();
-
-  // Ignore responses with smaller ballot numbers
-  if (paxos_elect.ballot() < ballot_) {
-    return false;
-  }
-
-  // Someone else started an election with a larger ballot number
-  if (paxos_elect.ballot() > ballot_) {
-    Abort();
-    return true;
-  }
-
-  for (const auto& tuple : paxos_elect.accepted()) {
-    auto slot = tuple.slot();
-    auto new_ballot = tuple.ballot();
-    if (new_ballot >= accepted_slots[slot].ballot()) {
-      accepted_slots[slot] = tuple;
-    }
-  }
-
-  return true;
-}
-*/
-
 AcceptanceTracker::AcceptanceTracker(
     uint32_t num_members,
     uint32_t ballot,

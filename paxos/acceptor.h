@@ -17,10 +17,6 @@ public:
       const string& from_machine_id);
 
 private:
-  void HandleElectRequest(
-      const internal::PaxosElectRequest& req,
-      const string& from_machine_id);
-
   void HandleAcceptRequest(
       const internal::PaxosAcceptRequest& req,
       const string& from_machine_id);

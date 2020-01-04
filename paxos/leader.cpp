@@ -44,26 +44,32 @@ void Leader::HandleCommitRequest(const internal::PaxosCommitRequest commit) {
   auto ballot = commit.ballot();
   auto slot = commit.slot();
   auto value = commit.value();
+
+  if (slot < min_uncommitted_slot_) {
+    // Ignore committed messages. We already forget about values of these older
+    // slots so we cannot check for paxos invariant like we do below
+    return;
+  }
+
   auto& proposal = proposals_[slot];
-  
-  if (proposal.is_chosen) {
+  if (proposal.is_committed) {
     CHECK_EQ(value, proposal.value) 
-        << "Paxos invariant violated: Two values are chosen for the same slot";
+        << "Paxos invariant violated: Two values are committed for the same slot";
+    CHECK_EQ(ballot, proposal.ballot)
+        << "Paxos invariatn violated: Two leaders commit to the same slot";
   }
   proposal.ballot = ballot;
   proposal.value = value;
-  proposal.is_chosen = true;
+  proposal.is_committed = true;
+
+  // Report to the paxos user
+  sender_->OnCommit(slot, value);
 
   if (slot >= next_empty_slot_) {
     next_empty_slot_ = slot + 1;
   }
-
   while (proposals_.count(min_uncommitted_slot_) > 0 
-      && proposals_[min_uncommitted_slot_].is_chosen) {
-    auto value = proposals_[min_uncommitted_slot_].value;
-
-    sender_->OnCommit(min_uncommitted_slot_, value);
-
+      && proposals_[min_uncommitted_slot_].is_committed) {
     proposals_.erase(min_uncommitted_slot_);
     min_uncommitted_slot_++;
   }
@@ -83,66 +89,21 @@ void Leader::HandleResponse(
       else if (const auto commit = dynamic_cast<CommitTracker*>(raw_tracker)) {
         CommitStateChanged(commit);
       }
-
-      // TODO: Current assumption is that the machines won't fail so this is not neccessary. 
-      //       Continue working on this after we change the assumption
-      // if (const auto election = dynamic_cast<ElectionTracker*>(raw_tracker)) {
-      //   ElectionStateChanged(election);
-      // }
-    }
-    // Clean up trackers with COMPLETE and ABORTED state
-    if (tracker->GetState() == QuorumState::COMPLETE
-        || tracker->GetState() == QuorumState::ABORTED) {
-      quorum_trackers_.erase(tracker);
     }
   }
-  
+  // Clean up trackers with COMPLETE and ABORTED state
+  auto pend = std::remove_if(
+      quorum_trackers_.begin(),
+      quorum_trackers_.end(),
+      [](auto& tracker) {
+        return tracker->GetState() == QuorumState::COMPLETE 
+            || tracker->GetState() == QuorumState::ABORTED;});
+  quorum_trackers_.erase(pend, quorum_trackers_.end());
 }
-
-// TODO: Current assumption is that the machines won't fail so this is not neccessary. 
-//       Continue working on this after we change the assumption
-/*
-void Leader::AdvanceBallot() {
-  ballot_ += members_.size();
-}
-
-void Leader::StartNewElection() {
-  quorum_trackers_.emplace(
-      new ElectionTracker(members_.size(), ballot_));
-
-  Request request;
-  auto paxos_elect = request.mutable_paxos_elect();
-  paxos_elect->set_ballot(ballot_);
-  for (uint32_t i = min_uncommitted_slot_; i < next_empty_slot_; i++) {
-    if (proposals_.count(i) == 0) {
-      paxos_elect->add_gaps(i);
-    }
-  }
-  SendToAllMembers(request);
-  AdvanceBallot();
-}
-
-void Leader::ElectionStateChanged(ElectionTracker* election) {
-  if (election->GetState() == QuorumState::QUORUM_REACHED) {
-    for (const auto& pair : election->accepted_slots) {
-      auto slot = pair.first;
-      auto tuple = pair.second;
-      if (proposals_.count(slot) == 0 || tuple.ballot() > proposals_[slot].ballot) {
-        proposals_[slot].ballot = tuple.ballot();
-        proposals_[slot].value = tuple.value();
-        proposals_[slot].is_chosen = true;
-      }
-    }
-    is_elected_ = true;
-    elected_leader_ = me_;
-    LOG(INFO) << "I am the leader";
-  }
-}
-*/
 
 void Leader::StartNewAcceptance(uint32_t value) {
   proposals_[next_empty_slot_] = Proposal(ballot_, value);
-  quorum_trackers_.emplace(
+  quorum_trackers_.emplace_back(
       new AcceptanceTracker(members_.size(), ballot_, next_empty_slot_));
 
   Request request;
@@ -156,7 +117,12 @@ void Leader::StartNewAcceptance(uint32_t value) {
 }
 
 void Leader::AcceptanceStateChanged(AcceptanceTracker* acceptance) {
-  if (acceptance->GetState() == QuorumState::QUORUM_REACHED) {
+  // The check for member size is an optimization. Without this check, we'll send commit
+  // messages twice: once when quorum is reached and once when all acceptance messages are
+  // received. When member size <= 2, the state COMPLETE would overshadow QUORUM_REACHED,
+  // so we only need to check for COMPLETE in this case. Otherwise, QUORUM_REACHED is enough.
+  if (acceptance->GetState() == QuorumState::QUORUM_REACHED
+      || (members_.size() <= 2 && acceptance->GetState() == QuorumState::COMPLETE)) {
     auto slot = acceptance->slot;
     StartNewCommit(slot);
   }
@@ -164,7 +130,7 @@ void Leader::AcceptanceStateChanged(AcceptanceTracker* acceptance) {
 }
 
 void Leader::StartNewCommit(uint32_t slot) {
-  quorum_trackers_.emplace(
+  quorum_trackers_.emplace_back(
       new CommitTracker(members_.size(), slot));
   
   Request request;

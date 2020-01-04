@@ -6,6 +6,7 @@
 
 #include "connection/channel.h"
 
+using std::shared_ptr;
 using std::unique_ptr;
 using std::string;
 
@@ -31,7 +32,7 @@ public:
 
 class ModuleRunner {
 public:
-  ModuleRunner(Module* module);
+  ModuleRunner(const shared_ptr<Module>& module);
   ~ModuleRunner();
 
   void Start();
@@ -40,7 +41,7 @@ public:
 private:
   void Run();
 
-  unique_ptr<Module> module_;
+  shared_ptr<Module> module_;
   std::thread thread_;
   std::atomic<bool> running_;
 };
@@ -49,8 +50,8 @@ template<typename T, typename... Args>
 inline unique_ptr<ModuleRunner>
 MakeRunnerFor(Args&&... args)
 {
-  typedef typename std::remove_cv<T>::type T_nc;
-  return std::make_unique<ModuleRunner>(new T_nc(std::forward<Args>(args)...));
+  return std::make_unique<ModuleRunner>(
+      std::make_shared<T>(std::forward<Args>(args)...));
 }
 
 /**

@@ -6,7 +6,7 @@ namespace slog {
 
 class PaxosClient {
 public:
-  virtual void Append(uint32_t value);
+  virtual void Propose(uint32_t value) = 0;
 };
 
 } // namespace slog

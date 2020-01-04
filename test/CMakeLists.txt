@@ -8,7 +8,8 @@ set(ALL_TESTS
   channel_test
   mem_only_storage_test
   server_test
-  forwarder_test)
+  forwarder_test
+  paxos_test)
 
 add_executable(mmessage_test common/mmessage_test.cpp)
 target_link_libraries(mmessage_test test_utils)
@@ -27,6 +28,9 @@ target_link_libraries(server_test test_utils)
 
 add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)
+
+add_executable(paxos_test paxos/paxos_test.cpp)
+target_link_libraries(paxos_test test_utils paxos)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

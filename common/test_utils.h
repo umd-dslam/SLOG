@@ -26,6 +26,8 @@ ConfigVec MakeTestConfigurations(
     int num_replicas, 
     int num_partitions);
 
+using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
+
 class TestSlog {
 public:
   TestSlog(shared_ptr<Configuration> config);
@@ -42,8 +44,8 @@ private:
   shared_ptr<zmq::context_t> server_context_;
   shared_ptr<MemOnlyStorage> storage_;
   Broker broker_;
-  unique_ptr<ModuleRunner> server_;
-  unique_ptr<ModuleRunner> forwarder_;
+  ModuleRunnerPtr server_;
+  ModuleRunnerPtr forwarder_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

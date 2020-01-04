@@ -212,7 +212,11 @@ void Broker::HandleIncomingMessage(MMessage&& message) {
   if (conn_id == loopback_connection_id_) {
     message.SetIdentity("");
   } else {
-    message.SetIdentity(connection_id_to_machine_id_[conn_id]);
+    if (connection_id_to_machine_id_.count(conn_id) == 0) {
+      LOG(ERROR) << "Message came from an unknown connection (" << conn_id << "). Dropping";
+      return;
+    }
+    message.SetIdentity(connection_id_to_machine_id_.at(conn_id));
   }
   SendToTargetChannel(move(message));
 }
@@ -225,9 +229,10 @@ void Broker::HandleOutgoingMessage(MMessage&& message) {
     // Remove the identity part of the message before pop_backsending 
     // out to a DEALER socket
     const auto& machine_id = message.GetIdentity();
-    const auto& addr = machine_id_to_address_[machine_id];
+    CHECK(machine_id_to_address_.count(machine_id) > 0) << "Unknown machine id: " << machine_id;
+    const auto& addr = machine_id_to_address_.at(machine_id);
     message.SetIdentity("");
-    message.SendTo(*address_to_socket_[addr]);
+    message.SendTo(*address_to_socket_.at(addr));
   } else {
     SendToTargetChannel(move(message));
   }
