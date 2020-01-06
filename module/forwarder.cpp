@@ -26,22 +26,23 @@ void Forwarder::HandleInternalRequest(
 
   auto txn = req.mutable_forward_txn()->mutable_txn();
   auto txn_type = SetTransactionType(*txn);
-  if (txn_type == TransactionType::UNKNOWN) {
-    pending_transaction_[txn->internal().id()] = *txn;
-
-    internal::Request lookup_master_request;
-    FillLookupMasterRequest(lookup_master_request, *txn);
-
-    // Send a look up master request for each partition in the same region
-    auto rep = config_->GetLocalReplica();
-    for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-      Send(
-          lookup_master_request,
-          MakeMachineId(rep, part),
-          SERVER_CHANNEL);
-    }
-  } else {
+  // Forward the transaction if we already knoww the type of the txn
+  if (txn_type != TransactionType::UNKNOWN) {
     Forward(*txn);
+    return;
+  }
+
+  pending_transaction_[txn->internal().id()] = *txn;
+
+  // Send a look up master request for each partition in the same region
+  internal::Request lookup_master_request;
+  FillLookupMasterRequest(lookup_master_request, *txn);
+  auto rep = config_->GetLocalReplica();
+  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+    Send(
+        lookup_master_request,
+        MakeMachineId(rep, part),
+        SERVER_CHANNEL);
   }
 }
 

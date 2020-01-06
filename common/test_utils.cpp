@@ -26,9 +26,9 @@ internal::Response MakeEchoResponse(const std::string& data) {
 ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
-    int num_partitions) {
-  std::random_device rd;
-  std::mt19937 re(rd());
+    int num_partitions,
+    uint32_t seed) {
+  std::mt19937 re(seed);
   std::uniform_int_distribution<> dis(20000, 30000);
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;

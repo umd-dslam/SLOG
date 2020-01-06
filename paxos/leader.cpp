@@ -17,8 +17,8 @@ Leader::Leader(
     next_empty_slot_(0) {
   auto position_in_members = 
       std::find(members.begin(), members.end(), me) - members.begin();
-  is_elected_ = position_in_members == 0;
-  elected_leader_ = members[0];
+  is_elected_ = position_in_members == PAXOS_DEFAULT_LEADER_POSITION;
+  elected_leader_ = members[PAXOS_DEFAULT_LEADER_POSITION];
   ballot_ = position_in_members;
 }
 

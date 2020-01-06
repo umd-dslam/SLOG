@@ -24,7 +24,8 @@ internal::Response MakeEchoResponse(const string& data);
 ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
-    int num_partitions);
+    int num_partitions,
+    uint32_t seed = 0);
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 

@@ -41,6 +41,8 @@ public:
   MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;
 
+  uint32_t GetGlobalPaxosMemberPartition() const;
+
 private:
   string protocol_;
   uint32_t broker_port_;

@@ -116,4 +116,11 @@ string Configuration::GetLocalMachineIdAsString() const {
   return MakeMachineId(local_replica_, local_partition_);
 }
 
+uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
+  // This can be any partition other than partition 0 because
+  // partition 0 is probably busy working as the leader of the 
+  // local paxos process
+  return num_partitions_ - 1;
+}
+
 } // namespace slog

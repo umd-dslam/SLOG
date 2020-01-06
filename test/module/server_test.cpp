@@ -17,7 +17,7 @@ using namespace slog;
 
 TEST(ServerTest, LookupMaster) {
   const string REQUESTER_CHANNEL("requester");
-  auto configs = MakeTestConfigurations("lookup", 1, 1);
+  auto configs = MakeTestConfigurations("lookup", 1, 1, 23 /* seed */);
   TestSlog test_slog(configs[0]);
   test_slog.AddServerAndClient();
   test_slog.Data("A", {"vzxcv", 0, 1});

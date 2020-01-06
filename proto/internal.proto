@@ -31,12 +31,6 @@ message MachineId {
     uint32 partition = 2;
 }
 
-message PaxosTuple {
-    uint32 ballot = 1;
-    uint32 slot = 2;
-    uint32 value = 3;
-}
-
 /***********************************************
                     REQUESTS
 ***********************************************/
@@ -56,6 +50,8 @@ message Request {
         PaxosProposeRequest paxos_propose = 6;
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
+
+        OrderRequest order = 10;
     }
 }
 
@@ -104,6 +100,11 @@ message PaxosCommitRequest {
     uint32 ballot = 1;
     uint32 slot = 2;
     uint32 value = 3;
+}
+
+message OrderRequest {
+    uint32 slot = 1;
+    uint32 value = 2;
 }
 
 /***********************************************

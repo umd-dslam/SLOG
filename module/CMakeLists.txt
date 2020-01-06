@@ -4,6 +4,7 @@ set(SOURCES
   basic_module.cpp
   forwarder.cpp
   module.cpp
+  orderer.cpp
   server.cpp
   sequencer.cpp
   scheduler.cpp
