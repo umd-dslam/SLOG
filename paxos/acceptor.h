@@ -10,7 +10,7 @@ class SimpleMultiPaxos;
 
 class Acceptor {
 public:
-  Acceptor(SimpleMultiPaxos* sender);
+  Acceptor(SimpleMultiPaxos& sender);
 
   void HandleRequest(
       const internal::Request& req,
@@ -25,7 +25,7 @@ private:
       const internal::PaxosCommitRequest& req,
       const string& from_machine_id);
 
-  SimpleMultiPaxos* const sender_;
+  SimpleMultiPaxos& sender_;
 
   uint32_t ballot_;
 };

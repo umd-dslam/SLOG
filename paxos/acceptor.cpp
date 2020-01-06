@@ -7,7 +7,7 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-Acceptor::Acceptor(SimpleMultiPaxos* sender) : sender_(sender), ballot_(0) {}
+Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 
 void Acceptor::HandleRequest(
     const Request& req,
@@ -33,7 +33,7 @@ void Acceptor::HandleAcceptRequest(
   auto accept_response = res.mutable_paxos_accept();
   accept_response->set_ballot(ballot_);
   accept_response->set_slot(req.slot());
-  sender_->SendSameChannel(res, from_machine_id);
+  sender_.SendSameChannel(res, from_machine_id);
 }
 
 void Acceptor::HandleCommitRequest(
@@ -44,7 +44,7 @@ void Acceptor::HandleCommitRequest(
   Response res;
   auto commit_response = res.mutable_paxos_commit();
   commit_response->set_slot(req.slot());
-  sender_->SendSameChannel(res, from_machine_id);
+  sender_.SendSameChannel(res, from_machine_id);
 }
 
 } // namespace slog

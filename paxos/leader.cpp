@@ -7,7 +7,7 @@ using internal::Request;
 using internal::Response;
 
 Leader::Leader(
-    SimpleMultiPaxos* sender,
+    SimpleMultiPaxos& sender,
     const vector<string>& members,
     const string& me)
   : sender_(sender), 
@@ -30,7 +30,7 @@ void Leader::HandleRequest(const Request& req) {
       if (is_elected_) {
         StartNewAcceptance(req.paxos_propose().value());
       } else {
-        sender_->SendSameChannel(req, elected_leader_);
+        sender_.SendSameChannel(req, elected_leader_);
       }
       break;
     case Request::TypeCase::kPaxosCommit:
@@ -63,7 +63,7 @@ void Leader::HandleCommitRequest(const internal::PaxosCommitRequest commit) {
   proposal.is_committed = true;
 
   // Report to the paxos user
-  sender_->OnCommit(slot, value);
+  sender_.OnCommit(slot, value);
 
   if (slot >= next_empty_slot_) {
     next_empty_slot_ = slot + 1;
@@ -147,7 +147,7 @@ void Leader::CommitStateChanged(CommitTracker* /* commit */) {
 
 void Leader::SendToAllMembers(const Request& request) {
   for (const auto& member : members_) {
-    sender_->SendSameChannel(request, member);
+    sender_.SendSameChannel(request, member);
   }
 }
 

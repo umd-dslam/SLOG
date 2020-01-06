@@ -35,7 +35,7 @@ public:
    * @param me      Machine Id of the current machine
    */
   Leader(
-      SimpleMultiPaxos* sender,
+      SimpleMultiPaxos& sender,
       const vector<string>& members,
       const string& me);
 
@@ -56,7 +56,7 @@ private:
 
   void SendToAllMembers(const internal::Request& request);
 
-  SimpleMultiPaxos* const sender_;
+  SimpleMultiPaxos& sender_;
 
   const vector<string> members_;
   const string me_;

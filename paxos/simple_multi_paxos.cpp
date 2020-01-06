@@ -13,8 +13,8 @@ SimpleMultiPaxos::SimpleMultiPaxos(
     const vector<string>& members,
     const string& me)
   : BasicModule(broker.AddChannel(CHANNEL_PREFIX + group_name)),
-    leader_(this, members, me),
-    acceptor_(this) {}
+    leader_(*this, members, me),
+    acceptor_(*this) {}
 
 void SimpleMultiPaxos::HandleInternalRequest(
     Request&& req,
@@ -30,21 +30,17 @@ void SimpleMultiPaxos::HandleInternalResponse(
   leader_.HandleResponse(res, from_machine_id);
 }
 
-const string SimpleMultiPaxosClient::CHANNEL_PREFIX = "paxos_client_";
-
-SimpleMultiPaxosClient::SimpleMultiPaxosClient(Broker& broker, const string& group_name)
-  : channel_(broker.AddChannel(CHANNEL_PREFIX + group_name)),
+SimpleMultiPaxosClient::SimpleMultiPaxosClient(
+    ChannelHolder& channel_holder, const string& group_name)
+  : channel_holder_(channel_holder),
     group_name_(group_name) {}
 
 void SimpleMultiPaxosClient::Propose(uint32_t value) {
-  MMessage msg;
   Request req;
   auto paxos_propose = req.mutable_paxos_propose();
   paxos_propose->set_value(value);
-  msg.Set(MM_PROTO, req);
-  msg.Set(MM_FROM_CHANNEL, SimpleMultiPaxosClient::CHANNEL_PREFIX + group_name_);
-  msg.Set(MM_TO_CHANNEL, SimpleMultiPaxos::CHANNEL_PREFIX + group_name_);
-  channel_->Send(msg);
+  channel_holder_.SendSameMachine(
+      req, SimpleMultiPaxos::CHANNEL_PREFIX + group_name_);
 }
 
 } // namespace slog

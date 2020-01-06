@@ -50,15 +50,13 @@ private:
 
 class SimpleMultiPaxosClient : public PaxosClient {
 public:
-  static const string CHANNEL_PREFIX;
-
-  SimpleMultiPaxosClient(Broker& broker, const string& group_name);
+  SimpleMultiPaxosClient(ChannelHolder& channel_holder, const string& group_name);
 
   void Propose(uint32_t value) final;
 
 private:
 
-  unique_ptr<Channel> channel_;
+  ChannelHolder& channel_holder_;
   const string group_name_;
 };
 

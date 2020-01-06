@@ -61,7 +61,6 @@ class ChannelHolder {
 public:
   ChannelHolder(unique_ptr<Channel>&& channel_);
 
-protected:
   /**
    * Send a request or response to a given channel of a given machine
    * @param request_or_response Request or response to be sent

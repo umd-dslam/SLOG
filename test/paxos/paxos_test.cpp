@@ -59,7 +59,7 @@ protected:
         config->GetAllMachineIds(),
         config->GetLocalMachineIdAsString());
     auto paxos_runner = new ModuleRunner(paxos);
-    auto client = new SimpleMultiPaxosClient(*broker, "test");
+    auto client = new SimpleMultiPaxosClient(*paxos, "test");
 
     broker->StartInNewThread();
     paxos_runner->StartInNewThread();
