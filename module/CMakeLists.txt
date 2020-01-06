@@ -7,8 +7,7 @@ set(SOURCES
   orderer.cpp
   server.cpp
   sequencer.cpp
-  scheduler.cpp
-  workload_generator.cpp)
+  scheduler.cpp)
 
 add_library(module ${SOURCES})
 

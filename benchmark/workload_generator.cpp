@@ -1,4 +1,4 @@
-#include "module/workload_generator.h"
+#include "benchmark/workload_generator.h"
 
 #include <random>
 

@@ -145,7 +145,6 @@ void Leader::CommitStateChanged(CommitTracker* /* commit */) {
   // TODO: Retransmit request after we implement heartbeat
 }
 
-
 void Leader::SendToAllMembers(const Request& request) {
   for (const auto& member : members_) {
     sender_->SendSameChannel(request, member);

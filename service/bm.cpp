@@ -1,5 +1,5 @@
 #include "common/service_utils.h"
-#include "module/workload_generator.h"
+#include "benchmark/workload_generator.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 5051, "Port number of the SLOG server to connect to");

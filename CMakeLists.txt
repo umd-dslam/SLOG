@@ -38,6 +38,7 @@ include_directories(${CMAKE_BINARY_DIR})
 
 # Proto needs to be added before everything else so that protobuf gets to generate files
 # needed in subsequent libraries
+add_subdirectory(benchmark)
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(module)
@@ -45,6 +46,7 @@ add_subdirectory(paxos)
 add_subdirectory(proto)
 add_subdirectory(storage)
 set(SLOG_LIBS
+  benchmark
   common
   connection
   module
@@ -64,8 +66,8 @@ set(EXTERNAL_LIBS
 add_executable(slog service/slog.cpp)
 target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
-add_executable(workload service/workload.cpp)
-target_link_libraries(workload ${SLOG_LIBS} ${EXTERNAL_LIBS})
+add_executable(bm service/bm.cpp)
+target_link_libraries(bm ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
 # =================================== Tests =============================================
 
