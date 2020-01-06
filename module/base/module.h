@@ -16,8 +16,12 @@ namespace slog {
  * An interface for a module in SLOG. Most modules only need
  * to connect to a single channel from the broker so they usually
  * extend from BasicModule. Extending from this class is
- * only needed if a module needs more than one socket or
+ * only needed if a module needs more than one socket and
  * needs more flexibility in implementation (for example: Server)
+ * 
+ * A module cannot run on its own but only contains the instructions
+ * for what to run. It has to be coupled with a ModuleRunner, which
+ * at heart is an indefinite loop.
  */
 class Module {
 public:
@@ -26,10 +30,22 @@ public:
   const Module& operator=(const Module&) = delete;
   virtual ~Module() {}
 
+  /**
+   * To be called before the main loop. This gives a chance to perform 
+   * all neccessary one-time initialization.
+   */
   virtual void SetUp() {};
+
+  /**
+   * Contains the actions to be perform in one iteration of the main loop
+   */
   virtual void Loop() = 0;
 };
 
+/**
+ * A ModuleRunner executes a Module. Its execution can either live in
+ * a new thread or in the same thread as its caller.
+ */
 class ModuleRunner {
 public:
   ModuleRunner(const shared_ptr<Module>& module);
@@ -46,6 +62,9 @@ private:
   std::atomic<bool> running_;
 };
 
+/**
+ * Helper function for create a ModuleRunner with a Module installed
+ */
 template<typename T, typename... Args>
 inline unique_ptr<ModuleRunner>
 MakeRunnerFor(Args&&... args)
@@ -55,7 +74,7 @@ MakeRunnerFor(Args&&... args)
 }
 
 /**
- * A base class for module that needs to hold a channel
+ * A base class for module that holds a channel
  */
 class ChannelHolder {
 public:
