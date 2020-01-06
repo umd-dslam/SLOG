@@ -1,18 +1,21 @@
 project(module)
 
-set(SOURCES
-  basic_module.cpp
+add_library(base_module 
+  base/basic_module.cpp
+  base/module.cpp)
+
+target_link_libraries(base_module
+  common
+  connection
+  proto)
+
+add_library(module
   forwarder.cpp
-  module.cpp
   orderer.cpp
   server.cpp
   sequencer.cpp
   scheduler.cpp)
 
-add_library(module ${SOURCES})
-
 target_link_libraries(module
-  common
-  connection
-  proto
+  base_module
   storage)

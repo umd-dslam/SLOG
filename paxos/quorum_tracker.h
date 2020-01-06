@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "module/module.h"
 #include "proto/internal.pb.h"
 
 using std::string;

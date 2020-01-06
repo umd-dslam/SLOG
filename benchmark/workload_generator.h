@@ -4,7 +4,7 @@
 
 #include <zmq.hpp>
 
-#include "module/module.h"
+#include "module/base/module.h"
 
 using std::string;
 

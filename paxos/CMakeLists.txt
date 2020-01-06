@@ -8,4 +8,4 @@ set(SOURCES
 
 add_library(paxos ${SOURCES})
 
-target_link_libraries(paxos connection module proto)
+target_link_libraries(paxos base_module connection proto)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/constants.h"
-#include "module/module.h"
+#include "module/base/module.h"
 #include "connection/channel.h"
 #include "proto/internal.pb.h"
 

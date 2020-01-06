@@ -4,7 +4,7 @@
 
 #include "common/configuration.h"
 #include "connection/broker.h"
-#include "module/module.h"
+#include "module/base/module.h"
 #include "module/server.h"
 #include "module/forwarder.h"
 #include "storage/mem_only_storage.h"

@@ -6,7 +6,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
-#include "module/basic_module.h"
+#include "module/base/basic_module.h"
 #include "proto/transaction.pb.h"
 
 using std::shared_ptr;

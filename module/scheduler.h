@@ -2,7 +2,7 @@
 
 #include "common/configuration.h"
 #include "connection/broker.h"
-#include "module/basic_module.h"
+#include "module/base/basic_module.h"
 
 using std::shared_ptr;
 

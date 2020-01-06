@@ -7,6 +7,7 @@
 #include "paxos/quorum_tracker.h"
 
 using std::string;
+using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;

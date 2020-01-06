@@ -10,7 +10,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
-#include "module/module.h"
+#include "module/base/module.h"
 #include "storage/lookup_master_index.h"
 
 using std::shared_ptr;

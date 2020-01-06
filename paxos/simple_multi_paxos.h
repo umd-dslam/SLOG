@@ -1,7 +1,7 @@
 #pragma once
 
 #include "connection/broker.h"
-#include "module/basic_module.h"
+#include "module/base/basic_module.h"
 #include "paxos/acceptor.h"
 #include "paxos/paxos_client.h"
 #include "paxos/leader.h"
