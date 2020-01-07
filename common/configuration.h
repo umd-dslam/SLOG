@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include "proto/configuration.pb.h"
 #include "proto/internal.pb.h"
 
 using std::string;
