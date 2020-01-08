@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include "common/types.h"
 #include "proto/configuration.pb.h"
 #include "proto/internal.pb.h"
 
@@ -44,16 +45,23 @@ public:
 
   uint32_t GetGlobalPaxosMemberPartition() const;
 
+  // TODO: How keys are partitioned is hardcoded for now. 
+  //       Later find a better place to put this method
+  bool KeyIsInLocalPartition(const Key& key) const;
+
 private:
   string protocol_;
   uint32_t broker_port_;
   uint32_t server_port_;
   uint32_t num_replicas_;
   uint32_t num_partitions_;
-  vector<string> all_addresses_;
+  uint32_t partition_key_num_bytes_;
+
   string local_address_;
   uint32_t local_replica_;
   uint32_t local_partition_;
+
+  vector<string> all_addresses_;
 };
 
 } // namespace slog

@@ -63,7 +63,7 @@ private:
 };
 
 /**
- * Helper function for create a ModuleRunner with a Module installed
+ * Helper function for creating a ModuleRunner.
  */
 template<typename T, typename... Args>
 inline unique_ptr<ModuleRunner>

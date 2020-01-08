@@ -9,6 +9,12 @@ target_link_libraries(base_module
   connection
   proto)
 
+add_library(scheduler_components
+  scheduler_components/deterministic_lock_manager.cpp
+  scheduler_components/worker.cpp)
+
+target_link_libraries(scheduler_components common)
+
 add_library(module
   forwarder.cpp
   orderer.cpp
@@ -18,4 +24,5 @@ add_library(module
 
 target_link_libraries(module
   base_module
+  scheduler_components
   storage)

@@ -21,4 +21,6 @@ const size_t MM_TO_CHANNEL = 2;
 
 const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
 
+const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;
+
 } // namespace slog

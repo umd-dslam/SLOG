@@ -11,6 +11,19 @@
 
 namespace slog {
 
+namespace {
+
+template<class It>
+uint32_t FNVHash(It begin, It end) {
+  uint32_t hash = 2166136261;
+  for (auto it = begin; it != end; it++) {
+    hash = (hash * 1099511628211) ^ *it;
+  }
+  return hash;
+}
+
+} // namespace
+
 using std::runtime_error;
 
 std::shared_ptr<Configuration> Configuration::FromFile(
@@ -42,6 +55,7 @@ Configuration::Configuration(
     server_port_(config.server_port()),
     num_replicas_(config.num_replicas()),
     num_partitions_(config.num_partitions()),
+    partition_key_num_bytes_(config.partition_key_num_bytes()),
     local_address_(local_address),
     local_replica_(local_replica),
     local_partition_(local_partition) {
@@ -121,6 +135,15 @@ uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
   // partition 0 is probably busy working as the leader of the 
   // local paxos process
   return num_partitions_ - 1;
+}
+
+bool Configuration::KeyIsInLocalPartition(const Key& key) const {
+  auto end = partition_key_num_bytes_ >= key.length() 
+      ? key.end() 
+      : key.begin() + partition_key_num_bytes_;
+  auto owning_partition = 
+      FNVHash(key.begin(), end) % num_partitions_;
+  return owning_partition == local_partition_;
 }
 
 } // namespace slog

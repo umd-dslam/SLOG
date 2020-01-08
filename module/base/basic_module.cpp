@@ -22,20 +22,23 @@ void BasicModule::Loop() {
       if (poll_item_.revents & ZMQ_POLLIN) {
         MMessage message;
         ReceiveFromChannel(message);
-
         auto from_machine_id = message.GetIdentity();
+
         if (message.IsProto<internal::Request>()) {
           internal::Request req;
           message.GetProto<internal::Request>(req);
+
           string from_channel;
           message.GetString(from_channel, MM_FROM_CHANNEL);
+
           HandleInternalRequest(
               move(req),
               move(from_machine_id),
               move(from_channel));
         } else if (message.IsProto<internal::Response>()) {
           internal::Response res;
-          message.GetProto<internal::Response>(res),
+          message.GetProto<internal::Response>(res);
+
           HandleInternalResponse(
               move(res),
               move(from_machine_id));

@@ -9,7 +9,8 @@ set(ALL_TESTS
   mem_only_storage_test
   server_test
   forwarder_test
-  paxos_test)
+  paxos_test
+  deterministic_lock_manager_test)
 
 add_executable(mmessage_test common/mmessage_test.cpp)
 target_link_libraries(mmessage_test test_utils)
@@ -31,6 +32,10 @@ target_link_libraries(forwarder_test test_utils)
 
 add_executable(paxos_test paxos/paxos_test.cpp)
 target_link_libraries(paxos_test test_utils paxos)
+
+add_executable(deterministic_lock_manager_test 
+  module/scheduler_components/deterministic_lock_manager_test.cpp)
+target_link_libraries(deterministic_lock_manager_test test_utils)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

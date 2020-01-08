@@ -34,10 +34,8 @@ include_directories(${GFLAGS_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
-# ================================== Server =============================================
+# ================================== Executables ========================================
 
-# Proto needs to be added before everything else so that protobuf gets to generate files
-# needed in subsequent libraries
 add_subdirectory(benchmark)
 add_subdirectory(common)
 add_subdirectory(connection)
