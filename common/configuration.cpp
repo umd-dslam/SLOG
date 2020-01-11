@@ -50,12 +50,7 @@ Configuration::Configuration(
     const std::string& local_address,
     uint32_t local_replica,
     uint32_t local_partition)
-  : protocol_(config.protocol()),
-    broker_port_(config.broker_port()),
-    server_port_(config.server_port()),
-    num_replicas_(config.num_replicas()),
-    num_partitions_(config.num_partitions()),
-    partition_key_num_bytes_(config.partition_key_num_bytes()),
+  : config_(config),
     local_address_(local_address),
     local_replica_(local_replica),
     local_partition_(local_partition) {
@@ -72,7 +67,7 @@ Configuration::Configuration(
 }
 
 const string& Configuration::GetProtocol() const {
-  return protocol_;
+  return config_.protocol();
 }
 
 const vector<string>& Configuration::GetAllAddresses() const {
@@ -80,26 +75,28 @@ const vector<string>& Configuration::GetAllAddresses() const {
 }
 
 uint32_t Configuration::GetNumReplicas() const {
-  return num_replicas_;
+  return config_.num_replicas();
 }
 
 uint32_t Configuration::GetNumPartitions() const {
-  return num_partitions_;
+  return config_.num_partitions();
 }
 
 uint32_t Configuration::GetBrokerPort() const {
-  return broker_port_;
+  return config_.broker_port();
 }
 
 uint32_t Configuration::GetServerPort() const {
-  return server_port_;
+  return config_.server_port();
 }
 
 vector<string> Configuration::GetAllMachineIds() const {
+  auto num_reps = GetNumReplicas();
+  auto num_parts = GetNumPartitions();
   vector<string> ret;
-  ret.reserve(num_replicas_ * num_partitions_);
-  for (size_t rep = 0; rep < num_replicas_; rep++) {
-    for (size_t part = 0; part < num_partitions_; part++) {
+  ret.reserve(num_reps * num_parts);
+  for (size_t rep = 0; rep < num_reps; rep++) {
+    for (size_t part = 0; part < num_parts; part++) {
       ret.push_back(MakeMachineId(rep, part));
     }
   }
@@ -123,7 +120,7 @@ MachineId Configuration::GetLocalMachineIdAsProto() const {
 }
 
 uint32_t Configuration::GetLocalMachineIdAsNumber() const {
-  return local_replica_ * num_partitions_ + local_partition_;
+  return local_replica_ * GetNumPartitions() + local_partition_;
 }
 
 string Configuration::GetLocalMachineIdAsString() const {
@@ -134,15 +131,15 @@ uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
   // This can be any partition other than partition 0 because
   // partition 0 is probably busy working as the leader of the 
   // local paxos process
-  return num_partitions_ - 1;
+  return GetNumPartitions() - 1;
 }
 
 bool Configuration::KeyIsInLocalPartition(const Key& key) const {
-  auto end = partition_key_num_bytes_ >= key.length() 
+  auto end = config_.partition_key_num_bytes() >= key.length() 
       ? key.end() 
-      : key.begin() + partition_key_num_bytes_;
+      : key.begin() + config_.partition_key_num_bytes();
   auto owning_partition = 
-      FNVHash(key.begin(), end) % num_partitions_;
+      FNVHash(key.begin(), end) % GetNumPartitions();
   return owning_partition == local_partition_;
 }
 

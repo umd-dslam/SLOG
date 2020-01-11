@@ -50,13 +50,7 @@ public:
   bool KeyIsInLocalPartition(const Key& key) const;
 
 private:
-  string protocol_;
-  uint32_t broker_port_;
-  uint32_t server_port_;
-  uint32_t num_replicas_;
-  uint32_t num_partitions_;
-  uint32_t partition_key_num_bytes_;
-
+  internal::Configuration config_;
   string local_address_;
   uint32_t local_replica_;
   uint32_t local_partition_;
