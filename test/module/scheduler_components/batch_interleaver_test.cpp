@@ -31,18 +31,18 @@ protected:
 TEST_F(BatchInterleaverTest, InOrder) {
   BatchInterleaver interleaver;
   interleaver.AddBatch(111 /* queue_id */, batches_[0]);
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddAgreedSlot(0 /* slot_id */, 111 /* queue_id */);
   AssertBatchId({100, 0}, interleaver.NextBatch());
 
   interleaver.AddBatch(222 /* queue_id */, batches_[1]);
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddAgreedSlot(1 /* slot_id */, 222 /* queue_id */);
   AssertBatchId({200, 1}, interleaver.NextBatch());
 
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
 TEST_F(BatchInterleaverTest, BatchesComeFirst) {
@@ -65,7 +65,7 @@ TEST_F(BatchInterleaverTest, BatchesComeFirst) {
   interleaver.AddAgreedSlot(3 /* slot_id */, 333 /* queue_id */);
   AssertBatchId({400, 3}, interleaver.NextBatch());
 
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
 TEST_F(BatchInterleaverTest, SlotsComeFirst) {
@@ -88,10 +88,10 @@ TEST_F(BatchInterleaverTest, SlotsComeFirst) {
   interleaver.AddBatch(333 /* queue_id */, batches_[3]);
   AssertBatchId({400, 3}, interleaver.NextBatch());
 
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
-TEST_F(BatchInterleaverTest, MultipleReadyBatches) {
+TEST_F(BatchInterleaverTest, MultipleNextBatches) {
   BatchInterleaver interleaver;
 
   interleaver.AddBatch(111 /* queue_id */, batches_[2]);
@@ -109,5 +109,5 @@ TEST_F(BatchInterleaverTest, MultipleReadyBatches) {
   AssertBatchId({300, 2}, interleaver.NextBatch());
   AssertBatchId({200, 3}, interleaver.NextBatch());
 
-  ASSERT_FALSE(interleaver.HasReadyBatch());
+  ASSERT_FALSE(interleaver.HasNextBatch());
 }

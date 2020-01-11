@@ -22,7 +22,7 @@ public:
   void AddBatch(uint32_t queue_id, BatchPtr batch);
   void AddAgreedSlot(SlotId slot_id, uint32_t queue_id);
 
-  bool HasReadyBatch() const;
+  bool HasNextBatch() const;
   pair<BatchPtr, SlotId> NextBatch();
 
 private:

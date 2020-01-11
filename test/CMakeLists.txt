@@ -8,6 +8,7 @@ set(ALL_TESTS
   channel_test
   deterministic_lock_manager_test
   forwarder_test
+  local_log_test
   mem_only_storage_test
   mmessage_test
   paxos_test
@@ -29,6 +30,10 @@ target_link_libraries(deterministic_lock_manager_test test_utils)
 
 add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)
+
+add_executable(local_log_test
+  module/scheduler_components/local_log_test.cpp)
+target_link_libraries(local_log_test scheduler_components proto)
 
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
 target_link_libraries(mem_only_storage_test storage)

@@ -20,12 +20,12 @@ void BatchInterleaver::AddAgreedSlot(SlotId slot_id, uint32_t queue_id) {
   UpdateReadyBatches();
 }
 
-bool BatchInterleaver::HasReadyBatch() const {
+bool BatchInterleaver::HasNextBatch() const {
   return !ready_batches_.empty();
 }
 
 pair<BatchPtr, SlotId> BatchInterleaver::NextBatch() {
-  if (!HasReadyBatch()) {
+  if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
   auto next_batch = ready_batches_.front();
