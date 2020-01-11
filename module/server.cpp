@@ -14,12 +14,12 @@ Server::Server(
     shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)
   : ChannelHolder(broker.AddChannel(SERVER_CHANNEL)), 
     config_(config),
-    socket_(context, ZMQ_ROUTER),
+    client_socket_(context, ZMQ_ROUTER),
     lookup_master_index_(lookup_master_index),
     txn_id_counter_(0) {
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({ 
-    static_cast<void*>(socket_),
+    static_cast<void*>(client_socket_),
     0, /* fd */
     ZMQ_POLLIN,
     0 /* revent */
@@ -29,7 +29,7 @@ Server::Server(
 void Server::SetUp() {
   string endpoint = 
       "tcp://*:" + std::to_string(config_->GetServerPort());
-  socket_.bind(endpoint);
+  client_socket_.bind(endpoint);
   LOG(INFO) << "Bound Server to: " << endpoint;
 }
 
@@ -39,7 +39,7 @@ void Server::Loop() {
     case 0: // Timed out. No event signaled during poll
       break;
     default:
-      if (poll_items_[0].revents & ZMQ_POLLIN) {
+      if (HasMessageFromChannel()) {
         ReceiveFromChannel(msg);
         if (msg.IsProto<internal::Request>()) {
           HandleInternalRequest(std::move(msg));
@@ -47,8 +47,8 @@ void Server::Loop() {
           HandleInternalResponse(std::move(msg));
         }
       }
-      if (poll_items_[1].revents & ZMQ_POLLIN) {
-        msg.ReceiveFrom(socket_);
+      if (HasMessageFromClient()) {
+        msg.ReceiveFrom(client_socket_);
         if (msg.IsProto<api::Request>()) {
           HandleAPIRequest(std::move(msg));
         }
@@ -63,7 +63,7 @@ void Server::Loop() {
       auto txn_id = top->second;
       auto& response = pending_response_[txn_id];
 
-      response.SendTo(socket_);
+      response.SendTo(client_socket_);
 
       pending_response_.erase(txn_id);
       response_time_.erase(top);
@@ -71,6 +71,14 @@ void Server::Loop() {
       break;
     }
   }
+}
+
+bool Server::HasMessageFromChannel() const {
+  return poll_items_[0].revents & ZMQ_POLLIN;
+}
+
+bool Server::HasMessageFromClient() const {
+  return poll_items_[1].revents & ZMQ_POLLIN;
 }
 
 void Server::HandleAPIRequest(MMessage&& msg) {

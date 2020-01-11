@@ -18,7 +18,7 @@ using std::unordered_map;
 
 namespace slog {
 
-class Server : public Module, public ChannelHolder {
+class Server : public Module, ChannelHolder {
 public:
   Server(
       shared_ptr<const Configuration> config,
@@ -30,6 +30,9 @@ private:
   void SetUp() final;
   void Loop() final;
 
+  bool HasMessageFromChannel() const;
+  bool HasMessageFromClient() const;
+
   void HandleAPIRequest(MMessage&& msg);
   void HandleInternalRequest(MMessage&& msg);
   void HandleInternalResponse(MMessage&& msg);
@@ -37,7 +40,7 @@ private:
   TxnId NextTxnId();
 
   shared_ptr<const Configuration> config_;
-  zmq::socket_t socket_;
+  zmq::socket_t client_socket_;
   std::vector<zmq::pollitem_t> poll_items_;
 
   shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
