@@ -129,7 +129,7 @@ void Leader::AcceptanceStateChanged(AcceptanceTracker* acceptance) {
   // TODO: Retransmit request after we implement heartbeat
 }
 
-void Leader::StartNewCommit(uint32_t slot) {
+void Leader::StartNewCommit(SlotId slot) {
   quorum_trackers_.emplace_back(
       new CommitTracker(members_.size(), slot));
   

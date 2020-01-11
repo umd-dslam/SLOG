@@ -9,6 +9,11 @@ message MachineId {
     uint32 partition = 2;
 }
 
+message Batch {
+    uint32 id = 1;
+    repeated Transaction transactions = 2;
+}
+
 /***********************************************
                     REQUESTS
 ***********************************************/
@@ -24,11 +29,9 @@ message Request {
         ForwardTransactionRequest forward_txn = 3;
         LookupMasterRequest lookup_master = 4;
         ForwardBatchRequest forward_batch = 5;
-        
         PaxosProposeRequest paxos_propose = 6;
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
-
         OrderRequest order = 10;
     }
 }
@@ -60,8 +63,7 @@ message LookupMasterRequest {
 }
 
 message ForwardBatchRequest {
-    uint32 batch_id = 1;
-    repeated Transaction batch = 2;
+    Batch batch = 1;
 }
 
 message PaxosProposeRequest {
@@ -95,8 +97,9 @@ message Response {
     oneof type {
         EchoResponse echo = 1;
         LookupMasterResponse lookup_master = 2;
-        PaxosAcceptResponse paxos_accept = 3;
-        PaxosCommitResponse paxos_commit = 4;
+        ForwardBatchResponse forward_batch = 3;
+        PaxosAcceptResponse paxos_accept = 4;
+        PaxosCommitResponse paxos_commit = 5;
     }
 }
 
@@ -110,6 +113,10 @@ message EchoResponse {
 message LookupMasterResponse {
     uint32 txn_id = 1;
     map<string, MasterMetadata> master_metadata = 2;
+}
+
+message ForwardBatchResponse {
+    uint32 batch_id = 1;
 }
 
 message PaxosAcceptResponse {

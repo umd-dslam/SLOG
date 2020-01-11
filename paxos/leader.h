@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/types.h"
 #include "paxos/quorum_tracker.h"
 
 using std::string;
@@ -52,7 +53,7 @@ private:
   void StartNewAcceptance(uint32_t value);
   void AcceptanceStateChanged(AcceptanceTracker* acceptance);
 
-  void StartNewCommit(uint32_t slot);
+  void StartNewCommit(SlotId slot);
   void CommitStateChanged(CommitTracker* commit);
 
   void SendToAllMembers(const internal::Request& request);
@@ -64,10 +65,10 @@ private:
   bool is_elected_;
   string elected_leader_;
 
-  uint32_t min_uncommitted_slot_;
-  uint32_t next_empty_slot_;
+  SlotId min_uncommitted_slot_;
+  SlotId next_empty_slot_;
   uint32_t ballot_;
-  unordered_map<uint32_t, Proposal> proposals_;
+  unordered_map<SlotId, Proposal> proposals_;
   vector<unique_ptr<QuorumTracker>> quorum_trackers_;
 };
 } // namespace slog

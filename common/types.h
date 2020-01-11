@@ -10,6 +10,7 @@ namespace slog {
 using Key = std::string;
 using Value = std::string;
 using TxnId = uint32_t;
+using SlotId = uint32_t;
 
 struct Metadata {
   Metadata(uint32_t m, uint32_t c = 0) : master(m), counter(c) {}
