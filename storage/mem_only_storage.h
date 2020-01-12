@@ -15,7 +15,7 @@ class MemOnlyStorage :
     public LookupMasterIndex<Key, Metadata> {
 public:
 
-  bool Read(const Key& key, Record* result) const final;
+  bool Read(const Key& key, Record& result) const final;
 
   void Write(const Key& key, const Record& record) final;
 

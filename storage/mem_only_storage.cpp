@@ -2,11 +2,11 @@
 
 namespace slog {
 
-bool MemOnlyStorage::Read(const Key& key, Record* result) const {
+bool MemOnlyStorage::Read(const Key& key, Record& result) const {
   if (table_.count(key) == 0) {
     return false;
   }
-  *result = table_.at(key);
+  result = table_.at(key);
   return true;
 }
 

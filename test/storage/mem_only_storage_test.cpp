@@ -12,7 +12,7 @@ TEST(MemOnlyStorageTest, ReadWriteTest) {
   storage.Write(key, record);
 
   Record ret;
-  bool ok = storage.Read(key, &ret);
+  bool ok = storage.Read(key, ret);
   ASSERT_TRUE(ok);
   ASSERT_EQ(value, ret.value);
 }
