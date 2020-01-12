@@ -34,11 +34,12 @@ void Server::SetUp() {
 }
 
 void Server::Loop() {
-  MMessage msg;
   switch (zmq::poll(poll_items_, SERVER_POLL_TIMEOUT_MS)) {
     case 0: // Timed out. No event signaled during poll
       break;
-    default:
+    default: {
+      MMessage msg;
+
       if (HasMessageFromChannel()) {
         ReceiveFromChannel(msg);
         if (msg.IsProto<internal::Request>()) {
@@ -47,13 +48,16 @@ void Server::Loop() {
           HandleInternalResponse(std::move(msg));
         }
       }
+
       if (HasMessageFromClient()) {
         msg.ReceiveFrom(client_socket_);
         if (msg.IsProto<api::Request>()) {
           HandleAPIRequest(std::move(msg));
         }
       }
+
       break;
+    }
   }
 
   // For testing the server. To be remove later
@@ -128,7 +132,7 @@ void Server::HandleInternalRequest(MMessage&& msg) {
     }
     lookup_response->set_txn_id(lookup_request.txn_id());
     
-    msg.Set(0, response);
+    msg.Set(MM_PROTO, response);
     Send(std::move(msg));
   }
 }

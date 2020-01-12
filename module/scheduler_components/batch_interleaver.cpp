@@ -24,7 +24,7 @@ bool BatchInterleaver::HasNextBatch() const {
   return !ready_batches_.empty();
 }
 
-pair<BatchPtr, SlotId> BatchInterleaver::NextBatch() {
+pair<SlotId, BatchPtr> BatchInterleaver::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
@@ -41,7 +41,7 @@ void BatchInterleaver::UpdateReadyBatches() {
     }
 
     auto next_batch = batch_queues_.at(next_queue_id).front();
-    ready_batches_.emplace_back(next_batch, next_slot_);
+    ready_batches_.emplace_back(next_slot_, next_batch);
 
     batch_queues_[next_queue_id].pop_front();
     pending_slots_.erase(next_slot_);

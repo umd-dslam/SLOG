@@ -23,7 +23,7 @@ public:
   void AddAgreedSlot(SlotId slot_id, uint32_t queue_id);
 
   bool HasNextBatch() const;
-  pair<BatchPtr, SlotId> NextBatch();
+  pair<SlotId, BatchPtr> NextBatch();
 
 private:
   void UpdateReadyBatches();
@@ -31,7 +31,7 @@ private:
   unordered_map<uint32_t, deque<BatchPtr>> batch_queues_;
   unordered_map<SlotId, uint32_t> pending_slots_;
   SlotId next_slot_;
-  deque<pair<BatchPtr, SlotId>> ready_batches_;
+  deque<pair<SlotId, BatchPtr>> ready_batches_;
 };
 
 } // namespace slog
