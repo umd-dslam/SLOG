@@ -34,13 +34,13 @@ void Leader::HandleRequest(const Request& req) {
       }
       break;
     case Request::TypeCase::kPaxosCommit:
-      HandleCommitRequest(req.paxos_commit()); break;
+      ProcessCommitRequest(req.paxos_commit()); break;
     default:
       break;
   }
 }
 
-void Leader::HandleCommitRequest(const internal::PaxosCommitRequest commit) {
+void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest commit) {
   auto ballot = commit.ballot();
   auto slot = commit.slot();
   auto value = commit.value();

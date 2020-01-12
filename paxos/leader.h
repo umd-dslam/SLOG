@@ -48,7 +48,7 @@ public:
       const string& from_machine_id);
 
 private:
-  void HandleCommitRequest(const internal::PaxosCommitRequest commit);
+  void ProcessCommitRequest(const internal::PaxosCommitRequest commit);
 
   void StartNewAcceptance(uint32_t value);
   void AcceptanceStateChanged(AcceptanceTracker* acceptance);

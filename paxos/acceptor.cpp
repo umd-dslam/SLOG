@@ -14,15 +14,15 @@ void Acceptor::HandleRequest(
     const string& from_machine_id) {
   switch (req.type_case()) {
     case Request::TypeCase::kPaxosAccept:
-      HandleAcceptRequest(req.paxos_accept(), from_machine_id); break;
+      ProcessAcceptRequest(req.paxos_accept(), from_machine_id); break;
     case Request::TypeCase::kPaxosCommit:
-      HandleCommitRequest(req.paxos_commit(), from_machine_id); break;
+      ProcessCommitRequest(req.paxos_commit(), from_machine_id); break;
     default:
       break;
   }
 }
 
-void Acceptor::HandleAcceptRequest(
+void Acceptor::ProcessAcceptRequest(
     const internal::PaxosAcceptRequest& req,
     const string& from_machine_id) {
   if (req.ballot() < ballot_) {
@@ -36,7 +36,7 @@ void Acceptor::HandleAcceptRequest(
   sender_.SendSameChannel(res, from_machine_id);
 }
 
-void Acceptor::HandleCommitRequest(
+void Acceptor::ProcessCommitRequest(
     const internal::PaxosCommitRequest& req,
     const string& from_machine_id) {
   // TODO: If leader election is implemented, this is where we erase

@@ -17,11 +17,11 @@ public:
       const string& from_machine_id);
 
 private:
-  void HandleAcceptRequest(
+  void ProcessAcceptRequest(
       const internal::PaxosAcceptRequest& req,
       const string& from_machine_id);
   
-  void HandleCommitRequest(
+  void ProcessCommitRequest(
       const internal::PaxosCommitRequest& req,
       const string& from_machine_id);
 
