@@ -82,6 +82,10 @@ uint32_t Configuration::GetNumPartitions() const {
   return config_.num_partitions();
 }
 
+uint32_t Configuration::GetNumWorkers() const {
+  return config_.num_workers();
+}
+
 uint32_t Configuration::GetBrokerPort() const {
   return config_.broker_port();
 }
