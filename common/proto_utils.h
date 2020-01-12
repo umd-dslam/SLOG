@@ -21,7 +21,25 @@ inline internal::MachineId MakeMachineIdProto(uint32_t replica, uint32_t partiti
   return machine_id;
 }
 
-inline std::string MakeMachineId(uint32_t replica, uint32_t partition) {
+inline internal::MachineId MakeMachineIdProto(const string& machine_id_str) {
+  auto split = machine_id_str.find(':');
+  if (split == string::npos) {
+    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
+  }
+  try {
+    auto replica_str = machine_id_str.substr(0, split);
+    auto partition_str = machine_id_str.substr(split + 1);
+
+    internal::MachineId machine_id;
+    machine_id.set_replica(std::stoul(replica_str));
+    machine_id.set_partition(std::stoul(partition_str));
+    return machine_id;
+  } catch (...) {
+    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
+  }
+}
+
+inline string MakeMachineId(uint32_t replica, uint32_t partition) {
   return std::to_string(replica) + ":" + std::to_string(partition);
 }
 
