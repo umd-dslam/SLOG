@@ -1,29 +1,73 @@
 #pragma once
 
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "common/configuration.h"
+#include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/basic_module.h"
+#include "module/scheduler_components/local_log.h"
+#include "module/scheduler_components/batch_interleaver.h"
+#include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/worker.h"
+#include "storage/storage.h"
 
 using std::shared_ptr;
+using std::unique_ptr;
+using std::unordered_map;
+using std::unordered_set;
+using std::vector;
 
 namespace slog {
 
-class Scheduler : public BasicModule {
+using TransactionPtr = unique_ptr<Transaction>;
+
+class Scheduler : public Module, ChannelHolder {
 public:
+  static const string WORKER_IN;
+
   Scheduler(
       shared_ptr<Configuration> config,
-      Broker& broker);
+      zmq::context_t& context,
+      Broker& broker,
+      shared_ptr<Storage<Key, Record>> storage);
 
 protected:
   void SetUp() final;
 
+  void Loop() final;
+
   void HandleInternalRequest(
       internal::Request&& req,
-      string&& from_machine_id,
-      string&& from_channel) final;
+      const string& from_machine_id);
 
 private:
+  bool HasMessageFromChannel() const;
+  bool HasMessageFromWorker() const;
+
+  void ProcessForwardBatchRequest(
+      internal::ForwardBatchRequest* forward_batch,
+      uint32_t queue_id);
+
+  void ProcessOrderRequest(
+      const internal::OrderRequest& order);
+
+  void TryFetchingNextBatchesFromGlobalLog();
+
+  void TryDispatchingTransaction(TxnId txn_id);
+
   shared_ptr<Configuration> config_;
+  zmq::socket_t worker_socket_;
+  vector<unique_ptr<ModuleRunner>> workers_;
+  vector<zmq::pollitem_t> poll_items_;
+
+  unordered_map<uint32_t, LocalLog> local_logs_;
+  BatchInterleaver interleaver_;
+  DeterministicLockManager lock_manager_;
+  unordered_map<TxnId, TransactionPtr> all_txns_;
+  unordered_set<TxnId> pending_txn_;
 };
 
 } // namespace slog

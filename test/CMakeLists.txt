@@ -12,6 +12,7 @@ set(ALL_TESTS
   mem_only_storage_test
   mmessage_test
   paxos_test
+  proto_utils_test
   server_test)
 
 add_executable(batch_interleaver_test
@@ -43,6 +44,9 @@ target_link_libraries(mmessage_test test_utils)
 
 add_executable(paxos_test paxos/paxos_test.cpp)
 target_link_libraries(paxos_test test_utils paxos)
+
+add_executable(proto_utils_test common/proto_utils_test.cpp)
+target_link_libraries(proto_utils_test common proto)
 
 add_executable(server_test module/server_test.cpp)
 target_link_libraries(server_test test_utils)

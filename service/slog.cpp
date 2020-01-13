@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
   modules.push_back(
       MakeRunnerFor<Sequencer>(config, broker));
   modules.push_back(
-      MakeRunnerFor<Scheduler>(config, broker));
+      MakeRunnerFor<Scheduler>(config, *context, broker, storage));
 
   // Only start the Broker after it is used to initialized all modules
   broker.StartInNewThread();
