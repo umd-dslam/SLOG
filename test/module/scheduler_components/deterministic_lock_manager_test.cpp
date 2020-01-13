@@ -12,7 +12,7 @@ TEST(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   DeterministicLockManager lock_manager(configs[0]);
   auto txn = MakeTransaction(
     {"readA", "readB"},
-    {{"writeC", "bczvsa"}});
+    {"writeC"});
   ASSERT_TRUE(lock_manager.AcquireLocks(txn));
   auto new_holders = lock_manager.ReleaseLocks(txn);
   ASSERT_TRUE(new_holders.empty());
@@ -22,10 +22,10 @@ TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
   auto configs = MakeTestConfigurations("locking", 1, 2);
   DeterministicLockManager lock_manager(configs[0]);
   // "AAAA" is in partition 0 so lock is acquired
-  auto txn1 = MakeTransaction({"readX"}, {{"AAAA", "bvczx"}});
+  auto txn1 = MakeTransaction({"readX"}, {"AAAA"});
   txn1.mutable_internal()->set_id(100);
   // "ZZZZ" is in partition 1 so is ignored
-  auto txn2 = MakeTransaction({"readX"}, {{"ZZZZ", "gazxc"}});
+  auto txn2 = MakeTransaction({"readX"}, {"ZZZZ"});
   txn2.mutable_internal()->set_id(200);
   ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
   ASSERT_TRUE(lock_manager.AcquireLocks(txn2));
@@ -47,14 +47,9 @@ TEST(DeterministicLockManager, ReadLocks) {
 TEST(DeterministicLockManager, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   DeterministicLockManager lock_manager(configs[0]);
-  auto txn1 = MakeTransaction(
-      {}, 
-      {{"writeA", "bcasb"},
-       {"writeB", "zhtio"}});
+  auto txn1 = MakeTransaction({}, {"writeA", "writeB"});
   txn1.mutable_internal()->set_id(100);
-  auto txn2 = MakeTransaction(
-      {"readA"},
-      {{"writeA", "eeqsvz"}});
+  auto txn2 = MakeTransaction({"readA"}, {"writeA"});
   txn2.mutable_internal()->set_id(200);
   ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
   ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
@@ -64,21 +59,13 @@ TEST(DeterministicLockManager, WriteLocks) {
 TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   DeterministicLockManager lock_manager(configs[0]);
-  auto txn1 = MakeTransaction(
-      {"A"}, 
-      {{"B", "bcasb"}, {"C", "otirj"}});
+  auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1.mutable_internal()->set_id(100);
-  auto txn2 = MakeTransaction(
-      {"B"},
-      {{"A", "cxzvx"}});
+  auto txn2 = MakeTransaction({"B"}, {"A"});
   txn2.mutable_internal()->set_id(200);
-  auto txn3 = MakeTransaction(
-      {"B"},
-      {});
+  auto txn3 = MakeTransaction({"B"}, {});
   txn3.mutable_internal()->set_id(300);
-  auto txn4 = MakeTransaction(
-      {"C"},
-      {});
+  auto txn4 = MakeTransaction({"C"}, {});
   txn4.mutable_internal()->set_id(400);
 
   ASSERT_TRUE(lock_manager.AcquireLocks(txn1));

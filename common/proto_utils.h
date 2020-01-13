@@ -54,7 +54,7 @@ inline string MakeMachineId(uint32_t replica, uint32_t partition) {
  */
 Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
-    const unordered_map<Key, Value>& write_set,
+    const unordered_set<Key>& write_set,
     const string& code = "",
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {});
 

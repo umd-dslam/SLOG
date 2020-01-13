@@ -67,9 +67,7 @@ protected:
 
 TEST_F(ForwarderTest, ForwardToSameRegion) {
   // This txn needs to lookup from both partitions in a region
-  auto txn = MakeTransaction(
-      {"A"},            /* read_set */
-      {{"C", "zxcvb"}}  /* write_set */);
+  auto txn = MakeTransaction({"A"} /* read_set */, {"C"}  /* write_set */);
   // Send to partition 0 of replica 0
   test_slogs_[0]->SendTxn(txn);
 
@@ -94,7 +92,7 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
 TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
   auto txn = MakeTransaction(
       {"A"},            /* read_set*/
-      {{"C", "bzxcv"}},  /* write_set */
+      {"C"},            /* write_set */
       "",               /* code */
       {{"A", {0, 0}},   /* master_metadata */
        {"C", {0, 1}}});
@@ -123,9 +121,7 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
   // Send to partition 1 of replica 0. This txn needs to lookup
   // from both partitions and later forwarded to replica 1
   test_slogs_[1]->SendTxn(
-      MakeTransaction(
-          {"B"},            /* read_set */
-          {{"D", "hrtjd"}}  /* write_set */));
+      MakeTransaction({"B"} /* read_set */, {"D"}  /* write_set */));
 
   // Send to partition 0 of replica 1. This txn needs to lookup
   // from partition 0 only and later forwarded to replica 0

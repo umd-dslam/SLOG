@@ -4,14 +4,16 @@ namespace slog {
 
 Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
-    const unordered_map<Key, Value>& write_set,
+    const unordered_set<Key>& write_set,
     const string& code,
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata) {
   Transaction txn;
   for (const auto& key : read_set) {
     txn.mutable_read_set()->insert({key, ""});
   }
-  txn.mutable_write_set()->insert(write_set.begin(), write_set.end());
+  for (const auto& key : write_set) {
+    txn.mutable_write_set()->insert({key, ""});
+  }
   txn.set_code(code);
 
   for (const auto& pair : master_metadata) {
