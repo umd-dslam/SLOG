@@ -6,9 +6,12 @@ using std::move;
 
 namespace slog {
 
+using internal::Request;
+using internal::Response;
+
 BasicModule::BasicModule(
     unique_ptr<Channel>&& listener,
-    long poll_timeout_ms) 
+    long poll_timeout_ms)
   : ChannelHolder(move(listener)),
     poll_item_(GetChannelPollItem()),
     poll_timeout_ms_(poll_timeout_ms) {}
@@ -24,9 +27,9 @@ void BasicModule::Loop() {
         ReceiveFromChannel(message);
         auto from_machine_id = message.GetIdentity();
 
-        if (message.IsProto<internal::Request>()) {
-          internal::Request req;
-          message.GetProto<internal::Request>(req);
+        if (message.IsProto<Request>()) {
+          Request req;
+          message.GetProto(req);
 
           string from_channel;
           message.GetString(from_channel, MM_FROM_CHANNEL);
@@ -35,9 +38,9 @@ void BasicModule::Loop() {
               move(req),
               move(from_machine_id),
               move(from_channel));
-        } else if (message.IsProto<internal::Response>()) {
-          internal::Response res;
-          message.GetProto<internal::Response>(res);
+        } else if (message.IsProto<Response>()) {
+          Response res;
+          message.GetProto(res);
 
           HandleInternalResponse(
               move(res),

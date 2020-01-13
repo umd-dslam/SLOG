@@ -54,7 +54,7 @@ private:
   void ProcessOrderRequest(
       const internal::OrderRequest& order);
 
-  void TryFetchingNextBatchesFromGlobalLog();
+  void TryProcessingNextBatchesFromGlobalLog();
 
   void TryDispatchingTransaction(TxnId txn_id);
 

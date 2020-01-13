@@ -49,9 +49,9 @@ void Scheduler::Loop() {
     ReceiveFromChannel(msg);
     if (msg.IsProto<Request>()) {
       Request req;
-      msg.GetProto<Request>(req);
+      msg.GetProto(req);
       HandleInternalRequest(std::move(req), msg.GetIdentity());
-      TryFetchingNextBatchesFromGlobalLog();
+      TryProcessingNextBatchesFromGlobalLog();
     } 
   }
 
@@ -107,7 +107,7 @@ void Scheduler::ProcessOrderRequest(
   interleaver_.AddAgreedSlot(order.slot(), order.value());
 }
 
-void Scheduler::TryFetchingNextBatchesFromGlobalLog() {
+void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
   // Update the local log of the local replica
   auto local_replica = config_->GetLocalReplica();
   while (interleaver_.HasNextBatch()) {
@@ -149,7 +149,7 @@ void Scheduler::TryDispatchingTransaction(TxnId txn_id) {
   auto process_txn = req.mutable_process_txn();
   process_txn->mutable_txn()->CopyFrom(*all_txns_[txn_id]);
   MMessage msg;
-  msg.Set(0, req);
+  msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);
 
   pending_txn_.erase(txn_id);
