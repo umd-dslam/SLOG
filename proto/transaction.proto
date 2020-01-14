@@ -7,6 +7,12 @@ enum TransactionType {
     MULTI_HOME = 2;
 }
 
+enum TransactionStatus {
+    NOT_STARTED = 0;
+    COMMITTED = 1;
+    ABORTED = 2;
+}
+
 message MasterMetadata {
     uint32 master = 1;
     uint32 counter = 2;
@@ -19,9 +25,12 @@ message TransactionInternal {
 }
 
 message Transaction {
-    map<string, string> read_set = 1;
-    map<string, string> write_set = 2;
-    string code = 3;
-
-    TransactionInternal internal = 4;
+    TransactionInternal internal = 1;
+    
+    map<string, string> read_set = 2;
+    map<string, string> write_set = 3;
+    string code = 4;
+    TransactionStatus status = 5;
+    string abort_reason = 6;
+    repeated string delete_set = 7;
 }

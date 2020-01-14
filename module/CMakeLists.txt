@@ -14,7 +14,9 @@ add_library(scheduler_components
   scheduler_components/deterministic_lock_manager.cpp
   scheduler_components/outputter.cpp
   scheduler_components/worker.cpp)
-target_link_libraries(scheduler_components common)
+target_link_libraries(scheduler_components
+  benchmark
+  common)
 
 add_library(module
   forwarder.cpp

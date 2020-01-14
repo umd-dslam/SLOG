@@ -15,6 +15,7 @@ Transaction MakeTransaction(
     txn.mutable_write_set()->insert({key, ""});
   }
   txn.set_code(code);
+  txn.set_status(TransactionStatus::NOT_STARTED);
 
   for (const auto& pair : master_metadata) {
     const auto& key = pair.first;

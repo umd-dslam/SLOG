@@ -13,7 +13,8 @@ set(ALL_TESTS
   mmessage_test
   paxos_test
   proto_utils_test
-  server_test)
+  server_test
+  stored_procedures_test)
 
 add_executable(batch_interleaver_test
   module/scheduler_components/batch_interleaver_test.cpp)
@@ -50,6 +51,9 @@ target_link_libraries(proto_utils_test common proto)
 
 add_executable(server_test module/server_test.cpp)
 target_link_libraries(server_test test_utils)
+
+add_executable(stored_procedures_test benchmark/stored_procedures_test.cpp)
+target_link_libraries(stored_procedures_test benchmark)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)
