@@ -6,6 +6,7 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
+#include "common/constants.h"
 #include "connection/channel.h"
 
 using std::shared_ptr;
@@ -48,7 +49,8 @@ class Broker {
 public:
   Broker(
       shared_ptr<const Configuration> config, 
-      shared_ptr<zmq::context_t> context);
+      shared_ptr<zmq::context_t> context,
+      long poll_timeout_ms = BROKER_POLL_TIMEOUT_MS);
   ~Broker();
 
   void StartInNewThread();
@@ -80,6 +82,7 @@ private:
 
   shared_ptr<const Configuration> config_;
   shared_ptr<zmq::context_t> context_;
+  long poll_timeout_ms_;
   zmq::socket_t router_;
   std::atomic<bool> running_;
 

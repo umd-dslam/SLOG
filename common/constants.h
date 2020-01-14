@@ -4,7 +4,7 @@
 
 namespace slog {
 
-const long BROKER_POLL_TIMEOUT_MS = 50;
+const long BROKER_POLL_TIMEOUT_MS = 100;
 const long SERVER_POLL_TIMEOUT_MS = 50;
 const long BASIC_MODULE_POLL_TIMEOUT_MS = 50;
 

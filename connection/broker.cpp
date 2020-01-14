@@ -5,7 +5,6 @@
 
 #include <glog/logging.h>
 
-#include "common/constants.h"
 #include "common/mmessage.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
@@ -13,14 +12,19 @@
 using std::pair;
 using std::unordered_set;
 using std::move;
+using std::string;
 
 namespace slog {
 
+using internal::Request;
+
 Broker::Broker(
     shared_ptr<const Configuration> config, 
-    shared_ptr<zmq::context_t> context) 
+    shared_ptr<zmq::context_t> context,
+    long poll_timeout_ms) 
   : config_(config),
     context_(context),
+    poll_timeout_ms_(poll_timeout_ms),
     router_(*context, ZMQ_ROUTER),
     running_(false) {
   // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
@@ -29,7 +33,7 @@ Broker::Broker(
   for (const auto& addr : config->GetAllAddresses()) {
     auto socket = std::make_unique<zmq::socket_t>(*context, ZMQ_DEALER);
     socket->setsockopt(ZMQ_LINGER, 0);
-    address_to_socket_[addr] = std::move(socket);
+    address_to_socket_[addr] = move(socket);
   }
 }
 
@@ -46,7 +50,7 @@ void Broker::StartInNewThread() {
   thread_ = std::thread(&Broker::Run, this);
 }
 
-unique_ptr<Channel> Broker::AddChannel(const std::string& name) {
+unique_ptr<Channel> Broker::AddChannel(const string& name) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
   CHECK(channels_.count(name) == 0) << "Channel \"" << name << "\" already exists";
 
@@ -80,7 +84,7 @@ bool Broker::InitializeConnection() {
   LOG(INFO) << "Bound Broker to: " << MakeEndpoint();
 
   // Prepare a READY message
-  internal::Request request;
+  Request request;
   auto ready = request.mutable_ready();
   ready->set_ip_address(config_->GetLocalAddress());
   ready->mutable_machine_id()->CopyFrom(
@@ -111,7 +115,7 @@ bool Broker::InitializeConnection() {
   LOG(INFO) << "Waiting for READY messages from other machines...";
   zmq::pollitem_t item = GetRouterPollItem();
   while (running_) {
-    zmq::poll(&item, 1, BROKER_POLL_TIMEOUT_MS);
+    zmq::poll(&item, 1, poll_timeout_ms_);
     if (item.revents & ZMQ_POLLIN) {
       MMessage msg;
       msg.ReceiveFrom(router_);
@@ -172,9 +176,7 @@ void Broker::Run() {
 
   // Set up poll items
   vector<zmq::pollitem_t> items;
-  items.reserve(channels_.size() + 1);
-  vector<std::string> channel_names;
-  channel_names.reserve(channels_.size());
+  vector<string> channel_names;
   for (const auto& pair : channels_) {
     items.push_back(pair.second->GetPollItem());
     channel_names.push_back(pair.first);
@@ -185,7 +187,7 @@ void Broker::Run() {
 
   while (running_) {
     // Wait until a message arrived at one of the sockets
-    zmq::poll(items, BROKER_POLL_TIMEOUT_MS);
+    zmq::poll(items, poll_timeout_ms_);
 
     // Router just received a message
     if (items.back().revents & ZMQ_POLLIN) {

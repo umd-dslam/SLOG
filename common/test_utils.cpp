@@ -68,7 +68,7 @@ TestSlog::TestSlog(shared_ptr<Configuration> config)
   : config_(config),
     server_context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage()),
-    broker_(config, server_context_),
+    broker_(config, server_context_, 5),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {}
 
