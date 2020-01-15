@@ -88,19 +88,17 @@ void Server::HandleAPIRequest(MMessage&& msg) {
   if (request.type_case() == api::Request::kTxn) {
     // TODO: reject transactions with empty read set and write set
     auto txn_id = NextTxnId();
+    auto txn = request.mutable_txn()->release_txn();
+    txn->mutable_internal()->set_id(txn_id);
 
     pending_response_[txn_id] = msg;
 
     internal::Request forward_request;
-    auto forwarded_txn = forward_request
-        .mutable_forward_txn()
-        ->mutable_txn();
-    forwarded_txn->CopyFrom(request.txn().txn());
-    forwarded_txn->mutable_internal()->set_id(txn_id);
-
+    forward_request.mutable_forward_txn()->set_allocated_txn(txn);
     SendSameMachine(forward_request, FORWARDER_CHANNEL);
 
     // For testing the server. To be remove later
+    response.mutable_txn()->mutable_txn()->CopyFrom(*txn);
     pending_response_[txn_id].Set(MM_PROTO, response);
     response_time_.emplace(
         Clock::now() + 100ms, txn_id);
@@ -145,8 +143,8 @@ void Server::HandleInternalResponse(MMessage&&) {
 }
 
 TxnId Server::NextTxnId() {
-  txn_id_counter_ = (txn_id_counter_ + 1) % MAX_TXN_COUNT;
-  return config_->GetLocalMachineIdAsNumber() * MAX_TXN_COUNT + txn_id_counter_;
+  txn_id_counter_++;
+  return txn_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
 }
 
 } // namespace slog
