@@ -55,7 +55,7 @@ void BasicModule::Loop() {
     }
   } else {
     if (NeedWakeUp()) {
-      HandleWakeUp();
+      HandlePeriodicWakeUp();
     }
   }
 

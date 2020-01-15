@@ -81,11 +81,10 @@ bool Scheduler::HasMessageFromWorker() const {
 void Scheduler::HandleInternalRequest(
     Request&& req,
     const string& from_machine_id) {
-  auto machine_id = MakeMachineIdProto(from_machine_id);
   switch (req.type_case()) {
     case Request::kForwardBatch: 
       ProcessForwardBatchRequest(
-          req.mutable_forward_batch(), machine_id.partition());
+          req.mutable_forward_batch(), from_machine_id);
       break;
     case Request::kOrder:
       ProcessOrderRequest(req.order());
@@ -97,9 +96,24 @@ void Scheduler::HandleInternalRequest(
 
 void Scheduler::ProcessForwardBatchRequest(
     internal::ForwardBatchRequest* forward_batch,
-    uint32_t queue_id) {
+    const string& from_machine_id) {
+  auto batch_id = forward_batch->batch().id();
+  auto machine_id = from_machine_id.empty() 
+    ? config_->GetLocalMachineIdAsProto() 
+    : MakeMachineIdProto(from_machine_id);
+
+  VLOG(1) << "Received a batch of " 
+          << forward_batch->batch().transactions_size() << " transactions";
+
   interleaver_.AddBatch(
-      queue_id, BatchPtr{forward_batch->release_batch()});
+      machine_id.partition(), BatchPtr{forward_batch->release_batch()});
+
+  // Only acknowledge if this batch is from the same replica
+  if (machine_id.replica() == config_->GetLocalReplica()) {
+    Response res;
+    res.mutable_forward_batch()->set_batch_id(batch_id);
+    Send(res, from_machine_id, SEQUENCER_CHANNEL);
+  }
 }
 
 void Scheduler::ProcessOrderRequest(

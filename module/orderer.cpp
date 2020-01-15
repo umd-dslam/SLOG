@@ -8,7 +8,7 @@ MultiHomeOrderer::MultiHomeOrderer(
     Broker& broker,
     const vector<string>& group_members,
     const string& me)
-  : SimpleMultiPaxos("multi_home", broker, group_members, me) {}
+  : SimpleMultiPaxos(MULTI_HOME_PAXOS, broker, group_members, me) {}
 
 void MultiHomeOrderer::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
@@ -22,7 +22,7 @@ LocalOrderer::LocalOrderer(
     Broker& broker,
     const vector<string>& group_members,
     const string& me)
-  : SimpleMultiPaxos("local", broker, group_members, me) {}
+  : SimpleMultiPaxos(LOCAL_PAXOS, broker, group_members, me) {}
 
 void LocalOrderer::OnCommit(uint32_t slot, uint32_t value) {
   Request req;

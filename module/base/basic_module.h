@@ -27,7 +27,7 @@ protected:
       internal::Response&& /* res */,
       string&& /* from_machine_id */) {};
 
-  virtual void HandleWakeUp() {};
+  virtual void HandlePeriodicWakeUp() {};
 
 private:
   void Loop() final;

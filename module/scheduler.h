@@ -49,7 +49,7 @@ private:
 
   void ProcessForwardBatchRequest(
       internal::ForwardBatchRequest* forward_batch,
-      uint32_t queue_id);
+      const string& from_machine_id);
 
   void ProcessOrderRequest(
       const internal::OrderRequest& order);

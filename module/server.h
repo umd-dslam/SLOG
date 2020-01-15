@@ -46,7 +46,7 @@ private:
   shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
 
   uint32_t server_id_;
-  uint32_t txn_id_counter_;
+  TxnId txn_id_counter_;
   unordered_map<TxnId, MMessage> pending_response_;
   std::set<std::pair<TimePoint, TxnId>> response_time_;
 };

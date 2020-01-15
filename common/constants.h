@@ -12,6 +12,9 @@ const std::string FORWARDER_CHANNEL("forwarder");
 const std::string SEQUENCER_CHANNEL("sequencer");
 const std::string SCHEDULER_CHANNEL("scheduler");
 
+const std::string LOCAL_PAXOS("local");
+const std::string MULTI_HOME_PAXOS("multi_home");
+
 const uint32_t MAX_NUM_MACHINES = 1000;
 
 const size_t MM_PROTO = 0;

@@ -37,6 +37,7 @@ void WorkloadGenerator::SetUp() {
     MMessage msg;
     msg.Push(req);
     msg.SendTo(socket_);
+    std::this_thread::sleep_for(5ms);
   }
 }
 
