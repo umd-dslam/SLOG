@@ -179,3 +179,32 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     ASSERT_EQ(0, master_metadata.at("A").counter());
   }
 }
+
+TEST_F(ForwarderTest, TransactionHasNewKeys) {
+  // This txn needs to lookup from both partitions in a region
+  auto txn = MakeTransaction({"X", "NEW"} /* read_set */, {"KEY"} /* write_set */);
+  // Send to partition 0 of replica 0
+  test_slogs_[3]->SendTxn(txn);
+
+  MMessage msg;
+  // The txn should be forwarded to the scheduler of the same machine
+  if (!Receive(msg, {3})) {
+    FAIL() << "Message was not received before timing out";
+  }
+
+  internal::Request req;
+  ASSERT_TRUE(msg.GetProto(req));
+  ASSERT_TRUE(req.has_forward_txn());
+  const auto& forwarded_txn = req.forward_txn().txn();
+  ASSERT_EQ(
+      TransactionType::SINGLE_HOME, forwarded_txn.internal().type());
+  const auto& master_metadata =
+      forwarded_txn.internal().master_metadata();
+  ASSERT_EQ(3, master_metadata.size());
+  ASSERT_EQ(1, master_metadata.at("X").master());
+  ASSERT_EQ(0, master_metadata.at("X").counter());
+  ASSERT_EQ(1, master_metadata.at("NEW").master());
+  ASSERT_EQ(0, master_metadata.at("NEW").counter());
+  ASSERT_EQ(1, master_metadata.at("KEY").master());
+  ASSERT_EQ(0, master_metadata.at("KEY").counter());
+}

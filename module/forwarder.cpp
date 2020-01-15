@@ -7,6 +7,14 @@
 
 namespace slog {
 
+namespace {
+
+bool TransactionContainsKey(const Transaction& txn, const Key& key) {
+  return txn.read_set().contains(key) || txn.write_set().contains(key);
+}
+
+} // namespace
+
 Forwarder::Forwarder(
     shared_ptr<Configuration> config,
     Broker& broker) 
@@ -67,7 +75,7 @@ void Forwarder::HandleInternalResponse(
   const auto& lookup_master = res.lookup_master();
   auto txn_id = lookup_master.txn_id();
   if (pending_transaction_.count(txn_id) == 0) {
-    LOG(ERROR) << "Transaction " << txn_id << " is not pending for master info";
+    LOG(ERROR) << "Transaction " << txn_id << " is not waiting for master info";
     return;
   }
 
@@ -75,10 +83,17 @@ void Forwarder::HandleInternalResponse(
   auto txn = pending_transaction_[txn_id];
   auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
   for (const auto& pair : lookup_master.master_metadata()) {
-    if (
-        txn->read_set().contains(pair.first) 
-        || txn->write_set().contains(pair.first)) {
+    if (TransactionContainsKey(*txn, pair.first)) {
       txn_master_metadata->insert(pair);
+    }
+  }
+  // The master region of new keys is the one it is first sent to
+  // TODO: re-consider this if needed
+  for (const auto& new_key : lookup_master.new_keys()) {
+    if (TransactionContainsKey(*txn, new_key)) {
+      auto& new_metadata = (*txn_master_metadata)[new_key];
+      new_metadata.set_master(config_->GetLocalReplica());
+      new_metadata.set_counter(0);
     }
   }
 
