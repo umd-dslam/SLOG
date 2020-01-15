@@ -59,15 +59,19 @@ void Worker::ProcessTransaction(Transaction* txn) {
   stored_procedures_->Execute(*txn);
 
   // Lastly, apply all writes to local storage
+  auto& master_metadata = txn->internal().master_metadata();
   for (const auto& key_value : txn->write_set()) {
+    const auto& key = key_value.first;
+    const auto& value = key_value.second;
     Record record;
     bool found = storage_->Read(key_value.first, record);
     if (!found) {
-      // TODO: need a way to deterministically assign master info
-      record.metadata = {};
+      CHECK(master_metadata.contains(key))
+          << "Master metadata for key \"" << key << "\" is missing";
+      record.metadata = master_metadata.at(key);
     }
-    record.value = key_value.second;
-    storage_->Write(key_value.first, record);
+    record.value = value;
+    storage_->Write(key, record);
   }
   for (const auto& key : txn->delete_set()) {
     storage_->Delete(key);

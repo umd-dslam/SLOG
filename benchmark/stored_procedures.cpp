@@ -72,7 +72,7 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
   }
 }
 
-void TPCCStoredProcedures::Execute(Transaction& txn) {
+void TPCCStoredProcedures::Execute(Transaction& /*txn*/) {
   
 }
 
