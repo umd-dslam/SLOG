@@ -13,11 +13,11 @@ Sequencer::Sequencer(
 void Sequencer::HandleInternalRequest(
     internal::Request&& req,
     string&& from_machine_id) {
-  LOG(INFO) << "Sequencer: Received something";
+  LOG(INFO) << "Received something";
 }
 
 void Sequencer::HandleWakeUp() {
-  LOG(INFO) << "Sequencer: Finished a batch. Sending out...";
+  LOG(INFO) << "Finished a batch. Sending out...";
 }
 
 } // namespace slog

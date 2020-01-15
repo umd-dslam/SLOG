@@ -125,8 +125,8 @@ void Forwarder::Forward(Transaction* txn) {
       auto partition = RandomPartition(re_);
       auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
 
-      DLOG(INFO) << "Forwarding txn " << txn_id << " to its home region (rep: "
-                 << home_replica << ", part: " << partition << ")";
+      VLOG(1) << "Forwarding txn " << txn_id << " to its home region (rep: "
+              << home_replica << ", part: " << partition << ")";
 
       Send(
           forward_request,

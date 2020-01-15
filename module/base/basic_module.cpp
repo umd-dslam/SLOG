@@ -6,6 +6,14 @@ using std::move;
 
 namespace slog {
 
+namespace {
+
+long DurationInMs(Duration duration) {
+  return duration_cast<milliseconds>(duration).count();
+}
+
+} // namespace
+
 using internal::Request;
 using internal::Response;
 
@@ -56,7 +64,12 @@ void BasicModule::Loop() {
     while (now >= wake_up_deadline_) {
       wake_up_deadline_ += milliseconds(wake_up_every_ms_);
     }
-    poll_timeout_ms_ = duration_cast<milliseconds>(wake_up_deadline_ - now).count();
+    poll_timeout_ms_ = 1 + DurationInMs(wake_up_deadline_ - now);
+
+    VLOG(2) << "Now: " << DurationInMs(now.time_since_epoch())
+            << " Deadline: " << DurationInMs(wake_up_deadline_.time_since_epoch())
+            << " Timeout: " << poll_timeout_ms_ << " ms";
+
   }
 }
 
