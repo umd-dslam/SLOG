@@ -17,8 +17,7 @@ Forwarder::Forwarder(
 
 void Forwarder::HandleInternalRequest(
     internal::Request&& req,
-    string&& /* from_machine_id */,
-    string&& /* from_channel */) {
+    string&& /* from_machine_id */) {
   // The forwarder only cares about Forward requests
   if (req.type_case() != internal::Request::kForwardTxn) {
     return;

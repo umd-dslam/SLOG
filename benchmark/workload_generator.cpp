@@ -27,7 +27,7 @@ void WorkloadGenerator::SetUp() {
   api::Request req;
   auto txn = MakeTransaction(
       {"read0", "read1"},
-      {{"write0", "bcasb"}, {"write1", "basdf"}});
+      {"write0", "write1"});
   
   req.mutable_txn()
       ->mutable_txn()

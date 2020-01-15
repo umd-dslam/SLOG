@@ -15,8 +15,8 @@
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
-DEFINE_uint32(replica, 0, "Replica number of the local machine");
-DEFINE_uint32(partition, 0, "Partition number of the local machine");
+DEFINE_uint32(replica, 1, "Replica number of the local machine");
+DEFINE_uint32(partition, 1, "Partition number of the local machine");
 
 using namespace slog;
 using namespace std;
@@ -32,7 +32,7 @@ unique_ptr<ModuleRunner> MakeMultihomeOrderer(
     members.push_back(
         MakeMachineId(rep, part));
   }
-  return MakeRunnerFor<LocalOrderer>(
+  return MakeRunnerFor<MultiHomeOrderer>(
     broker, members, MakeMachineId(local_rep, part));
 }
 

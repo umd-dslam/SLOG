@@ -34,29 +34,23 @@ void Server::SetUp() {
 }
 
 void Server::Loop() {
-  switch (zmq::poll(poll_items_, SERVER_POLL_TIMEOUT_MS)) {
-    case 0: // Timed out. No event signaled during poll
-      break;
-    default: {
-      MMessage msg;
+  MMessage msg;
 
-      if (HasMessageFromChannel()) {
-        ReceiveFromChannel(msg);
-        if (msg.IsProto<internal::Request>()) {
-          HandleInternalRequest(std::move(msg));
-        } else if (msg.IsProto<internal::Response>()) {
-          HandleInternalResponse(std::move(msg));
-        }
-      }
+  zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
-      if (HasMessageFromClient()) {
-        msg.ReceiveFrom(client_socket_);
-        if (msg.IsProto<api::Request>()) {
-          HandleAPIRequest(std::move(msg));
-        }
-      }
+  if (HasMessageFromChannel()) {
+    ReceiveFromChannel(msg);
+    if (msg.IsProto<internal::Request>()) {
+      HandleInternalRequest(std::move(msg));
+    } else if (msg.IsProto<internal::Response>()) {
+      HandleInternalResponse(std::move(msg));
+    }
+  }
 
-      break;
+  if (HasMessageFromClient()) {
+    msg.ReceiveFrom(client_socket_);
+    if (msg.IsProto<api::Request>()) {
+      HandleAPIRequest(std::move(msg));
     }
   }
 
@@ -107,6 +101,7 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     SendSameMachine(forward_request, FORWARDER_CHANNEL);
 
     // For testing the server. To be remove later
+    pending_response_[txn_id].Set(MM_PROTO, response);
     response_time_.emplace(
         Clock::now() + 100ms, txn_id);
   }

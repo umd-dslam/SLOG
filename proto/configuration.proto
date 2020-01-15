@@ -26,4 +26,6 @@ message Configuration {
     uint32 partition_key_num_bytes = 7;
     // Number of worker threads for processing the transactions
     uint32 num_workers = 8;
+    // How long the sequencer wait for batching
+    uint64 batch_duration = 9;
 }

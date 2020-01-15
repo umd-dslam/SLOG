@@ -18,8 +18,7 @@ SimpleMultiPaxos::SimpleMultiPaxos(
 
 void SimpleMultiPaxos::HandleInternalRequest(
     Request&& req,
-    string&& from_machine_id,
-    string&& /* from_channel */) {
+    string&& from_machine_id) {
   leader_.HandleRequest(req);
   acceptor_.HandleRequest(req, from_machine_id);
 }

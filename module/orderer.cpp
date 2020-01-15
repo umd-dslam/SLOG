@@ -22,7 +22,7 @@ LocalOrderer::LocalOrderer(
     Broker& broker,
     const vector<string>& group_members,
     const string& me)
-  : SimpleMultiPaxos("lobal", broker, group_members, me) {}
+  : SimpleMultiPaxos("local", broker, group_members, me) {}
 
 void LocalOrderer::OnCommit(uint32_t slot, uint32_t value) {
   Request req;

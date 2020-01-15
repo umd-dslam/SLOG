@@ -31,8 +31,7 @@ public:
 protected:
   void HandleInternalRequest(
       internal::Request&& req,
-      string&& from_machine_id,
-      string&& from_channel) final;
+      string&& from_machine_id) final;
 
   void HandleInternalResponse(
       internal::Response&& res,

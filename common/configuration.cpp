@@ -94,6 +94,10 @@ uint32_t Configuration::GetServerPort() const {
   return config_.server_port();
 }
 
+long Configuration::GetBatchDuration() const {
+  return config_.batch_duration();
+}
+
 vector<string> Configuration::GetAllMachineIds() const {
   auto num_reps = GetNumReplicas();
   auto num_parts = GetNumPartitions();

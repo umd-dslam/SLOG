@@ -19,10 +19,11 @@ public:
       const string& me)
     : SimpleMultiPaxos("test", broker, group_members, me) {}
 
-  Pair Poll(long timeout_ms = 1000) {
+  Pair Poll() {
     unique_lock<mutex> lock(m_);
     // Wait until committed_ is not null
-    bool ok = cv_.wait_for(lock, milliseconds(timeout_ms), [this]{return committed_ != nullptr;});
+    bool ok = cv_.wait_for(
+        lock, milliseconds(2000), [this]{return committed_ != nullptr;});
     if (!ok) {
       CHECK(false) << "Poll timed out";
     }

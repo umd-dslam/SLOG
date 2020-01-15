@@ -36,6 +36,7 @@ public:
   uint32_t GetNumPartitions() const;
   uint32_t GetNumWorkers() const;
   vector<string> GetAllMachineIds() const;
+  long GetBatchDuration() const;
 
   const string& GetLocalAddress() const;
   uint32_t GetLocalReplica() const;
