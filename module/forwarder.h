@@ -35,13 +35,14 @@ private:
   /**
    * Pre-condition: transaction type is not UNKNOWN
    */
-  void Forward(const Transaction& txn);
+  void Forward(Transaction* txn);
 
   shared_ptr<Configuration> config_;
-  unordered_map<TxnId, Transaction> pending_transaction_;
+  unordered_map<TxnId, Transaction*> pending_transaction_;
 
-  std::random_device rd_;
+  // A constant seed is fine so we don't need a random_device
   std::mt19937 re_;
+  std::uniform_int_distribution<> RandomPartition;
 };
 
 } // namespace slog

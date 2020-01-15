@@ -12,8 +12,7 @@ Forwarder::Forwarder(
     Broker& broker) 
   : BasicModule(broker.AddChannel(FORWARDER_CHANNEL)),
     config_(config),
-    re_(rd_()) {
-}
+    RandomPartition(0, config->GetNumPartitions() - 1) {}
 
 void Forwarder::HandleInternalRequest(
     internal::Request&& req,
@@ -23,17 +22,17 @@ void Forwarder::HandleInternalRequest(
     return;
   }
 
-  auto txn = req.mutable_forward_txn()->mutable_txn();
+  auto txn = req.mutable_forward_txn()->release_txn();
   auto txn_type = SetTransactionType(*txn);
   // Forward the transaction if we already knoww the type of the txn
   if (txn_type != TransactionType::UNKNOWN) {
-    Forward(*txn);
+    Forward(txn);
     return;
   }
 
-  pending_transaction_[txn->internal().id()] = *txn;
+  pending_transaction_[txn->internal().id()] = txn;
 
-  // Send a look up master request for each partition in the same region
+  // Send a look up master request to each partition in the same region
   internal::Request lookup_master_request;
   FillLookupMasterRequest(lookup_master_request, *txn);
   auto rep = config_->GetLocalReplica();
@@ -73,46 +72,45 @@ void Forwarder::HandleInternalResponse(
   }
 
   // Transfer master info from the lookup response to its intended transaction
-  auto& txn = pending_transaction_[txn_id];
-  auto txn_master_metadata = txn.mutable_internal()->mutable_master_metadata();
+  auto txn = pending_transaction_[txn_id];
+  auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
   for (const auto& pair : lookup_master.master_metadata()) {
     if (
-        txn.read_set().contains(pair.first) 
-        || txn.write_set().contains(pair.first)) {
+        txn->read_set().contains(pair.first) 
+        || txn->write_set().contains(pair.first)) {
       txn_master_metadata->insert(pair);
     }
   }
 
   // If a transaction can be determined to be either SINGLE_HOME or MULTI_HOME,
   // forward it to the appropriate sequencer
-  auto txn_type = SetTransactionType(txn);
+  auto txn_type = SetTransactionType(*txn);
   if (txn_type != TransactionType::UNKNOWN) {
     Forward(txn);
     pending_transaction_.erase(txn_id);
   }
 }
 
-void Forwarder::Forward(const Transaction& txn) {
-  auto txn_type = txn.internal().type();
-  auto& master_metadata = txn.internal().master_metadata();
-  auto home_replica = master_metadata.begin()->second.master();
+void Forwarder::Forward(Transaction* txn) {
+  auto txn_id = txn->internal().id();
+  auto txn_type = txn->internal().type();
+  auto& master_metadata = txn->internal().master_metadata();
 
   // Prepare a request to be forwarded to a sequencer
   internal::Request forward_request;
-  auto forwarded_txn = forward_request.mutable_forward_txn()->mutable_txn();
-  forwarded_txn->CopyFrom(txn);
+  forward_request.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
+    auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->GetLocalReplica()) {
       SendSameMachine(forward_request, SEQUENCER_CHANNEL);
     } else {
-      std::uniform_int_distribution<> dist(0, config_->GetNumPartitions() - 1);
-      auto partition = dist(re_);
+      auto partition = RandomPartition(re_);
       auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
 
-      DLOG(INFO) << "Forwarding txn " << txn.internal().id() << " to its home region (rep: "
+      DLOG(INFO) << "Forwarding txn " << txn_id << " to its home region (rep: "
                  << home_replica << ", part: " << partition << ")";
 
       Send(
