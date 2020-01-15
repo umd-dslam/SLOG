@@ -118,6 +118,8 @@ void Scheduler::ProcessForwardBatchRequest(
 
 void Scheduler::ProcessOrderRequest(
     const internal::OrderRequest& order) {
+  VLOG(1) << "Received batch order. Slot id: "
+          << order.slot() << ". Batch id: " << order.value(); 
   interleaver_.AddAgreedSlot(order.slot(), order.value());
 }
 
