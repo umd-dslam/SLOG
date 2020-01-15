@@ -11,9 +11,11 @@ using internal::Request;
 using internal::Response;
 
 Worker::Worker(
+    Scheduler& scheduler,
     zmq::context_t& context,
     shared_ptr<Storage<Key, Record>> storage)
-  : scheduler_socket_(context, ZMQ_REP),
+  : scheduler_(scheduler),
+    scheduler_socket_(context, ZMQ_REP),
     outputter_socket_(context, ZMQ_PUSH),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
@@ -34,15 +36,13 @@ void Worker::Loop() {
   if (req.type_case() != Request::kProcessTxn) {
     return;
   }
-
-  auto txn = req.mutable_process_txn()->release_txn();
-  ProcessTransaction(txn);
-
-  ResponseToScheduler(txn->internal().id());
-  ForwardToOutputter(txn);
+  auto txn_id = req.process_txn().txn_id();
+  ProcessTransaction(txn_id);
+  ResponseToScheduler(txn_id);
 }
 
-void Worker::ProcessTransaction(Transaction* txn) {
+void Worker::ProcessTransaction(TxnId txn_id) {
+  auto& txn = scheduler_.all_txns_[txn_id];
   // Firstly, read all keys from the read set and write set to the buffer
   for (auto& key_value : *txn->mutable_read_set()) {
     Record record;
@@ -84,14 +84,6 @@ void Worker::ResponseToScheduler(TxnId txn_id) {
   MMessage msg;
   msg.Set(MM_PROTO, process_txn_res);
   msg.SendTo(scheduler_socket_);
-}
-
-void Worker::ForwardToOutputter(Transaction* txn) {
-  Request forward_req;
-  forward_req.mutable_forward_txn()->set_allocated_txn(txn);
-  MMessage msg;
-  msg.Set(MM_PROTO, forward_req);
-  msg.SendTo(outputter_socket_);
 }
 
 } // namespace slog

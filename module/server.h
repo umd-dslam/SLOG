@@ -34,8 +34,18 @@ private:
   bool HasMessageFromClient() const;
 
   void HandleAPIRequest(MMessage&& msg);
-  void HandleInternalRequest(MMessage&& msg);
-  void HandleInternalResponse(MMessage&& msg);
+  void HandleInternalRequest(
+      internal::Request&& req,
+      string&& from_machine_id,
+      string&& from_channel);
+
+  void ProcessLookUpMasterRequest(
+      internal::LookupMasterRequest* lookup_master,
+      string&& from_machine_id,
+      string&& from_channel);
+  void ProcessForwardTxnRequest(
+      internal::ForwardTransactionRequest* forward_txn,
+      string&& from_machine_id);
 
   TxnId NextTxnId();
 
@@ -48,7 +58,6 @@ private:
   uint32_t server_id_;
   TxnId txn_id_counter_;
   unordered_map<TxnId, MMessage> pending_response_;
-  std::set<std::pair<TimePoint, TxnId>> response_time_;
 };
 
 } // namespace slog

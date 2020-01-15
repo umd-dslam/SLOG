@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package slog.internal;
+
+message MachineId {
+    uint32 replica = 1;
+    uint32 partition = 2;
+}

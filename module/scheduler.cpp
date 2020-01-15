@@ -30,7 +30,7 @@ Scheduler::Scheduler(
   });
 
   for (size_t i = 0; i < config->GetNumWorkers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(context, storage));
+    workers_.push_back(MakeRunnerFor<Worker>(*this, context, storage));
   }
 }
 
@@ -47,9 +47,8 @@ void Scheduler::Loop() {
   if (HasMessageFromChannel()) {
     MMessage msg;
     ReceiveFromChannel(msg);
-    if (msg.IsProto<Request>()) {
-      Request req;
-      msg.GetProto(req);
+    Request req;
+    if (msg.GetProto(req)) {
       HandleInternalRequest(std::move(req), msg.GetIdentity());
       TryProcessingNextBatchesFromGlobalLog();
     } 
@@ -58,17 +57,11 @@ void Scheduler::Loop() {
   if (HasMessageFromWorker()) {
     MMessage msg(worker_socket_);
     Response res;
-    msg.GetProto(res);
-    if (res.type_case() == Response::kProcessTxn) {
-      auto txn_id = res.process_txn().txn_id();
-      auto ready_txns = lock_manager_.ReleaseLocks(*all_txns_.at(txn_id));
-      all_txns_.erase(txn_id);
-      for (auto txn_id : ready_txns) {
-        TryDispatchingTransaction(txn_id);
-      }
+    if (msg.GetProto(res)) {
+      HandleResponseFromWorker(std::move(res));
     }
   }
-} 
+}
 
 bool Scheduler::HasMessageFromChannel() const {
   return poll_items_[0].revents & ZMQ_POLLIN;
@@ -151,6 +144,26 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
   }
 }
 
+void Scheduler::HandleResponseFromWorker(Response&& res) {
+  if (res.type_case() != Response::kProcessTxn) {
+    return;
+  }
+  auto txn_id = res.process_txn().txn_id();
+  auto& txn = all_txns_.at(txn_id);
+  auto ready_txns = lock_manager_.ReleaseLocks(*txn);
+  for (auto ready_txn_id : ready_txns) {
+    TryDispatchingTransaction(ready_txn_id);
+  }
+
+  auto coordinating_server = MakeMachineId(
+        txn->internal().coordinating_server());
+  Request req;
+  req.mutable_forward_txn()->set_allocated_txn(txn.release());
+  Send(req, coordinating_server, SERVER_CHANNEL);
+
+  all_txns_.erase(txn_id);
+}
+
 void Scheduler::TryDispatchingTransaction(TxnId txn_id) {
   if (pending_txn_.count(txn_id) == 0) {
     LOG(ERROR) << "Transaction " << txn_id << " is not in pending state";
@@ -163,7 +176,7 @@ void Scheduler::TryDispatchingTransaction(TxnId txn_id) {
 
   Request req;
   auto process_txn = req.mutable_process_txn();
-  process_txn->mutable_txn()->CopyFrom(*all_txns_[txn_id]);
+  process_txn->set_txn_id(txn_id);
   MMessage msg;
   msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);

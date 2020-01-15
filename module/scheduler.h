@@ -39,11 +39,14 @@ protected:
 
   void Loop() final;
 
-  void HandleInternalRequest(
-      internal::Request&& req,
-      const string& from_machine_id);
-
 private:
+  friend class Worker;
+
+  void HandleInternalRequest(
+    internal::Request&& req,
+    const string& from_machine_id);
+  void HandleResponseFromWorker(internal::Response&& res);
+
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
 

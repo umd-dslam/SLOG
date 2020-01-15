@@ -1,13 +1,9 @@
 syntax = "proto3";
 
+import "machine_id.proto";
 import "transaction.proto";
 
 package slog.internal;
-
-message MachineId {
-    uint32 replica = 1;
-    uint32 partition = 2;
-}
 
 message Batch {
     uint32 id = 1;
@@ -89,7 +85,7 @@ message OrderRequest {
 }
 
 message ProcessTransactionRequest {
-    Transaction txn = 1;
+    uint32 txn_id = 1;
 }
 
 /***********************************************

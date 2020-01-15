@@ -1,6 +1,8 @@
 syntax = "proto3";
 package slog;
 
+import "machine_id.proto";
+
 enum TransactionType {
     UNKNOWN = 0;
     SINGLE_HOME = 1;
@@ -22,14 +24,15 @@ message TransactionInternal {
     uint32 id = 1;
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
+    internal.MachineId coordinating_server = 4;
 }
 
 message Transaction {
     TransactionInternal internal = 1;
-    
-    map<string, string> read_set = 2;
-    map<string, string> write_set = 3;
-    string code = 4;
+    string code = 2;
+    map<string, string> read_set = 3;
+    map<string, string> write_set = 4;
+
     TransactionStatus status = 5;
     string abort_reason = 6;
     repeated string delete_set = 7;

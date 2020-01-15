@@ -5,6 +5,8 @@
 #include "proto/api.pb.h"
 #include "proto/internal.pb.h"
 
+using std::move;
+
 namespace slog {
 
 Server::Server(
@@ -34,39 +36,28 @@ void Server::SetUp() {
 }
 
 void Server::Loop() {
-  MMessage msg;
 
   zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
   if (HasMessageFromChannel()) {
+    MMessage msg;
     ReceiveFromChannel(msg);
-    if (msg.IsProto<internal::Request>()) {
-      HandleInternalRequest(std::move(msg));
-    } else if (msg.IsProto<internal::Response>()) {
-      HandleInternalResponse(std::move(msg));
+    internal::Request req;
+    if (msg.GetProto(req)) {
+      auto from_machine_id = msg.GetIdentity();
+      string from_channel;
+      msg.GetString(from_channel, MM_FROM_CHANNEL);
+      HandleInternalRequest(
+          move(req),
+          move(from_machine_id),
+          move(from_channel));
     }
   }
 
   if (HasMessageFromClient()) {
-    msg.ReceiveFrom(client_socket_);
+    MMessage msg(client_socket_);
     if (msg.IsProto<api::Request>()) {
-      HandleAPIRequest(std::move(msg));
-    }
-  }
-
-  // For testing the server. To be remove later
-  while (!response_time_.empty()) {
-    auto top = response_time_.begin();
-    if (top->first <= Clock::now()) {
-      auto txn_id = top->second;
-      auto& response = pending_response_[txn_id];
-
-      response.SendTo(client_socket_);
-
-      pending_response_.erase(txn_id);
-      response_time_.erase(top);
-    } else {
-      break;
+      HandleAPIRequest(move(msg));
     }
   }
 }
@@ -81,65 +72,90 @@ bool Server::HasMessageFromClient() const {
 
 void Server::HandleAPIRequest(MMessage&& msg) {
   api::Request request;
-  api::Response response;
-  CHECK(msg.GetProto(request));
-  response.set_stream_id(request.stream_id());
+  if (!msg.GetProto(request)) {
+    LOG(ERROR) << "Invalid request from client";
+    return;
+  }
   
   if (request.type_case() == api::Request::kTxn) {
-    // TODO: reject transactions with empty read set and write set
     auto txn_id = NextTxnId();
     auto txn = request.mutable_txn()->release_txn();
-    txn->mutable_internal()->set_id(txn_id);
+    auto txn_internal = txn->mutable_internal();
+    txn_internal->set_id(txn_id);
+    txn_internal
+        ->mutable_coordinating_server()
+        ->CopyFrom(
+            config_->GetLocalMachineIdAsProto());
 
     pending_response_[txn_id] = msg;
 
     internal::Request forward_request;
     forward_request.mutable_forward_txn()->set_allocated_txn(txn);
     SendSameMachine(forward_request, FORWARDER_CHANNEL);
-
-    // For testing the server. To be remove later
-    response.mutable_txn()->mutable_txn()->CopyFrom(*txn);
-    pending_response_[txn_id].Set(MM_PROTO, response);
-    response_time_.emplace(
-        Clock::now() + 100ms, txn_id);
   }
 }
 
-void Server::HandleInternalRequest(MMessage&& msg) {
-  internal::Request request;
+void Server::HandleInternalRequest(
+    internal::Request&& req,
+    string&& from_machine_id,
+    string&& from_channel) {
+  switch (req.type_case()) {
+    case internal::Request::kLookupMaster: 
+      ProcessLookUpMasterRequest(
+          req.mutable_lookup_master(), move(from_machine_id), move(from_channel));
+      break;
+    case internal::Request::kForwardTxn:
+      ProcessForwardTxnRequest(
+          req.mutable_forward_txn(), move(from_machine_id));
+      break;
+    default:
+      break;
+  }
+}
+
+void Server::ProcessLookUpMasterRequest(
+    internal::LookupMasterRequest* lookup_master,
+    string&& from_machine_id,
+    string&& from_channel) {
   internal::Response response;
-  CHECK(msg.GetProto(request));
+  auto lookup_response = response.mutable_lookup_master();
+  lookup_response->set_txn_id(lookup_master->txn_id());
 
-  if (request.type_case() == internal::Request::kLookupMaster) {
-    auto lookup_request = request.mutable_lookup_master();
-    auto lookup_response = response.mutable_lookup_master();
-    auto metadata_map = lookup_response->mutable_master_metadata();
-    auto new_keys = lookup_response->mutable_new_keys();
-
-    lookup_response->set_txn_id(lookup_request->txn_id());
-    while (!lookup_request->keys().empty()) {
-      auto key = lookup_request->mutable_keys()->ReleaseLast();
-      if (!config_->KeyIsInLocalPartition(*key)) {
+  auto metadata_map = lookup_response->mutable_master_metadata();
+  auto new_keys = lookup_response->mutable_new_keys();
+  while (!lookup_master->keys().empty()) {
+    auto key = lookup_master->mutable_keys()->ReleaseLast();
+    if (!config_->KeyIsInLocalPartition(*key)) {
+      delete key;
+    } else {
+      Metadata metadata;
+      if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
+        auto& response_metadata = (*metadata_map)[*key];
+        response_metadata.set_master(metadata.master);
+        response_metadata.set_counter(metadata.counter);
         delete key;
       } else {
-        Metadata metadata;
-        if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
-          auto& response_metadata = (*metadata_map)[*key];
-          response_metadata.set_master(metadata.master);
-          response_metadata.set_counter(metadata.counter);
-          delete key;
-        } else {
-          new_keys->AddAllocated(key);
-        }
+        new_keys->AddAllocated(key);
       }
     }
-    
-    msg.Set(MM_PROTO, response);
-    Send(std::move(msg));
   }
+  Send(response, from_machine_id, from_channel);
 }
 
-void Server::HandleInternalResponse(MMessage&&) {
+void Server::ProcessForwardTxnRequest(
+    internal::ForwardTransactionRequest* forward_txn,
+    string&& from_machine_id) {
+  auto txn = forward_txn->release_txn();
+  auto txn_id = txn->internal().id();
+  if (pending_response_.count(txn_id) == 0) {
+
+    return;
+  }
+  auto machine_id = from_machine_id.empty() 
+    ? config_->GetLocalMachineIdAsProto() 
+    : MakeMachineIdProto(from_machine_id);
+
+  
 }
 
 TxnId Server::NextTxnId() {

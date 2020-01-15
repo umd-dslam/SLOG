@@ -43,6 +43,10 @@ inline string MakeMachineId(uint32_t replica, uint32_t partition) {
   return std::to_string(replica) + ":" + std::to_string(partition);
 }
 
+inline string MakeMachineId(const internal::MachineId& machine_id) {
+  return MakeMachineId(machine_id.replica(), machine_id.partition());
+}
+
 /**
  * Creates a new transaction
  * @param read_set        Read set of the transaction
