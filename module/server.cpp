@@ -113,19 +113,28 @@ void Server::HandleInternalRequest(MMessage&& msg) {
   CHECK(msg.GetProto(request));
 
   if (request.type_case() == internal::Request::kLookupMaster) {
-    auto& lookup_request = request.lookup_master();
+    auto lookup_request = request.mutable_lookup_master();
     auto lookup_response = response.mutable_lookup_master();
     auto metadata_map = lookup_response->mutable_master_metadata();
+    auto new_keys = lookup_response->mutable_new_keys();
 
-    for (const auto& key : lookup_request.keys()) {
-      Metadata metadata;
-      if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
-        auto& response_metadata = (*metadata_map)[key];
-        response_metadata.set_master(metadata.master);
-        response_metadata.set_counter(metadata.counter);
+    lookup_response->set_txn_id(lookup_request->txn_id());
+    while (!lookup_request->keys().empty()) {
+      auto key = lookup_request->mutable_keys()->ReleaseLast();
+      if (!config_->KeyIsInLocalPartition(*key)) {
+        delete key;
+      } else {
+        Metadata metadata;
+        if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
+          auto& response_metadata = (*metadata_map)[*key];
+          response_metadata.set_master(metadata.master);
+          response_metadata.set_counter(metadata.counter);
+          delete key;
+        } else {
+          new_keys->AddAllocated(key);
+        }
       }
     }
-    lookup_response->set_txn_id(lookup_request.txn_id());
     
     msg.Set(MM_PROTO, response);
     Send(std::move(msg));

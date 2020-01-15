@@ -142,13 +142,15 @@ uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
   return GetNumPartitions() - 1;
 }
 
-bool Configuration::KeyIsInLocalPartition(const Key& key) const {
+uint32_t Configuration::KeyToPartition(const Key& key) const {
   auto end = config_.partition_key_num_bytes() >= key.length() 
       ? key.end() 
       : key.begin() + config_.partition_key_num_bytes();
-  auto owning_partition = 
-      FNVHash(key.begin(), end) % GetNumPartitions();
-  return owning_partition == local_partition_;
+  return FNVHash(key.begin(), end) % GetNumPartitions();
+}
+
+bool Configuration::KeyIsInLocalPartition(const Key& key) const {
+  return KeyToPartition(key) == local_partition_;
 }
 
 } // namespace slog

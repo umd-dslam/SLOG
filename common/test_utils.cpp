@@ -2,6 +2,8 @@
 
 #include <random>
 
+#include <glog/logging.h>
+
 #include "common/proto_utils.h"
 #include "proto/api.pb.h"
 
@@ -73,6 +75,8 @@ TestSlog::TestSlog(shared_ptr<Configuration> config)
     client_socket_(client_context_, ZMQ_DEALER) {}
 
 void TestSlog::Data(Key&& key, Record&& record) {
+  CHECK(config_->KeyIsInLocalPartition(key)) 
+      << "Key \"" << key << "\" belongs to partition " << config_->KeyToPartition(key);
   storage_->Write(key, record);
 }
 

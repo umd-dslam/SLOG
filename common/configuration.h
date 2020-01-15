@@ -49,6 +49,7 @@ public:
 
   // TODO: How keys are partitioned is hardcoded for now. 
   //       Later find a better place to put this method
+  uint32_t KeyToPartition(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
 
 private:
