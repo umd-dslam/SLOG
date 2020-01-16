@@ -1,12 +1,12 @@
 #pragma once
 
-#include <deque>
+#include <queue>
 #include <unordered_map>
 
 #include "common/types.h"
 #include "proto/internal.pb.h"
 
-using std::deque;
+using std::queue;
 using std::shared_ptr;
 using std::pair;
 using std::unordered_map;
@@ -28,10 +28,10 @@ public:
 private:
   void UpdateReadyBatches();
 
-  unordered_map<uint32_t, deque<BatchPtr>> batch_queues_;
+  unordered_map<uint32_t, queue<BatchPtr>> batch_queues_;
   unordered_map<SlotId, uint32_t> pending_slots_;
   SlotId next_slot_;
-  deque<pair<SlotId, BatchPtr>> ready_batches_;
+  queue<pair<SlotId, BatchPtr>> ready_batches_;
 };
 
 } // namespace slog

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <deque>
+#include <list>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -8,7 +8,7 @@
 #include "common/constants.h"
 #include "common/types.h"
 
-using std::deque;
+using std::list;
 using std::shared_ptr;
 using std::pair;
 using std::unordered_map;
@@ -33,7 +33,7 @@ public:
 
 private:
   unordered_set<TxnId> holders_;
-  deque<pair<TxnId, LockMode>> waiters_;
+  list<pair<TxnId, LockMode>> waiters_;
 };
 
 /**
