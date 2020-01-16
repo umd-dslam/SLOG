@@ -143,7 +143,7 @@ void Server::ProcessLookUpMasterRequest(
 }
 
 void Server::ProcessForwardTxnRequest(
-    internal::ForwardTransactionRequest* forward_txn,
+    internal::ForwardTransaction* forward_txn,
     string&& from_machine_id) {
   auto txn = forward_txn->release_txn();
   auto txn_id = txn->internal().id();

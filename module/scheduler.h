@@ -69,8 +69,8 @@ private:
       internal::ForwardBatchRequest* forward_batch,
       const string& from_machine_id);
 
-  void ProcessOrderRequest(
-      const internal::OrderRequest& order);
+  void ProcessBatchOrder(
+      const internal::PaxosOrder& order);
 
   void TryProcessingNextBatchesFromGlobalLog();
 

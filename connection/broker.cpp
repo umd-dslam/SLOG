@@ -85,7 +85,7 @@ bool Broker::InitializeConnection() {
 
   // Prepare a READY message
   Request request;
-  auto ready = request.mutable_ready();
+  auto ready = request.mutable_broker_ready();
   ready->set_ip_address(config_->GetLocalAddress());
   ready->mutable_machine_id()->CopyFrom(
       config_->GetLocalMachineIdAsProto());
@@ -121,7 +121,7 @@ bool Broker::InitializeConnection() {
       msg.ReceiveFrom(router_);
 
       // The message must be a Request and it must be a READY request
-      if (!msg.GetProto(request) || !request.has_ready()) {
+      if (!msg.GetProto(request) || !request.has_broker_ready()) {
         LOG(INFO) << "Received a message while broker is not READY. "
                   << "Saving for later";
         unhandled_incoming_messages_.push_back(move(msg));
@@ -130,7 +130,7 @@ bool Broker::InitializeConnection() {
 
       // Use the information in each READY message to build up the translation maps
       const auto& conn_id = msg.GetIdentity();
-      const auto& ready = request.ready();
+      const auto& ready = request.broker_ready();
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
       auto machine_id_str = MakeMachineId(

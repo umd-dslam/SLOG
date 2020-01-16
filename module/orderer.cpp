@@ -12,7 +12,7 @@ MultiHomeOrderer::MultiHomeOrderer(
 
 void MultiHomeOrderer::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
-  auto order = req.mutable_order();
+  auto order = req.mutable_paxos_order();
   order->set_slot(slot);
   order->set_value(value);
   SendSameMachine(req, SEQUENCER_CHANNEL);
@@ -26,7 +26,7 @@ LocalOrderer::LocalOrderer(
 
 void LocalOrderer::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
-  auto order = req.mutable_order();
+  auto order = req.mutable_paxos_order();
   order->set_slot(slot);
   order->set_value(value);
   SendSameMachine(req, SCHEDULER_CHANNEL);

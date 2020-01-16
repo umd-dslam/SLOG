@@ -44,7 +44,7 @@ private:
       string&& from_machine_id,
       string&& from_channel);
   void ProcessForwardTxnRequest(
-      internal::ForwardTransactionRequest* forward_txn,
+      internal::ForwardTransaction* forward_txn,
       string&& from_machine_id);
 
   TxnId NextTxnId();

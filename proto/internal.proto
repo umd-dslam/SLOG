@@ -16,19 +16,21 @@ message Batch {
 /**
  * The first message of a communication between two entities is
  * always a Request. Some types of Request needs a Response
- * (e.g. LookUpMaster), some other do not (one-way request).
+ * (e.g. LookUpMasterRequest); these requests end with "Request".
+ * Some others are one-way requests (e.g. PaxosPropose) and do not 
+ * end with "Request".
  */
 message Request {
     oneof type {
         EchoRequest echo = 1;
-        ReadyRequest ready = 2;
-        ForwardTransactionRequest forward_txn = 3;
+        BrokerReady broker_ready = 2;
+        ForwardTransaction forward_txn = 3;
         LookupMasterRequest lookup_master = 4;
         ForwardBatchRequest forward_batch = 5;
-        PaxosProposeRequest paxos_propose = 6;
+        PaxosPropose paxos_propose = 6;
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
-        OrderRequest order = 10;
+        PaxosOrder paxos_order = 10;
         ProcessTransactionRequest process_txn = 11;
     }
 }
@@ -45,12 +47,12 @@ message EchoRequest {
  * identifiers are included so that the receivers can build a
  * map of the whole network.
  */
-message ReadyRequest {
+message BrokerReady {
     bytes ip_address = 1;
     MachineId machine_id = 2;
 }
 
-message ForwardTransactionRequest {
+message ForwardTransaction {
     Transaction txn = 1;
 }
 
@@ -63,7 +65,7 @@ message ForwardBatchRequest {
     Batch batch = 1;
 }
 
-message PaxosProposeRequest {
+message PaxosPropose {
     uint32 value = 1;
 }
 
@@ -79,7 +81,7 @@ message PaxosCommitRequest {
     uint32 value = 3;
 }
 
-message OrderRequest {
+message PaxosOrder {
     uint32 slot = 1;
     uint32 value = 2;
 }

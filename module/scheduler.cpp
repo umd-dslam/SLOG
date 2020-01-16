@@ -81,8 +81,8 @@ void Scheduler::HandleInternalRequest(
       ProcessForwardBatchRequest(
           req.mutable_forward_batch(), from_machine_id);
       break;
-    case Request::kOrder:
-      ProcessOrderRequest(req.order());
+    case Request::kPaxosOrder:
+      ProcessBatchOrder(req.paxos_order());
       break;
     default:
       break;
@@ -111,8 +111,8 @@ void Scheduler::ProcessForwardBatchRequest(
   }
 }
 
-void Scheduler::ProcessOrderRequest(
-    const internal::OrderRequest& order) {
+void Scheduler::ProcessBatchOrder(
+    const internal::PaxosOrder& order) {
   VLOG(1) << "Received batch order. Slot id: "
           << order.slot() << ". Batch id: " << order.value(); 
   interleaver_.AddAgreedSlot(order.slot(), order.value());
