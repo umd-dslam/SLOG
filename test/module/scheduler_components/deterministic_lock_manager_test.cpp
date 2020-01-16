@@ -53,7 +53,10 @@ TEST(DeterministicLockManager, WriteLocks) {
   txn2.mutable_internal()->set_id(200);
   ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
   ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+  // The blocked txn becomes ready
   ASSERT_EQ(lock_manager.ReleaseLocks(txn1).size(), 1);
+  // Make sure the lock is already held by txn2
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn1));
 }
 
 TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
@@ -75,10 +78,33 @@ TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
 
   ASSERT_TRUE(lock_manager.ReleaseLocks(txn3).empty());
 
-  auto new_holders = lock_manager.ReleaseLocks(txn1);
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
-  ASSERT_EQ(new_holders.size(), 2);
-  ASSERT_TRUE(new_holders.count(200) > 0);
-  ASSERT_TRUE(new_holders.count(400) > 0);
+  ASSERT_EQ(new_ready_txns.size(), 2);
+  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+  ASSERT_TRUE(new_ready_txns.count(400) > 0);
+}
+
+TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0]);
+  auto txn1 = MakeTransaction({"A"}, {"B", "C"});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {"B"});
+  txn2.mutable_internal()->set_id(200);
+  auto txn3 = MakeTransaction({}, {"A", "C"});
+  txn3.mutable_internal()->set_id(300);
+
+  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn3));
+
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+
+  new_ready_txns = lock_manager.ReleaseLocks(txn2);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(300) > 0);
 }

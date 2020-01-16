@@ -137,8 +137,10 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
         TransactionPtr txn(transactions->ReleaseLast());
         auto txn_id = txn->internal().id();
         all_txns_[txn_id] = std::move(txn);
-        pending_txn_.insert(txn_id);
-        TryDispatchingTransaction(txn_id);
+        
+        if (lock_manager_.AcquireLocks(*all_txns_.at(txn_id))) {
+          DispatchTransaction(txn_id); 
+        }
       }
     }
   }
@@ -152,7 +154,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   auto& txn = all_txns_.at(txn_id);
   auto ready_txns = lock_manager_.ReleaseLocks(*txn);
   for (auto ready_txn_id : ready_txns) {
-    TryDispatchingTransaction(ready_txn_id);
+    DispatchTransaction(ready_txn_id);
   }
 
   auto coordinating_server = MakeMachineId(
@@ -164,24 +166,13 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   all_txns_.erase(txn_id);
 }
 
-void Scheduler::TryDispatchingTransaction(TxnId txn_id) {
-  if (pending_txn_.count(txn_id) == 0) {
-    LOG(ERROR) << "Transaction " << txn_id << " is not in pending state";
-    return;
-  }
-
-  if (!lock_manager_.AcquireLocks(*all_txns_[txn_id])) {
-    return;
-  }
-
+void Scheduler::DispatchTransaction(TxnId txn_id) {
   Request req;
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);
   MMessage msg;
   msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);
-
-  pending_txn_.erase(txn_id);
 }
 
 } // namespace slog

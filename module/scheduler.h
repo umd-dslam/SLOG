@@ -59,7 +59,7 @@ private:
 
   void TryProcessingNextBatchesFromGlobalLog();
 
-  void TryDispatchingTransaction(TxnId txn_id);
+  void DispatchTransaction(TxnId txn_id);
 
   shared_ptr<Configuration> config_;
   zmq::socket_t worker_socket_;
@@ -70,7 +70,6 @@ private:
   BatchInterleaver interleaver_;
   DeterministicLockManager lock_manager_;
   unordered_map<TxnId, TransactionPtr> all_txns_;
-  unordered_set<TxnId> pending_txn_;
 };
 
 } // namespace slog

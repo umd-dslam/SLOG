@@ -136,6 +136,7 @@ DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
       if (!config_->KeyIsInLocalPartition(key)) {
         continue;
       }
+
       auto new_holders = lock_table_[key].Release(txn_id);
       for (auto holder : new_holders) {
         num_locks_waited_[holder]--;
