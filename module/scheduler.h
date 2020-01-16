@@ -1,5 +1,6 @@
 #pragma once
 
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "storage/storage.h"
 
 using std::shared_ptr;
+using std::queue;
 using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
@@ -22,11 +24,24 @@ using std::vector;
 
 namespace slog {
 
-using TransactionPtr = unique_ptr<Transaction>;
+class TransactionState {
+public:
+  TransactionState(Transaction* txn);
+
+  Transaction* ReleaseTransaction();
+  void SetWorker(const string& worker);
+
+  Transaction& GetTransaction() const;
+  const string& GetWorker() const;
+
+private:
+  unique_ptr<Transaction> txn_;
+  string worker_;
+};
 
 class Scheduler : public Module, ChannelHolder {
 public:
-  static const string WORKER_IN;
+  static const string WORKERS_ENDPOINT;
 
   Scheduler(
       shared_ptr<Configuration> config,
@@ -63,13 +78,14 @@ private:
 
   shared_ptr<Configuration> config_;
   zmq::socket_t worker_socket_;
-  vector<unique_ptr<ModuleRunner>> workers_;
   vector<zmq::pollitem_t> poll_items_;
+  vector<unique_ptr<ModuleRunner>> workers_;
+  queue<string> ready_workers_;
 
   unordered_map<uint32_t, LocalLog> local_logs_;
   BatchInterleaver interleaver_;
   DeterministicLockManager lock_manager_;
-  unordered_map<TxnId, TransactionPtr> all_txns_;
+  unordered_map<TxnId, TransactionState> all_txns_;
 };
 
 } // namespace slog

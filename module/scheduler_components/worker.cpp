@@ -3,7 +3,6 @@
 #include <thread>
 
 #include "module/scheduler.h"
-#include "module/scheduler_components/outputter.h"
 
 namespace slog {
 
@@ -15,15 +14,16 @@ Worker::Worker(
     zmq::context_t& context,
     shared_ptr<Storage<Key, Record>> storage)
   : scheduler_(scheduler),
-    scheduler_socket_(context, ZMQ_REP),
-    outputter_socket_(context, ZMQ_PUSH),
+    scheduler_socket_(context, ZMQ_DEALER),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
     stored_procedures_(new KeyValueStoredProcedures()) {}
 
 void Worker::SetUp() {
-  scheduler_socket_.connect(Scheduler::WORKER_IN);
-  outputter_socket_.connect(Outputter::WORKER_OUT);
+  scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
+  MMessage msg;
+  msg.Set(0, ""); // Notify scheduler that this is ready
+  msg.SendTo(scheduler_socket_);
 }
 
 void Worker::Loop() {
@@ -42,25 +42,29 @@ void Worker::Loop() {
 }
 
 void Worker::ProcessTransaction(TxnId txn_id) {
-  auto& txn = scheduler_.all_txns_[txn_id];
+  auto& txn = scheduler_
+      .all_txns_
+      .at(txn_id)
+      .GetTransaction();
+
   // Firstly, read all keys from the read set and write set to the buffer
-  for (auto& key_value : *txn->mutable_read_set()) {
+  for (auto& key_value : *txn.mutable_read_set()) {
     Record record;
     storage_->Read(key_value.first, record);
     key_value.second = record.value;
   }
-  for (auto& key_value : *txn->mutable_write_set()) {
+  for (auto& key_value : *txn.mutable_write_set()) {
     Record record;
     storage_->Read(key_value.first, record);
     key_value.second = record.value;
   }
 
   // Secondly, execute the transaction code
-  stored_procedures_->Execute(*txn);
+  stored_procedures_->Execute(txn);
 
   // Lastly, apply all writes to local storage
-  auto& master_metadata = txn->internal().master_metadata();
-  for (const auto& key_value : txn->write_set()) {
+  auto& master_metadata = txn.internal().master_metadata();
+  for (const auto& key_value : txn.write_set()) {
     const auto& key = key_value.first;
     const auto& value = key_value.second;
     Record record;
@@ -73,7 +77,7 @@ void Worker::ProcessTransaction(TxnId txn_id) {
     record.value = value;
     storage_->Write(key, record);
   }
-  for (const auto& key : txn->delete_set()) {
+  for (const auto& key : txn.delete_set()) {
     storage_->Delete(key);
   }
 }

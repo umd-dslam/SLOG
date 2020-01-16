@@ -30,7 +30,6 @@ private:
 
   Scheduler& scheduler_;
   zmq::socket_t scheduler_socket_;
-  zmq::socket_t outputter_socket_;
   shared_ptr<Storage<Key, Record>> storage_;
   unique_ptr<StoredProcedures> stored_procedures_;
 };

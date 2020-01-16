@@ -10,7 +10,7 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-const string Scheduler::WORKER_IN("inproc://worker_in");
+const string Scheduler::WORKERS_ENDPOINT("inproc://workers");
 
 Scheduler::Scheduler(
     shared_ptr<Configuration> config,
@@ -19,7 +19,7 @@ Scheduler::Scheduler(
     shared_ptr<Storage<Key, Record>> storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
     config_(config),
-    worker_socket_(context, ZMQ_PUSH),
+    worker_socket_(context, ZMQ_ROUTER),
     lock_manager_(config) {
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
@@ -35,7 +35,7 @@ Scheduler::Scheduler(
 }
 
 void Scheduler::SetUp() {
-  worker_socket_.bind(WORKER_IN);
+  worker_socket_.bind(WORKERS_ENDPOINT);
   for (auto& worker : workers_) {
     worker->StartInNewThread();
   }
@@ -56,6 +56,8 @@ void Scheduler::Loop() {
 
   if (HasMessageFromWorker()) {
     MMessage msg(worker_socket_);
+    ready_workers_.push(msg.GetIdentity());
+
     Response res;
     if (msg.GetProto(res)) {
       HandleResponseFromWorker(std::move(res));
@@ -134,11 +136,12 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
       auto transactions = batch->mutable_transactions();
 
       while (!transactions->empty()) {
-        TransactionPtr txn(transactions->ReleaseLast());
-        auto txn_id = txn->internal().id();
-        all_txns_[txn_id] = std::move(txn);
-        
-        if (lock_manager_.AcquireLocks(*all_txns_.at(txn_id))) {
+        TransactionState state(transactions->ReleaseLast());
+        auto& txn = state.GetTransaction();
+        auto txn_id = txn.internal().id();
+        all_txns_.emplace(txn_id, std::move(state));
+
+        if (lock_manager_.AcquireLocks(txn)) {
           DispatchTransaction(txn_id); 
         }
       }
@@ -150,29 +153,58 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   if (res.type_case() != Response::kProcessTxn) {
     return;
   }
+  // This txn is done so remove it from the txn list
   auto txn_id = res.process_txn().txn_id();
-  auto& txn = all_txns_.at(txn_id);
+  auto txn = all_txns_.at(txn_id).ReleaseTransaction();
+  all_txns_.erase(txn_id);
+
+  // Release locks held by this txn. Dispatch the txns that
+  // become ready thanks to this release.
   auto ready_txns = lock_manager_.ReleaseLocks(*txn);
   for (auto ready_txn_id : ready_txns) {
     DispatchTransaction(ready_txn_id);
   }
 
+  // Send the txn back to the coordinating server
   auto coordinating_server = MakeMachineId(
         txn->internal().coordinating_server());
   Request req;
-  req.mutable_forward_txn()->set_allocated_txn(txn.release());
+  req.mutable_forward_txn()->set_allocated_txn(txn);
   Send(req, coordinating_server, SERVER_CHANNEL);
-
-  all_txns_.erase(txn_id);
 }
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
+  auto worker = ready_workers_.front();
+  ready_workers_.pop();
+
+  all_txns_.at(txn_id).SetWorker(worker);
+
   Request req;
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);
+
   MMessage msg;
+  msg.SetIdentity(std::move(worker));
   msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);
+}
+
+TransactionState::TransactionState(Transaction* txn) : txn_(txn) {}
+
+Transaction* TransactionState::ReleaseTransaction() {
+  return txn_.release();
+}
+
+void TransactionState::SetWorker(const string& worker) {
+  worker_ = worker;
+}
+
+Transaction& TransactionState::GetTransaction() const {
+  return *txn_;
+}
+
+const string& TransactionState::GetWorker() const {
+  return worker_;
 }
 
 } // namespace slog
