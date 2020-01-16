@@ -24,19 +24,10 @@ using std::vector;
 
 namespace slog {
 
-class TransactionState {
-public:
-  TransactionState(Transaction* txn);
-
-  Transaction* ReleaseTransaction();
-  void SetWorker(const string& worker);
-
-  Transaction& GetTransaction() const;
-  const string& GetWorker() const;
-
-private:
-  unique_ptr<Transaction> txn_;
-  string worker_;
+struct TransactionHolder {
+  TransactionHolder(Transaction* txn) : txn(txn) {}
+  unique_ptr<Transaction> txn;
+  string worker;
 };
 
 class Scheduler : public Module, ChannelHolder {
@@ -85,7 +76,7 @@ private:
   unordered_map<uint32_t, LocalLog> local_logs_;
   BatchInterleaver interleaver_;
   DeterministicLockManager lock_manager_;
-  unordered_map<TxnId, TransactionState> all_txns_;
+  unordered_map<TxnId, TransactionHolder> all_txns_;
 };
 
 } // namespace slog

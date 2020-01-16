@@ -136,12 +136,11 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
       auto transactions = batch->mutable_transactions();
 
       while (!transactions->empty()) {
-        TransactionState state(transactions->ReleaseLast());
-        auto& txn = state.GetTransaction();
-        auto txn_id = txn.internal().id();
-        all_txns_.emplace(txn_id, std::move(state));
+        TransactionHolder holder(transactions->ReleaseLast());
+        auto txn_id = holder.txn->internal().id();
+        all_txns_.emplace(txn_id, std::move(holder));
 
-        if (lock_manager_.AcquireLocks(txn)) {
+        if (lock_manager_.AcquireLocks(*holder.txn)) {
           DispatchTransaction(txn_id); 
         }
       }
@@ -155,7 +154,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   }
   // This txn is done so remove it from the txn list
   auto txn_id = res.process_txn().txn_id();
-  auto txn = all_txns_.at(txn_id).ReleaseTransaction();
+  auto txn = all_txns_.at(txn_id).txn.release();
   all_txns_.erase(txn_id);
 
   // Release locks held by this txn. Dispatch the txns that
@@ -177,7 +176,7 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   auto worker = ready_workers_.front();
   ready_workers_.pop();
 
-  all_txns_.at(txn_id).SetWorker(worker);
+  all_txns_.at(txn_id).worker = worker;
 
   Request req;
   auto process_txn = req.mutable_process_txn();
@@ -187,24 +186,6 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   msg.SetIdentity(std::move(worker));
   msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);
-}
-
-TransactionState::TransactionState(Transaction* txn) : txn_(txn) {}
-
-Transaction* TransactionState::ReleaseTransaction() {
-  return txn_.release();
-}
-
-void TransactionState::SetWorker(const string& worker) {
-  worker_ = worker;
-}
-
-Transaction& TransactionState::GetTransaction() const {
-  return *txn_;
-}
-
-const string& TransactionState::GetWorker() const {
-  return worker_;
 }
 
 } // namespace slog

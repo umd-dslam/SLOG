@@ -42,29 +42,26 @@ void Worker::Loop() {
 }
 
 void Worker::ProcessTransaction(TxnId txn_id) {
-  auto& txn = scheduler_
-      .all_txns_
-      .at(txn_id)
-      .GetTransaction();
+  auto& txn = scheduler_.all_txns_.at(txn_id).txn;
 
   // Firstly, read all keys from the read set and write set to the buffer
-  for (auto& key_value : *txn.mutable_read_set()) {
+  for (auto& key_value : *txn->mutable_read_set()) {
     Record record;
     storage_->Read(key_value.first, record);
     key_value.second = record.value;
   }
-  for (auto& key_value : *txn.mutable_write_set()) {
+  for (auto& key_value : *txn->mutable_write_set()) {
     Record record;
     storage_->Read(key_value.first, record);
     key_value.second = record.value;
   }
 
   // Secondly, execute the transaction code
-  stored_procedures_->Execute(txn);
+  stored_procedures_->Execute(*txn);
 
   // Lastly, apply all writes to local storage
-  auto& master_metadata = txn.internal().master_metadata();
-  for (const auto& key_value : txn.write_set()) {
+  auto& master_metadata = txn->internal().master_metadata();
+  for (const auto& key_value : txn->write_set()) {
     const auto& key = key_value.first;
     const auto& value = key_value.second;
     Record record;
@@ -77,7 +74,7 @@ void Worker::ProcessTransaction(TxnId txn_id) {
     record.value = value;
     storage_->Write(key, record);
   }
-  for (const auto& key : txn.delete_set()) {
+  for (const auto& key : txn->delete_set()) {
     storage_->Delete(key);
   }
 }
