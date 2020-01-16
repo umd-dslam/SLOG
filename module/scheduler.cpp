@@ -50,16 +50,24 @@ void Scheduler::Loop() {
     Request req;
     if (msg.GetProto(req)) {
       HandleInternalRequest(std::move(req), msg.GetIdentity());
-      TryProcessingNextBatchesFromGlobalLog();
     } 
   }
 
   if (HasMessageFromWorker()) {
     MMessage msg(worker_socket_);
-    ready_workers_.push(msg.GetIdentity());
+    if (msg.IsProto<Request>()) {
+      // Forward requests from worker to remote machines
+      Request forwarded_req;
+      msg.GetProto(forwarded_req);
+      string destination;
+      msg.GetString(destination, MM_PROTO + 1);
 
-    Response res;
-    if (msg.GetProto(res)) {
+      SendSameChannel(forwarded_req, destination);
+    } else if (msg.IsProto<Response>()) {
+      Response res;
+      msg.GetProto(res);
+      ready_workers_.push(msg.GetIdentity());
+
       HandleResponseFromWorker(std::move(res));
     }
   }
@@ -84,9 +92,13 @@ void Scheduler::HandleInternalRequest(
     case Request::kPaxosOrder:
       ProcessBatchOrder(req.paxos_order());
       break;
+    case Request::kRemoteReadResult:
+      ProcessRemoteReadResult(std::move(req));
+      break;
     default:
       break;
   }
+  TryProcessingNextBatchesFromGlobalLog();
 }
 
 void Scheduler::ProcessForwardBatchRequest(
@@ -116,6 +128,16 @@ void Scheduler::ProcessBatchOrder(
   VLOG(1) << "Received batch order. Slot id: "
           << order.slot() << ". Batch id: " << order.value(); 
   interleaver_.AddAgreedSlot(order.slot(), order.value());
+}
+
+void Scheduler::ProcessRemoteReadResult(
+    internal::Request&& req) {
+  auto txn_id = req.remote_read_result().txn_id();
+  if (all_txns_.count(txn_id) == 0) {
+    return;
+  }
+  const auto& worker = all_txns_.at(txn_id).worker;
+  SendToWorker(std::move(req), worker);
 }
 
 void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
@@ -182,8 +204,12 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);
 
+  SendToWorker(std::move(req), worker);
+}
+
+void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {
   MMessage msg;
-  msg.SetIdentity(std::move(worker));
+  msg.SetIdentity(worker);
   msg.Set(MM_PROTO, req);
   msg.SendTo(worker_socket_);
 }

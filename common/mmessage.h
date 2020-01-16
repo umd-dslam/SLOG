@@ -8,6 +8,8 @@
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
 
+#include "common/constants.h"
+
 using std::string;
 using std::vector;
 using std::unordered_map;
@@ -52,7 +54,7 @@ public:
   void Set(size_t index, string&& data);
 
   template<typename T>
-  bool GetProto(T& out, size_t index = 0) const {
+  bool GetProto(T& out, size_t index = MM_PROTO) const {
     if (IsProto<T>(index)) {
       const auto any = GetAny(index);
       return (*any).UnpackTo(&out);
@@ -61,7 +63,7 @@ public:
   }
 
   template<typename T>
-  bool IsProto(size_t index = 0) const {
+  bool IsProto(size_t index = MM_PROTO) const {
     CHECK(index < body_.size()) 
         << "Index out of bound. Size: " << body_.size() << ". Index: " << index;
     const auto any = GetAny(index);

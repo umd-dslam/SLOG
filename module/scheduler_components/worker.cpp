@@ -2,6 +2,7 @@
 
 #include <thread>
 
+#include "common/proto_utils.h"
 #include "module/scheduler.h"
 
 namespace slog {
@@ -21,45 +22,134 @@ Worker::Worker(
 
 void Worker::SetUp() {
   scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
-  MMessage msg;
-  msg.Set(0, ""); // Notify scheduler that this is ready
-  msg.SendTo(scheduler_socket_);
+  // Send an empty response to tell Scheduler that this worker is ready
+  SendToScheduler(Response());
 }
 
 void Worker::Loop() {
   MMessage msg(scheduler_socket_);
-  if (!msg.IsProto<Request>()) {
-    return;
-  }
   Request req;
-  msg.GetProto(req);
-  if (req.type_case() != Request::kProcessTxn) {
+  if (!msg.GetProto(req)) {
     return;
   }
-  auto txn_id = req.process_txn().txn_id();
-  ProcessTransaction(txn_id);
-  ResponseToScheduler(txn_id);
+  switch (req.type_case()) {
+    case Request::kProcessTxn: {
+      CHECK(txn_state_ == nullptr)
+          << "Another transaction is being processed by this worker";
+      auto txn_id = req.process_txn().txn_id();
+      txn_state_.reset(new TransactionState(txn_id));
+      if (PrepareTransaction()) {
+        // Immediately execute and commit this transaction if this
+        // machine is a passive participant
+        ExecuteAndCommitTransaction();
+      }
+      break;
+    }
+    case Request::kRemoteReadResult: {
+      auto& remote_read_result = req.remote_read_result();
+      if (ApplyRemoteReadResult(remote_read_result)) {
+        // Execute and commit this transaction when all remote reads
+        // are received
+        ExecuteAndCommitTransaction();
+      }
+      break;
+    }
+    default:
+      break;
+  }
 }
 
-void Worker::ProcessTransaction(TxnId txn_id) {
+bool Worker::PrepareTransaction() {
+  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
+
+  bool is_passive_participant = true;
+
+  auto txn_id  = txn_state_->txn_id;
+  auto config = scheduler_.config_;
   auto& txn = scheduler_.all_txns_.at(txn_id).txn;
 
-  // Firstly, read all keys from the read set and write set to the buffer
+  Request request;
+  auto remote_read_result = request.mutable_remote_read_result();
+  auto remote_reads = remote_read_result->mutable_reads();
+  remote_read_result->set_txn_id(txn_id);
+  remote_read_result->set_partition(config->GetLocalPartition());
+
   for (auto& key_value : *txn->mutable_read_set()) {
-    Record record;
-    storage_->Read(key_value.first, record);
-    key_value.second = record.value;
-  }
-  for (auto& key_value : *txn->mutable_write_set()) {
-    Record record;
-    storage_->Read(key_value.first, record);
-    key_value.second = record.value;
+    const auto& key = key_value.first;
+    auto partition = config->KeyToPartition(key);
+    if (partition == config->GetLocalPartition()) {
+      Record record;
+      storage_->Read(key, record);
+      key_value.second = record.value;
+      (*remote_reads)[key] = record.value;
+    } else {
+      txn_state_->awaited_passive_participants.insert(partition);
+    }
   }
 
-  // Secondly, execute the transaction code
+  for (auto& key_value : *txn->mutable_write_set()) {
+    const auto& key = key_value.first;
+    auto partition = config->KeyToPartition(key);
+    if (partition == config->GetLocalPartition()) {
+
+      is_passive_participant = false;
+
+      Record record;
+      storage_->Read(key, record);
+      key_value.second = record.value;
+      (*remote_reads)[key] = record.value;
+    } else {
+      txn_state_->active_participants.insert(partition);
+    }
+  }
+
+  // Send reads to all active participants in local replica
+  auto local_replica = config->GetLocalReplica();
+  for (auto participant : txn_state_->active_participants) {
+    SendToScheduler(
+        request, MakeMachineId(local_replica, participant));
+  }
+
+  return is_passive_participant;
+}
+
+bool Worker::ApplyRemoteReadResult(
+    const internal::RemoteReadResult& read_result) {
+  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
+
+  auto txn_id = txn_state_->txn_id;
+  CHECK_EQ(txn_id, read_result.txn_id())
+      << "Remote read result belongs to a different transaction. "
+      << "Expected: " << txn_id
+      << ". Received: " << read_result.txn_id();
+  
+  auto& awaited = txn_state_->awaited_passive_participants;
+  if (awaited.count(read_result.partition()) == 0) {
+    return awaited.empty();
+  }
+  awaited.erase(read_result.partition());
+
+  // Apply remote reads to local txn
+  auto& txn = scheduler_.all_txns_.at(txn_id).txn;
+  for (const auto& key_value : read_result.reads()) {
+    const auto& key = key_value.first;
+    const auto& value = key_value.second;
+    (*txn->mutable_read_set())[key] = value;
+  }
+
+  return awaited.empty();
+}
+
+void Worker::ExecuteAndCommitTransaction() {
+  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
+
+  auto txn_id = txn_state_->txn_id;
+  auto& txn = scheduler_.all_txns_.at(txn_id).txn;
+
+  // Execute the transaction code
   stored_procedures_->Execute(*txn);
 
-  // Lastly, apply all writes to local storage
+  // Apply all writes to local storage
   auto& master_metadata = txn->internal().master_metadata();
   for (const auto& key_value : txn->write_set()) {
     const auto& key = key_value.first;
@@ -77,13 +167,21 @@ void Worker::ProcessTransaction(TxnId txn_id) {
   for (const auto& key : txn->delete_set()) {
     storage_->Delete(key);
   }
+
+  // Response back to the scheduler
+  Response res;
+  res.mutable_process_txn()->set_txn_id(txn_id);
+  SendToScheduler(res);
+
+  txn_state_.reset();
 }
 
-void Worker::ResponseToScheduler(TxnId txn_id) {
-  Response process_txn_res;
-  process_txn_res.mutable_process_txn()->set_txn_id(txn_id);
+void Worker::SendToScheduler(
+    const google::protobuf::Message& req_or_res,
+    string&& forward_to_machine) {
   MMessage msg;
-  msg.Set(MM_PROTO, process_txn_res);
+  msg.Set(MM_PROTO, req_or_res);
+  msg.Set(MM_PROTO + 1, std::move(forward_to_machine));
   msg.SendTo(scheduler_socket_);
 }
 

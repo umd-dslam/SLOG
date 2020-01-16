@@ -32,6 +32,7 @@ message Request {
         PaxosCommitRequest paxos_commit = 9;
         PaxosOrder paxos_order = 10;
         ProcessTransactionRequest process_txn = 11;
+        RemoteReadResult remote_read_result = 12;
     }
 }
 
@@ -88,6 +89,12 @@ message PaxosOrder {
 
 message ProcessTransactionRequest {
     uint32 txn_id = 1;
+}
+
+message RemoteReadResult {
+    uint32 txn_id = 1;
+    uint32 partition = 2;
+    map<string, string> reads = 3;
 }
 
 /***********************************************

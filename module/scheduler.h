@@ -63,9 +63,14 @@ private:
   void ProcessBatchOrder(
       const internal::PaxosOrder& order);
 
+  void ProcessRemoteReadResult(
+      internal::Request&& request);
+
   void TryProcessingNextBatchesFromGlobalLog();
 
   void DispatchTransaction(TxnId txn_id);
+
+  void SendToWorker(internal::Request&& req, const string& worker);
 
   shared_ptr<Configuration> config_;
   zmq::socket_t worker_socket_;
