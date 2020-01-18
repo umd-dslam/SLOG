@@ -83,7 +83,7 @@ uint32_t Configuration::GetNumPartitions() const {
 }
 
 uint32_t Configuration::GetNumWorkers() const {
-  return config_.num_workers();
+  return std::max(config_.num_workers(), 1U);
 }
 
 uint32_t Configuration::GetBrokerPort() const {

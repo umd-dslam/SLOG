@@ -18,11 +18,13 @@ using namespace slog;
 
 class ForwarderTest : public ::testing::Test {
 protected:
+  static const size_t NUM_MACHINES = 4;
+
   void SetUp() {
     ConfigVec configs = MakeTestConfigurations(
         "forwarder", 2 /* num_replicas */, 2 /* num_partitions */);
 
-    for (int i = 0; i < 4; i++) {
+    for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddServerAndClient();
       test_slogs_[i]->AddForwarder();
@@ -42,7 +44,7 @@ protected:
     for (const auto& test_slog : test_slogs_) {
       test_slog->StartInNewThreads();
     }
-   }
+  }
 
   bool Receive(MMessage& msg, vector<size_t> indices) {
     CHECK(!indices.empty());
@@ -60,10 +62,10 @@ protected:
       }
     }
     return true;
-   }
+  }
 
-  unique_ptr<TestSlog> test_slogs_[4];
-  unique_ptr<Channel> sinks_[4];
+  unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
+  unique_ptr<Channel> sinks_[NUM_MACHINES];
 };
 
 TEST_F(ForwarderTest, ForwardToSameRegion) {

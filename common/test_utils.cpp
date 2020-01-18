@@ -5,6 +5,11 @@
 #include <glog/logging.h>
 
 #include "common/proto_utils.h"
+#include "module/forwarder.h"
+#include "module/server.h"
+#include "module/sequencer.h"
+#include "module/scheduler.h"
+#include "module/orderer.h"
 #include "proto/api.pb.h"
 
 using std::to_string;
@@ -68,9 +73,9 @@ ConfigVec MakeTestConfigurations(
 
 TestSlog::TestSlog(shared_ptr<Configuration> config)
   : config_(config),
-    server_context_(new zmq::context_t(1)),
+    context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage()),
-    broker_(config, server_context_, 5),
+    broker_(config, context_, 5),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {}
 
@@ -82,11 +87,32 @@ void TestSlog::Data(Key&& key, Record&& record) {
 
 void TestSlog::AddServerAndClient() {
   server_ = MakeRunnerFor<Server>(
-      config_, *server_context_, broker_, storage_);
+      config_, *context_, broker_, storage_);
 }
 
 void TestSlog::AddForwarder() {
   forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_);
+}
+
+void TestSlog::AddSequencer() {
+  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_);
+}
+
+void TestSlog::AddScheduler() {
+  scheduler_ = MakeRunnerFor<Scheduler>(
+      config_, *context_, broker_, storage_);
+}
+
+void TestSlog::AddLocalOrderer() {
+  auto local_rep = config_->GetLocalReplica();
+  auto local_part = config_->GetLocalPartition();
+  vector<string> members;
+  // Enlist all machines in the same replica as members
+  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+    members.push_back(MakeMachineId(local_rep, part));
+  }
+  local_orderer_ = MakeRunnerFor<LocalOrderer>(
+      broker_, members, MakeMachineId(local_rep, local_part));
 }
 
 unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
@@ -103,6 +129,15 @@ void TestSlog::StartInNewThreads() {
   }
   if (forwarder_) {
     forwarder_->StartInNewThread();
+  }
+  if (sequencer_) {
+    sequencer_->StartInNewThread();
+  }
+  if (scheduler_) {
+    scheduler_->StartInNewThread();
+  }
+  if (local_orderer_) {
+    local_orderer_->StartInNewThread();
   }
 }
 

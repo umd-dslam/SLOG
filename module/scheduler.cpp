@@ -42,7 +42,7 @@ void Scheduler::SetUp() {
 }
 
 void Scheduler::Loop() {
-  zmq::poll(poll_items_);
+  zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
   if (HasMessageFromChannel()) {
     MMessage msg;
@@ -162,7 +162,8 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
         auto txn_id = holder.txn->internal().id();
         all_txns_.emplace(txn_id, std::move(holder));
 
-        if (lock_manager_.AcquireLocks(*holder.txn)) {
+        auto& txn_ptr = all_txns_.at(txn_id).txn;
+        if (lock_manager_.AcquireLocks(*txn_ptr)) {
           DispatchTransaction(txn_id); 
         }
       }

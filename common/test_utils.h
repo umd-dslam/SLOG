@@ -5,8 +5,6 @@
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "module/base/module.h"
-#include "module/server.h"
-#include "module/forwarder.h"
 #include "storage/mem_only_storage.h"
 #include "proto/internal.pb.h"
 
@@ -35,6 +33,10 @@ public:
   void Data(Key&& key, Record&& record);
   void AddServerAndClient();
   void AddForwarder();
+  void AddSequencer();
+  void AddScheduler();
+  void AddLocalOrderer();
+
   unique_ptr<Channel> AddChannel(const string& name);
 
   void StartInNewThreads();
@@ -42,11 +44,14 @@ public:
 
 private:
   shared_ptr<Configuration> config_;
-  shared_ptr<zmq::context_t> server_context_;
+  shared_ptr<zmq::context_t> context_;
   shared_ptr<MemOnlyStorage> storage_;
   Broker broker_;
   ModuleRunnerPtr server_;
   ModuleRunnerPtr forwarder_;
+  ModuleRunnerPtr sequencer_;
+  ModuleRunnerPtr scheduler_;
+  ModuleRunnerPtr local_orderer_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

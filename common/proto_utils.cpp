@@ -6,7 +6,8 @@ Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code,
-    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata) {
+    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
+    const internal::MachineId coordinating_server) {
   Transaction txn;
   for (const auto& key : read_set) {
     txn.mutable_read_set()->insert({key, ""});
@@ -28,6 +29,10 @@ Transaction MakeTransaction(
         ->insert({pair.first, std::move(metadata)});
     }
   }
+  txn.mutable_internal()
+      ->mutable_coordinating_server()
+      ->CopyFrom(coordinating_server);
+
   SetTransactionType(txn);
   return txn;
 }

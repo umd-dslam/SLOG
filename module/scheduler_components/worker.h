@@ -50,7 +50,7 @@ private:
   zmq::socket_t scheduler_socket_;
   shared_ptr<Storage<Key, Record>> storage_;
   unique_ptr<StoredProcedures> stored_procedures_;
-
+  zmq::pollitem_t poll_item_;
   unique_ptr<TransactionState> txn_state_;
 };
 

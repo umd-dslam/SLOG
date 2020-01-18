@@ -60,7 +60,8 @@ Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code = "",
-    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {});
+    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
+    const internal::MachineId coordinating_server = MakeMachineIdProto("0:0"));
 
 /**
  * This function inspects the internal metadata of a transaction then

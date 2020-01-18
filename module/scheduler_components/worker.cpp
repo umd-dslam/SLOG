@@ -18,7 +18,14 @@ Worker::Worker(
     scheduler_socket_(context, ZMQ_DEALER),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
-    stored_procedures_(new KeyValueStoredProcedures()) {}
+    stored_procedures_(new KeyValueStoredProcedures()) {
+  poll_item_ = {
+    static_cast<void*>(scheduler_socket_),
+    0, /* fd */
+    ZMQ_POLLIN,
+    0 /* revent */
+  };
+}
 
 void Worker::SetUp() {
   scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
@@ -27,6 +34,10 @@ void Worker::SetUp() {
 }
 
 void Worker::Loop() {
+  if (!zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS)) {
+    return;
+  }
+
   MMessage msg(scheduler_socket_);
   Request req;
   if (!msg.GetProto(req)) {
@@ -40,7 +51,8 @@ void Worker::Loop() {
       txn_state_.reset(new TransactionState(txn_id));
       if (PrepareTransaction()) {
         // Immediately execute and commit this transaction if this
-        // machine is a passive participant
+        // machine is a passive participant or if it is an active
+        // one but does not have to wait for other partitions
         ExecuteAndCommitTransaction();
       }
       break;
@@ -110,7 +122,7 @@ bool Worker::PrepareTransaction() {
         request, MakeMachineId(local_replica, participant));
   }
 
-  return is_passive_participant;
+  return is_passive_participant || txn_state_->awaited_passive_participants.empty();
 }
 
 bool Worker::ApplyRemoteReadResult(
@@ -145,6 +157,7 @@ void Worker::ExecuteAndCommitTransaction() {
 
   auto txn_id = txn_state_->txn_id;
   auto& txn = scheduler_.all_txns_.at(txn_id).txn;
+  auto config = scheduler_.config_;
 
   // Execute the transaction code
   stored_procedures_->Execute(*txn);
@@ -153,19 +166,23 @@ void Worker::ExecuteAndCommitTransaction() {
   auto& master_metadata = txn->internal().master_metadata();
   for (const auto& key_value : txn->write_set()) {
     const auto& key = key_value.first;
-    const auto& value = key_value.second;
-    Record record;
-    bool found = storage_->Read(key_value.first, record);
-    if (!found) {
-      CHECK(master_metadata.contains(key))
-          << "Master metadata for key \"" << key << "\" is missing";
-      record.metadata = master_metadata.at(key);
+    if (config->KeyIsInLocalPartition(key)) {
+      const auto& value = key_value.second;
+      Record record;
+      bool found = storage_->Read(key_value.first, record);
+      if (!found) {
+        CHECK(master_metadata.contains(key))
+            << "Master metadata for key \"" << key << "\" is missing";
+        record.metadata = master_metadata.at(key);
+      }
+      record.value = value;
+      storage_->Write(key, record);
     }
-    record.value = value;
-    storage_->Write(key, record);
   }
   for (const auto& key : txn->delete_set()) {
-    storage_->Delete(key);
+    if (config->KeyIsInLocalPartition(key)) {
+      storage_->Delete(key);
+    }
   }
 
   // Response back to the scheduler

@@ -13,6 +13,7 @@ set(ALL_TESTS
   mmessage_test
   paxos_test
   proto_utils_test
+  scheduler_test
   server_test
   stored_procedures_test)
 
@@ -48,6 +49,9 @@ target_link_libraries(paxos_test test_utils paxos)
 
 add_executable(proto_utils_test common/proto_utils_test.cpp)
 target_link_libraries(proto_utils_test common proto)
+
+add_executable(scheduler_test module/scheduler_test.cpp)
+target_link_libraries(scheduler_test test_utils)
 
 add_executable(server_test module/server_test.cpp)
 target_link_libraries(server_test test_utils)

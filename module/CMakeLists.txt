@@ -25,5 +25,6 @@ add_library(module
   scheduler.cpp)
 target_link_libraries(module
   base_module
+  paxos
   scheduler_components
   storage)
