@@ -6,23 +6,26 @@
 using namespace std;
 using namespace slog;
 
-TEST(StoredProceduresTest, KeyValue) {
+TEST(StoredProceduresTest, SimpleKeyValueProcedures) {
   auto txn = MakeTransaction(
-      {"key0"},
-      {"key1", "key2", "key3"},
-      "GET key0\n"
-      "SET key1 value1\n"
+      {"key1"},
+      {"key2", "key3", "key4"},
+      "GET key1\n"
       "SET key2 value2\n"
-      "DEL key3");
+      "DEL key4\n"
+      "COPY key1 key3\n");
+  (*txn.mutable_read_set())["key1"] = "value1";
 
   KeyValueStoredProcedures proc;
   proc.Execute(txn);
   ASSERT_EQ(txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn.read_set_size(), 1);
+  ASSERT_EQ(txn.read_set().at("key1"), "value1");
   ASSERT_EQ(txn.write_set_size(), 3);
-  ASSERT_EQ(txn.write_set().at("key1"), "value1");
   ASSERT_EQ(txn.write_set().at("key2"), "value2");
+  ASSERT_EQ(txn.write_set().at("key3"), "value1");
   ASSERT_EQ(txn.delete_set_size(), 1);
-  ASSERT_EQ(txn.delete_set(0), "key3");
+  ASSERT_EQ(txn.delete_set(0), "key4");
 }
 
 TEST(StoredProceduresTest, KeyValueAbortedNotEnoughArgs) {

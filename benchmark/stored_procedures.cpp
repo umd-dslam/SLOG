@@ -1,5 +1,7 @@
 #include "benchmark/stored_procedures.h"
 
+#include <glog/logging.h>
+
 using std::string;
 using std::vector;
 
@@ -37,6 +39,11 @@ size_t NextNTokens(
 
 } // namespace
 
+const std::unordered_map<string, size_t>
+KeyValueStoredProcedures::COMMAND_NUM_ARGS = {
+  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}
+};
+
 void KeyValueStoredProcedures::Execute(Transaction& txn) {
   Reset();
   auto& read_set = *txn.mutable_read_set();
@@ -46,27 +53,41 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
   while (NextCommand(txn.code())) {
     if (cmd_ == "GET") {
       if (!read_set.contains(args_[0])) {
-        aborted_ = true;
-        abort_reason_ << "Key \"" << args_[0]
-                      << "\" was not found in the read set";
+        Abort() << "Key \"" << args_[0]
+                << "\" was not found in the read set";
         break;
       }
     } else if (cmd_ == "SET") {
       if (!write_set.contains(args_[0])) {
-        aborted_ = true;
-        abort_reason_ << "Key \"" << args_[0] 
-                      << "\" was not found in the write set";
+        Abort() << "Key \"" << args_[0] 
+                << "\" was not found in the write set";
         break;
       }
+
       write_set[args_[0]] = std::move(args_[1]);
+
     } else if (cmd_ == "DEL") {
       if (!write_set.contains(args_[0])) {
-        aborted_ = true;
-        abort_reason_ << "Key \"" << args_[0] 
-                      << "\" was not found in the write set";
+        Abort() << "Key \"" << args_[0] 
+                << "\" was not found in the write set";
         break;
       }
+
       delete_set.Add(std::move(args_[0]));
+
+    } else if (cmd_ == "COPY") {
+      if (!read_set.contains(args_[0])) {
+        Abort() << "Key \"" << args_[0]
+                << "\" was not found in the read set";
+        break;
+      }
+      if (!write_set.contains(args_[1])) {
+        Abort() << "Key \"" << args_[1]
+                << "\" was not found in the write set";
+        break;
+      }
+
+      write_set[args_[1]] = read_set.at(args_[0]);
     }
   }
 
@@ -85,10 +106,10 @@ void KeyValueStoredProcedures::Reset() {
   abort_reason_.str(string());
 }
 
-const std::unordered_map<string, size_t>
-KeyValueStoredProcedures::COMMAND_NUM_ARGS = {
-  {"GET", 1}, {"SET", 2}, {"DEL", 1}
-};
+std::ostringstream& KeyValueStoredProcedures::Abort() {
+  aborted_ = true;
+  return abort_reason_;
+}
 
 bool KeyValueStoredProcedures::NextCommand(const string& code) {
   pos_ = NextToken(cmd_, code, pos_);

@@ -25,8 +25,9 @@ public:
 private:
   static const std::unordered_map<string, size_t> COMMAND_NUM_ARGS;
 
-  bool NextCommand(const string& code);
   void Reset();
+  std::ostringstream& Abort();
+  bool NextCommand(const string& code);
 
   string cmd_;
   std::vector<string> args_;
