@@ -38,38 +38,79 @@ size_t NextNTokens(
 } // namespace
 
 void KeyValueStoredProcedures::Execute(Transaction& txn) {
+  Reset();
+  auto& read_set = *txn.mutable_read_set();
   auto& write_set = *txn.mutable_write_set();
   auto& delete_set = *txn.mutable_delete_set();
-  string cmd;
-  vector<string> args;
-  size_t pos = 0;
 
-  txn.set_status(TransactionStatus::COMMITTED);
-
-  while ((pos = NextToken(cmd, txn.code(), pos))
-      != string::npos) {
-    if (cmd == "SET") {
-      pos = NextNTokens(args, txn.code(), pos, 2);
-      if (pos == string::npos) {
-        txn.set_status(TransactionStatus::ABORTED);
-        txn.set_abort_reason("Invalid transaction code");
+  while (NextCommand(txn.code())) {
+    if (cmd_ == "GET") {
+      if (!read_set.contains(args_[0])) {
+        aborted_ = true;
+        abort_reason_ << "Key \"" << args_[0]
+                      << "\" was not found in the read set";
         break;
       }
-      if (write_set.contains(args[0])) {
-        write_set[args[0]] = std::move(args[1]);
-      } 
-    } else if (cmd == "DEL") {
-      pos = NextNTokens(args, txn.code(), pos);
-      if (pos == string::npos) {
-        txn.set_status(TransactionStatus::ABORTED);
-        txn.set_abort_reason("Invalid transaction code");
+    } else if (cmd_ == "SET") {
+      if (!write_set.contains(args_[0])) {
+        aborted_ = true;
+        abort_reason_ << "Key \"" << args_[0] 
+                      << "\" was not found in the write set";
         break;
       }
-      if (write_set.contains(args[0])) {
-        delete_set.Add(std::move(args[0]));
+      write_set[args_[0]] = std::move(args_[1]);
+    } else if (cmd_ == "DEL") {
+      if (!write_set.contains(args_[0])) {
+        aborted_ = true;
+        abort_reason_ << "Key \"" << args_[0] 
+                      << "\" was not found in the write set";
+        break;
       }
+      delete_set.Add(std::move(args_[0]));
     }
   }
+
+  if (aborted_) {
+    txn.set_status(TransactionStatus::ABORTED);
+    txn.set_abort_reason(abort_reason_.str());
+  } else {
+    txn.set_status(TransactionStatus::COMMITTED);
+  }
+}
+
+void KeyValueStoredProcedures::Reset() {
+  pos_ = 0;
+  aborted_ = false;
+  abort_reason_.clear();
+  abort_reason_.str(string());
+}
+
+const std::unordered_map<string, size_t>
+KeyValueStoredProcedures::COMMAND_NUM_ARGS = {
+  {"GET", 1}, {"SET", 2}, {"DEL", 1}
+};
+
+bool KeyValueStoredProcedures::NextCommand(const string& code) {
+  pos_ = NextToken(cmd_, code, pos_);
+  if (pos_ == string::npos) {
+    return false;
+  }
+
+  if (COMMAND_NUM_ARGS.count(cmd_) == 0) {
+    aborted_ = true;
+    abort_reason_ << "Invalid command: " << cmd_; 
+    return false;
+  }
+
+  auto required_num_args = COMMAND_NUM_ARGS.at(cmd_);
+  pos_ = NextNTokens(args_, code, pos_, required_num_args);
+  if (pos_ == string::npos) {
+    aborted_ = true;
+    abort_reason_ << "Invalid number of arguments for command " << cmd_;
+    return false;
+  }
+
+  return true;
 }
 
 void TPCCStoredProcedures::Execute(Transaction& /*txn*/) {
