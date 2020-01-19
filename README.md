@@ -1,6 +1,8 @@
+**!!! This is a Work In Progress !!!**
+
 # SLOG
 
-This is an implementation of the paper [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
+This is an experimental implementation of the paper [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
 The following instructions work best on Ubuntu with CMake 3.13.4.
 
