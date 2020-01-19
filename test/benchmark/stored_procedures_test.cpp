@@ -54,7 +54,7 @@ TEST(StoredProceduresTest, KeyValueAbortedKeyNotSpecified) {
   auto txn = MakeTransaction(
       {},
       {"key1"},
-      "SET key2 10");
+      "GET key2");
 
   KeyValueStoredProcedures proc;
   proc.Execute(txn);
@@ -67,6 +67,7 @@ TEST(StoredProceduresTest, KeyValueOnlyWritesKeysInWriteSet) {
       {"key2", "key3"},
       "GET key1\n"
       "SET key2 value2\n"
+      "SET key4 value4\n"
       "DEL key3");
 
   KeyValueStoredProcedures proc;

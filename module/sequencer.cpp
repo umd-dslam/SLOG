@@ -53,6 +53,10 @@ void Sequencer::HandleInternalResponse(
 }
 
 void Sequencer::HandlePeriodicWakeUp() {
+  // TODO: Investigate whether ZMQ keeps messages in order. If it
+  // does this wait for acks is unneccessary and should be removed
+  // for better latency
+ 
   // Do nothing if we're still waiting for confirmation for the
   // latest batch or there is nothing to send
   if (!pending_acks_.empty() || batch_->transactions().empty()) {

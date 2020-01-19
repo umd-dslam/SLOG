@@ -33,6 +33,7 @@ message Request {
         PaxosOrder paxos_order = 10;
         ProcessTransactionRequest process_txn = 11;
         RemoteReadResult remote_read_result = 12;
+        ForwardSubtransaction forward_sub_txn = 13;
     }
 }
 
@@ -97,6 +98,12 @@ message RemoteReadResult {
     map<string, string> reads = 3;
 }
 
+message ForwardSubtransaction {
+    Transaction txn = 1;
+    uint32 partition = 2;
+    uint32 num_involved_partitions = 3;
+}
+
 /***********************************************
                     RESPONSES
 ***********************************************/
@@ -144,4 +151,5 @@ message PaxosCommitResponse {
 
 message ProcessTransactionResponse {
     uint32 txn_id = 1;
+    repeated uint32 participants = 2;
 }

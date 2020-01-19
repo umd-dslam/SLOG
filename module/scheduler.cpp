@@ -21,6 +21,7 @@ Scheduler::Scheduler(
     config_(config),
     worker_socket_(context, ZMQ_ROUTER),
     lock_manager_(config) {
+  worker_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
     static_cast<void*>(worker_socket_),
@@ -126,18 +127,27 @@ void Scheduler::ProcessForwardBatchRequest(
 void Scheduler::ProcessBatchOrder(
     const internal::PaxosOrder& order) {
   VLOG(1) << "Received batch order. Slot id: "
-          << order.slot() << ". Batch id: " << order.value(); 
+          << order.slot() << ". Queue id: " << order.value(); 
   interleaver_.AddAgreedSlot(order.slot(), order.value());
 }
 
 void Scheduler::ProcessRemoteReadResult(
     internal::Request&& req) {
   auto txn_id = req.remote_read_result().txn_id();
-  if (all_txns_.count(txn_id) == 0) {
-    return;
+  auto& holder = all_txns_[txn_id];
+  if (holder.txn != nullptr) {
+    DLOG(INFO) << config_->GetLocalPartition() << ": Got remote read result";
+    SendToWorker(std::move(req), holder.worker);
+  } else {
+    // Save the remote reads that come before the txn
+    // is processed by this partition
+    //
+    // TODO: If this request is not needed but still arrives and arrives AFTER
+    // the transaction is already commited, it will be stuck in early_remote_reads
+    // forever. Consider garbage collect this if it waits for too long.
+    DLOG(INFO) << config_->GetLocalPartition() << ": Got early remote read result";
+    holder.early_remote_reads.push_back(std::move(req));
   }
-  const auto& worker = all_txns_.at(txn_id).worker;
-  SendToWorker(std::move(req), worker);
 }
 
 void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
@@ -158,12 +168,11 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
       auto transactions = batch->mutable_transactions();
 
       while (!transactions->empty()) {
-        TransactionHolder holder(transactions->ReleaseLast());
-        auto txn_id = holder.txn->internal().id();
-        all_txns_.emplace(txn_id, std::move(holder));
-
-        auto& txn_ptr = all_txns_.at(txn_id).txn;
-        if (lock_manager_.AcquireLocks(*txn_ptr)) {
+        auto txn = transactions->ReleaseLast();
+        auto txn_id = txn->internal().id();
+        auto& holder = all_txns_[txn_id];
+        holder.txn.reset(txn);
+        if (lock_manager_.AcquireLocks(*holder.txn)) {
           DispatchTransaction(txn_id); 
         }
       }
@@ -187,25 +196,42 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
     DispatchTransaction(ready_txn_id);
   }
 
-  // Send the txn back to the coordinating server
-  auto coordinating_server = MakeMachineId(
-        txn->internal().coordinating_server());
-  Request req;
-  req.mutable_forward_txn()->set_allocated_txn(txn);
-  Send(req, coordinating_server, SERVER_CHANNEL);
+  // Send the txn back to the coordinating server if need to
+  auto local_partition = config_->GetLocalPartition();
+  auto& participants = res.process_txn().participants();
+  if (std::find(
+      participants.begin(),
+      participants.end(),
+      local_partition) != participants.end()) {
+    auto coordinating_server = MakeMachineId(
+          txn->internal().coordinating_server());
+    Request req;
+    auto forward_sub_txn = req.mutable_forward_sub_txn();
+    forward_sub_txn->set_allocated_txn(txn);
+    forward_sub_txn->set_partition(config_->GetLocalPartition());
+    forward_sub_txn->set_num_involved_partitions(participants.size());
+    Send(req, coordinating_server, SERVER_CHANNEL);
+  }
 }
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
-  auto worker = ready_workers_.front();
-  ready_workers_.pop();
+  DLOG(INFO) << config_->GetLocalPartition() << ": Dispatched txn " << txn_id;
 
-  all_txns_.at(txn_id).worker = worker;
+  auto& holder = all_txns_.at(txn_id);
+
+  holder.worker = ready_workers_.front();
+  ready_workers_.pop();
 
   Request req;
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);
 
-  SendToWorker(std::move(req), worker);
+  // TODO: pretty sure that the order of messages follow the order of these
+  // function calls but investigate a bit about ZMQ ordering to be sure
+  SendToWorker(std::move(req), holder.worker);
+  for (auto& remote_read : holder.early_remote_reads) {
+    SendToWorker(std::move(remote_read), holder.worker);
+  }
 }
 
 void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {

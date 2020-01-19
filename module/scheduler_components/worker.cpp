@@ -19,6 +19,7 @@ Worker::Worker(
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
     stored_procedures_(new KeyValueStoredProcedures()) {
+  scheduler_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_item_ = {
     static_cast<void*>(scheduler_socket_),
     0, /* fd */
@@ -58,6 +59,10 @@ void Worker::Loop() {
       break;
     }
     case Request::kRemoteReadResult: {
+      if (txn_state_ == nullptr) {
+        LOG(ERROR) << "There is no in-progress transaction to apply remote reads to";
+        break;
+      }
       auto& remote_read_result = req.remote_read_result();
       if (ApplyRemoteReadResult(remote_read_result)) {
         // Execute and commit this transaction when all remote reads
@@ -78,48 +83,66 @@ bool Worker::PrepareTransaction() {
 
   auto txn_id  = txn_state_->txn_id;
   auto config = scheduler_.config_;
+  auto local_partition = config->GetLocalPartition();
   auto& txn = scheduler_.all_txns_.at(txn_id).txn;
 
   Request request;
   auto remote_read_result = request.mutable_remote_read_result();
-  auto remote_reads = remote_read_result->mutable_reads();
+  auto to_be_sent = remote_read_result->mutable_reads();
   remote_read_result->set_txn_id(txn_id);
-  remote_read_result->set_partition(config->GetLocalPartition());
+  remote_read_result->set_partition(local_partition);
 
+  vector<Key> remote_read_keys;
   for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;
     auto partition = config->KeyToPartition(key);
-    if (partition == config->GetLocalPartition()) {
+    if (partition == local_partition) {
       Record record;
       storage_->Read(key, record);
       key_value.second = record.value;
-      (*remote_reads)[key] = record.value;
+      (*to_be_sent)[key] = record.value;
     } else {
+      remote_read_keys.push_back(key);
       txn_state_->awaited_passive_participants.insert(partition);
     }
+    txn_state_->participants.insert(partition);
+  }
+  // Remove all keys that are to be read in a remote partition
+  for (const auto& key : remote_read_keys) {
+    txn->mutable_read_set()->erase(key);
   }
 
+  vector<Key> remote_write_keys;
   for (auto& key_value : *txn->mutable_write_set()) {
     const auto& key = key_value.first;
     auto partition = config->KeyToPartition(key);
-    if (partition == config->GetLocalPartition()) {
+    if (partition == local_partition) {
 
       is_passive_participant = false;
 
       Record record;
       storage_->Read(key, record);
       key_value.second = record.value;
-      (*remote_reads)[key] = record.value;
+      (*to_be_sent)[key] = record.value;
     } else {
+      remote_write_keys.push_back(key);
       txn_state_->active_participants.insert(partition);
     }
+    txn_state_->participants.insert(partition);
+  }
+  // Remove all keys that are to be written in a remote partition
+  for (const auto& key : remote_write_keys) {
+    txn->mutable_write_set()->erase(key);
   }
 
-  // Send reads to all active participants in local replica
-  auto local_replica = config->GetLocalReplica();
-  for (auto participant : txn_state_->active_participants) {
-    SendToScheduler(
-        request, MakeMachineId(local_replica, participant));
+  // Send reads to all active participants in local replica if
+  // the current partition is one of the participants
+  if (txn_state_->participants.count(local_partition) > 0) {
+    auto local_replica = config->GetLocalReplica();
+    for (auto participant : txn_state_->active_participants) {
+      auto machine_id = MakeMachineId(local_replica, participant);
+      SendToScheduler(request, std::move(machine_id));
+    }
   }
 
   return is_passive_participant || txn_state_->awaited_passive_participants.empty();
@@ -127,8 +150,6 @@ bool Worker::PrepareTransaction() {
 
 bool Worker::ApplyRemoteReadResult(
     const internal::RemoteReadResult& read_result) {
-  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
-
   auto txn_id = txn_state_->txn_id;
   CHECK_EQ(txn_id, read_result.txn_id())
       << "Remote read result belongs to a different transaction. "
@@ -188,6 +209,9 @@ void Worker::ExecuteAndCommitTransaction() {
   // Response back to the scheduler
   Response res;
   res.mutable_process_txn()->set_txn_id(txn_id);
+  for (auto participant : txn_state_->participants) {
+    res.mutable_process_txn()->mutable_participants()->Add(participant);
+  }
   SendToScheduler(res);
 
   txn_state_.reset();

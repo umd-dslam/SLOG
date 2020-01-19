@@ -58,36 +58,24 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
         break;
       }
     } else if (cmd_ == "SET") {
-      if (!write_set.contains(args_[0])) {
-        Abort() << "Key \"" << args_[0] 
-                << "\" was not found in the write set";
-        break;
+      if (write_set.contains(args_[0])) {
+        write_set[args_[0]] = std::move(args_[1]);
       }
-
-      write_set[args_[0]] = std::move(args_[1]);
-
     } else if (cmd_ == "DEL") {
-      if (!write_set.contains(args_[0])) {
-        Abort() << "Key \"" << args_[0] 
-                << "\" was not found in the write set";
-        break;
+      if (write_set.contains(args_[0])) {
+        delete_set.Add(std::move(args_[0]));
       }
-
-      delete_set.Add(std::move(args_[0]));
-
     } else if (cmd_ == "COPY") {
-      if (!read_set.contains(args_[0])) {
-        Abort() << "Key \"" << args_[0]
+      const auto& src = args_[0];
+      const auto& dst = args_[1];
+      if (!read_set.contains(src)) {
+        Abort() << "Key \"" << src
                 << "\" was not found in the read set";
         break;
       }
-      if (!write_set.contains(args_[1])) {
-        Abort() << "Key \"" << args_[1]
-                << "\" was not found in the write set";
-        break;
+      if (write_set.contains(dst)) {
+        write_set[dst] = read_set.at(src);
       }
-
-      write_set[args_[1]] = read_set.at(args_[0]);
     }
   }
 

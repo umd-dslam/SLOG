@@ -26,6 +26,7 @@ struct TransactionState {
   TxnId txn_id;
   unordered_set<uint32_t> awaited_passive_participants;
   unordered_set<uint32_t> active_participants;
+  unordered_set<uint32_t> participants;
 };
 
 class Worker : public Module {

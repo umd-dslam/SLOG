@@ -25,9 +25,9 @@ using std::vector;
 namespace slog {
 
 struct TransactionHolder {
-  TransactionHolder(Transaction* txn) : txn(txn) {}
   unique_ptr<Transaction> txn;
   string worker;
+  vector<internal::Request> early_remote_reads;
 };
 
 class Scheduler : public Module, ChannelHolder {
