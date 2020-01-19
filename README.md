@@ -1,4 +1,4 @@
-**!!! This is a Work In Progress !!!**
+**!!! This repo is a Work In Progress !!!**
 
 # SLOG
 
