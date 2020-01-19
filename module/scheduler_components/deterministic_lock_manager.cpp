@@ -101,7 +101,12 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   num_locks_waited_[txn_id] = 0;
   for (const auto& pair : txn.read_set()) {
     auto key = pair.first;
+    // Ignore this key if it is not in the current partition
     if (!config_->KeyIsInLocalPartition(key)) {
+      continue;
+    }
+    // If this key is also in the writeset, give it write lock instead
+    if (txn.write_set().contains(key)) {
       continue;
     }
     if (!lock_table_[key].AcquireReadLock(txn_id)) {
@@ -110,6 +115,7 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   }
   for (const auto& pair : txn.write_set()) {
     auto key = pair.first;
+    // Ignore this key if it is not in the current partition
     if (!config_->KeyIsInLocalPartition(key)) {
       continue;
     }

@@ -108,3 +108,19 @@ TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
   ASSERT_EQ(new_ready_txns.size(), 1);
   ASSERT_TRUE(new_ready_txns.count(300) > 0);
 }
+
+TEST(DeterministicLockManager, PrioritizeWriteLock) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0]);
+  auto txn1 = MakeTransaction({"A"}, {"A"});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {});
+  txn2.mutable_internal()->set_id(200);
+ 
+  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+}
