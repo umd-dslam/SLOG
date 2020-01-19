@@ -24,6 +24,7 @@ Channel::Channel(
   } else {
     socket_.connect(endpoint);
   }
+  socket_.setsockopt(ZMQ_LINGER, 0);
 }
 
 const std::string& Channel::GetName() const {

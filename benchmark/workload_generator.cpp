@@ -18,7 +18,9 @@ WorkloadGenerator::WorkloadGenerator(
     uint32_t port)
   : socket_(*context, ZMQ_DEALER),
     host_(host),
-    port_(port) {}
+    port_(port) {
+  socket_.setsockopt(ZMQ_LINGER, 0);
+}
 
 void WorkloadGenerator::SetUp() {
   string endpoint = "tcp://" + host_ + ":" + std::to_string(port_);
