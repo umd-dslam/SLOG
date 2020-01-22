@@ -85,13 +85,12 @@ protected:
       CHECK_EQ(forward_sub_txn.involved_partitions_size(), num_partitions);
       auto sub_txn = forward_sub_txn.txn();
 
-      if (!first_time) {
-        CHECK_EQ(txn.code(), sub_txn.code());
-        CHECK_EQ(txn.internal().id(), sub_txn.internal().id());
-        CHECK_EQ(txn.internal().type(), sub_txn.internal().type());
+      if (first_time) {
+        txn = sub_txn;
+      } else {
+        MergeTransaction(txn, sub_txn);
       }
 
-      txn.MergeFrom(sub_txn);
       first_time = false;
     }
     return txn;
@@ -114,6 +113,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
   SendBatch(100, {txn}, {1});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
   ASSERT_EQ(output_txn.write_set_size(), 1);
@@ -129,6 +129,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
   ASSERT_EQ(output_txn.write_set_size(), 1);
@@ -145,6 +146,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 2);
   ASSERT_EQ(output_txn.read_set().at("B"), "valueB");
   ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
@@ -164,6 +166,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 0);
   ASSERT_EQ(output_txn.write_set_size(), 3);
   ASSERT_EQ(output_txn.write_set().at("A"), "newA");
@@ -182,6 +185,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 3);
   ASSERT_EQ(output_txn.read_set().at("D"), "valueD");
   ASSERT_EQ(output_txn.read_set().at("E"), "valueE");

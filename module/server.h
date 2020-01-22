@@ -51,7 +51,8 @@ private:
       string&& from_machine_id,
       string&& from_channel);
   void ProcessForwardSubtxnRequest(
-      internal::ForwardSubtransaction* forward_sub_txn);
+      internal::ForwardSubtransaction* forward_sub_txn,
+      string&& from_machine_id);
 
   void SendAPIResponse(TxnId txn_id);
 

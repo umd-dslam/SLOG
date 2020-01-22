@@ -104,11 +104,14 @@ void Server::HandleInternalRequest(
   switch (req.type_case()) {
     case internal::Request::kLookupMaster: 
       ProcessLookUpMasterRequest(
-          req.mutable_lookup_master(), move(from_machine_id), move(from_channel));
+          req.mutable_lookup_master(),
+          move(from_machine_id),
+          move(from_channel));
       break;
     case internal::Request::kForwardSubTxn:
       ProcessForwardSubtxnRequest(
-          req.mutable_forward_sub_txn());
+          req.mutable_forward_sub_txn(),
+          move(from_machine_id));
       break;
     default:
       break;
@@ -145,11 +148,13 @@ void Server::ProcessLookUpMasterRequest(
 }
 
 void Server::ProcessForwardSubtxnRequest(
-    internal::ForwardSubtransaction* forward_sub_txn) {
+    internal::ForwardSubtransaction* forward_sub_txn,
+    string&& from_machine_id) {
   auto txn = forward_sub_txn->release_txn();
   auto txn_id = txn->internal().id();
   if (pending_responses_.count(txn_id) == 0) {
-    LOG(ERROR) << "No pending response for transaction " << txn_id;
+    LOG(ERROR) << "Got sub-txn from [" << from_machine_id 
+               << "] but there is no pending response for transaction " << txn_id;
     return;
   }
   auto& pr = pending_responses_.at(txn_id);

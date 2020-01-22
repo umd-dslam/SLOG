@@ -1,5 +1,5 @@
 #include "benchmark/stored_procedures.h"
-
+#include "common/proto_utils.h"
 #include <glog/logging.h>
 
 using std::string;
@@ -51,13 +51,7 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
   auto& delete_set = *txn.mutable_delete_set();
 
   while (NextCommand(txn.code())) {
-    if (cmd_ == "GET") {
-      if (!read_set.contains(args_[0])) {
-        Abort() << "Key \"" << args_[0]
-                << "\" was not found in the read set";
-        break;
-      }
-    } else if (cmd_ == "SET") {
+    if (cmd_ == "SET") {
       if (write_set.contains(args_[0])) {
         write_set[args_[0]] = std::move(args_[1]);
       }
@@ -68,12 +62,7 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
     } else if (cmd_ == "COPY") {
       const auto& src = args_[0];
       const auto& dst = args_[1];
-      if (!read_set.contains(src)) {
-        Abort() << "Key \"" << src
-                << "\" was not found in the read set";
-        break;
-      }
-      if (write_set.contains(dst)) {
+      if (read_set.contains(src) && write_set.contains(dst)) {
         write_set[dst] = read_set.at(src);
       }
     }
@@ -106,16 +95,14 @@ bool KeyValueStoredProcedures::NextCommand(const string& code) {
   }
 
   if (COMMAND_NUM_ARGS.count(cmd_) == 0) {
-    aborted_ = true;
-    abort_reason_ << "Invalid command: " << cmd_; 
+    Abort() << "Invalid command: " << cmd_; 
     return false;
   }
 
   auto required_num_args = COMMAND_NUM_ARGS.at(cmd_);
   pos_ = NextNTokens(args_, code, pos_, required_num_args);
   if (pos_ == string::npos) {
-    aborted_ = true;
-    abort_reason_ << "Invalid number of arguments for command " << cmd_;
+    Abort() << "Invalid number of arguments for command " << cmd_;
     return false;
   }
 

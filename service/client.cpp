@@ -64,7 +64,10 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Connected to " << endpoint;
 
   auto txn = ReadTransactionFromFile(FLAGS_txn_file);
- 
+  if (txn == nullptr) {
+    return 1;
+  }
+
   {
     api::Request req;
     req.mutable_txn()->set_allocated_txn(txn);

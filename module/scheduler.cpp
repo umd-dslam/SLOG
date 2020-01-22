@@ -111,7 +111,7 @@ void Scheduler::ProcessForwardBatchRequest(
     : MakeMachineIdProto(from_machine_id);
 
   VLOG(1) << "Received a batch with id " << batch_id << ": " 
-          << forward_batch->batch().transactions_size() << " transactions";
+          << forward_batch->batch().transactions_size() << " transaction(s)";
 
   interleaver_.AddBatch(
       machine_id.partition(), BatchPtr{forward_batch->release_batch()});

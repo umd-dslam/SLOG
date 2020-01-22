@@ -50,17 +50,6 @@ TEST(StoredProceduresTest, KeyValueAbortedInvalidCommand) {
   ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
 }
 
-TEST(StoredProceduresTest, KeyValueAbortedKeyNotSpecified) {
-  auto txn = MakeTransaction(
-      {},
-      {"key1"},
-      "GET key2");
-
-  KeyValueStoredProcedures proc;
-  proc.Execute(txn);
-  ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
-}
-
 TEST(StoredProceduresTest, KeyValueOnlyWritesKeysInWriteSet) {
   auto txn = MakeTransaction(
       {"key1"},
