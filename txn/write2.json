@@ -1,0 +1,5 @@
+{
+  "read_set": [],
+  "write_set": ["E", "F", "G"],
+  "code": "SET E Elephant SET F Fourier SET G Something"
+}

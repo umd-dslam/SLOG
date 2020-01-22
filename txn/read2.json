@@ -1,0 +1,5 @@
+{
+  "read_set": ["E", "F", "G"],
+  "write_set": [],
+  "code": "GET E GET F GET G"
+}
