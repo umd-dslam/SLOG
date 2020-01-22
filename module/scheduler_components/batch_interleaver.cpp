@@ -43,7 +43,7 @@ void BatchInterleaver::UpdateReadyBatches() {
     auto next_batch = batch_queues_.at(next_queue_id).front();
     ready_batches_.emplace(next_slot_, next_batch);
 
-    batch_queues_[next_queue_id].pop();
+    batch_queues_.at(next_queue_id).pop();
     pending_slots_.erase(next_slot_);
     next_slot_++;
   }

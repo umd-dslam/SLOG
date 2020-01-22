@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "storage/mem_only_storage.h"
 
 using namespace slog;
 
 TEST(MemOnlyStorageTest, ReadWriteTest) {
-  MemOnlyStorage storage;
+  MemOnlyStorage<Key, Record, Metadata> storage;
   Key key = "key1";
   Value value = "value1";
   Record record(value, 0);

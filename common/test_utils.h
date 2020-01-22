@@ -45,7 +45,7 @@ public:
 private:
   shared_ptr<Configuration> config_;
   shared_ptr<zmq::context_t> context_;
-  shared_ptr<MemOnlyStorage> storage_;
+  shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
   Broker broker_;
   ModuleRunnerPtr server_;
   ModuleRunnerPtr forwarder_;

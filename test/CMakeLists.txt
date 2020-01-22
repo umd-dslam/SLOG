@@ -39,7 +39,7 @@ add_executable(local_log_test
 target_link_libraries(local_log_test scheduler_components proto)
 
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
-target_link_libraries(mem_only_storage_test storage)
+target_link_libraries(mem_only_storage_test)
 
 add_executable(mmessage_test common/mmessage_test.cpp)
 target_link_libraries(mmessage_test test_utils)

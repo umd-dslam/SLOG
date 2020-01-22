@@ -18,6 +18,13 @@ using std::unordered_map;
 
 namespace slog {
 
+struct PendingResponse {
+  MMessage response;
+  Transaction* txn;
+  std::unordered_set<uint32_t> awaited_partitions;
+  bool initialized;
+};
+
 class Server : public Module, ChannelHolder {
 public:
   Server(
@@ -43,9 +50,10 @@ private:
       internal::LookupMasterRequest* lookup_master,
       string&& from_machine_id,
       string&& from_channel);
-  void ProcessForwardTxnRequest(
-      internal::ForwardTransaction* forward_txn,
-      string&& from_machine_id);
+  void ProcessForwardSubtxnRequest(
+      internal::ForwardSubtransaction* forward_sub_txn);
+
+  void SendAPIResponse(TxnId txn_id);
 
   TxnId NextTxnId();
 
@@ -57,7 +65,7 @@ private:
 
   uint32_t server_id_;
   TxnId txn_id_counter_;
-  unordered_map<TxnId, MMessage> pending_response_;
+  unordered_map<TxnId, PendingResponse> pending_responses_;
 };
 
 } // namespace slog

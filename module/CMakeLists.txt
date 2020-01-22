@@ -26,5 +26,4 @@ add_library(module
 target_link_libraries(module
   base_module
   paxos
-  scheduler_components
-  storage)
+  scheduler_components)

@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
   auto context = make_shared<zmq::context_t>(1);
   Broker broker(config, context);
 
-  auto storage = make_shared<MemOnlyStorage>();
+  auto storage = make_shared<MemOnlyStorage<Key, Record, Metadata>>();
   auto server = MakeRunnerFor<Server>(config, *context, broker, storage);
 
   vector<unique_ptr<ModuleRunner>> modules;

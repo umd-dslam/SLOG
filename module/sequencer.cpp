@@ -75,7 +75,7 @@ void Sequencer::HandlePeriodicWakeUp() {
   forward_batch->set_allocated_batch(batch_.release());
 
   // Send batch id to local paxos for ordering
-  local_paxos_->Propose(batch_id);
+  local_paxos_->Propose(config_->GetLocalPartition());
 
   // Replicate batch to all machines
   for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {

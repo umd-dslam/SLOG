@@ -82,7 +82,7 @@ protected:
       CHECK(msg.GetProto(req));
       CHECK_EQ(req.type_case(), internal::Request::kForwardSubTxn);
       auto forward_sub_txn = req.forward_sub_txn();
-      CHECK_EQ(forward_sub_txn.num_involved_partitions(), num_partitions);
+      CHECK_EQ(forward_sub_txn.involved_partitions_size(), num_partitions);
       auto sub_txn = forward_sub_txn.txn();
 
       if (!first_time) {

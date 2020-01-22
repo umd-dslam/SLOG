@@ -1,4 +1,4 @@
-project(slog_proto)
+project(proto)
 
 set(PROTOS 
   api.proto

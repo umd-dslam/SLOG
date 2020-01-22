@@ -123,7 +123,6 @@ bool Worker::PrepareTransaction() {
       Record record;
       storage_->Read(key, record);
       key_value.second = record.value;
-      (*to_be_sent)[key] = record.value;
     } else {
       remote_write_keys.push_back(key);
       txn_state_->active_participants.insert(partition);
@@ -183,26 +182,28 @@ void Worker::ExecuteAndCommitTransaction() {
   // Execute the transaction code
   stored_procedures_->Execute(*txn);
 
-  // Apply all writes to local storage
-  auto& master_metadata = txn->internal().master_metadata();
-  for (const auto& key_value : txn->write_set()) {
-    const auto& key = key_value.first;
-    if (config->KeyIsInLocalPartition(key)) {
-      const auto& value = key_value.second;
-      Record record;
-      bool found = storage_->Read(key_value.first, record);
-      if (!found) {
-        CHECK(master_metadata.contains(key))
-            << "Master metadata for key \"" << key << "\" is missing";
-        record.metadata = master_metadata.at(key);
+  // Apply all writes to local storage if the transaction is not aborted
+  if (txn->status() == TransactionStatus::COMMITTED) {
+    auto& master_metadata = txn->internal().master_metadata();
+    for (const auto& key_value : txn->write_set()) {
+      const auto& key = key_value.first;
+      if (config->KeyIsInLocalPartition(key)) {
+        const auto& value = key_value.second;
+        Record record;
+        bool found = storage_->Read(key_value.first, record);
+        if (!found) {
+          CHECK(master_metadata.contains(key))
+              << "Master metadata for key \"" << key << "\" is missing";
+          record.metadata = master_metadata.at(key);
+        }
+        record.value = value;
+        storage_->Write(key, record);
       }
-      record.value = value;
-      storage_->Write(key, record);
     }
-  }
-  for (const auto& key : txn->delete_set()) {
-    if (config->KeyIsInLocalPartition(key)) {
-      storage_->Delete(key);
+    for (const auto& key : txn->delete_set()) {
+      if (config->KeyIsInLocalPartition(key)) {
+        storage_->Delete(key);
+      }
     }
   }
 

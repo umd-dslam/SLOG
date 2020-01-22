@@ -74,7 +74,7 @@ ConfigVec MakeTestConfigurations(
 TestSlog::TestSlog(shared_ptr<Configuration> config)
   : config_(config),
     context_(new zmq::context_t(1)),
-    storage_(new MemOnlyStorage()),
+    storage_(new MemOnlyStorage<Key, Record, Metadata>()),
     broker_(config, context_, 5),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {}

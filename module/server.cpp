@@ -88,7 +88,8 @@ void Server::HandleAPIRequest(MMessage&& msg) {
         ->CopyFrom(
             config_->GetLocalMachineIdAsProto());
 
-    pending_response_[txn_id] = msg;
+    CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
+    pending_responses_[txn_id].response = msg;
 
     internal::Request forward_request;
     forward_request.mutable_forward_txn()->set_allocated_txn(txn);
@@ -105,9 +106,9 @@ void Server::HandleInternalRequest(
       ProcessLookUpMasterRequest(
           req.mutable_lookup_master(), move(from_machine_id), move(from_channel));
       break;
-    case internal::Request::kForwardTxn:
-      ProcessForwardTxnRequest(
-          req.mutable_forward_txn(), move(from_machine_id));
+    case internal::Request::kForwardSubTxn:
+      ProcessForwardSubtxnRequest(
+          req.mutable_forward_sub_txn());
       break;
     default:
       break;
@@ -143,21 +144,43 @@ void Server::ProcessLookUpMasterRequest(
   Send(response, from_machine_id, from_channel);
 }
 
-void Server::ProcessForwardTxnRequest(
-    internal::ForwardTransaction* forward_txn,
-    string&& from_machine_id) {
-  auto txn = forward_txn->release_txn();
+void Server::ProcessForwardSubtxnRequest(
+    internal::ForwardSubtransaction* forward_sub_txn) {
+  auto txn = forward_sub_txn->release_txn();
   auto txn_id = txn->internal().id();
-  if (pending_response_.count(txn_id) == 0) {
-
+  if (pending_responses_.count(txn_id) == 0) {
+    LOG(ERROR) << "No pending response for transaction " << txn_id;
     return;
   }
-  auto machine_id = from_machine_id.empty() 
-    ? config_->GetLocalMachineIdAsProto() 
-    : MakeMachineIdProto(from_machine_id);
+  auto& pr = pending_responses_.at(txn_id);
+  if (!pr.initialized) {
+    pr.txn = new Transaction();
+    pr.awaited_partitions.clear();
+    for (auto p :forward_sub_txn->involved_partitions()) {
+      pr.awaited_partitions.insert(p);
+    }
+    pr.initialized = true;
+  }
 
-  
+  if (pr.awaited_partitions.erase(forward_sub_txn->partition())) {
+    pr.txn->MergeFrom(*txn);
+    if (pr.awaited_partitions.empty()) {
+      SendAPIResponse(txn_id);
+    }
+  }
 }
+
+void Server::SendAPIResponse(TxnId txn_id) {
+  auto& pr = pending_responses_.at(txn_id);
+  api::Response response;
+  auto txn_response = response.mutable_txn();
+  txn_response->set_allocated_txn(pr.txn);
+  pr.response.Set(MM_PROTO, response);
+  pr.response.SendTo(client_socket_);
+
+  pending_responses_.erase(txn_id);
+}
+
 
 TxnId Server::NextTxnId() {
   txn_id_counter_++;

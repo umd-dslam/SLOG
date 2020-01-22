@@ -115,8 +115,7 @@ bool Broker::InitializeConnection() {
   LOG(INFO) << "Waiting for READY messages from other machines...";
   zmq::pollitem_t item = GetRouterPollItem();
   while (running_) {
-    zmq::poll(&item, 1, poll_timeout_ms_);
-    if (item.revents & ZMQ_POLLIN) {
+    if (zmq::poll(&item, 1, poll_timeout_ms_)) {
       MMessage msg;
       msg.ReceiveFrom(router_);
 

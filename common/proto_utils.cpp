@@ -1,5 +1,7 @@
 #include "common/proto_utils.h"
 
+#include <iostream>
+
 namespace slog {
 
 Transaction MakeTransaction(
@@ -61,6 +63,27 @@ TransactionType SetTransactionType(Transaction& txn) {
   txn_internal->set_type(
       is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME);
   return txn_internal->type();
+}
+
+using std::endl;
+
+std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
+  os << "Transaction ID: " << txn.internal().id() << endl;
+  if (txn.status() == TransactionStatus::COMMITTED) {
+    os << "Status: COMMITTED" << endl;
+    os << "Read set:" << endl;
+    for (const auto& pair : txn.read_set()) {
+      os << std::setw(10) << pair.first << " ==> " << pair.second << endl;
+    }
+    os << "Write set:" << endl;
+    for (const auto& pair : txn.write_set()) {
+      os << std::setw(10) << pair.first << " ==> " << pair.second << endl;
+    }
+  } else {
+    os << "Status: ABORTED" << endl;
+    os << "Abort reason: " << txn.abort_reason() << endl;
+  }
+  return os;
 }
 
 } // namespace slog

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13.4)
 project(slog)
 
 set(DEPENDENCIES_DIR ".dep")
-set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-W -Wextra -Wall")
@@ -20,14 +20,14 @@ if (protobuf_VERBOSE)
   message(STATUS "Using Protocol Buffers ${Protobuf_VERSION}")
 endif()
 
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
-
 find_package(Glog REQUIRED)
 include_directories(${GLOG_INCLUDE_DIRS})
 
 find_package(gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIRS})
+
+find_package(Readline REQUIRED)
+include_directories(${READLINE_INCLUDE_DIR})
 
 # Add root and build directory to include path. The build directory inclusion is
 # necessary for protobuf
@@ -35,22 +35,19 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
 # ================================== Executables ========================================
-
+add_subdirectory(proto)
 add_subdirectory(benchmark)
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(module)
 add_subdirectory(paxos)
-add_subdirectory(proto)
-add_subdirectory(storage)
 set(SLOG_LIBS
   benchmark
   common
   connection
   module
   paxos
-  proto
-  storage)
+  proto)
 
 # All libraries to be linked to executables
 set(EXTERNAL_LIBS
@@ -58,7 +55,8 @@ set(EXTERNAL_LIBS
   ${ZeroMQ_STATIC_LIBRARY}
   ${cppzmq_STATIC_LIBRARY}
   ${GLOG_LIBRARIES}
-  ${GFLAGS_LIBRARIES})
+  ${GFLAGS_LIBRARIES}
+  ${READLINE_LIBRARIES})
 
 # Create an executable for the services
 add_executable(slog service/slog.cpp)
@@ -67,7 +65,16 @@ target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
 add_executable(bm service/bm.cpp)
 target_link_libraries(bm ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
-# =================================== Tests =============================================
+add_executable(client service/client.cpp)
+target_link_libraries(client ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
-enable_testing()
-add_subdirectory(test)
+# =================================== Tests =============================================
+find_package(GTest)
+if (GTEST_FOUND)
+  message(STATUS "GTest found. Tests will be built")
+  include_directories(${GTEST_INCLUDE_DIRS})
+  enable_testing()
+  add_subdirectory(test)
+else()
+  message(STATUS "GTest not found. No test will be built")
+endif()

@@ -110,7 +110,7 @@ void Scheduler::ProcessForwardBatchRequest(
     ? config_->GetLocalMachineIdAsProto() 
     : MakeMachineIdProto(from_machine_id);
 
-  VLOG(1) << "Received a batch of " 
+  VLOG(1) << "Received a batch with id " << batch_id << ": " 
           << forward_batch->batch().transactions_size() << " transactions";
 
   interleaver_.AddBatch(
@@ -136,7 +136,7 @@ void Scheduler::ProcessRemoteReadResult(
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
   if (holder.txn != nullptr) {
-    DLOG(INFO) << config_->GetLocalPartition() << ": Got remote read result";
+    VLOG(2) << " Got remote read result";
     SendToWorker(std::move(req), holder.worker);
   } else {
     // Save the remote reads that come before the txn
@@ -145,7 +145,7 @@ void Scheduler::ProcessRemoteReadResult(
     // TODO: If this request is not needed but still arrives and arrives AFTER
     // the transaction is already commited, it will be stuck in early_remote_reads
     // forever. Consider garbage collect this if it waits for too long.
-    DLOG(INFO) << config_->GetLocalPartition() << ": Got early remote read result";
+    VLOG(2) << "Got early remote read result";
     holder.early_remote_reads.push_back(std::move(req));
   }
 }
@@ -209,13 +209,15 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
     auto forward_sub_txn = req.mutable_forward_sub_txn();
     forward_sub_txn->set_allocated_txn(txn);
     forward_sub_txn->set_partition(config_->GetLocalPartition());
-    forward_sub_txn->set_num_involved_partitions(participants.size());
+    for (auto p : participants) {
+      forward_sub_txn->add_involved_partitions(p);
+    }
     Send(req, coordinating_server, SERVER_CHANNEL);
   }
 }
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
-  DLOG(INFO) << config_->GetLocalPartition() << ": Dispatched txn " << txn_id;
+  VLOG(1) << "Dispatched txn " << txn_id;
 
   auto& holder = all_txns_.at(txn_id);
 

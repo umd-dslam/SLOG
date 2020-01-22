@@ -10,9 +10,9 @@ int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
 
   auto context = std::make_shared<zmq::context_t>(1);
-  auto client = MakeRunnerFor<WorkloadGenerator>(context, FLAGS_host, FLAGS_port);
+  auto generator = MakeRunnerFor<WorkloadGenerator>(context, FLAGS_host, FLAGS_port);
 
-  client->Start();
+  generator->Start();
  
   return 0;
 }

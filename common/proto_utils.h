@@ -75,4 +75,6 @@ Transaction MakeTransaction(
  */
 TransactionType SetTransactionType(Transaction& txn);
 
-}
+std::ostream& operator<<(std::ostream& os, const Transaction& txn);
+
+} // namespace slog
