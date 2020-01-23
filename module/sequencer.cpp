@@ -72,7 +72,7 @@ void Sequencer::HandlePeriodicWakeUp() {
 
   Request req;
   auto forward_batch = req.mutable_forward_batch();
-  forward_batch->set_allocated_batch(batch_.release());
+  forward_batch->set_allocated_batch_data(batch_.release());
 
   // Send batch id to local paxos for ordering
   local_paxos_->Propose(config_->GetLocalPartition());

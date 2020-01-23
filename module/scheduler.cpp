@@ -99,36 +99,54 @@ void Scheduler::HandleInternalRequest(
     default:
       break;
   }
+  TryUpdatingLocalLog();
   TryProcessingNextBatchesFromGlobalLog();
 }
 
 void Scheduler::ProcessForwardBatchRequest(
     internal::ForwardBatchRequest* forward_batch,
     const string& from_machine_id) {
-  auto batch_id = forward_batch->batch().id();
   auto machine_id = from_machine_id.empty() 
     ? config_->GetLocalMachineIdAsProto() 
     : MakeMachineIdProto(from_machine_id);
+  auto from_replica = machine_id.replica();
 
-  VLOG(1) << "Received a batch with id " << batch_id << ": " 
-          << forward_batch->batch().transactions_size() << " transaction(s)";
+  switch (forward_batch->part_case()) {
+    case internal::ForwardBatchRequest::kBatchData: {
+      auto batch = BatchPtr(forward_batch->release_batch_data());
+      auto batch_id = batch->id();
 
-  interleaver_.AddBatch(
-      machine_id.partition(), BatchPtr{forward_batch->release_batch()});
+      VLOG(1) << "Received data for batch " << batch_id 
+              << " from [" << from_machine_id << "]. Num transactions: " << batch->transactions_size();
 
-  // Only acknowledge if this batch is from the same replica
-  if (machine_id.replica() == config_->GetLocalReplica()) {
-    Response res;
-    res.mutable_forward_batch()->set_batch_id(batch_id);
-    Send(res, from_machine_id, SEQUENCER_CHANNEL);
+      // The interleaver is used to order the batches coming from the same region
+      if (from_replica == config_->GetLocalReplica()) {
+        interleaver_.AddBatch(machine_id.partition(), batch);
+
+        Response res;
+        res.mutable_forward_batch()->set_batch_id(batch_id);
+        Send(res, from_machine_id, SEQUENCER_CHANNEL);
+      } else {
+        all_local_logs_[from_replica].AddBatch(batch);
+      }
+      break;
+    }
+    case internal::ForwardBatchRequest::kBatchOrder: {
+      auto& batch_order = forward_batch->batch_order();
+      all_local_logs_[from_replica].AddSlot(batch_order.slot(), batch_order.id());
+      break;
+    }
+    default:
+      break;  
   }
+
 }
 
 void Scheduler::ProcessBatchOrder(
     const internal::PaxosOrder& order) {
   VLOG(1) << "Received batch order. Slot id: "
           << order.slot() << ". Queue id: " << order.value(); 
-  interleaver_.AddAgreedSlot(order.slot(), order.value());
+  interleaver_.AddSlot(order.slot(), order.value());
 }
 
 void Scheduler::ProcessRemoteReadResult(
@@ -150,18 +168,31 @@ void Scheduler::ProcessRemoteReadResult(
   }
 }
 
-void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
-  // Update the local log of the local replica
+void Scheduler::TryUpdatingLocalLog() {
+  // Update the local log of the local region
   auto local_replica = config_->GetLocalReplica();
+  auto local_partition = config_->GetLocalPartition();
   while (interleaver_.HasNextBatch()) {
     auto slot_id_and_batch = interleaver_.NextBatch();
-    local_logs_[local_replica].AddBatch(
-        slot_id_and_batch.first,
-        slot_id_and_batch.second);
-  }
+    auto slot_id = slot_id_and_batch.first;
+    auto batch = slot_id_and_batch.second;
+    all_local_logs_[local_replica].AddSlottedBatch(slot_id, batch);
 
-  // Interleave batches from all local logs
-  for (auto& pair : local_logs_) {
+    Request request;
+    auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
+    forward_batch_order->set_id(batch->id());
+    forward_batch_order->set_slot(slot_id);
+    for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
+      if (rep != local_replica) {
+        SendSameChannel(request, MakeMachineId(rep, local_partition));
+      }
+    }
+  }
+}
+
+void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
+  // Interleave batches from local logs of all regions
+  for (auto& pair : all_local_logs_) {
     auto& local_log = pair.second;
     while (local_log.HasNextBatch()) {
       auto batch = local_log.NextBatch();

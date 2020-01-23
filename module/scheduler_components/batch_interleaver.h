@@ -20,7 +20,7 @@ public:
   BatchInterleaver();
 
   void AddBatch(uint32_t queue_id, BatchPtr batch);
-  void AddAgreedSlot(SlotId slot_id, uint32_t queue_id);
+  void AddSlot(SlotId slot_id, uint32_t queue_id);
 
   bool HasNextBatch() const;
   pair<SlotId, BatchPtr> NextBatch();
@@ -28,8 +28,8 @@ public:
 private:
   void UpdateReadyBatches();
 
-  unordered_map<uint32_t, queue<BatchPtr>> batch_queues_;
   unordered_map<SlotId, uint32_t> pending_slots_;
+  unordered_map<uint32_t, queue<BatchPtr>> batch_queues_;
   SlotId next_slot_;
   queue<pair<SlotId, BatchPtr>> ready_batches_;
 };

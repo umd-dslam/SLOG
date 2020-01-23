@@ -66,6 +66,7 @@ private:
   void ProcessRemoteReadResult(
       internal::Request&& request);
 
+  void TryUpdatingLocalLog();
   void TryProcessingNextBatchesFromGlobalLog();
 
   void DispatchTransaction(TxnId txn_id);
@@ -78,7 +79,7 @@ private:
   vector<unique_ptr<ModuleRunner>> workers_;
   queue<string> ready_workers_;
 
-  unordered_map<uint32_t, LocalLog> local_logs_;
+  unordered_map<uint32_t, LocalLog> all_local_logs_;
   BatchInterleaver interleaver_;
   DeterministicLockManager lock_manager_;
   unordered_map<TxnId, TransactionHolder> all_txns_;

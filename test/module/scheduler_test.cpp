@@ -12,7 +12,7 @@ using namespace slog;
 internal::Request MakeForwardBatchRequest(
     BatchId batch_id, const vector<Transaction>& txns) {
   internal::Request req;
-  auto batch = req.mutable_forward_batch()->mutable_batch();
+  auto batch = req.mutable_forward_batch()->mutable_batch_data();
   batch->set_id(batch_id);
   for (auto txn : txns) {
     batch->mutable_transactions()->Add(move(txn));

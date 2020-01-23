@@ -11,9 +11,9 @@ void BatchInterleaver::AddBatch(uint32_t queue_id, BatchPtr batch) {
   UpdateReadyBatches();
 }
 
-void BatchInterleaver::AddAgreedSlot(SlotId slot_id, uint32_t queue_id) {
+void BatchInterleaver::AddSlot(SlotId slot_id, uint32_t queue_id) {
   if (pending_slots_.count(slot_id) > 0) {
-    LOG(ERROR) << "BatchInterleaver: slot " << slot_id << " has already been taken.";
+    LOG(ERROR) << "Slot " << slot_id << " has already been taken.";
     return;
   }
   pending_slots_[slot_id] = queue_id;

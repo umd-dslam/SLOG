@@ -28,13 +28,13 @@ protected:
 
 TEST_F(LocalLogTest, InOrder) {
   LocalLog log;
-  log.AddBatch(0 /* slot_id */, batches_[0]);
+  log.AddSlottedBatch(0 /* slot_id */, batches_[0]);
   AssertBatchId(100, log.NextBatch());
 
-  log.AddBatch(1 /* slot_id */, batches_[1]);
+  log.AddSlottedBatch(1 /* slot_id */, batches_[1]);
   AssertBatchId(200, log.NextBatch());
 
-  log.AddBatch(2 /* slot_id */, batches_[2]);
+  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
   AssertBatchId(300, log.NextBatch());
 
   ASSERT_FALSE(log.HasNextBatch());
@@ -42,14 +42,20 @@ TEST_F(LocalLogTest, InOrder) {
 
 TEST_F(LocalLogTest, OutOfOrder) {
   LocalLog log;
-  log.AddBatch(1 /* slot_id */, batches_[1]);
+  log.AddBatch(batches_[1]);
   ASSERT_FALSE(log.HasNextBatch());
 
-  log.AddBatch(0 /* slot_id */, batches_[0]);
-  AssertBatchId(100, log.NextBatch());
-  AssertBatchId(200, log.NextBatch());
+  log.AddBatch(batches_[0]);
+  ASSERT_FALSE(log.HasNextBatch());
 
-  log.AddBatch(2 /* slot_id */, batches_[2]);
+  log.AddSlot(1, 100);
+  ASSERT_FALSE(log.HasNextBatch());
+
+  log.AddSlot(0, 200);
+  AssertBatchId(200, log.NextBatch());
+  AssertBatchId(100, log.NextBatch());
+
+  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
   AssertBatchId(300, log.NextBatch());
 
   ASSERT_FALSE(log.HasNextBatch());
@@ -58,9 +64,9 @@ TEST_F(LocalLogTest, OutOfOrder) {
 TEST_F(LocalLogTest, MultipleNextBatches) {
   LocalLog log;
 
-  log.AddBatch(2 /* slot_id */, batches_[2]);
-  log.AddBatch(1 /* slot_id */, batches_[1]);
-  log.AddBatch(0 /* slot_id */, batches_[0]);
+  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
+  log.AddSlottedBatch(1 /* slot_id */, batches_[1]);
+  log.AddSlottedBatch(0 /* slot_id */, batches_[0]);
 
   AssertBatchId(100, log.NextBatch());
   AssertBatchId(200, log.NextBatch());

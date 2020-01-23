@@ -10,6 +10,11 @@ message Batch {
     repeated Transaction transactions = 2;
 }
 
+message BatchOrder {
+    uint32 id = 1;
+    uint32 slot = 2;
+}
+
 /***********************************************
                     REQUESTS
 ***********************************************/
@@ -64,7 +69,10 @@ message LookupMasterRequest {
 }
 
 message ForwardBatchRequest {
-    Batch batch = 1;
+    oneof part {
+        Batch batch_data = 1;
+        BatchOrder batch_order =2;
+    }
 }
 
 message PaxosPropose {
