@@ -66,7 +66,7 @@ void BasicModule::Loop() {
     }
     poll_timeout_ms_ = 1 + DurationInMs(wake_up_deadline_ - now);
 
-    VLOG(2) << "Now: " << DurationInMs(now.time_since_epoch())
+    VLOG(3) << "Now: " << DurationInMs(now.time_since_epoch())
             << " Deadline: " << DurationInMs(wake_up_deadline_.time_since_epoch())
             << " Timeout: " << poll_timeout_ms_ << " ms";
 

@@ -113,9 +113,9 @@ void Forwarder::Forward(Transaction* txn) {
 
   // Prepare a request to be forwarded to a sequencer
   internal::Request forward_request;
-  forward_request.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
+    forward_request.mutable_forward_txn()->set_allocated_txn(txn);
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     auto home_replica = master_metadata.begin()->second.master();
@@ -134,7 +134,14 @@ void Forwarder::Forward(Transaction* txn) {
           SEQUENCER_CHANNEL);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    // TODO: send to a multi-home transaction ordering module
+    LOG(ERROR) << "Multi-home transactions are not supported yet. Aborting txn";
+    txn->set_status(TransactionStatus::ABORTED);
+    txn->set_abort_reason("Multi-home transactions are not supported yet.");
+    forward_request.mutable_forward_sub_txn()->set_allocated_txn(txn);
+    Send(
+        forward_request,
+        MakeMachineId(txn->internal().coordinating_server()),
+        SERVER_CHANNEL);
   }
 }
 

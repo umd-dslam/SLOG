@@ -154,7 +154,7 @@ void Scheduler::ProcessRemoteReadResult(
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
   if (holder.txn != nullptr) {
-    VLOG(2) << " Got remote read result";
+    VLOG(2) << "Got remote read result";
     SendToWorker(std::move(req), holder.worker);
   } else {
     // Save the remote reads that come before the txn

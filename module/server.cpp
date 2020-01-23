@@ -150,28 +150,29 @@ void Server::ProcessLookUpMasterRequest(
 void Server::ProcessForwardSubtxnRequest(
     internal::ForwardSubtransaction* forward_sub_txn,
     string&& from_machine_id) {
-  auto txn = forward_sub_txn->release_txn();
-  auto txn_id = txn->internal().id();
+  auto txn_id = forward_sub_txn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
     LOG(ERROR) << "Got sub-txn from [" << from_machine_id 
                << "] but there is no pending response for transaction " << txn_id;
     return;
   }
   auto& pr = pending_responses_.at(txn_id);
+  auto sub_txn_origin = forward_sub_txn->partition();
   if (!pr.initialized) {
-    pr.txn = new Transaction();
+    pr.txn = forward_sub_txn->release_txn();
     pr.awaited_partitions.clear();
     for (auto p :forward_sub_txn->involved_partitions()) {
-      pr.awaited_partitions.insert(p);
+      if (p != sub_txn_origin) {
+        pr.awaited_partitions.insert(p);
+      }
     }
     pr.initialized = true;
+  } else if (pr.awaited_partitions.erase(sub_txn_origin)) {
+    MergeTransaction(*pr.txn, forward_sub_txn->txn());
   }
 
-  if (pr.awaited_partitions.erase(forward_sub_txn->partition())) {
-    pr.txn->MergeFrom(*txn);
-    if (pr.awaited_partitions.empty()) {
-      SendAPIResponse(txn_id);
-    }
+  if (pr.awaited_partitions.empty()) {
+    SendAPIResponse(txn_id);
   }
 }
 

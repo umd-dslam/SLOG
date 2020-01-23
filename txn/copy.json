@@ -1,0 +1,5 @@
+{
+  "read_set": ["A", "B", "C"],
+  "write_set": ["D", "E", "F"],
+  "code": "COPY A D COPY B E COPY C F"
+}

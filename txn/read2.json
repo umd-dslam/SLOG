@@ -1,5 +1,5 @@
 {
-  "read_set": ["E", "F", "G"],
+  "read_set": ["D", "E", "F"],
   "write_set": [],
-  "code": "GET E GET F GET G"
+  "code": "GET D GET E GET F"
 }
