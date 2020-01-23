@@ -133,6 +133,10 @@ void Scheduler::ProcessForwardBatchRequest(
     }
     case internal::ForwardBatchRequest::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
+
+      VLOG(1) << "Received order for batch " << batch_order.id()
+          << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
+
       all_local_logs_[from_replica].AddSlot(batch_order.slot(), batch_order.id());
       break;
     }
@@ -144,7 +148,7 @@ void Scheduler::ProcessForwardBatchRequest(
 
 void Scheduler::ProcessBatchOrder(
     const internal::PaxosOrder& order) {
-  VLOG(1) << "Received batch order. Slot id: "
+  VLOG(1) << "Received local batch order. Slot id: "
           << order.slot() << ". Queue id: " << order.value(); 
   interleaver_.AddSlot(order.slot(), order.value());
 }

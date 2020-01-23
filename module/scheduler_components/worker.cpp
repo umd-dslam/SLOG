@@ -136,7 +136,7 @@ bool Worker::PrepareTransaction() {
 
   // Send reads to all active participants in local replica if
   // the current partition is one of the participants
-  if (txn_state_->participants.count(local_partition) > 0) {
+  if (!to_be_sent->empty() && txn_state_->participants.count(local_partition) > 0) {
     auto local_replica = config->GetLocalReplica();
     for (auto participant : txn_state_->active_participants) {
       auto machine_id = MakeMachineId(local_replica, participant);

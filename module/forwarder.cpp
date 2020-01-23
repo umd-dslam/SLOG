@@ -87,12 +87,11 @@ void Forwarder::HandleInternalResponse(
       txn_master_metadata->insert(pair);
     }
   }
-  // The master region of new keys is the one it is first sent to
-  // TODO: re-consider this if needed
+  // The master of new keys is set to a default region
   for (const auto& new_key : lookup_master.new_keys()) {
     if (TransactionContainsKey(*txn, new_key)) {
       auto& new_metadata = (*txn_master_metadata)[new_key];
-      new_metadata.set_master(config_->GetLocalReplica());
+      new_metadata.set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
       new_metadata.set_counter(0);
     }
   }
@@ -125,7 +124,7 @@ void Forwarder::Forward(Transaction* txn) {
       auto partition = RandomPartition(re_);
       auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
 
-      VLOG_EVERY_N(1, 100) << "Forwarding txn " << txn_id << " to its home region (rep: "
+      VLOG(1) << "Forwarding txn " << txn_id << " to its home region (rep: "
               << home_replica << ", part: " << partition << ")";
 
       Send(

@@ -21,6 +21,7 @@ const size_t MM_PROTO = 0;
 const size_t MM_FROM_CHANNEL = 1;
 const size_t MM_TO_CHANNEL = 2;
 
+const uint32_t DEFAULT_MASTER_REGION_OF_NEW_KEY = 0;
 const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
 
 const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;

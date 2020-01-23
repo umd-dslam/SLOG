@@ -1,5 +1,5 @@
 {
   "read_set": [],
   "write_set": ["A", "B", "C", "D", "E", "F"],
-  "code": "SET A Chao SET B TheGioi SET ????? SET D ------ SET E $$$$$$ SET F @@@@@@"
+  "code": "SET A Chao SET B TheGioi SET C ????? SET D ------ SET E $$$$$$ SET F @@@@@@"
 }
