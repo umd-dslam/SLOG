@@ -33,7 +33,7 @@ unique_ptr<ModuleRunner> MakeMultihomeOrderer(
         MakeMachineId(rep, part));
   }
   return MakeRunnerFor<MultiHomeOrderer>(
-    broker, members, MakeMachineId(local_rep, part));
+      broker, members, MakeMachineId(local_rep, part));
 }
 
 unique_ptr<ModuleRunner> MakeLocalOrderer(

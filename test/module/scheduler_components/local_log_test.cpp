@@ -13,8 +13,8 @@ protected:
 
   void SetUp() {
     for (size_t i = 0; i < NUM_BATCHES; i++) {
-      batches_[i] = make_shared<Batch>();
-      batches_[i]->set_id(100 * (i + 1));
+      batches[i] = make_shared<Batch>();
+      batches[i]->set_id(100 * (i + 1));
     }
   }
 
@@ -23,18 +23,18 @@ protected:
     ASSERT_EQ(expected_id, batch->id());
   }
 
-  BatchPtr batches_[NUM_BATCHES]; // batch ids: 100 200 300
+  BatchPtr batches[NUM_BATCHES]; // batch ids: 100 200 300
 };
 
 TEST_F(LocalLogTest, InOrder) {
   LocalLog log;
-  log.AddSlottedBatch(0 /* slot_id */, batches_[0]);
+  log.AddSlottedBatch(0 /* slot_id */, batches[0]);
   AssertBatchId(100, log.NextBatch());
 
-  log.AddSlottedBatch(1 /* slot_id */, batches_[1]);
+  log.AddSlottedBatch(1 /* slot_id */, batches[1]);
   AssertBatchId(200, log.NextBatch());
 
-  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
+  log.AddSlottedBatch(2 /* slot_id */, batches[2]);
   AssertBatchId(300, log.NextBatch());
 
   ASSERT_FALSE(log.HasNextBatch());
@@ -42,10 +42,10 @@ TEST_F(LocalLogTest, InOrder) {
 
 TEST_F(LocalLogTest, OutOfOrder) {
   LocalLog log;
-  log.AddBatch(batches_[1]);
+  log.AddBatch(batches[1]);
   ASSERT_FALSE(log.HasNextBatch());
 
-  log.AddBatch(batches_[0]);
+  log.AddBatch(batches[0]);
   ASSERT_FALSE(log.HasNextBatch());
 
   log.AddSlot(1, 100);
@@ -55,7 +55,7 @@ TEST_F(LocalLogTest, OutOfOrder) {
   AssertBatchId(200, log.NextBatch());
   AssertBatchId(100, log.NextBatch());
 
-  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
+  log.AddSlottedBatch(2 /* slot_id */, batches[2]);
   AssertBatchId(300, log.NextBatch());
 
   ASSERT_FALSE(log.HasNextBatch());
@@ -64,9 +64,9 @@ TEST_F(LocalLogTest, OutOfOrder) {
 TEST_F(LocalLogTest, MultipleNextBatches) {
   LocalLog log;
 
-  log.AddSlottedBatch(2 /* slot_id */, batches_[2]);
-  log.AddSlottedBatch(1 /* slot_id */, batches_[1]);
-  log.AddSlottedBatch(0 /* slot_id */, batches_[0]);
+  log.AddSlottedBatch(2 /* slot_id */, batches[2]);
+  log.AddSlottedBatch(1 /* slot_id */, batches[1]);
+  log.AddSlottedBatch(0 /* slot_id */, batches[0]);
 
   AssertBatchId(100, log.NextBatch());
   AssertBatchId(200, log.NextBatch());

@@ -16,15 +16,15 @@ class ChannelTest : public ::testing::Test {
 protected:
   void SetUp() override {
     auto context = make_shared<zmq::context_t>(1);
-    channel_ = make_unique<Channel>(context, "test_channel");
+    channel = make_unique<Channel>(context, "test_channel");
   }
 
-  unique_ptr<Channel> channel_;
+  unique_ptr<Channel> channel;
 };
 
 TEST_F(ChannelTest, ListenToChannel) {
   thread th([this](){
-    unique_ptr<Channel> listener(channel_->GetListener());
+    unique_ptr<Channel> listener(channel->GetListener());
     MMessage message;
     listener->Receive(message);
     Request req;
@@ -35,13 +35,13 @@ TEST_F(ChannelTest, ListenToChannel) {
   MMessage message;
   message.Set(MM_PROTO, MakeEchoRequest("test"));
   message.SetIdentity("zZz");
-  channel_->Send(message);
+  channel->Send(message);
   th.join();
 }
 
 TEST_F(ChannelTest, SendToChannel) {
   thread th([this](){
-    unique_ptr<Channel> listener(channel_->GetListener());
+    unique_ptr<Channel> listener(channel->GetListener());
     MMessage message;
     message.SetIdentity("zZz");
     message.Set(MM_PROTO, MakeEchoResponse("test"));
@@ -49,11 +49,11 @@ TEST_F(ChannelTest, SendToChannel) {
   });
 
   // Not necessary to poll but still do to test GetPollItem
-  auto item = channel_->GetPollItem();
+  auto item = channel->GetPollItem();
   zmq::poll(&item, 1);
 
   MMessage message;
-  channel_->Receive(message);
+  channel->Receive(message);
   Response res;
   ASSERT_TRUE(message.GetProto(res));
   ASSERT_EQ("test", res.echo().data());

@@ -96,6 +96,7 @@ protected:
     return txn;
   }
 
+private:
   unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
   unique_ptr<Channel> input_[NUM_MACHINES];
   unique_ptr<Channel> output_[NUM_MACHINES];

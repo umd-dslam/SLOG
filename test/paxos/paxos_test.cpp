@@ -54,7 +54,7 @@ protected:
   void AddAndStartNewPaxos(
       shared_ptr<Configuration> config) {
     auto context = make_shared<zmq::context_t>(1);
-    auto broker = new Broker(config, context, 5);
+    auto broker = new Broker(config, context, 5 /* timeout_ms */);
     auto paxos = make_shared<TestSimpleMultiPaxos>(
         *broker,
         config->GetAllMachineIds(),
