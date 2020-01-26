@@ -28,6 +28,8 @@ public:
       const vector<string>& group_members,
       const string& me);
 
+  bool IsMember() const;
+
 protected:
   void HandleInternalRequest(
       internal::Request&& req,

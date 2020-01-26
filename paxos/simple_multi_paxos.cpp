@@ -29,6 +29,10 @@ void SimpleMultiPaxos::HandleInternalResponse(
   leader_.HandleResponse(res, from_machine_id);
 }
 
+bool SimpleMultiPaxos::IsMember() const {
+  return leader_.IsMember();
+}
+
 SimpleMultiPaxosClient::SimpleMultiPaxosClient(
     ChannelHolder& channel_holder, const string& group_name)
   : channel_holder_(channel_holder),

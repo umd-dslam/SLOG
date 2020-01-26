@@ -46,6 +46,8 @@ public:
   void HandleResponse(
       const internal::Response& res,
       const string& from_machine_id);
+  
+  bool IsMember() const;
 
 private:
   void ProcessCommitRequest(const internal::PaxosCommitRequest commit);
@@ -63,6 +65,7 @@ private:
   const vector<string> members_;
   const string me_;
   bool is_elected_;
+  bool is_member_;
   string elected_leader_;
 
   SlotId min_uncommitted_slot_;

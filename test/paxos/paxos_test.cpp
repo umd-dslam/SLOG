@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include "common/proto_utils.h"
 #include "common/test_utils.h"
 #include "paxos/simple_multi_paxos.h"
 
@@ -53,12 +54,19 @@ class PaxosTest : public ::testing::Test {
 protected:
   void AddAndStartNewPaxos(
       shared_ptr<Configuration> config) {
-    auto context = make_shared<zmq::context_t>(1);
-    auto broker = new Broker(config, context, 5 /* timeout_ms */);
-    auto paxos = make_shared<TestSimpleMultiPaxos>(
-        *broker,
+    AddAndStartNewPaxos(
+        config,
         config->GetAllMachineIds(),
         config->GetLocalMachineIdAsString());
+  }
+
+  void AddAndStartNewPaxos(
+      shared_ptr<Configuration> config,
+      const vector<string>& members,
+      const string& me) {
+    auto context = make_shared<zmq::context_t>(1);
+    auto broker = new Broker(config, context, 5 /* timeout_ms */);
+    auto paxos = make_shared<TestSimpleMultiPaxos>(*broker, members, me);
     auto paxos_runner = new ModuleRunner(paxos);
     auto client = new SimpleMultiPaxosClient(*paxos, "test");
 
@@ -84,9 +92,9 @@ private:
 
 TEST_F(PaxosTest, ProposeWithoutForwarding) {
   auto configs = MakeTestConfigurations("paxos", 1, 3);
-  AddAndStartNewPaxos(configs[0]);
-  AddAndStartNewPaxos(configs[1]);
-  AddAndStartNewPaxos(configs[2]);
+  for (auto config : configs) {
+    AddAndStartNewPaxos(config);
+  }
 
   clients[0]->Propose(111);
   for (auto& paxos : paxi) {
@@ -98,9 +106,9 @@ TEST_F(PaxosTest, ProposeWithoutForwarding) {
 
 TEST_F(PaxosTest, ProposeWithForwarding) {
   auto configs = MakeTestConfigurations("paxos", 1, 3);
-  AddAndStartNewPaxos(configs[0]);
-  AddAndStartNewPaxos(configs[1]);
-  AddAndStartNewPaxos(configs[2]);
+  for (auto config : configs) {
+    AddAndStartNewPaxos(config);
+  }
 
   clients[1]->Propose(111);
   for (auto& paxos : paxi) {
@@ -112,9 +120,9 @@ TEST_F(PaxosTest, ProposeWithForwarding) {
 
 TEST_F(PaxosTest, ProposeMultipleValues) {
   auto configs = MakeTestConfigurations("paxos", 1, 3);
-  AddAndStartNewPaxos(configs[0]);
-  AddAndStartNewPaxos(configs[1]);
-  AddAndStartNewPaxos(configs[2]);
+  for (auto config : configs) {
+    AddAndStartNewPaxos(config);
+  }
 
   clients[0]->Propose(111);
   for (auto& paxos : paxi) {
@@ -135,5 +143,27 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
     auto ret = paxos->Poll();
     ASSERT_EQ(2, ret.first);
     ASSERT_EQ(333, ret.second);
+  }
+}
+
+TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
+  auto configs = MakeTestConfigurations("paxos", 2, 2);
+  vector<string> members;
+  auto member_part = configs.front()->GetGlobalPaxosMemberPartition();
+  for (uint32_t rep = 0; rep < configs.front()->GetNumReplicas(); rep++) {
+    members.emplace_back(MakeMachineId(rep, member_part));
+  }
+  for (auto config : configs) {
+    AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsString());
+  }
+
+  auto non_member = (member_part + 1) % configs.front()->GetNumPartitions(); 
+  clients[non_member]->Propose(111);
+  for (auto& paxos : paxi) {
+    if (paxos->IsMember()) {
+      auto ret = paxos->Poll();
+      ASSERT_EQ(0, ret.first);
+      ASSERT_EQ(111, ret.second);
+    }
   }
 }

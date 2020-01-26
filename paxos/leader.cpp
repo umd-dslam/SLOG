@@ -15,11 +15,20 @@ Leader::Leader(
     me_(me),
     min_uncommitted_slot_(0),
     next_empty_slot_(0) {
-  auto position_in_members = 
-      std::find(members.begin(), members.end(), me) - members.begin();
-  is_elected_ = position_in_members == PAXOS_DEFAULT_LEADER_POSITION;
+  auto it = std::find(members.begin(), members.end(), me);
+  is_member_ = it != members.end();
+  if (is_member_) {
+    auto position_in_members = it - members.begin();
+    is_elected_ = position_in_members == PAXOS_DEFAULT_LEADER_POSITION;
+    ballot_ = position_in_members;
+  } else {
+    // When the current machine is not a member of this paxos group, it
+    // will always forward a proposal request to the initially elected
+    // leader of the group (which would never change in this implementation 
+    // of paxos)
+    is_elected_ = false;
+  }
   elected_leader_ = members[PAXOS_DEFAULT_LEADER_POSITION];
-  ballot_ = position_in_members;
 }
 
 void Leader::HandleRequest(const Request& req) {
@@ -151,5 +160,8 @@ void Leader::SendToAllMembers(const Request& request) {
   }
 }
 
+bool Leader::IsMember() const {
+  return is_member_;
+}
 
 } // namespace slog
