@@ -26,14 +26,13 @@ using std::make_shared;
 unique_ptr<ModuleRunner> MakeMultihomeOrderer(
     shared_ptr<Configuration> config, Broker& broker) {
   auto local_rep = config->GetLocalReplica();
-  auto part = config->GetGlobalPaxosMemberPartition();
+  auto part = config->GetLeaderPartitionForMultiHomeOrdering();
   vector<string> members;
   for (uint32_t rep = 0; rep < config->GetNumReplicas(); rep++) {
-    members.push_back(
-        MakeMachineId(rep, part));
+    members.push_back(MakeMachineId(rep, part));
   }
-  return MakeRunnerFor<MultiHomeOrderer>(
-      broker, members, MakeMachineId(local_rep, part));
+  auto me = MakeMachineId(local_rep, part);
+  return MakeRunnerFor<MultiHomeOrderer>(broker, members, me);
 }
 
 unique_ptr<ModuleRunner> MakeLocalOrderer(
@@ -45,8 +44,8 @@ unique_ptr<ModuleRunner> MakeLocalOrderer(
   for (uint32_t part = 0; part < config->GetNumPartitions(); part++) {
     members.push_back(MakeMachineId(local_rep, part));
   }
-  return MakeRunnerFor<LocalOrderer>(
-      broker, members, MakeMachineId(local_rep, local_part));
+  auto me = MakeMachineId(local_rep, local_part);
+  return MakeRunnerFor<LocalOrderer>(broker, members, me);
 }
 
 int main(int argc, char* argv[]) {

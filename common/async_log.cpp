@@ -1,17 +1,17 @@
-#include "module/scheduler_components/local_log.h"
+#include "common/async_log.h"
 
 #include <glog/logging.h>
 
 namespace slog {
 
-LocalLog::LocalLog() : next_slot_(0) {}
+AsyncLog::AsyncLog() : next_slot_(0) {}
 
-void LocalLog::AddBatch(BatchPtr batch) {
+void AsyncLog::AddBatch(BatchPtr batch) {
   unordered_batches_[batch->id()] = batch;
   UpdateReadyBatches();
 }
 
-void LocalLog::AddSlot(SlotId slot_id, BatchId batch_id) {
+void AsyncLog::AddSlot(SlotId slot_id, BatchId batch_id) {
   if (pending_slots_.count(slot_id) > 0) {
     LOG(ERROR) << "Slot " << slot_id << " has already been taken.";
     return;
@@ -20,16 +20,16 @@ void LocalLog::AddSlot(SlotId slot_id, BatchId batch_id) {
   UpdateReadyBatches();
 }
 
-void LocalLog::AddSlottedBatch(SlotId slot_id, BatchPtr batch) {
+void AsyncLog::AddSlottedBatch(SlotId slot_id, BatchPtr batch) {
   AddBatch(batch);
   AddSlot(slot_id, batch->id());
 }
 
-bool LocalLog::HasNextBatch() const {
+bool AsyncLog::HasNextBatch() const {
   return !ready_batches_.empty();
 }
 
-BatchPtr LocalLog::NextBatch() {
+BatchPtr AsyncLog::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
@@ -38,7 +38,7 @@ BatchPtr LocalLog::NextBatch() {
   return next_batch;
 }
 
-void LocalLog::UpdateReadyBatches() {
+void AsyncLog::UpdateReadyBatches() {
   while (pending_slots_.count(next_slot_) > 0) {
     auto next_batch_id = pending_slots_.at(next_slot_);
     if (unordered_batches_.count(next_batch_id) == 0) {

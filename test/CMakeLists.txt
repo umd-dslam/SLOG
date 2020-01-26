@@ -3,12 +3,12 @@ project(test)
 # Don't forget to add all of the tests here so that they
 # are linked properly
 set(ALL_TESTS
+  async_log_test
   batch_interleaver_test
   broker_test
   channel_test
   deterministic_lock_manager_test
   forwarder_test
-  local_log_test
   mem_only_storage_test
   mmessage_test
   paxos_test
@@ -17,6 +17,9 @@ set(ALL_TESTS
   server_test
   stored_procedures_test)
 
+add_executable(async_log_test common/async_log_test.cpp)
+target_link_libraries(async_log_test async_log proto)
+  
 add_executable(batch_interleaver_test
   module/scheduler_components/batch_interleaver_test.cpp)
 target_link_libraries(batch_interleaver_test scheduler_components proto)
@@ -33,10 +36,6 @@ target_link_libraries(deterministic_lock_manager_test test_utils)
 
 add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)
-
-add_executable(local_log_test
-  module/scheduler_components/local_log_test.cpp)
-target_link_libraries(local_log_test scheduler_components proto)
 
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
 target_link_libraries(mem_only_storage_test)

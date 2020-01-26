@@ -9,7 +9,6 @@ target_link_libraries(base_module
   proto)
 
 add_library(scheduler_components
-  scheduler_components/local_log.cpp
   scheduler_components/batch_interleaver.cpp
   scheduler_components/deterministic_lock_manager.cpp
   scheduler_components/worker.cpp)
@@ -24,6 +23,7 @@ add_library(module
   sequencer.cpp
   scheduler.cpp)
 target_link_libraries(module
+  async_log
   base_module
   paxos
   scheduler_components)

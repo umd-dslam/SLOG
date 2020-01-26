@@ -14,9 +14,9 @@ namespace slog {
 
 using BatchPtr = shared_ptr<internal::Batch>;
 
-class LocalLog {
+class AsyncLog {
 public:
-  LocalLog();
+  AsyncLog();
 
   void AddBatch(BatchPtr batch);
   void AddSlot(SlotId slot_id, BatchId batch_id);

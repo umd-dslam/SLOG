@@ -5,11 +5,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/async_log.h"
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/basic_module.h"
-#include "module/scheduler_components/local_log.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
 #include "module/scheduler_components/worker.h"
@@ -79,7 +79,7 @@ private:
   vector<unique_ptr<ModuleRunner>> workers_;
   queue<string> ready_workers_;
 
-  unordered_map<uint32_t, LocalLog> all_local_logs_;
+  unordered_map<uint32_t, AsyncLog> all_local_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
 

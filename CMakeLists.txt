@@ -42,6 +42,7 @@ add_subdirectory(connection)
 add_subdirectory(module)
 add_subdirectory(paxos)
 set(SLOG_LIBS
+  async_log
   benchmark
   common
   connection

@@ -45,7 +45,7 @@ public:
   MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;
 
-  uint32_t GetGlobalPaxosMemberPartition() const;
+  uint32_t GetLeaderPartitionForMultiHomeOrdering() const;
 
   // TODO: How keys are partitioned is hardcoded for now. 
   //       Later find a better place to put this method

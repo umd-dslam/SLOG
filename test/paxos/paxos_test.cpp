@@ -149,7 +149,7 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
 TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   auto configs = MakeTestConfigurations("paxos", 2, 2);
   vector<string> members;
-  auto member_part = configs.front()->GetGlobalPaxosMemberPartition();
+  auto member_part = configs.front()->GetLeaderPartitionForMultiHomeOrdering();
   for (uint32_t rep = 0; rep < configs.front()->GetNumReplicas(); rep++) {
     members.emplace_back(MakeMachineId(rep, member_part));
   }

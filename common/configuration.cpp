@@ -135,7 +135,7 @@ string Configuration::GetLocalMachineIdAsString() const {
   return MakeMachineId(local_replica_, local_partition_);
 }
 
-uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
+uint32_t Configuration::GetLeaderPartitionForMultiHomeOrdering() const {
   // Avoid using partition 0 here since it usually works as the
   // leader of the local paxos process
   return GetNumPartitions() - 1;
