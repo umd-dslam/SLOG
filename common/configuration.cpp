@@ -136,9 +136,8 @@ string Configuration::GetLocalMachineIdAsString() const {
 }
 
 uint32_t Configuration::GetGlobalPaxosMemberPartition() const {
-  // This can be any partition other than partition 0 because
-  // partition 0 is probably busy working as the leader of the 
-  // local paxos process
+  // Avoid using partition 0 here since it usually works as the
+  // leader of the local paxos process
   return GetNumPartitions() - 1;
 }
 

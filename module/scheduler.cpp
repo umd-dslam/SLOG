@@ -65,6 +65,8 @@ void Scheduler::Loop() {
 
       SendSameChannel(forwarded_req, destination);
     } else if (msg.IsProto<Response>()) {
+      // A worker finishes processing a transaction. Mark this 
+      // worker as ready for another transaction.
       Response res;
       msg.GetProto(res);
       ready_workers_.push(msg.GetIdentity());
@@ -121,7 +123,7 @@ void Scheduler::ProcessForwardBatchRequest(
 
       // The interleaver is used to order the batches coming from the same region
       if (from_replica == config_->GetLocalReplica()) {
-        interleaver_.AddBatch(machine_id.partition(), batch);
+        local_interleaver_.AddBatch(machine_id.partition(), batch);
 
         Response res;
         res.mutable_forward_batch()->set_batch_id(batch_id);
@@ -150,7 +152,7 @@ void Scheduler::ProcessBatchOrder(
     const internal::PaxosOrder& order) {
   VLOG(1) << "Received local batch order. Slot id: "
           << order.slot() << ". Queue id: " << order.value(); 
-  interleaver_.AddSlot(order.slot(), order.value());
+  local_interleaver_.AddSlot(order.slot(), order.value());
 }
 
 void Scheduler::ProcessRemoteReadResult(
@@ -166,7 +168,7 @@ void Scheduler::ProcessRemoteReadResult(
     //
     // TODO: If this request is not needed but still arrives and arrives AFTER
     // the transaction is already commited, it will be stuck in early_remote_reads
-    // forever. Consider garbage collect this if it waits for too long.
+    // forever. Consider garbage collecting them.
     VLOG(2) << "Got early remote read result";
     holder.early_remote_reads.push_back(std::move(req));
   }
@@ -176,12 +178,13 @@ void Scheduler::TryUpdatingLocalLog() {
   // Update the local log of the local region
   auto local_replica = config_->GetLocalReplica();
   auto local_partition = config_->GetLocalPartition();
-  while (interleaver_.HasNextBatch()) {
-    auto slot_id_and_batch = interleaver_.NextBatch();
+  while (local_interleaver_.HasNextBatch()) {
+    auto slot_id_and_batch = local_interleaver_.NextBatch();
     auto slot_id = slot_id_and_batch.first;
     auto batch = slot_id_and_batch.second;
     all_local_logs_[local_replica].AddSlottedBatch(slot_id, batch);
 
+    // Replicate to the corresponding partition in other regions
     Request request;
     auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
     forward_batch_order->set_id(batch->id());
