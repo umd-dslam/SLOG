@@ -9,7 +9,7 @@
 #include "module/server.h"
 #include "module/sequencer.h"
 #include "module/scheduler.h"
-#include "module/orderer.h"
+#include "module/consensus.h"
 #include "proto/api.pb.h"
 
 using std::to_string;
@@ -103,16 +103,8 @@ void TestSlog::AddScheduler() {
       config_, *context_, broker_, storage_);
 }
 
-void TestSlog::AddLocalOrderer() {
-  auto local_rep = config_->GetLocalReplica();
-  auto local_part = config_->GetLocalPartition();
-  vector<string> members;
-  // Enlist all machines in the same replica as members
-  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-    members.push_back(MakeMachineId(local_rep, part));
-  }
-  local_orderer_ = MakeRunnerFor<LocalOrderer>(
-      broker_, members, MakeMachineId(local_rep, local_part));
+void TestSlog::AddLocalPaxos() {
+  local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_);
 }
 
 unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
@@ -136,8 +128,8 @@ void TestSlog::StartInNewThreads() {
   if (scheduler_) {
     scheduler_->StartInNewThread();
   }
-  if (local_orderer_) {
-    local_orderer_->StartInNewThread();
+  if (local_paxos_) {
+    local_paxos_->StartInNewThread();
   }
 }
 

@@ -13,7 +13,7 @@ const std::string SEQUENCER_CHANNEL("sequencer");
 const std::string SCHEDULER_CHANNEL("scheduler");
 
 const std::string LOCAL_PAXOS("local");
-const std::string MULTI_HOME_PAXOS("multi_home");
+const std::string GLOBAL_PAXOS("global");
 
 const uint32_t MAX_NUM_MACHINES = 1000;
 

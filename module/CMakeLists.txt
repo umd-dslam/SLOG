@@ -17,8 +17,8 @@ target_link_libraries(scheduler_components
   common)
 
 add_library(module
+  consensus.cpp
   forwarder.cpp
-  orderer.cpp
   server.cpp
   sequencer.cpp
   scheduler.cpp)

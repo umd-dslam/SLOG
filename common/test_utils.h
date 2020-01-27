@@ -35,7 +35,7 @@ public:
   void AddForwarder();
   void AddSequencer();
   void AddScheduler();
-  void AddLocalOrderer();
+  void AddLocalPaxos();
 
   unique_ptr<Channel> AddChannel(const string& name);
 
@@ -51,7 +51,7 @@ private:
   ModuleRunnerPtr forwarder_;
   ModuleRunnerPtr sequencer_;
   ModuleRunnerPtr scheduler_;
-  ModuleRunnerPtr local_orderer_;
+  ModuleRunnerPtr local_paxos_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;
