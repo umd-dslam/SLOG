@@ -20,10 +20,10 @@ internal::Request MakeForwardBatchRequest(
   return req;
 }
 
-internal::Request MakePaxosOrder(uint32_t slot, uint32_t value) {
+internal::Request MakeLocalQueueOrder(uint32_t slot, uint32_t queue_id) {
   internal::Request req;
-  req.mutable_paxos_order()->set_slot(slot);
-  req.mutable_paxos_order()->set_value(value);
+  req.mutable_local_queue_order()->set_slot(slot);
+  req.mutable_local_queue_order()->set_queue_id(queue_id);
   return req;
 }
 
@@ -66,7 +66,7 @@ protected:
       input_[partition]->Send(msg);
 
       msg.Clear();
-      msg.Set(MM_PROTO, MakePaxosOrder(0, partition));
+      msg.Set(MM_PROTO, MakeLocalQueueOrder(0, partition));
       msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
       input_[partition]->Send(msg);
     }

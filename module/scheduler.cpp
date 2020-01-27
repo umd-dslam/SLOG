@@ -92,8 +92,8 @@ void Scheduler::HandleInternalRequest(
       ProcessForwardBatchRequest(
           req.mutable_forward_batch(), from_machine_id);
       break;
-    case Request::kPaxosOrder:
-      ProcessBatchOrder(req.paxos_order());
+    case Request::kLocalQueueOrder:
+      ProcessLocalQueueOrder(req.local_queue_order());
       break;
     case Request::kRemoteReadResult:
       ProcessRemoteReadResult(std::move(req));
@@ -136,10 +136,12 @@ void Scheduler::ProcessForwardBatchRequest(
     case internal::ForwardBatchRequest::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
 
-      VLOG(1) << "Received order for batch " << batch_order.id()
-          << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
+      VLOG(1) << "Received order for batch " << batch_order.batch_id()
+              << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
 
-      all_local_logs_[from_replica].AddSlot(batch_order.slot(), batch_order.id());
+      all_local_logs_[from_replica].AddSlot(
+          batch_order.slot(),
+          batch_order.batch_id());
       break;
     }
     default:
@@ -148,11 +150,11 @@ void Scheduler::ProcessForwardBatchRequest(
 
 }
 
-void Scheduler::ProcessBatchOrder(
-    const internal::PaxosOrder& order) {
-  VLOG(1) << "Received local batch order. Slot id: "
-          << order.slot() << ". Queue id: " << order.value(); 
-  local_interleaver_.AddSlot(order.slot(), order.value());
+void Scheduler::ProcessLocalQueueOrder(
+    const internal::LocalQueueOrder& order) {
+  VLOG(1) << "Received local queue order. Slot id: "
+          << order.slot() << ". Queue id: " << order.queue_id(); 
+  local_interleaver_.AddSlot(order.slot(), order.queue_id());
 }
 
 void Scheduler::ProcessRemoteReadResult(
@@ -187,7 +189,7 @@ void Scheduler::TryUpdatingLocalLog() {
     // Replicate to the corresponding partition in other regions
     Request request;
     auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
-    forward_batch_order->set_id(batch->id());
+    forward_batch_order->set_batch_id(batch->id());
     forward_batch_order->set_slot(slot_id);
     for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
       if (rep != local_replica) {

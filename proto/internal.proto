@@ -11,7 +11,7 @@ message Batch {
 }
 
 message BatchOrder {
-    uint32 id = 1;
+    uint32 batch_id = 1;
     uint32 slot = 2;
 }
 
@@ -35,7 +35,7 @@ message Request {
         PaxosPropose paxos_propose = 6;
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
-        PaxosOrder paxos_order = 10;
+        LocalQueueOrder local_queue_order = 10;
         ProcessTransactionRequest process_txn = 11;
         RemoteReadResult remote_read_result = 12;
         ForwardSubtransaction forward_sub_txn = 13;
@@ -91,9 +91,11 @@ message PaxosCommitRequest {
     uint32 value = 3;
 }
 
-message PaxosOrder {
-    uint32 slot = 1;
-    uint32 value = 2;
+message LocalQueueOrder {
+    // queue_id is the partition that the 
+    // batch queue is generated from
+    uint32 queue_id = 1;
+    uint32 slot = 2;
 }
 
 message ProcessTransactionRequest {

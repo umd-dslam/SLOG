@@ -60,8 +60,8 @@ private:
       internal::ForwardBatchRequest* forward_batch,
       const string& from_machine_id);
 
-  void ProcessBatchOrder(
-      const internal::PaxosOrder& order);
+  void ProcessLocalQueueOrder(
+      const internal::LocalQueueOrder& order);
 
   void ProcessRemoteReadResult(
       internal::Request&& request);

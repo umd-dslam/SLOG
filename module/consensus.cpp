@@ -28,9 +28,9 @@ GlobalPaxos::GlobalPaxos(
 
 void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
-  auto order = req.mutable_paxos_order();
+  auto order = req.mutable_forward_batch()->mutable_batch_order();
   order->set_slot(slot);
-  order->set_value(value);
+  order->set_batch_id(value);
   SendSameMachine(req, SEQUENCER_CHANNEL);
 }
 
@@ -56,9 +56,9 @@ LocalPaxos::LocalPaxos(
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
-  auto order = req.mutable_paxos_order();
+  auto order = req.mutable_local_queue_order();
+  order->set_queue_id(value);
   order->set_slot(slot);
-  order->set_value(value);
   SendSameMachine(req, SCHEDULER_CHANNEL);
 }
 
