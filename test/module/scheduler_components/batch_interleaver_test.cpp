@@ -7,68 +7,47 @@ using namespace slog;
 
 using internal::Batch;
 
-class BatchInterleaverTest : public ::testing::Test {
-protected:
-  static const size_t NUM_BATCHES = 4;
-
-  void SetUp() {
-    for (size_t i = 0; i < NUM_BATCHES; i++) {
-      batches_[i] = make_shared<Batch>();
-      batches_[i]->set_id(100 * (i + 1));
-    }
-  }
-
-  void AssertBatchId(
-      pair<SlotId, uint32_t> expected, pair<SlotId, BatchPtr> batch) {
-    ASSERT_NE(nullptr, batch.second);
-    ASSERT_EQ(expected.first, batch.first);
-    ASSERT_EQ(expected.second, batch.second->id());
-  }
-
-  BatchPtr batches_[NUM_BATCHES]; // batch ids: 100 200 300 400
-};
-
-TEST_F(BatchInterleaverTest, InOrder) {
+TEST(BatchInterleaverTest, InOrder) {
   BatchInterleaver interleaver;
-  interleaver.AddBatch(111 /* queue_id */, batches_[0]);
+  interleaver.AddBatchId(111 /* queue_id */, 100 /* batch_id */);
   ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */);
-  AssertBatchId({0, 100}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, 100U), interleaver.NextBatch());
 
-  interleaver.AddBatch(222 /* queue_id */, batches_[1]);
+  interleaver.AddBatchId(222 /* queue_id */, 200 /* batch_id */);
   ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddSlot(1 /* slot_id */, 222 /* queue_id */);
-  AssertBatchId({1, 200}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, 200U), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
-TEST_F(BatchInterleaverTest, BatchesComeFirst) {
+TEST(BatchInterleaverTest, BatchesComeFirst) {
   BatchInterleaver interleaver;
 
-  interleaver.AddBatch(222 /* queue_id */, batches_[0]);
-  interleaver.AddBatch(111 /* queue_id */, batches_[1]);
-  interleaver.AddBatch(333 /* queue_id */, batches_[2]);
-  interleaver.AddBatch(333 /* queue_id */, batches_[3]);
+  interleaver.AddBatchId(222 /* queue_id */, 100 /* batch_id */);
+  interleaver.AddBatchId(111 /* queue_id */, 200 /* batch_id */);
+  interleaver.AddBatchId(333 /* queue_id */, 300 /* batch_id */);
+  interleaver.AddBatchId(333 /* queue_id */, 400 /* batch_id */);
 
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */);
-  AssertBatchId({0, 200}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, 200U), interleaver.NextBatch());
 
   interleaver.AddSlot(1 /* slot_id */, 333 /* queue_id */);
-  AssertBatchId({1, 300}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, 300U), interleaver.NextBatch());
 
   interleaver.AddSlot(2 /* slot_id */, 222 /* queue_id */);
-  AssertBatchId({2, 100}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, 100U), interleaver.NextBatch());
 
   interleaver.AddSlot(3 /* slot_id */, 333 /* queue_id */);
-  AssertBatchId({3, 400}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(3U, 400U), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
-TEST_F(BatchInterleaverTest, SlotsComeFirst) {
+TEST(BatchInterleaverTest, SlotsComeFirst) {
   BatchInterleaver interleaver;
 
   interleaver.AddSlot(2 /* slot_id */, 222 /* queue_id */);
@@ -76,38 +55,38 @@ TEST_F(BatchInterleaverTest, SlotsComeFirst) {
   interleaver.AddSlot(3 /* slot_id */, 333 /* queue_id */);
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */);
 
-  interleaver.AddBatch(111 /* queue_id */, batches_[1]);
-  AssertBatchId({0, 200}, interleaver.NextBatch());
+  interleaver.AddBatchId(111 /* queue_id */, 200 /* batch_id */);
+  ASSERT_EQ(make_pair(0U, 200U), interleaver.NextBatch());
 
-  interleaver.AddBatch(333 /* queue_id */, batches_[2]);
-  AssertBatchId({1, 300}, interleaver.NextBatch());
+  interleaver.AddBatchId(333 /* queue_id */, 300 /* batch_id */);
+  ASSERT_EQ(make_pair(1U, 300U), interleaver.NextBatch());
 
-  interleaver.AddBatch(222 /* queue_id */, batches_[0]);
-  AssertBatchId({2, 100}, interleaver.NextBatch());
+  interleaver.AddBatchId(222 /* queue_id */, 100 /* batch_id */);
+  ASSERT_EQ(make_pair(2U, 100U), interleaver.NextBatch());
 
-  interleaver.AddBatch(333 /* queue_id */, batches_[3]);
-  AssertBatchId({3, 400}, interleaver.NextBatch());
+  interleaver.AddBatchId(333 /* queue_id */, 400 /* batch_id */);
+  ASSERT_EQ(make_pair(3U, 400U), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
 
-TEST_F(BatchInterleaverTest, MultipleNextBatches) {
+TEST(BatchInterleaverTest, MultipleNextBatches) {
   BatchInterleaver interleaver;
 
-  interleaver.AddBatch(111 /* queue_id */, batches_[2]);
-  interleaver.AddBatch(222 /* queue_id */, batches_[0]);
-  interleaver.AddBatch(333 /* queue_id */, batches_[3]);
-  interleaver.AddBatch(333 /* queue_id */, batches_[1]);
+  interleaver.AddBatchId(111 /* queue_id */, 300 /* batch_id */);
+  interleaver.AddBatchId(222 /* queue_id */, 100 /* batch_id */);
+  interleaver.AddBatchId(333 /* queue_id */, 400 /* batch_id */);
+  interleaver.AddBatchId(333 /* queue_id */, 200 /* batch_id */);
 
   interleaver.AddSlot(3 /* slot_id */, 333 /* queue_id */);
   interleaver.AddSlot(1 /* slot_id */, 333 /* queue_id */);
   interleaver.AddSlot(2 /* slot_id */, 111 /* queue_id */);
   interleaver.AddSlot(0 /* slot_id */, 222 /* queue_id */);
 
-  AssertBatchId({0, 100}, interleaver.NextBatch());
-  AssertBatchId({1, 400}, interleaver.NextBatch());
-  AssertBatchId({2, 300}, interleaver.NextBatch());
-  AssertBatchId({3, 200}, interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, 100U), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, 400U), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, 300U), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(3U, 200U), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }

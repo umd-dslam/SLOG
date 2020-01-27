@@ -7,31 +7,28 @@
 #include "proto/internal.pb.h"
 
 using std::queue;
-using std::shared_ptr;
 using std::pair;
 using std::unordered_map;
 
 namespace slog {
 
-using BatchPtr = shared_ptr<internal::Batch>;
-
 class BatchInterleaver {
 public:
   BatchInterleaver();
 
-  void AddBatch(uint32_t queue_id, BatchPtr batch);
+  void AddBatchId(uint32_t queue_id, BatchId batch_id);
   void AddSlot(SlotId slot_id, uint32_t queue_id);
 
   bool HasNextBatch() const;
-  pair<SlotId, BatchPtr> NextBatch();
+  pair<SlotId, BatchId> NextBatch();
 
 private:
   void UpdateReadyBatches();
 
   unordered_map<SlotId, uint32_t> pending_slots_;
-  unordered_map<uint32_t, queue<BatchPtr>> batch_queues_;
+  unordered_map<uint32_t, queue<BatchId>> batch_queues_;
   SlotId next_slot_;
-  queue<pair<SlotId, BatchPtr>> ready_batches_;
+  queue<pair<SlotId, BatchId>> ready_batches_;
 };
 
 } // namespace slog

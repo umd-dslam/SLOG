@@ -116,21 +116,20 @@ void Scheduler::ProcessForwardBatchRequest(
   switch (forward_batch->part_case()) {
     case internal::ForwardBatchRequest::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
-      auto batch_id = batch->id();
-
-      VLOG(1) << "Received data for batch " << batch_id 
-              << " from [" << from_machine_id << "]. Num transactions: " << batch->transactions_size();
+      VLOG(1) << "Received data for batch " << batch->id()
+              << " from [" << from_machine_id
+              << "]. Num transactions: " << batch->transactions_size();
 
       // The interleaver is used to order the batches coming from the same region
       if (from_replica == config_->GetLocalReplica()) {
-        local_interleaver_.AddBatch(machine_id.partition(), batch);
+        local_interleaver_.AddBatchId(machine_id.partition(), batch->id());
 
         Response res;
-        res.mutable_forward_batch()->set_batch_id(batch_id);
+        res.mutable_forward_batch()->set_batch_id(batch->id());
         Send(res, from_machine_id, SEQUENCER_CHANNEL);
-      } else {
-        all_local_logs_[from_replica].AddBatch(batch);
       }
+      
+      all_local_logs_[from_replica].AddBatch(std::move(batch));
       break;
     }
     case internal::ForwardBatchRequest::kBatchOrder: {
@@ -178,23 +177,19 @@ void Scheduler::ProcessRemoteReadResult(
 
 void Scheduler::TryUpdatingLocalLog() {
   // Update the local log of the local region
-  auto local_replica = config_->GetLocalReplica();
   auto local_partition = config_->GetLocalPartition();
   while (local_interleaver_.HasNextBatch()) {
-    auto slot_id_and_batch = local_interleaver_.NextBatch();
-    auto slot_id = slot_id_and_batch.first;
-    auto batch = slot_id_and_batch.second;
-    all_local_logs_[local_replica].AddSlottedBatch(slot_id, batch);
+    auto slot_id_and_batch_id = local_interleaver_.NextBatch();
+    auto slot_id = slot_id_and_batch_id.first;
+    auto batch_id = slot_id_and_batch_id.second;
 
     // Replicate to the corresponding partition in other regions
     Request request;
     auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
-    forward_batch_order->set_batch_id(batch->id());
+    forward_batch_order->set_batch_id(batch_id);
     forward_batch_order->set_slot(slot_id);
     for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-      if (rep != local_replica) {
-        SendSameChannel(request, MakeMachineId(rep, local_partition));
-      }
+      SendSameChannel(request, MakeMachineId(rep, local_partition));
     }
   }
 }

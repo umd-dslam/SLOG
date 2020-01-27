@@ -6,8 +6,8 @@ namespace slog {
 
 AsyncLog::AsyncLog() : next_slot_(0) {}
 
-void AsyncLog::AddBatch(BatchPtr batch) {
-  unordered_batches_[batch->id()] = batch;
+void AsyncLog::AddBatch(BatchPtr&& batch) {
+  unordered_batches_[batch->id()] = std::move(batch);
   UpdateReadyBatches();
 }
 
@@ -20,11 +20,6 @@ void AsyncLog::AddSlot(SlotId slot_id, BatchId batch_id) {
   UpdateReadyBatches();
 }
 
-void AsyncLog::AddSlottedBatch(SlotId slot_id, BatchPtr batch) {
-  AddBatch(batch);
-  AddSlot(slot_id, batch->id());
-}
-
 bool AsyncLog::HasNextBatch() const {
   return !ready_batches_.empty();
 }
@@ -33,7 +28,7 @@ BatchPtr AsyncLog::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
-  auto next_batch = ready_batches_.front();
+  auto next_batch = std::move(ready_batches_.front());
   ready_batches_.pop();
   return next_batch;
 }
@@ -45,7 +40,8 @@ void AsyncLog::UpdateReadyBatches() {
       break;
     }
 
-    ready_batches_.emplace(unordered_batches_.at(next_batch_id));
+    ready_batches_.emplace(
+        std::move(unordered_batches_.at(next_batch_id)));
 
     unordered_batches_.erase(next_batch_id);
     pending_slots_.erase(next_slot_);

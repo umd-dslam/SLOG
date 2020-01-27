@@ -7,20 +7,18 @@
 #include "proto/internal.pb.h"
 
 using std::queue;
-using std::shared_ptr;
 using std::unordered_map;
 
 namespace slog {
 
-using BatchPtr = shared_ptr<internal::Batch>;
+using BatchPtr = std::unique_ptr<internal::Batch>;
 
 class AsyncLog {
 public:
   AsyncLog();
 
-  void AddBatch(BatchPtr batch);
+  void AddBatch(BatchPtr&& batch);
   void AddSlot(SlotId slot_id, BatchId batch_id);
-  void AddSlottedBatch(SlotId slot_id, BatchPtr batch);
 
   bool HasNextBatch() const;
   BatchPtr NextBatch();

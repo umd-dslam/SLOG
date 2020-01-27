@@ -6,8 +6,8 @@ namespace slog {
 
 BatchInterleaver::BatchInterleaver() : next_slot_(0) {}
 
-void BatchInterleaver::AddBatch(uint32_t queue_id, BatchPtr batch) {
-  batch_queues_[queue_id].push(batch);
+void BatchInterleaver::AddBatchId(uint32_t queue_id, BatchId batch_id) {
+  batch_queues_[queue_id].push(batch_id);
   UpdateReadyBatches();
 }
 
@@ -24,7 +24,7 @@ bool BatchInterleaver::HasNextBatch() const {
   return !ready_batches_.empty();
 }
 
-pair<SlotId, BatchPtr> BatchInterleaver::NextBatch() {
+pair<SlotId, BatchId> BatchInterleaver::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
@@ -40,7 +40,8 @@ void BatchInterleaver::UpdateReadyBatches() {
       break;
     }
 
-    auto next_batch = batch_queues_.at(next_queue_id).front();
+    auto& next_queue = batch_queues_.at(next_queue_id);
+    auto next_batch = next_queue.front();
     ready_batches_.emplace(next_slot_, next_batch);
 
     batch_queues_.at(next_queue_id).pop();
