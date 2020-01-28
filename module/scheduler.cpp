@@ -99,6 +99,8 @@ void Scheduler::HandleInternalRequest(
       ProcessRemoteReadResult(std::move(req));
       break;
     default:
+      LOG(ERROR) << "Unexpected request type received: \""
+                 << CASE_NAME(req.type_case(), Request) << "\"";
       break;
   }
   TryUpdatingLocalLog();

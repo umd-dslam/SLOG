@@ -114,6 +114,8 @@ void Server::HandleInternalRequest(
           move(from_machine_id));
       break;
     default:
+      LOG(ERROR) << "Unexpected request type received: \""
+                 << CASE_NAME(req.type_case(), internal::Request) << "\"";
       break;
   }
 }

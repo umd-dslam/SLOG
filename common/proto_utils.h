@@ -8,6 +8,7 @@
 #include "proto/internal.pb.h"
 
 #define ENUM_NAME(enum, enum_type) enum_type##_descriptor()->FindValueByNumber(enum)->name()
+#define CASE_NAME(case, type) type::descriptor()->FindFieldByNumber(case)->name()
 
 using std::pair;
 using std::string;

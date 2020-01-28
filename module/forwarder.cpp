@@ -7,6 +7,9 @@
 
 namespace slog {
 
+using internal::Request;
+using internal::Response;
+
 namespace {
 
 bool TransactionContainsKey(const Transaction& txn, const Key& key) {
@@ -23,10 +26,12 @@ Forwarder::Forwarder(
     RandomPartition(0, config->GetNumPartitions() - 1) {}
 
 void Forwarder::HandleInternalRequest(
-    internal::Request&& req,
+    Request&& req,
     string&& /* from_machine_id */) {
   // The forwarder only cares about Forward requests
-  if (req.type_case() != internal::Request::kForwardTxn) {
+  if (req.type_case() != Request::kForwardTxn) {
+    LOG(ERROR) << "Unexpected request type received: \""
+               << CASE_NAME(req.type_case(), Request) << "\"";
     return;
   }
 
@@ -41,7 +46,7 @@ void Forwarder::HandleInternalRequest(
   pending_transaction_[txn->internal().id()] = txn;
 
   // Send a look up master request to each partition in the same region
-  internal::Request lookup_master_request;
+  Request lookup_master_request;
   FillLookupMasterRequest(lookup_master_request, *txn);
   auto rep = config_->GetLocalReplica();
   for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
@@ -53,7 +58,7 @@ void Forwarder::HandleInternalRequest(
 }
 
 void Forwarder::FillLookupMasterRequest(
-    internal::Request& req, const Transaction& txn) {
+    Request& req, const Transaction& txn) {
   auto lookup_master = req.mutable_lookup_master();
   for (const auto& pair : txn.read_set()) {
     lookup_master->add_keys(pair.first);
@@ -65,10 +70,12 @@ void Forwarder::FillLookupMasterRequest(
 }
 
 void Forwarder::HandleInternalResponse(
-    internal::Response&& res,
+    Response&& res,
     string&& /* from_machine_id */) {
   // The forwarder only cares about lookup master responses
-  if (res.type_case() != internal::Response::kLookupMaster) {
+  if (res.type_case() != Response::kLookupMaster) {
+    LOG(ERROR) << "Unexpected response type received: \""
+               << CASE_NAME(res.type_case(), Response) << "\"";
     return;
   }
 
@@ -111,7 +118,7 @@ void Forwarder::Forward(Transaction* txn) {
   auto& master_metadata = txn->internal().master_metadata();
 
   // Prepare a request to be forwarded to a sequencer
-  internal::Request forward_request;
+  Request forward_request;
 
   if (txn_type == TransactionType::SINGLE_HOME) {
     forward_request.mutable_forward_txn()->set_allocated_txn(txn);

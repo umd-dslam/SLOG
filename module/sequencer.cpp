@@ -34,8 +34,11 @@ void Sequencer::HandleInternalRequest(
       // Received a batch of multi-home txns
       auto batch = req.mutable_forward_batch()->release_batch_data();
       ProcessMultiHomeBatch(batch);
+      break;
     }
     default:
+      LOG(ERROR) << "Unexpected request type received: \""
+                 << CASE_NAME(req.type_case(), Request) << "\"";
       break;
   }
 }
@@ -43,8 +46,13 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleInternalResponse(
     Response&& res,
     string&& from_machine_id) {
-  if (res.type_case() != Response::kForwardBatch  
-      || res.forward_batch().batch_id() != current_batch_id_) {
+  if (res.type_case() != Response::kForwardBatch) {
+    LOG(ERROR) << "Unexpected response type received: \""
+               << CASE_NAME(res.type_case(), Response) << "\"";
+    return;
+  }
+
+  if (res.forward_batch().batch_id() != current_batch_id_) {
     return;
   }
 
@@ -72,7 +80,7 @@ void Sequencer::HandlePeriodicWakeUp() {
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(1) << "Finished batch " << batch_id 
+  VLOG(1) << "Finished batch " << batch_id
           << ". Sending out for ordering and replicating";
 
   Request req;

@@ -33,7 +33,8 @@ void MultiHomeOrderer::HandleInternalRequest(
       ProcessForwardBatchRequest(req.mutable_forward_batch());
       break;
     default:
-      // TODO: Log error here
+      LOG(ERROR) << "Unexpected request type received: \""
+                 << CASE_NAME(req.type_case(), Request) << "\"";
       break;
   }
 }
