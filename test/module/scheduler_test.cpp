@@ -109,6 +109,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       "SET F newF\n", /* code */
       {},
       MakeMachineIdProto("0:1") /* coordinating server */);
+  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {1});
 
@@ -125,6 +126,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
       {"A"}, /* read_set */
       {"C"},  /* write_set */
       "COPY A C" /* code */);
+  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {0, 1, 2});
 
@@ -142,6 +144,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
       {"B", "C"},  /* write_set */
       "COPY C B\n"
       "COPY B C\n" /* code */);
+  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {0, 1, 2});
 
@@ -162,6 +165,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
       "SET A newA\n"
       "SET B newB\n"
       "SET C newC\n" /* code */);
+  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {0, 1, 2});
 
@@ -181,6 +185,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
       "GET D\n"
       "GET E\n"
       "GET F\n" /* code */);
+  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {0, 1, 2});
 

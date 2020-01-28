@@ -30,7 +30,7 @@ protected:
       string&& from_machine_id) final;
 
 private:
-  void FillLookupMasterRequest(internal::Request& req, const Transaction& txn);
+  internal::Request MakeLookupMasterRequest(const Transaction& txn);
 
   /**
    * Pre-condition: transaction type is not UNKNOWN

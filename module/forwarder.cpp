@@ -46,8 +46,7 @@ void Forwarder::HandleInternalRequest(
   pending_transaction_[txn->internal().id()] = txn;
 
   // Send a look up master request to each partition in the same region
-  Request lookup_master_request;
-  FillLookupMasterRequest(lookup_master_request, *txn);
+  auto lookup_master_request = MakeLookupMasterRequest(*txn);
   auto rep = config_->GetLocalReplica();
   for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
     Send(
@@ -57,16 +56,22 @@ void Forwarder::HandleInternalRequest(
   }
 }
 
-void Forwarder::FillLookupMasterRequest(
-    Request& req, const Transaction& txn) {
+Request Forwarder::MakeLookupMasterRequest(const Transaction& txn) {
+  auto& metadata = txn.internal().master_metadata();
+  Request req;
   auto lookup_master = req.mutable_lookup_master();
+  lookup_master->set_txn_id(txn.internal().id());
   for (const auto& pair : txn.read_set()) {
-    lookup_master->add_keys(pair.first);
+    if (!metadata.contains(pair.first)) {
+      lookup_master->add_keys(pair.first);
+    }
   }
   for (const auto& pair : txn.write_set()) {
-    lookup_master->add_keys(pair.first);
+    if (!metadata.contains(pair.first)) {
+      lookup_master->add_keys(pair.first);
+    }
   }
-  lookup_master->set_txn_id(txn.internal().id());
+  return req;
 }
 
 void Forwarder::HandleInternalResponse(
@@ -94,7 +99,7 @@ void Forwarder::HandleInternalResponse(
       txn_master_metadata->insert(pair);
     }
   }
-  // The master of new keys is set to a default region
+  // The master of new keys are set to a default region
   for (const auto& new_key : lookup_master.new_keys()) {
     if (TransactionContainsKey(*txn, new_key)) {
       auto& new_metadata = (*txn_master_metadata)[new_key];
@@ -119,9 +124,9 @@ void Forwarder::Forward(Transaction* txn) {
 
   // Prepare a request to be forwarded to a sequencer
   Request forward_request;
+  forward_request.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
-    forward_request.mutable_forward_txn()->set_allocated_txn(txn);
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     auto home_replica = master_metadata.begin()->second.master();
@@ -140,17 +145,15 @@ void Forwarder::Forward(Transaction* txn) {
           SEQUENCER_CHANNEL);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    LOG(ERROR) << "Multi-home transactions are not supported yet. Aborting txn";
-    txn->set_status(TransactionStatus::ABORTED);
-    txn->set_abort_reason("Multi-home transactions are not supported yet.");
-    forward_request.mutable_forward_sub_txn()->set_allocated_txn(txn);
+    auto destination = MakeMachineId(
+        config_->GetLocalReplica(),
+        config_->GetLeaderPartitionForMultiHomeOrdering());
+
     Send(
         forward_request,
-        MakeMachineId(txn->internal().coordinating_server()),
-        SERVER_CHANNEL);
+        destination,
+        MULTI_HOME_ORDERER_CHANNEL);
   }
 }
-
-
 
 } // namespace slog

@@ -65,6 +65,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
   SendToSequencer(req);
 
   auto batch = ReceiveBatch();
+  ASSERT_NE(batch, nullptr);
   ASSERT_EQ(batch->transactions_size(), 1);
   ASSERT_EQ(batch->transactions().at(0), txn);
 
@@ -91,7 +92,7 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
   SendToSequencer(req);
 
   auto sh_batch = ReceiveBatch();
-
+  ASSERT_NE(sh_batch, nullptr);
   ASSERT_EQ(sh_batch->transactions_size(), 2);
 
   auto sh_txn1 = sh_batch->transactions().at(0);

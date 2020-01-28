@@ -25,11 +25,13 @@ void MultiHomeOrderer::HandleInternalRequest(
     string&& /* from_machine_id */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
+      // Received a new multi-home txn
       auto txn = req.mutable_forward_txn()->release_txn();
       batch_->mutable_transactions()->AddAllocated(txn);
       break;
     }
     case Request::kForwardBatch:
+      // Received a batch of multi-home txn replicated from another region
       ProcessForwardBatchRequest(req.mutable_forward_batch());
       break;
     default:

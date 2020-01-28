@@ -4,8 +4,9 @@
 #include "common/service_utils.h"
 #include "common/configuration.h"
 #include "connection/broker.h"
-#include "module/forwarder.h"
 #include "module/consensus.h"
+#include "module/forwarder.h"
+#include "module/multi_home_orderer.h"
 #include "module/scheduler.h"
 #include "module/server.h"
 #include "module/sequencer.h"
@@ -38,8 +39,6 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<ModuleRunner>> modules;
   modules.push_back(
-      MakeRunnerFor<GlobalPaxos>(config, broker));
-  modules.push_back(
       MakeRunnerFor<LocalPaxos>(config, broker));
   modules.push_back(
       MakeRunnerFor<Forwarder>(config, broker));
@@ -47,6 +46,14 @@ int main(int argc, char* argv[]) {
       MakeRunnerFor<Sequencer>(config, broker));
   modules.push_back(
       MakeRunnerFor<Scheduler>(config, *context, broker, storage));
+  
+  if (config->GetLeaderPartitionForMultiHomeOrdering() 
+      == config->GetLocalPartition()) {
+    modules.push_back(
+        MakeRunnerFor<GlobalPaxos>(config, broker));
+    modules.push_back(
+        MakeRunnerFor<MultiHomeOrderer>(config, broker));
+  }
 
   // Only start the Broker after it is used to initialized all modules
   broker.StartInNewThread();

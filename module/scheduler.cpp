@@ -207,7 +207,13 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
       while (!transactions->empty()) {
         auto txn = transactions->ReleaseLast();
 
-        if (txn->internal().type() == TransactionType::MULTI_HOME) {
+        auto txn_type = txn->internal().type();
+        CHECK(txn_type == TransactionType::SINGLE_HOME 
+            || txn_type == TransactionType::LOCK_ONLY)
+            << "Transaction with type other than SINGLE_HOME or LOCK_ONLY received: "
+            << ENUM_NAME(txn_type, TransactionType);
+
+        if (txn_type == TransactionType::LOCK_ONLY) {
           LOG(ERROR) << "LockOnlyTxn (MultiHome) encountered. Skipping for now...";
           continue;
         }
