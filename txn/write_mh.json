@@ -1,0 +1,13 @@
+{
+  "read_set": [],
+  "write_set": ["A", "B", "C", "D", "E", "F"],
+  "code": "SET A Hello SET B World SET C !!!!! SET D Goodbye SET E World SET F ??????",
+  "metadata": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 1,
+    "E": 1,
+    "F": 1
+  }
+}

@@ -42,11 +42,15 @@ void MultiHomeOrderer::HandleInternalRequest(
 }
 
 void MultiHomeOrderer::HandlePeriodicWakeUp() {
+  if (batch_->transactions().empty()) {
+    return;
+  }
+
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
   VLOG(1) << "Finished multi-home batch " << batch_id
-          << "Sending out for ordering and replicating";
+          << ". Sending out for ordering and replicating";
   
   Request req;
   auto forward_batch = req.mutable_forward_batch();

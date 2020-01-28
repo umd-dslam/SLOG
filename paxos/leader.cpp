@@ -47,8 +47,6 @@ void Leader::HandleRequest(const Request& req) {
     case Request::TypeCase::kPaxosCommit:
       ProcessCommitRequest(req.paxos_commit()); break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.type_case(), Request) << "\"";
       break;
   }
 }

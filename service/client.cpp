@@ -47,11 +47,20 @@ Transaction* ReadTransactionFromFile(const string& path) {
     write_set.insert(v.GetString());
   }
 
+  unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
+  if (d.HasMember("metadata")) {
+    auto json = d["metadata"].GetObject();
+    for (auto& mem : d["metadata"].GetObject()) {
+      metadata[mem.name.GetString()] = {mem.value.GetUint(), 0};
+    }
+  }
+
   return new Transaction(
       MakeTransaction(
           read_set,
           write_set,
-          d["code"].GetString()));
+          d["code"].GetString(),
+          metadata));
 }
 
 int main(int argc, char* argv[]) {
