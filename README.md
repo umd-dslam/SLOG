@@ -2,7 +2,7 @@
 
 # SLOG
 
-This is an experimental implementation of the paper [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
+This is a prototype of the system described in [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
 The following instructions work best on Ubuntu with CMake 3.13.4.
 
@@ -25,12 +25,12 @@ To run tests, from the 'build' directory, run
 ctest
 ```
 
-## How to Start a Database
+## How to Start SLOG
 
-### As multiple processes on a single machine
+### As multiple processes on the same machine
 
-This set up is only for testing on the local machine. In the following example config file (slog.conf), we use 2 
-replicas, each of which has two partitions. Since you're running multiple processes on the same machine, they cannot share the same port. As a work around, you need to create 4 different configuration files, one for each process and set `server_port` to different values.
+This set up is only for testing on the local machine. In the following example config file (slogX.conf), there are 2 
+replicas, each of which has 2 partitions. Since you're running multiple processes on the same machine, they cannot share the same port. As a work around, you can create 4 different configuration files, one for each process and set `server_port` to different values.
 
 ```
 protocol: "ipc"
@@ -39,15 +39,14 @@ addresses: "/tmp/test_1"
 addresses: "/tmp/test_2"
 addresses: "/tmp/test_3"
 broker_port: 0
-server_port: 5051
+server_port: 5051 <-- Set this to different values for each slogX.conf
 num_replicas: 2
 num_partitions: 2
 batch_duration: 20
 partition_key_num_bytes: 2
 ```
 
-Open 4 terminal windows and run each of the following commands in each of the terminal. The current directory should be 
-the root of the project:
+Open 4 terminal windows and run the following commands in each of the terminal:
 ```
 ./build/slog -config slog0.conf -address /tmp/test_0 -replica 0 -partition 0
 ```
