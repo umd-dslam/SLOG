@@ -46,6 +46,7 @@ ConfigVec MakeTestConfigurations(
   common_config.set_num_replicas(num_replicas);
   common_config.set_num_partitions(num_partitions);
   common_config.set_partition_key_num_bytes(1);
+  common_config.set_batch_duration(1);
   for (int i = 0; i < num_machines; i++) {
     common_config.add_addresses(addr + to_string(i));
   }

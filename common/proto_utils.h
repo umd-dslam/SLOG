@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "proto/internal.pb.h"
 
+#define ENUM_NAME(enum, enum_type) enum_type##_descriptor()->FindValueByNumber(enum)->name()
+
 using std::pair;
 using std::string;
 using std::unordered_map;
@@ -78,5 +80,6 @@ TransactionType SetTransactionType(Transaction& txn);
 void MergeTransaction(Transaction& txn, const Transaction& other);
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);
+bool operator==(const Transaction& txn1, const Transaction txn2);
 
 } // namespace slog

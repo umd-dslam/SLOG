@@ -14,7 +14,7 @@ Sequencer::Sequencer(
     Broker& broker)
   : BasicModule(
         broker.AddChannel(SEQUENCER_CHANNEL),
-        config->GetBatchDuration()),
+        config->GetBatchDuration() /* wake_up_every_ms */),
     config_(config),
     local_paxos_(new SimpleMultiPaxosClient(*this, LOCAL_PAXOS)),
     batch_(new Batch()),
@@ -60,7 +60,7 @@ void Sequencer::HandleInternalResponse(
 
 void Sequencer::HandlePeriodicWakeUp() {
   // TODO: Investigate whether ZMQ keeps messages in order. If it
-  // does this wait for acks is unneccessary and should be removed
+  // does, this wait for acks is unneccessary and should be removed
   // for better latency
  
   // Do nothing if we're still waiting for confirmation for the
@@ -114,14 +114,18 @@ void Sequencer::ProcessMultiHomeBatch(internal::Batch* batch) {
     RemoveKeysMasteredRemotely(txn->mutable_read_set());
     RemoveKeysMasteredRemotely(txn->mutable_write_set());
 
+    txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
     PutTransactionIntoBatch(txn);
   }
 }
 
 void Sequencer::PutTransactionIntoBatch(Transaction* txn) {
-  CHECK_EQ(txn->internal().type(), TransactionType::SINGLE_HOME)
-      << "Sequencer batch can only contain single-home txn. "
-      << "Multi-home txn or unknown txn type received";
+  CHECK(
+      txn->internal().type() == TransactionType::SINGLE_HOME
+      || txn->internal().type() == TransactionType::LOCK_ONLY)
+      << "Sequencer batch can only contain single-home or lock-only txn. "
+      << "Multi-home txn or unknown txn type received instead.";
   batch_->mutable_transactions()->AddAllocated(txn);
 }
 

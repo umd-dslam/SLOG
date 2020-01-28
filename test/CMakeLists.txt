@@ -15,6 +15,7 @@ set(ALL_TESTS
   proto_utils_test
   scheduler_test
   server_test
+  sequencer_test
   stored_procedures_test)
 
 add_executable(async_log_test common/async_log_test.cpp)
@@ -54,6 +55,9 @@ target_link_libraries(scheduler_test test_utils)
 
 add_executable(server_test module/server_test.cpp)
 target_link_libraries(server_test test_utils)
+
+add_executable(sequencer_test module/sequencer_test.cpp)
+target_link_libraries(sequencer_test test_utils)
 
 add_executable(stored_procedures_test benchmark/stored_procedures_test.cpp)
 target_link_libraries(stored_procedures_test benchmark)

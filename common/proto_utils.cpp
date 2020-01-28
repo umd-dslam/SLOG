@@ -3,7 +3,35 @@
 #include <iostream>
 #include <sstream>
 
+using std::string;
+
 namespace slog {
+
+namespace {
+
+using google::protobuf::Map;
+
+bool operator!=(MasterMetadata metadata1, MasterMetadata metadata2) {
+  return metadata1.master() != metadata2.master() 
+      || metadata1.counter() != metadata2.counter();
+}
+
+template<typename K, typename V>
+bool operator==(Map<K, V> map1, Map<K, V> map2) {
+  if (map1.size() != map2.size()) {
+    return false;
+  }
+  for (const auto& key_value : map1) {
+    auto& key = key_value.first;
+    auto& value = key_value.second;
+    if (!map2.contains(key) || map2.at(key) != value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+} // namespace
 
 Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
@@ -111,17 +139,8 @@ using std::endl;
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   os << "Transaction ID: " << txn.internal().id() << endl;
-  os << "Status: ";
-  switch (txn.status()) {
-    case TransactionStatus::ABORTED:
-        os << "ABORTED" << endl;
-        os << "Abort reason: " << txn.abort_reason() << endl;
-        break;
-    case TransactionStatus::COMMITTED: os << "COMMITTED" << endl; break;
-    case TransactionStatus::NOT_STARTED: os << "NOT_STARTED" << endl; break;
-    default:
-      break;
-  }
+  os << "Status: " 
+      << ENUM_NAME(txn.status(), TransactionStatus) << endl;
   os << "Read set:" << endl;
   os << std::setfill(' ');
   for (const auto& pair : txn.read_set()) {
@@ -131,8 +150,21 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   for (const auto& pair : txn.write_set()) {
     os << std::setw(10) << pair.first << " ==> " << pair.second << endl;
   }
+  os << "Type: "
+      << ENUM_NAME(txn.internal().type(), TransactionType) << endl;
   os << "Code: " << txn.code() << endl;
   return os;
+}
+
+bool operator==(const Transaction& txn1, const Transaction txn2) {
+  return txn1.status() == txn2.status()
+      && txn1.read_set() == txn2.read_set()
+      && txn1.write_set() == txn2.write_set()
+      && txn1.code() == txn2.code()
+      && txn1.abort_reason() == txn2.abort_reason()
+      && txn1.internal().id() == txn2.internal().id()
+      && txn1.internal().master_metadata() == txn2.internal().master_metadata()
+      && txn1.internal().type() == txn2.internal().type();
 }
 
 } // namespace slog
