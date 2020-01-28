@@ -204,6 +204,12 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
 
       while (!transactions->empty()) {
         auto txn = transactions->ReleaseLast();
+
+        if (txn->internal().type() == TransactionType::MULTI_HOME) {
+          LOG(ERROR) << "LockOnlyTxn (MultiHome) encountered. Skipping for now...";
+          continue;
+        }
+
         auto txn_id = txn->internal().id();
         auto& holder = all_txns_[txn_id];
         holder.txn.reset(txn);

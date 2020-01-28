@@ -31,7 +31,7 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   auto order = req.mutable_forward_batch()->mutable_batch_order();
   order->set_slot(slot);
   order->set_batch_id(value);
-  SendSameMachine(req, SEQUENCER_CHANNEL);
+  SendSameMachine(req, MULTI_HOME_ORDERER_CHANNEL);
 }
 
 vector<string> LocalPaxos::GetMembers(

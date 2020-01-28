@@ -71,7 +71,7 @@ message LookupMasterRequest {
 message ForwardBatchRequest {
     oneof part {
         Batch batch_data = 1;
-        BatchOrder batch_order =2;
+        BatchOrder batch_order = 2;
     }
 }
 

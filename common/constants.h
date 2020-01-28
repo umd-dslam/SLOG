@@ -10,6 +10,7 @@ const long MODULE_POLL_TIMEOUT_MS = 100;
 const std::string SERVER_CHANNEL("server");
 const std::string FORWARDER_CHANNEL("forwarder");
 const std::string SEQUENCER_CHANNEL("sequencer");
+const std::string MULTI_HOME_ORDERER_CHANNEL("multi_home_orderer");
 const std::string SCHEDULER_CHANNEL("scheduler");
 
 const std::string LOCAL_PAXOS("local");

@@ -25,9 +25,15 @@ void Sequencer::HandleInternalRequest(
     string&& /* from_machine_id */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
-      auto forward_txn = req.mutable_forward_txn();
-      PutTransactionIntoBatch(forward_txn->release_txn());
+      // Received a single-home txn
+      auto txn = req.mutable_forward_txn()->release_txn();
+      PutTransactionIntoBatch(txn);
       break;
+    }
+    case Request::kForwardBatch: {
+      // Received a batch of multi-home txns
+      auto batch = req.mutable_forward_batch()->release_batch_data();
+      ProcessMultiHomeBatch(batch);
     }
     default:
       break;
@@ -64,11 +70,10 @@ void Sequencer::HandlePeriodicWakeUp() {
   }
 
   auto batch_id = NextBatchId();
+  batch_->set_id(batch_id);
 
   VLOG(1) << "Finished batch " << batch_id 
           << ". Sending out for ordering and replicating";
-
-  batch_->set_id(batch_id);
 
   Request req;
   auto forward_batch = req.mutable_forward_batch();
@@ -88,18 +93,36 @@ void Sequencer::HandlePeriodicWakeUp() {
   batch_.reset(new Batch());
 }
 
-void Sequencer::PutTransactionIntoBatch(Transaction* txn) {
-  switch (txn->internal().type()) {
-    case TransactionType::SINGLE_HOME:
-      batch_->mutable_transactions()->AddAllocated(txn);
-      break;
-    case TransactionType::MULTI_HOME:
-      break;
-    case TransactionType::UNKNOWN:
-      LOG(FATAL) << "Sequencer encountered a transaction with UNKNOWN type";
-    default:
-      break;
+void Sequencer::ProcessMultiHomeBatch(internal::Batch* batch) {
+  auto local_rep = config_->GetLocalReplica();
+  while (!batch->transactions().empty()) {
+    auto txn = batch->mutable_transactions()->ReleaseLast();
+    auto& master_metadata = txn->internal().master_metadata();
+    auto RemoveKeysMasteredRemotely = [&master_metadata, local_rep](
+        auto key_map) {
+      auto it = key_map->begin();
+      while (it != key_map->end()) {
+        auto& metadata = master_metadata.at((*it).first);
+        if (metadata.master() != local_rep) {
+          it = key_map->erase(it);
+        } else {
+          it++;
+        }
+      }
+    };
+
+    RemoveKeysMasteredRemotely(txn->mutable_read_set());
+    RemoveKeysMasteredRemotely(txn->mutable_write_set());
+
+    PutTransactionIntoBatch(txn);
   }
+}
+
+void Sequencer::PutTransactionIntoBatch(Transaction* txn) {
+  CHECK_EQ(txn->internal().type(), TransactionType::SINGLE_HOME)
+      << "Sequencer batch can only contain single-home txn. "
+      << "Multi-home txn or unknown txn type received";
+  batch_->mutable_transactions()->AddAllocated(txn);
 }
 
 BatchId Sequencer::NextBatchId() {
