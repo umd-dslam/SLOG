@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/async_log.h"
+#include "common/batch_log.h"
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "module/base/basic_module.h"
@@ -32,7 +32,7 @@ private:
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
 
-  AsyncLog multi_home_batch_log_;
+  BatchLog multi_home_batch_log_;
 };
 
 } // namespace slog

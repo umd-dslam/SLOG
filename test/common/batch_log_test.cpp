@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
-#include "common/async_log.h"
+#include "common/batch_log.h"
 
 using namespace std;
 using namespace slog;
 
 using internal::Batch;
 
-class AsyncLogTest : public ::testing::Test {
+class BatchLogTest : public ::testing::Test {
 protected:
   static const size_t NUM_BATCHES = 3;
 
@@ -26,8 +26,8 @@ protected:
   BatchPtr batches[NUM_BATCHES]; // batch ids: 100 200 300
 };
 
-TEST_F(AsyncLogTest, InOrder) {
-  AsyncLog log;
+TEST_F(BatchLogTest, InOrder) {
+  BatchLog log;
   log.AddSlot(0 /* slot_id */, 100 /* batch_id */);
   log.AddBatch(move(batches[0]));
   AssertBatchId(100, log.NextBatch());
@@ -43,8 +43,8 @@ TEST_F(AsyncLogTest, InOrder) {
   ASSERT_FALSE(log.HasNextBatch());
 }
 
-TEST_F(AsyncLogTest, OutOfOrder) {
-  AsyncLog log;
+TEST_F(BatchLogTest, OutOfOrder) {
+  BatchLog log;
   log.AddBatch(move(batches[1]));
   ASSERT_FALSE(log.HasNextBatch());
 
@@ -61,8 +61,8 @@ TEST_F(AsyncLogTest, OutOfOrder) {
   ASSERT_FALSE(log.HasNextBatch());
 }
 
-TEST_F(AsyncLogTest, MultipleNextBatches) {
-  AsyncLog log;
+TEST_F(BatchLogTest, MultipleNextBatches) {
+  BatchLog log;
 
   log.AddBatch(move(batches[2]));
   log.AddBatch(move(batches[1]));

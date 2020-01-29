@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/async_log.h"
+#include "common/batch_log.h"
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
@@ -79,7 +79,7 @@ private:
   vector<unique_ptr<ModuleRunner>> workers_;
   queue<string> ready_workers_;
 
-  unordered_map<uint32_t, AsyncLog> all_local_logs_;
+  unordered_map<uint32_t, BatchLog> all_local_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
 

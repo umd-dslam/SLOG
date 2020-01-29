@@ -24,7 +24,7 @@ add_library(module
   sequencer.cpp
   scheduler.cpp)
 target_link_libraries(module
-  async_log
+  batch_log
   base_module
   paxos
   scheduler_components)

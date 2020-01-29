@@ -1,35 +1,48 @@
 #pragma once
 
-#include <queue>
+#include <sstream>
 #include <unordered_map>
-
-#include "common/types.h"
-#include "proto/internal.pb.h"
-
-using std::queue;
-using std::unordered_map;
 
 namespace slog {
 
-using BatchPtr = std::unique_ptr<internal::Batch>;
-
+template<typename T>
 class AsyncLog {
 public:
-  AsyncLog();
+  AsyncLog(uint32_t start_from = 0) : next_(start_from) {}
+  
+  void Insert(uint32_t position, T item) {
+    if (position < next_) {
+      return;
+    }
+    if (log_.count(position) > 0) {
+      std::ostringstream os;
+      os << "Log position " << position << " has already been taken";
+      throw std::runtime_error(os.str());
+    }
+    log_[position] = item;
+  }
 
-  void AddBatch(BatchPtr&& batch);
-  void AddSlot(SlotId slot_id, BatchId batch_id);
+  bool HasNext() const {
+    return log_.count(next_) > 0;
+  }
 
-  bool HasNextBatch() const;
-  BatchPtr NextBatch();
+  const T& Peek() {
+    return log_.at(next_);
+  }
+
+  T Next() {
+    if (!HasNext()) {
+      throw std::runtime_error("Next item does not exist");
+    }
+    T result = std::move(log_[next_]);
+    log_.erase(next_);
+    next_++;
+    return result;
+  }
 
 private:
-  void UpdateReadyBatches();
-
-  unordered_map<SlotId, BatchId> pending_slots_;
-  unordered_map<BatchId, BatchPtr> unordered_batches_;
-  SlotId next_slot_;
-  queue<BatchPtr> ready_batches_;
+  std::unordered_map<uint32_t, T> log_;
+  uint32_t next_;
 };
 
 } // namespace slog

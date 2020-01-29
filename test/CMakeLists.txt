@@ -3,7 +3,7 @@ project(test)
 # Don't forget to add all of the tests here so that they
 # are linked properly
 set(ALL_TESTS
-  async_log_test
+  batch_log_test
   batch_interleaver_test
   broker_test
   channel_test
@@ -18,8 +18,8 @@ set(ALL_TESTS
   sequencer_test
   stored_procedures_test)
 
-add_executable(async_log_test common/async_log_test.cpp)
-target_link_libraries(async_log_test async_log proto)
+add_executable(batch_log_test common/batch_log_test.cpp)
+target_link_libraries(batch_log_test batch_log proto)
   
 add_executable(batch_interleaver_test
   module/scheduler_components/batch_interleaver_test.cpp)

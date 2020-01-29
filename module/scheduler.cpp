@@ -122,7 +122,8 @@ void Scheduler::ProcessForwardBatchRequest(
               << " from [" << from_machine_id
               << "]. Num txns: " << batch->transactions_size();
 
-      // The interleaver is used to order the batches coming from the same region
+      // If this batch come from the local region, put it into the local interleaver
+      // and acknowledge 
       if (from_replica == config_->GetLocalReplica()) {
         local_interleaver_.AddBatchId(machine_id.partition(), batch->id());
 
@@ -148,7 +149,6 @@ void Scheduler::ProcessForwardBatchRequest(
     default:
       break;  
   }
-
 }
 
 void Scheduler::ProcessLocalQueueOrder(
