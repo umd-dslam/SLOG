@@ -22,8 +22,8 @@ protected:
   void HandlePeriodicWakeUp() final;
 
 private:
-  void ProcessForwardBatchRequest(
-      internal::ForwardBatchRequest* forward_batch);
+  void ProcessForwardBatch(
+      internal::ForwardBatch* forward_batch);
 
   BatchId NextBatchId();
 

@@ -32,7 +32,7 @@ void MultiHomeOrderer::HandleInternalRequest(
     }
     case Request::kForwardBatch:
       // Received a batch of multi-home txn replicated from another region
-      ProcessForwardBatchRequest(req.mutable_forward_batch());
+      ProcessForwardBatch(req.mutable_forward_batch());
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
@@ -68,15 +68,15 @@ void MultiHomeOrderer::HandlePeriodicWakeUp() {
   batch_.reset(new Batch());
 }
 
-void MultiHomeOrderer::ProcessForwardBatchRequest(
-    internal::ForwardBatchRequest* forward_batch) {
+void MultiHomeOrderer::ProcessForwardBatch(
+    internal::ForwardBatch* forward_batch) {
   switch (forward_batch->part_case()) {
-    case internal::ForwardBatchRequest::kBatchData: {
+    case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
-    case internal::ForwardBatchRequest::kBatchOrder: {
+    case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
       multi_home_batch_log_.AddSlot(
           batch_order.slot(), batch_order.batch_id());

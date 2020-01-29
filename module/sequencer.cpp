@@ -43,37 +43,9 @@ void Sequencer::HandleInternalRequest(
   }
 }
 
-void Sequencer::HandleInternalResponse(
-    Response&& res,
-    string&& from_machine_id) {
-  if (res.type_case() != Response::kForwardBatch) {
-    LOG(ERROR) << "Unexpected response type received: \""
-               << CASE_NAME(res.type_case(), Response) << "\"";
-    return;
-  }
-
-  if (res.forward_batch().batch_id() != current_batch_id_) {
-    return;
-  }
-
-  auto machine_id = from_machine_id.empty() 
-    ? config_->GetLocalMachineIdAsProto() 
-    : MakeMachineIdProto(from_machine_id);
-
-  if (machine_id.replica() != config_->GetLocalReplica()) {
-    return;
-  }
-  pending_acks_.erase(machine_id.partition());
-}
-
 void Sequencer::HandlePeriodicWakeUp() {
-  // TODO: Investigate whether ZMQ keeps messages in order. If it
-  // does, this wait for acks is unneccessary and should be removed
-  // for better latency
- 
-  // Do nothing if we're still waiting for confirmation for the
-  // latest batch or there is nothing to send
-  if (!pending_acks_.empty() || batch_->transactions().empty()) {
+  // Do nothing if there is nothing to send
+  if (batch_->transactions().empty()) {
     return;
   }
 
@@ -97,7 +69,6 @@ void Sequencer::HandlePeriodicWakeUp() {
     for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
       Send(req, MakeMachineId(rep, part), SCHEDULER_CHANNEL);
     }
-    pending_acks_.insert(part);
   }
 
   batch_.reset(new Batch());

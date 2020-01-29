@@ -21,10 +21,6 @@ protected:
       internal::Request&& req,
       string&& from_machine_id) final;
 
-  void HandleInternalResponse(
-      internal::Response&& res,
-      string&& from_machine_id) final;
-
   void HandlePeriodicWakeUp() final;
 
 private:
@@ -38,8 +34,6 @@ private:
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
   BatchId current_batch_id_;
-
-  std::unordered_set<uint32_t> pending_acks_;
 };
 
 } // namespace slog

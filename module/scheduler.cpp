@@ -89,7 +89,7 @@ void Scheduler::HandleInternalRequest(
     const string& from_machine_id) {
   switch (req.type_case()) {
     case Request::kForwardBatch: 
-      ProcessForwardBatchRequest(
+      ProcessForwardBatch(
           req.mutable_forward_batch(), from_machine_id);
       break;
     case Request::kLocalQueueOrder:
@@ -107,8 +107,8 @@ void Scheduler::HandleInternalRequest(
   TryProcessingNextBatchesFromGlobalLog();
 }
 
-void Scheduler::ProcessForwardBatchRequest(
-    internal::ForwardBatchRequest* forward_batch,
+void Scheduler::ProcessForwardBatch(
+    internal::ForwardBatch* forward_batch,
     const string& from_machine_id) {
   auto machine_id = from_machine_id.empty() 
     ? config_->GetLocalMachineIdAsProto() 
@@ -116,29 +116,24 @@ void Scheduler::ProcessForwardBatchRequest(
   auto from_replica = machine_id.replica();
 
   switch (forward_batch->part_case()) {
-    case internal::ForwardBatchRequest::kBatchData: {
+    case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
       VLOG(1) << "Received data for batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Num txns: " << batch->transactions_size();
 
       // If this batch come from the local region, put it into the local interleaver
-      // and acknowledge 
       if (from_replica == config_->GetLocalReplica()) {
         local_interleaver_.AddBatchId(
             machine_id.partition(),
             forward_batch->same_origin_position(),
             batch->id());
-
-        Response res;
-        res.mutable_forward_batch()->set_batch_id(batch->id());
-        Send(res, from_machine_id, SEQUENCER_CHANNEL);
       }
       
       all_local_logs_[from_replica].AddBatch(std::move(batch));
       break;
     }
-    case internal::ForwardBatchRequest::kBatchOrder: {
+    case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
 
       VLOG(1) << "Received order for batch " << batch_order.batch_id()

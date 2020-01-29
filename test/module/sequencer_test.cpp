@@ -39,7 +39,7 @@ protected:
       return nullptr;
     }
     auto forward_batch = req.mutable_forward_batch();
-    if (forward_batch->part_case() != internal::ForwardBatchRequest::kBatchData) {
+    if (forward_batch->part_case() != internal::ForwardBatch::kBatchData) {
       return nullptr;
     }
     auto batch = req.mutable_forward_batch()->release_batch_data();

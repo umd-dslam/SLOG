@@ -31,7 +31,7 @@ message Request {
         BrokerReady broker_ready = 2;
         ForwardTransaction forward_txn = 3;
         LookupMasterRequest lookup_master = 4;
-        ForwardBatchRequest forward_batch = 5;
+        ForwardBatch forward_batch = 5;
         PaxosPropose paxos_propose = 6;
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
@@ -68,7 +68,7 @@ message LookupMasterRequest {
     repeated string keys = 2;
 }
 
-message ForwardBatchRequest {
+message ForwardBatch {
     oneof part {
         Batch batch_data = 1;
         BatchOrder batch_order = 2;
@@ -128,10 +128,9 @@ message Response {
     oneof type {
         EchoResponse echo = 1;
         LookupMasterResponse lookup_master = 2;
-        ForwardBatchResponse forward_batch = 3;
-        PaxosAcceptResponse paxos_accept = 4;
-        PaxosCommitResponse paxos_commit = 5;
-        ProcessTransactionResponse process_txn = 6;
+        PaxosAcceptResponse paxos_accept = 3;
+        PaxosCommitResponse paxos_commit = 4;
+        ProcessTransactionResponse process_txn = 5;
     }
 }
 
@@ -148,10 +147,6 @@ message LookupMasterResponse {
     // Keys belonging to the responding partition
     // but without mastership info (because the key is new)
     repeated string new_keys = 3;
-}
-
-message ForwardBatchResponse {
-    uint32 batch_id = 1;
 }
 
 message PaxosAcceptResponse {

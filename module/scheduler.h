@@ -56,8 +56,8 @@ private:
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
 
-  void ProcessForwardBatchRequest(
-      internal::ForwardBatchRequest* forward_batch,
+  void ProcessForwardBatch(
+      internal::ForwardBatch* forward_batch,
       const string& from_machine_id);
 
   void ProcessLocalQueueOrder(
