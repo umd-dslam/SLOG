@@ -120,7 +120,7 @@ void Scheduler::ProcessForwardBatchRequest(
       auto batch = BatchPtr(forward_batch->release_batch_data());
       VLOG(1) << "Received data for batch " << batch->id()
               << " from [" << from_machine_id
-              << "]. Num transactions: " << batch->transactions_size();
+              << "]. Num txns: " << batch->transactions_size();
 
       // The interleaver is used to order the batches coming from the same region
       if (from_replica == config_->GetLocalReplica()) {
@@ -163,7 +163,7 @@ void Scheduler::ProcessRemoteReadResult(
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
   if (holder.txn != nullptr) {
-    VLOG(2) << "Got remote read result";
+    VLOG(1) << "Got remote read result";
     SendToWorker(std::move(req), holder.worker);
   } else {
     // Save the remote reads that come before the txn
@@ -172,7 +172,7 @@ void Scheduler::ProcessRemoteReadResult(
     // TODO: If this request is not needed but still arrives and arrives AFTER
     // the transaction is already commited, it will be stuck in early_remote_reads
     // forever. Consider garbage collecting them.
-    VLOG(2) << "Got early remote read result";
+    VLOG(1) << "Got early remote read result";
     holder.early_remote_reads.push_back(std::move(req));
   }
 }
@@ -221,7 +221,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
         auto txn_id = txn->internal().id();
         auto& holder = all_txns_[txn_id];
         holder.txn.reset(txn);
-        if (lock_manager_.AcquireLocks(*holder.txn)) {
+        if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
           DispatchTransaction(txn_id); 
         }
       }

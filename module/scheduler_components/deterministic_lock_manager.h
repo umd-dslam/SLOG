@@ -28,12 +28,15 @@ public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
   unordered_set<TxnId> Release(TxnId txn_id);
+  bool IsQueued(TxnId txn_id);
 
   LockMode mode = LockMode::UNLOCKED;
 
 private:
   unordered_set<TxnId> holders_;
-  list<pair<TxnId, LockMode>> waiters_;
+  unordered_set<TxnId> waiters_;
+  list<pair<TxnId, LockMode>> waiter_queue_;
+
 };
 
 /**
@@ -46,6 +49,8 @@ class DeterministicLockManager {
 public:
   DeterministicLockManager(shared_ptr<Configuration> config);
 
+  bool RegisterTxn(const Transaction& txn);
+
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
@@ -55,6 +60,8 @@ public:
    *            the transaction is queued up
    */
   bool AcquireLocks(const Transaction& txn);
+
+  bool RegisterTxnAndAcquireLocks(const Transaction& txn);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -67,7 +74,7 @@ public:
 private:
   shared_ptr<Configuration> config_;
   unordered_map<Key, LockState> lock_table_;
-  unordered_map<TxnId, uint32_t> num_locks_waited_;
+  unordered_map<TxnId, int32_t> num_locks_waited_;
 };
 
 } // namespace slog

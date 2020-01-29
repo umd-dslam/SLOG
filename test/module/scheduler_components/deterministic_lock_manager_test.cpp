@@ -13,7 +13,7 @@ TEST(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   auto txn = MakeTransaction(
     {"readA", "readB"},
     {"writeC"});
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn));
   auto new_holders = lock_manager.ReleaseLocks(txn);
   ASSERT_TRUE(new_holders.empty());
 }
@@ -27,8 +27,8 @@ TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
   // "ZZZZ" is in partition 1 so is ignored
   auto txn2 = MakeTransaction({"readX"}, {"ZZZZ"});
   txn2.mutable_internal()->set_id(200);
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn2));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
 }
 
 TEST(DeterministicLockManager, ReadLocks) {
@@ -38,8 +38,8 @@ TEST(DeterministicLockManager, ReadLocks) {
   txn1.mutable_internal()->set_id(100);
   auto txn2 = MakeTransaction({"readB", "readC"}, {});
   txn2.mutable_internal()->set_id(200);
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn2));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
   ASSERT_TRUE(lock_manager.ReleaseLocks(txn1).empty());
   ASSERT_TRUE(lock_manager.ReleaseLocks(txn2).empty());
 }
@@ -51,12 +51,12 @@ TEST(DeterministicLockManager, WriteLocks) {
   txn1.mutable_internal()->set_id(100);
   auto txn2 = MakeTransaction({"readA"}, {"writeA"});
   txn2.mutable_internal()->set_id(200);
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
   // The blocked txn becomes ready
   ASSERT_EQ(lock_manager.ReleaseLocks(txn1).size(), 1);
   // Make sure the lock is already held by txn2
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
 }
 
 TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
@@ -71,10 +71,10 @@ TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
   auto txn4 = MakeTransaction({"C"}, {});
   txn4.mutable_internal()->set_id(400);
 
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn3));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn4));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn3));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn4));
 
   ASSERT_TRUE(lock_manager.ReleaseLocks(txn3).empty());
 
@@ -96,9 +96,9 @@ TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
   auto txn3 = MakeTransaction({}, {"A", "C"});
   txn3.mutable_internal()->set_id(300);
 
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn3));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn3));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
   ASSERT_EQ(new_ready_txns.size(), 1);
@@ -117,10 +117,80 @@ TEST(DeterministicLockManager, PrioritizeWriteLock) {
   auto txn2 = MakeTransaction({"A"}, {});
   txn2.mutable_internal()->set_id(200);
  
-  ASSERT_TRUE(lock_manager.AcquireLocks(txn1));
-  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
   ASSERT_EQ(new_ready_txns.size(), 1);
   ASSERT_TRUE(new_ready_txns.count(200) > 0);
+}
+
+TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0]);
+  auto txn1 = MakeTransaction({"A"}, {"B", "C"});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {"B"});
+  txn2.mutable_internal()->set_id(200);
+  auto txn2_lockonly1 = MakeTransaction({}, {"B"});
+  txn2_lockonly1.mutable_internal()->set_id(200);
+  auto txn2_lockonly2 = MakeTransaction({"A"}, {});
+  txn2_lockonly2.mutable_internal()->set_id(200);
+
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn2));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2_lockonly1));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn1));
+  ASSERT_TRUE(lock_manager.AcquireLocks(txn2_lockonly2));
+
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+}
+
+TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0]);
+  auto txn1 = MakeTransaction({"A"}, {"B", "C"});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {"B"});
+  txn2.mutable_internal()->set_id(200);
+  auto txn2_lockonly1 = MakeTransaction({}, {"B"});
+  txn2_lockonly1.mutable_internal()->set_id(200);
+  auto txn2_lockonly2 = MakeTransaction({"A"}, {});
+  txn2_lockonly2.mutable_internal()->set_id(200);
+
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2_lockonly1));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2_lockonly2));
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn1));
+  ASSERT_TRUE(lock_manager.RegisterTxn(txn2));
+
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+}
+
+
+TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0]);
+  auto txn1 = MakeTransaction({"A"}, {"B", "C"});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {"B"});
+  txn2.mutable_internal()->set_id(200);
+  auto txn2_lockonly1 = MakeTransaction({}, {"B"});
+  txn2_lockonly1.mutable_internal()->set_id(200);
+  auto txn2_lockonly2 = MakeTransaction({"A"}, {});
+  txn2_lockonly2.mutable_internal()->set_id(200);
+
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2_lockonly1));
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn2));
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn1));
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn1));
+  ASSERT_TRUE(lock_manager.AcquireLocks(txn2_lockonly2));
+
+  auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
+  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }

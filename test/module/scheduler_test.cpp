@@ -96,9 +96,11 @@ protected:
   }
 
 private:
-  unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
+  // Make sure to maintain the order of these variables otherwise the channels are
+  // deallocated before the test slogs leading to ZMQ somehow hanging up.
   unique_ptr<Channel> input_[NUM_MACHINES];
   unique_ptr<Channel> output_[NUM_MACHINES];
+  unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
 };
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {
@@ -114,6 +116,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
   SendBatch(100, {txn}, {1});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
@@ -131,6 +134,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
+  LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
@@ -149,6 +153,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
+  LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 2);
   ASSERT_EQ(output_txn.read_set().at("B"), "valueB");
@@ -170,6 +175,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
+  LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 0);
   ASSERT_EQ(output_txn.write_set_size(), 3);
@@ -190,6 +196,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
   SendBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
+  LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 3);
   ASSERT_EQ(output_txn.read_set().at("D"), "valueD");

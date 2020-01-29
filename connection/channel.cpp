@@ -19,12 +19,12 @@ Channel::Channel(
     is_listener_(is_listener),
     listener_created_(false) {
   string endpoint = "inproc://" + name;
+  socket_.setsockopt(ZMQ_LINGER, 0);
   if (is_listener) {
     socket_.bind(endpoint);
   } else {
     socket_.connect(endpoint);
   }
-  socket_.setsockopt(ZMQ_LINGER, 0);
 }
 
 const std::string& Channel::GetName() const {

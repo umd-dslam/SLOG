@@ -1,5 +1,7 @@
 #include "module/scheduler_components/deterministic_lock_manager.h"
 
+#include <glog/logging.h>
+
 using std::make_pair;
 
 namespace slog {
@@ -15,11 +17,13 @@ bool LockState::AcquireReadLock(TxnId txn_id) {
         holders_.insert(txn_id);
         return true;
       } else {
-        waiters_.push_back(make_pair(txn_id, LockMode::READ));
+        waiters_.insert(txn_id);
+        waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
         return false;
       }
     case LockMode::WRITE:
-      waiters_.push_back(make_pair(txn_id, LockMode::READ));
+      waiters_.insert(txn_id);
+      waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
       return false;
     default:
       return false;
@@ -34,28 +38,32 @@ bool LockState::AcquireWriteLock(TxnId txn_id) {
       return true;
     case LockMode::READ:
     case LockMode::WRITE:
-      waiters_.push_back(make_pair(txn_id, LockMode::READ));
+      waiters_.insert(txn_id);
+      waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
       return false;
     default:
       return false;
   }
 }
 
+bool LockState::IsQueued(TxnId txn_id) {
+  return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0;
+}
+
 unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   // If the transaction is not among the lock holders, find and remove it in
   // the queue of waiters
   if (holders_.count(txn_id) == 0) {
-    auto it = std::find_if(
-        waiters_.begin(),
-        waiters_.end(),
-        [txn_id](auto pair) { return pair.first == txn_id; });
-    if (it != waiters_.end()) {
-      waiters_.erase(it);
-    }
+    waiter_queue_.erase(
+      std::remove_if(
+          waiter_queue_.begin(),
+          waiter_queue_.end(),
+          [txn_id](auto& pair) { return pair.first == txn_id; }),
+      waiter_queue_.end());
+    waiters_.erase(txn_id);
     // No new transaction get the lock
     return {};
   }
-
 
   holders_.erase(txn_id);
 
@@ -73,20 +81,23 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
     return {};
   }
 
-  auto front = waiters_.front();
+  auto front = waiter_queue_.front();
   if (front.second == LockMode::READ) {
     // Gives the READ lock to all read transactions at the head of the queue
     do {
-      holders_.insert(waiters_.front().first);
-      waiters_.pop_front();
-    } while (!waiters_.empty() && waiters_.front().second == LockMode::READ);
+      auto txn_id = waiter_queue_.front().first;
+      holders_.insert(txn_id);
+      waiters_.erase(txn_id);
+      waiter_queue_.pop_front();
+    } while (!waiter_queue_.empty() && waiter_queue_.front().second == LockMode::READ);
 
     mode = LockMode::READ;
 
   } else if (front.second == LockMode::WRITE) {
     // Give the WRITE lock to a single transaction at the head of the queue
     holders_.insert(front.first);
-    waiters_.pop_front();
+    waiters_.erase(front.first);
+    waiter_queue_.pop_front();
     mode = LockMode::WRITE;
   }
   return holders_;
@@ -96,9 +107,30 @@ DeterministicLockManager::DeterministicLockManager(
     shared_ptr<Configuration> config)
   : config_(config) {}
 
+bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
+  auto txn_id = txn.internal().id();
+  unordered_set<Key> all_keys;
+  auto AddToAllKeys = [&all_keys, this](auto& key_values) {
+    for (const auto& kv : key_values) {
+      if (config_->KeyIsInLocalPartition(kv.first)) {
+        all_keys.insert(kv.first);
+      }
+    }
+  };
+  AddToAllKeys(txn.read_set());
+  AddToAllKeys(txn.write_set());
+
+  num_locks_waited_[txn_id] += all_keys.size();
+
+  if (num_locks_waited_[txn_id] == 0) {
+    num_locks_waited_.erase(txn_id);
+    return true;
+  }
+  return false;
+}
+
 bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
-  num_locks_waited_[txn_id] = 0;
   for (const auto& pair : txn.read_set()) {
     auto key = pair.first;
     // Ignore this key if it is not in the current partition
@@ -109,8 +141,9 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
     if (txn.write_set().contains(key)) {
       continue;
     }
-    if (!lock_table_[key].AcquireReadLock(txn_id)) {
-      num_locks_waited_[txn_id]++;
+    if (!lock_table_[key].IsQueued(txn_id)
+        && lock_table_[key].AcquireReadLock(txn_id)) {
+      num_locks_waited_[txn_id]--;
     }
   }
   for (const auto& pair : txn.write_set()) {
@@ -119,8 +152,9 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
     if (!config_->KeyIsInLocalPartition(key)) {
       continue;
     }
-    if (!lock_table_[key].AcquireWriteLock(txn_id)) {
-      num_locks_waited_[txn_id]++;
+    if (!lock_table_[key].IsQueued(txn_id)
+        && lock_table_[key].AcquireWriteLock(txn_id)) {
+      num_locks_waited_[txn_id]--;
     }
   }
   if (num_locks_waited_[txn_id] == 0) {
@@ -128,6 +162,11 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
     return true;
   }
   return false;
+}
+
+bool DeterministicLockManager::RegisterTxnAndAcquireLocks(const Transaction& txn) {
+  RegisterTxn(txn);
+  return AcquireLocks(txn);
 }
 
 unordered_set<TxnId>
@@ -162,6 +201,7 @@ DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
 
   Release(txn.read_set());
   Release(txn.write_set());
+  num_locks_waited_.erase(txn_id);
 
   return ready_txns;
 }
