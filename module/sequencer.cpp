@@ -85,6 +85,8 @@ void Sequencer::HandlePeriodicWakeUp() {
 
   Request req;
   auto forward_batch = req.mutable_forward_batch();
+  // minus 1 so that it starts from 0
+  forward_batch->set_same_origin_position(batch_id_counter_ - 1);
   forward_batch->set_allocated_batch_data(batch_.release());
 
   // Send batch id to local paxos for ordering

@@ -38,7 +38,7 @@ void BatchLog::UpdateReadyBatches() {
     if (batches_.count(next_batch_id) == 0) {
       break;
     }
-    ready_batches_.push(slots_.Next());
+    ready_batches_.push(slots_.Next().second);
   }
 }
 

@@ -125,7 +125,10 @@ void Scheduler::ProcessForwardBatchRequest(
       // If this batch come from the local region, put it into the local interleaver
       // and acknowledge 
       if (from_replica == config_->GetLocalReplica()) {
-        local_interleaver_.AddBatchId(machine_id.partition(), batch->id());
+        local_interleaver_.AddBatchId(
+            machine_id.partition(),
+            forward_batch->same_origin_position(),
+            batch->id());
 
         Response res;
         res.mutable_forward_batch()->set_batch_id(batch->id());

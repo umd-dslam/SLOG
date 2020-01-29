@@ -3,6 +3,7 @@
 #include <queue>
 #include <unordered_map>
 
+#include "common/async_log.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
 
@@ -16,7 +17,8 @@ class BatchInterleaver {
 public:
   BatchInterleaver();
 
-  void AddBatchId(uint32_t queue_id, BatchId batch_id);
+  void AddBatchId(
+      uint32_t queue_id, uint32_t position, BatchId batch_id);
   void AddSlot(SlotId slot_id, uint32_t queue_id);
 
   bool HasNextBatch() const;
@@ -25,9 +27,8 @@ public:
 private:
   void UpdateReadyBatches();
 
-  unordered_map<SlotId, uint32_t> pending_slots_;
-  unordered_map<uint32_t, queue<BatchId>> batch_queues_;
-  SlotId next_slot_;
+  AsyncLog<uint32_t> slots_;
+  unordered_map<uint32_t, AsyncLog<BatchId>> batch_queues_;
   queue<pair<SlotId, BatchId>> ready_batches_;
 };
 

@@ -2,21 +2,20 @@
 
 #include <glog/logging.h>
 
+#include "common/constants.h"
+
 namespace slog {
 
-BatchInterleaver::BatchInterleaver() : next_slot_(0) {}
+BatchInterleaver::BatchInterleaver() {}
 
-void BatchInterleaver::AddBatchId(uint32_t queue_id, BatchId batch_id) {
-  batch_queues_[queue_id].push(batch_id);
+void BatchInterleaver::AddBatchId(
+    uint32_t queue_id, uint32_t position, BatchId batch_id) {
+  batch_queues_[queue_id].Insert(position, batch_id);
   UpdateReadyBatches();
 }
 
 void BatchInterleaver::AddSlot(SlotId slot_id, uint32_t queue_id) {
-  if (pending_slots_.count(slot_id) > 0) {
-    LOG(ERROR) << "Slot " << slot_id << " has already been taken.";
-    return;
-  }
-  pending_slots_[slot_id] = queue_id;
+  slots_.Insert(slot_id, queue_id);
   UpdateReadyBatches();
 }
 
@@ -34,19 +33,18 @@ pair<SlotId, BatchId> BatchInterleaver::NextBatch() {
 }
 
 void BatchInterleaver::UpdateReadyBatches() {
-  while (pending_slots_.count(next_slot_) > 0) {
-    auto next_queue_id = pending_slots_.at(next_slot_);
-    if (batch_queues_[next_queue_id].empty()) {
+  while (slots_.HasNext()) {
+    auto next_queue_id = slots_.Peek();
+    if (batch_queues_.count(next_queue_id) == 0) {
       break;
     }
-
     auto& next_queue = batch_queues_.at(next_queue_id);
-    auto next_batch = next_queue.front();
-    ready_batches_.emplace(next_slot_, next_batch);
-
-    batch_queues_.at(next_queue_id).pop();
-    pending_slots_.erase(next_slot_);
-    next_slot_++;
+    if (!next_queue.HasNext()) {
+      break;
+    }
+    auto slot_id = slots_.Next().first;
+    auto batch_id = next_queue.Next().second;
+    ready_batches_.emplace(slot_id, batch_id);
   }
 }
 

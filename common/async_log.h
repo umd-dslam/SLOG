@@ -30,14 +30,16 @@ public:
     return log_.at(next_);
   }
 
-  T Next() {
+  std::pair<T, uint32_t> Next() {
     if (!HasNext()) {
       throw std::runtime_error("Next item does not exist");
     }
-    T result = std::move(log_[next_]);
-    log_.erase(next_);
+    auto position = next_;
     next_++;
-    return result;
+
+    T result = std::move(log_[position]);
+    log_.erase(position);
+    return std::make_pair(position, std::move(result));
   }
 
 private:
