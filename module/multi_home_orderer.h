@@ -22,10 +22,11 @@ protected:
   void HandlePeriodicWakeUp() final;
 
 private:
+  void NewBatch();
+  BatchId NextBatchId();
+
   void ProcessForwardBatch(
       internal::ForwardBatch* forward_batch);
-
-  BatchId NextBatchId();
 
   shared_ptr<Configuration> config_;
   unique_ptr<PaxosClient> global_paxos_;

@@ -24,10 +24,11 @@ protected:
   void HandlePeriodicWakeUp() final;
 
 private:
-  void PutSingleHomeTransactionIntoBatch(Transaction* txn);
-  void ProcessMultiHomeBatch(internal::Batch* batch);
-
+  void NewBatch();
   BatchId NextBatchId();
+
+  void ProcessMultiHomeBatch(internal::Request&& request);
+  void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
   shared_ptr<Configuration> config_;
   unique_ptr<PaxosClient> local_paxos_;

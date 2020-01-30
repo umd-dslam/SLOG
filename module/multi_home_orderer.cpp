@@ -17,8 +17,14 @@ MultiHomeOrderer::MultiHomeOrderer(
         config->GetBatchDuration()),
     config_(config),
     global_paxos_(new SimpleMultiPaxosClient(*this, GLOBAL_PAXOS)),
-    batch_(new Batch()),
-    batch_id_counter_(0) {}
+    batch_id_counter_(0) {
+  NewBatch();
+}
+
+void MultiHomeOrderer::NewBatch() {
+  batch_.reset(new Batch());
+  batch_->set_transaction_type(TransactionType::MULTI_HOME);
+}
 
 void MultiHomeOrderer::HandleInternalRequest(
     Request&& req,
@@ -66,7 +72,7 @@ void MultiHomeOrderer::HandlePeriodicWakeUp() {
     Send(req, machine_id, MULTI_HOME_ORDERER_CHANNEL);
   }
 
-  batch_.reset(new Batch());
+  NewBatch();
 }
 
 void MultiHomeOrderer::ProcessForwardBatch(

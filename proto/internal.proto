@@ -8,6 +8,10 @@ package slog.internal;
 message Batch {
     uint32 id = 1;
     repeated Transaction transactions = 2;
+    // All txns in this batch has this same type.
+    // Can either be SINGLE_HOME or MULTI_HOME. 
+    // LOCK_ONLY txns are also considered SINGLE_HOME.
+    TransactionType transaction_type = 3;
 }
 
 message BatchOrder {

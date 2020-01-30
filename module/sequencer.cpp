@@ -17,8 +17,14 @@ Sequencer::Sequencer(
         config->GetBatchDuration() /* wake_up_every_ms */),
     config_(config),
     local_paxos_(new SimpleMultiPaxosClient(*this, LOCAL_PAXOS)),
-    batch_(new Batch()),
-    batch_id_counter_(0) {}
+    batch_id_counter_(0) {
+  NewBatch();
+}
+
+void Sequencer::NewBatch() {
+  batch_.reset(new Batch());
+  batch_->set_transaction_type(TransactionType::SINGLE_HOME);
+}
 
 void Sequencer::HandleInternalRequest(
     Request&& req,
@@ -32,8 +38,9 @@ void Sequencer::HandleInternalRequest(
     }
     case Request::kForwardBatch: {
       // Received a batch of multi-home txns
-      auto batch = req.mutable_forward_batch()->release_batch_data();
-      ProcessMultiHomeBatch(batch);
+      if (req.forward_batch().part_case() == internal::ForwardBatch::kBatchData) {
+        ProcessMultiHomeBatch(std::move(req));
+      }
       break;
     }
     default:
@@ -72,33 +79,50 @@ void Sequencer::HandlePeriodicWakeUp() {
     }
   }
 
-  batch_.reset(new Batch());
+  NewBatch();
 }
 
-void Sequencer::ProcessMultiHomeBatch(internal::Batch* batch) {
+void Sequencer::ProcessMultiHomeBatch(Request&& req) {
+  const auto& batch = req.forward_batch().batch_data();
+  if (batch.transaction_type() != TransactionType::MULTI_HOME) {
+    LOG(ERROR) << "Batch has to contain multi-home txns";
+    return;
+  }
+
   auto local_rep = config_->GetLocalReplica();
-  while (!batch->transactions().empty()) {
-    auto txn = batch->mutable_transactions()->ReleaseLast();
-    auto& master_metadata = txn->internal().master_metadata();
-    auto KeepLocalKeysOnly = [&master_metadata, local_rep](
-        auto key_map) {
-      auto it = key_map->begin();
-      while (it != key_map->end()) {
-        auto& metadata = master_metadata.at((*it).first);
-        if (metadata.master() != local_rep) {
-          it = key_map->erase(it);
-        } else {
-          it++;
-        }
+  // For each multi-home txn, create a lock-only txn and put into
+  // the single-home batch to be sent to the local log
+  for (auto& txn : batch.transactions()) {
+    auto lock_only_txn = new Transaction();
+
+    lock_only_txn->mutable_internal()
+        ->set_id(txn.internal().id());
+
+    lock_only_txn->mutable_internal()
+        ->set_type(TransactionType::LOCK_ONLY);
+    
+    const auto& metadata = txn.internal().master_metadata();
+    
+    for (auto& key_value : txn.read_set()) {
+      auto master = metadata.at(key_value.first).master();
+      if (master == local_rep) {
+        lock_only_txn->mutable_read_set()->insert(key_value);
       }
-    };
+    }
+    for (auto& key_value : txn.write_set()) {
+      auto master = metadata.at(key_value.first).master();
+      if (master == local_rep) {
+        lock_only_txn->mutable_write_set()->insert(key_value);
+      }
+    }
 
-    KeepLocalKeysOnly(txn->mutable_read_set());
-    KeepLocalKeysOnly(txn->mutable_write_set());
+    PutSingleHomeTransactionIntoBatch(lock_only_txn);
+  }
 
-    txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
-
-    PutSingleHomeTransactionIntoBatch(txn);
+  // Replicate the batch of multi-home txns to all machines in the same region
+  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+    auto machine_id = MakeMachineIdAsString(local_rep, part);
+    Send(req, machine_id, SCHEDULER_CHANNEL);
   }
 }
 

@@ -68,6 +68,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
   ASSERT_NE(batch, nullptr);
   ASSERT_EQ(batch->transactions_size(), 1);
   ASSERT_EQ(batch->transactions().at(0), txn);
+  ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
 
   delete batch;
 }
@@ -89,22 +90,45 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
   auto mh_batch = req.mutable_forward_batch()->mutable_batch_data();
   mh_batch->add_transactions()->CopyFrom(txn1);
   mh_batch->add_transactions()->CopyFrom(txn2);
+  mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
   SendToSequencer(req);
 
-  auto sh_batch = ReceiveBatch();
-  ASSERT_NE(sh_batch, nullptr);
-  ASSERT_EQ(sh_batch->transactions_size(), 2);
+  for (int i = 0; i < 2; i++) {
+    auto batch = ReceiveBatch();
+    ASSERT_NE(batch, nullptr);
 
-  auto sh_txn1 = sh_batch->transactions().at(0);
-  ASSERT_EQ(sh_txn1.read_set_size(), 0);
-  ASSERT_EQ(sh_txn1.write_set_size(), 1);
-  ASSERT_TRUE(sh_txn1.write_set().contains("D"));
-  ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
+    switch (batch->transaction_type()) {
+      case TransactionType::SINGLE_HOME: {
+        ASSERT_EQ(batch->transactions_size(), 2);
 
-  auto sh_txn2 = sh_batch->transactions().at(1);
-  ASSERT_EQ(sh_txn2.read_set_size(), 1);
-  ASSERT_TRUE(sh_txn2.read_set().contains("A"));
-  ASSERT_EQ(sh_txn2.write_set_size(), 0);
-  ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
-  delete sh_batch;
+        auto sh_txn1 = batch->transactions().at(0);
+        ASSERT_EQ(sh_txn1.read_set_size(), 1);
+        ASSERT_TRUE(sh_txn1.read_set().contains("A"));
+        ASSERT_EQ(sh_txn1.write_set_size(), 0);
+        ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
+
+        auto sh_txn2 = batch->transactions().at(1);
+        ASSERT_EQ(sh_txn2.read_set_size(), 0);
+        ASSERT_EQ(sh_txn2.write_set_size(), 1);
+        ASSERT_TRUE(sh_txn2.write_set().contains("D"));
+        ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
+        break;
+      }
+      case TransactionType::MULTI_HOME: {
+        ASSERT_EQ(batch->transactions_size(), 2);
+
+        auto mh_txn1 = batch->transactions().at(0);
+        ASSERT_EQ(mh_txn1, txn1);
+        
+        auto mh_txn2 = batch->transactions().at(1);
+        ASSERT_EQ(mh_txn2, txn2);
+        break;
+      }
+      default:
+        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: " 
+               << ENUM_NAME(batch->transaction_type(), TransactionType);
+        break;
+    }
+    delete batch;
+  }
 }
