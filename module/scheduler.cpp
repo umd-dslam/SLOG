@@ -18,7 +18,9 @@ Scheduler::Scheduler(
     Broker& broker,
     shared_ptr<Storage<Key, Record>> storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
-    kMultiHomeTxnLog(config->GetNumReplicas()),
+    // All single-home txn logs take indices in [0, num_replicas - 1],
+    // thus assigning num_replicas as the marker for multi-home txn log
+    kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
     worker_socket_(context, ZMQ_ROUTER),
     lock_manager_(config) {
@@ -124,7 +126,7 @@ void Scheduler::ProcessForwardBatch(
           VLOG(1) << "Received data for single-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Num txns: " << batch->transactions_size();
-         // If this batch come from the local region, put it into the local interleaver
+          // If this batch comes from the local region, put it into the local interleaver
           if (from_replica == config_->GetLocalReplica()) {
             local_interleaver_.AddBatchId(
                 machine_id.partition(),
@@ -132,7 +134,7 @@ void Scheduler::ProcessForwardBatch(
                 batch->id());
           }
           
-          all_local_logs_[from_replica].AddBatch(std::move(batch));
+          all_logs_[from_replica].AddBatch(std::move(batch));
           break;
         }
         case TransactionType::MULTI_HOME: {
@@ -142,8 +144,8 @@ void Scheduler::ProcessForwardBatch(
           // Multi-home txns are already ordered with respect to each other
           // and their IDs have been replaced with slot id in the orderer module
           // so here their id and slot id are the same
-          all_local_logs_[kMultiHomeTxnLog].AddSlot(batch->id(), batch->id());
-          all_local_logs_[kMultiHomeTxnLog].AddBatch(std::move(batch));
+          all_logs_[kMultiHomeTxnLogMarker].AddSlot(batch->id(), batch->id());
+          all_logs_[kMultiHomeTxnLogMarker].AddBatch(std::move(batch));
           break;
         }
         default:
@@ -161,7 +163,7 @@ void Scheduler::ProcessForwardBatch(
       VLOG(1) << "Received order for batch " << batch_order.batch_id()
               << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
 
-      all_local_logs_[from_replica].AddSlot(
+      all_logs_[from_replica].AddSlot(
           batch_order.slot(),
           batch_order.batch_id());
       break;
@@ -217,8 +219,8 @@ void Scheduler::TryUpdatingLocalLog() {
 }
 
 void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
-  // Interleave batches from local logs of all regions
-  for (auto& pair : all_local_logs_) {
+  // Interleave batches from local logs of all regions and the log of multi-home txn
+  for (auto& pair : all_logs_) {
     auto& local_log = pair.second;
     while (local_log.HasNextBatch()) {
       auto batch = local_log.NextBatch().second;

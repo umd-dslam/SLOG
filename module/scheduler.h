@@ -49,7 +49,7 @@ private:
   friend class Worker;
 
   // A marker for the special log containing only multi-home txn
-  const uint32_t kMultiHomeTxnLog;
+  const uint32_t kMultiHomeTxnLogMarker;
 
   void HandleInternalRequest(
     internal::Request&& req,
@@ -82,7 +82,7 @@ private:
   vector<unique_ptr<ModuleRunner>> workers_;
   queue<string> ready_workers_;
 
-  unordered_map<uint32_t, BatchLog> all_local_logs_;
+  unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
 
