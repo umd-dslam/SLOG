@@ -19,14 +19,14 @@ public:
   void AddSlot(SlotId slot_id, BatchId batch_id);
 
   bool HasNextBatch() const;
-  BatchPtr NextBatch();
+  std::pair<SlotId, BatchPtr> NextBatch();
 
 private:
   void UpdateReadyBatches();
 
   AsyncLog<BatchId> slots_;
   std::unordered_map<BatchId, BatchPtr> batches_;
-  std::queue<BatchId> ready_batches_;
+  std::queue<std::pair<SlotId, BatchId>> ready_batches_;
 };
 
 } // namespace slog

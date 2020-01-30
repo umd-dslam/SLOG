@@ -18,9 +18,12 @@ protected:
     }
   }
 
-  void AssertBatchId(uint32_t expected_id, BatchPtr batch) {
-    ASSERT_NE(nullptr, batch);
-    ASSERT_EQ(expected_id, batch->id());
+  bool BatchEQ(
+      pair<uint32_t, uint32_t> expected_id,
+      pair<SlotId, BatchPtr> batch) {
+    return batch.second != nullptr
+        && expected_id.second == batch.second->id()
+        && expected_id.first == batch.first;
   }
 
   BatchPtr batches[NUM_BATCHES]; // batch ids: 100 200 300
@@ -30,15 +33,15 @@ TEST_F(BatchLogTest, InOrder) {
   BatchLog log;
   log.AddSlot(0 /* slot_id */, 100 /* batch_id */);
   log.AddBatch(move(batches[0]));
-  AssertBatchId(100, log.NextBatch());
+  ASSERT_TRUE(BatchEQ({0, 100}, log.NextBatch()));
 
   log.AddSlot(1 /* slot_id */, 200 /* batch_id */);
   log.AddBatch(move(batches[1]));
-  AssertBatchId(200, log.NextBatch());
+  ASSERT_TRUE(BatchEQ({1, 200}, log.NextBatch()));
 
   log.AddSlot(2 /* slot_id */, 300 /* batch_id */);
   log.AddBatch(move(batches[2]));
-  AssertBatchId(300, log.NextBatch());
+  ASSERT_TRUE(BatchEQ({2, 300}, log.NextBatch()));
 
   ASSERT_FALSE(log.HasNextBatch());
 }
@@ -55,8 +58,8 @@ TEST_F(BatchLogTest, OutOfOrder) {
   ASSERT_FALSE(log.HasNextBatch());
 
   log.AddSlot(0 /* slot_id */, 200 /* batch_id */);
-  AssertBatchId(200, log.NextBatch());
-  AssertBatchId(100, log.NextBatch());
+  ASSERT_TRUE(BatchEQ({0, 200}, log.NextBatch()));
+  ASSERT_TRUE(BatchEQ({1, 100}, log.NextBatch()));
 
   ASSERT_FALSE(log.HasNextBatch());
 }
@@ -67,12 +70,12 @@ TEST_F(BatchLogTest, MultipleNextBatches) {
   log.AddBatch(move(batches[2]));
   log.AddBatch(move(batches[1]));
   log.AddBatch(move(batches[0]));
-  log.AddSlot(2 /* slot_id */, 300);
-  log.AddSlot(1 /* slot_id */, 200);
-  log.AddSlot(0 /* slot_id */, 100);
+  log.AddSlot(2 /* slot_id */, 300 /* batch_id */);
+  log.AddSlot(1 /* slot_id */, 200 /* batch_id */);
+  log.AddSlot(0 /* slot_id */, 100 /* batch_id */);
 
-  AssertBatchId(100, log.NextBatch());
-  AssertBatchId(200, log.NextBatch());
-  AssertBatchId(300, log.NextBatch());
+  ASSERT_TRUE(BatchEQ({0, 100}, log.NextBatch()));
+  ASSERT_TRUE(BatchEQ({1, 200}, log.NextBatch()));
+  ASSERT_TRUE(BatchEQ({2, 300}, log.NextBatch()));
   ASSERT_FALSE(log.HasNextBatch());
 }

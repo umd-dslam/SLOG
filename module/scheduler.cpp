@@ -18,6 +18,7 @@ Scheduler::Scheduler(
     Broker& broker,
     shared_ptr<Storage<Key, Record>> storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
+    kMultiHomeTxnLog(config->GetNumReplicas()),
     config_(config),
     worker_socket_(context, ZMQ_ROUTER),
     lock_manager_(config) {
@@ -118,19 +119,38 @@ void Scheduler::ProcessForwardBatch(
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
-      VLOG(1) << "Received data for batch " << batch->id()
+ 
+      switch (batch->transaction_type()) {
+        case TransactionType::SINGLE_HOME: {
+          VLOG(1) << "Received data for single-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Num txns: " << batch->transactions_size();
-
-      // If this batch come from the local region, put it into the local interleaver
-      if (from_replica == config_->GetLocalReplica()) {
-        local_interleaver_.AddBatchId(
-            machine_id.partition(),
-            forward_batch->same_origin_position(),
-            batch->id());
+         // If this batch come from the local region, put it into the local interleaver
+          if (from_replica == config_->GetLocalReplica()) {
+            local_interleaver_.AddBatchId(
+                machine_id.partition(),
+                forward_batch->same_origin_position(),
+                batch->id());
+          }
+          
+          all_local_logs_[from_replica].AddBatch(std::move(batch));
+          break;
+        }
+        case TransactionType::MULTI_HOME: {
+          VLOG(1) << "Received data for multi-home batch " << batch->id()
+              << " from [" << from_machine_id
+              << "]. Num txns: " << batch->transactions_size();
+          // Multi-home txns are already ordered with respect to each other
+          // and their IDs have been replaced with slot id in the orderer module
+          // so here their id and slot id are the same
+          all_local_logs_[kMultiHomeTxnLog].AddSlot(batch->id(), batch->id());
+          all_local_logs_[kMultiHomeTxnLog].AddBatch(std::move(batch));
+          break;
+        }
+        default:
+          break;
       }
-      
-      all_local_logs_[from_replica].AddBatch(std::move(batch));
+
       break;
     }
     case internal::ForwardBatch::kBatchOrder: {
@@ -199,28 +219,45 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
   for (auto& pair : all_local_logs_) {
     auto& local_log = pair.second;
     while (local_log.HasNextBatch()) {
-      auto batch = local_log.NextBatch();
+      auto batch = local_log.NextBatch().second;
       auto transactions = batch->mutable_transactions();
 
       while (!transactions->empty()) {
         auto txn = transactions->ReleaseLast();
-
         auto txn_type = txn->internal().type();
-        CHECK(txn_type == TransactionType::SINGLE_HOME 
-            || txn_type == TransactionType::LOCK_ONLY)
-            << "Transaction with type other than SINGLE_HOME or LOCK_ONLY received: "
-            << ENUM_NAME(txn_type, TransactionType);
 
-        if (txn_type == TransactionType::LOCK_ONLY) {
-          LOG(ERROR) << "LockOnlyTxn (MultiHome) encountered. Skipping for now...";
-          continue;
-        }
-
-        auto txn_id = txn->internal().id();
-        auto& holder = all_txns_[txn_id];
-        holder.txn.reset(txn);
-        if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
-          DispatchTransaction(txn_id); 
+        switch (txn_type) {
+          case TransactionType::SINGLE_HOME: {
+            auto txn_id = txn->internal().id();
+            auto& holder = all_txns_[txn_id];
+            holder.txn.reset(txn);
+            if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
+              DispatchTransaction(txn_id); 
+            }
+            break;
+          }
+          case TransactionType::MULTI_HOME: {
+            auto txn_id = txn->internal().id();
+            auto& holder = all_txns_[txn_id];
+            holder.txn.reset(txn);
+            if (lock_manager_.RegisterTxn(*holder.txn)) {
+              DispatchTransaction(txn_id); 
+            }
+            break;
+          }
+          case TransactionType::LOCK_ONLY: {
+            if (lock_manager_.AcquireLocks(*txn)) {
+              auto txn_id = txn->internal().id();
+              CHECK(all_txns_.count(txn_id) > 0) 
+                  << "Txn " << txn_id << " is not found for dispatching";
+              DispatchTransaction(txn_id);
+            }
+            delete txn;
+            break;
+          }
+          default:
+            LOG(ERROR) << "Unknown transaction type";
+            break;
         }
       }
     }

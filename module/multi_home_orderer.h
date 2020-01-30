@@ -31,6 +31,7 @@ private:
   shared_ptr<Configuration> config_;
   unique_ptr<PaxosClient> global_paxos_;
   unique_ptr<internal::Batch> batch_;
+  BatchId local_batch_id_counter_;
   BatchId batch_id_counter_;
 
   BatchLog multi_home_batch_log_;

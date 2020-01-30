@@ -48,6 +48,9 @@ protected:
 private:
   friend class Worker;
 
+  // A marker for the special log containing only multi-home txn
+  const uint32_t kMultiHomeTxnLog;
+
   void HandleInternalRequest(
     internal::Request&& req,
     const string& from_machine_id);

@@ -94,7 +94,14 @@ void MultiHomeOrderer::ProcessForwardBatch(
   }
 
   while (multi_home_batch_log_.HasNextBatch()) {
-    auto batch = multi_home_batch_log_.NextBatch();
+    auto batch_and_slot = multi_home_batch_log_.NextBatch();
+    auto slot = batch_and_slot.first;
+    auto& batch = batch_and_slot.second;
+
+    // Replace the batch id with its slot number so that it is
+    // easier to determine the batch order later on
+    batch->set_id(slot);
+
     Request req;
     auto forward_batch = req.mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());

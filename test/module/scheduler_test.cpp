@@ -8,11 +8,12 @@
 using namespace std;
 using namespace slog;
 
-internal::Request MakeForwardBatch(
+internal::Request MakeSingleHomeBatch(
     BatchId batch_id, const vector<Transaction>& txns) {
   internal::Request req;
   auto batch = req.mutable_forward_batch()->mutable_batch_data();
   batch->set_id(batch_id);
+  batch->set_transaction_type(TransactionType::SINGLE_HOME);
   for (auto txn : txns) {
     batch->mutable_transactions()->Add(move(txn));
   }
@@ -60,7 +61,7 @@ protected:
         const vector<size_t>& partitions) {
     for (auto partition : partitions) {
       MMessage msg;
-      msg.Set(MM_PROTO, MakeForwardBatch(batch_id, txns));
+      msg.Set(MM_PROTO, MakeSingleHomeBatch(batch_id, txns));
       msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
       input_[partition]->Send(msg);
 

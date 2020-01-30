@@ -20,16 +20,18 @@ bool BatchLog::HasNextBatch() const {
   return !ready_batches_.empty();
 }
 
-BatchPtr BatchLog::NextBatch() {
+std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
-  auto next_batch_id = ready_batches_.front();
+  auto next_slot = ready_batches_.front().first;
+  auto next_batch_id = ready_batches_.front().second;
   ready_batches_.pop();
 
   auto next_batch = std::move(batches_[next_batch_id]);
   batches_.erase(next_batch_id);
-  return next_batch;
+
+  return {next_slot, std::move(next_batch)};
 }
 
 void BatchLog::UpdateReadyBatches() {
@@ -38,7 +40,7 @@ void BatchLog::UpdateReadyBatches() {
     if (batches_.count(next_batch_id) == 0) {
       break;
     }
-    ready_batches_.push(slots_.Next().second);
+    ready_batches_.push(slots_.Next());
   }
 }
 
