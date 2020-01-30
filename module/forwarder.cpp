@@ -51,7 +51,7 @@ void Forwarder::HandleInternalRequest(
   for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
     Send(
         lookup_master_request,
-        MakeMachineId(rep, part),
+        MakeMachineIdAsString(rep, part),
         SERVER_CHANNEL);
   }
 }
@@ -134,7 +134,7 @@ void Forwarder::Forward(Transaction* txn) {
       SendSameMachine(forward_request, SEQUENCER_CHANNEL);
     } else {
       auto partition = RandomPartition(re_);
-      auto random_machine_in_home_replica = MakeMachineId(home_replica, partition);
+      auto random_machine_in_home_replica = MakeMachineIdAsString(home_replica, partition);
 
       VLOG(1) << "Forwarding txn " << txn_id << " to its home region (rep: "
               << home_replica << ", part: " << partition << ")";
@@ -145,7 +145,7 @@ void Forwarder::Forward(Transaction* txn) {
           SEQUENCER_CHANNEL);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    auto destination = MakeMachineId(
+    auto destination = MakeMachineIdAsString(
         config_->GetLocalReplica(),
         config_->GetLeaderPartitionForMultiHomeOrdering());
 

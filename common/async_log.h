@@ -5,6 +5,15 @@
 
 namespace slog {
 
+/**
+ * This data structure is a log of items numbered consecutively in
+ * an increasing order. 
+ * 
+ * Items can be added in any order but they are iterated one-by-one 
+ * following their number. In other words, if the item right after the
+ * most recently read item has not been added to the log, read cannot 
+ * advance. A log can only be iterated forward in one direction.
+ */
 template<typename T>
 class AsyncLog {
 public:

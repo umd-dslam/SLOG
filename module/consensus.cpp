@@ -12,7 +12,8 @@ vector<string> GlobalPaxos::GetMembers(
   vector<string> members;
   // Enlist a fixed machine at each region as members
   for (uint32_t rep = 0; rep < config->GetNumReplicas(); rep++) {
-    members.push_back(MakeMachineId(rep, part));
+    auto machine_id = MakeMachineIdAsString(rep, part);
+    members.push_back(machine_id);
   }
   return members;
 }
@@ -40,7 +41,7 @@ vector<string> LocalPaxos::GetMembers(
   vector<string> members;
   // Enlist all machines in the same region as members
   for (uint32_t part = 0; part < config->GetNumPartitions(); part++) {
-    members.push_back(MakeMachineId(local_rep, part));
+    members.push_back(MakeMachineIdAsString(local_rep, part));
   }
   return members;
 }

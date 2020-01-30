@@ -30,19 +30,18 @@ namespace slog {
  *                   |            K      Dealer  -----> Outgoing Message to XXX.XXX.XXX.XXX
  *                   |             E     Dealer  -----> Outgoing Message to YYY.YYY.YYY.YYY
  *  Module C <---> Channel C        R    Dealer  -----> Outgoing Message to ZZZ.ZZZ.ZZZ.ZZZ
- *                   |                   ...
+ *                   |                    ....                      ....
+ *                   |                     |
  *                   -----------------------
  * 
  * To receive messages from other machines, it uses a ZMQ_ROUTER socket, which automatically
  * prepends a connection identity to an arriving zmq message. Using this identity, it can
  * tell where the message comes from.
  * 
- * The messages going into the system via the router will be broker to the channel
+ * The messages going into the system via the router will be brokered to the channel
  * specified in each message. On the other end of each channel is a module which also runs
- * in its own thread. The module can also send messages back to the broker and
- * subsequently to other machines.
- * 
- * To send messages to other machines, a broker uses a ZMQ_DEALER socket for each machines.
+ * in its own thread. A module can also send messages back to the broker and the broker
+ * will subsequently send them to other machines through the appropriate ZMQ_DEALER sockets.
  * 
  */
 class Broker {

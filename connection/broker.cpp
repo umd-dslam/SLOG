@@ -108,7 +108,7 @@ bool Broker::InitializeConnection() {
   unordered_set<string> needed_machine_ids;
   for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
     for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-      needed_machine_ids.insert(MakeMachineId(rep, part));
+      needed_machine_ids.insert(MakeMachineIdAsString(rep, part));
     }
   }
 
@@ -132,7 +132,7 @@ bool Broker::InitializeConnection() {
       const auto& ready = request.broker_ready();
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
-      auto machine_id_str = MakeMachineId(
+      auto machine_id_str = MakeMachineIdAsString(
             machine_id.replica(), machine_id.partition());
 
       if (needed_machine_ids.count(machine_id_str) == 0) {

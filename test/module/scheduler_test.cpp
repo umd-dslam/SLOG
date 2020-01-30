@@ -110,7 +110,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       "GET C     \n"
       "SET F newF\n", /* code */
       {},
-      MakeMachineIdProto("0:1") /* coordinating server */);
+      MakeMachineId("0:1") /* coordinating server */);
   txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendBatch(100, {txn}, {1});

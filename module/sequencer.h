@@ -24,7 +24,7 @@ protected:
   void HandlePeriodicWakeUp() final;
 
 private:
-  void PutTransactionIntoBatch(Transaction* txn);
+  void PutSingleHomeTransactionIntoBatch(Transaction* txn);
   void ProcessMultiHomeBatch(internal::Batch* batch);
 
   BatchId NextBatchId();

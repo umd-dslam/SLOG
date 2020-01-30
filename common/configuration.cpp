@@ -105,7 +105,7 @@ vector<string> Configuration::GetAllMachineIds() const {
   ret.reserve(num_reps * num_parts);
   for (size_t rep = 0; rep < num_reps; rep++) {
     for (size_t part = 0; part < num_parts; part++) {
-      ret.push_back(MakeMachineId(rep, part));
+      ret.push_back(MakeMachineIdAsString(rep, part));
     }
   }
   return ret;
@@ -124,7 +124,7 @@ uint32_t Configuration::GetLocalPartition() const {
 }
 
 MachineId Configuration::GetLocalMachineIdAsProto() const {
-  return MakeMachineIdProto(local_replica_, local_partition_);
+  return MakeMachineId(local_replica_, local_partition_);
 }
 
 uint32_t Configuration::GetLocalMachineIdAsNumber() const {
@@ -132,7 +132,7 @@ uint32_t Configuration::GetLocalMachineIdAsNumber() const {
 }
 
 string Configuration::GetLocalMachineIdAsString() const {
-  return MakeMachineId(local_replica_, local_partition_);
+  return MakeMachineIdAsString(local_replica_, local_partition_);
 }
 
 uint32_t Configuration::GetLeaderPartitionForMultiHomeOrdering() const {

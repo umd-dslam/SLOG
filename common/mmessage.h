@@ -19,15 +19,20 @@ using google::protobuf::Message;
 namespace slog {
 
 /**
- * Encapsulates a multi-part zmq message:
+ * Encapsulates a ZMQ Multipart Message. See
+ * 
+ * + http://zguide.zeromq.org/php:chapter2#Multipart-Messages
+ * + http://zguide.zeromq.org/php:chapter3#The-Request-Reply-Mechanisms
+ * 
+ * for more about ZMQ Multipart Message. The general structure of
+ * a multipart message used here is:
  * 
  * [identity][empty frame][body_0][body_1]...
- *
- * 'identity' stores the identity of the sender and is optional
+ *  
+ * Where 'identity' stores the identity of the sender and is optional.
+ * Most frequently used messages are:
  * 
- * Typical messages are like:
- * 
- * [identity][empty frame][request][from channel][to channel]
+ * [identity][empty frame][request][from channel][to channel] 
  * 
  * [identity][empty frame][response][to channel]
  */

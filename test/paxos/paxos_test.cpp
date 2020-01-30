@@ -151,7 +151,7 @@ TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   vector<string> members;
   auto member_part = configs.front()->GetLeaderPartitionForMultiHomeOrdering();
   for (uint32_t rep = 0; rep < configs.front()->GetNumReplicas(); rep++) {
-    members.emplace_back(MakeMachineId(rep, member_part));
+    members.emplace_back(MakeMachineIdAsString(rep, member_part));
   }
   for (auto config : configs) {
     AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsString());

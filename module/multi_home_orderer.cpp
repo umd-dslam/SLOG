@@ -62,7 +62,8 @@ void MultiHomeOrderer::HandlePeriodicWakeUp() {
   // Replicate new batch to other regions
   auto part = config_->GetLeaderPartitionForMultiHomeOrdering();
   for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-    Send(req, MakeMachineId(rep, part), MULTI_HOME_ORDERER_CHANNEL);
+    auto machine_id = MakeMachineIdAsString(rep, part);
+    Send(req, machine_id, MULTI_HOME_ORDERER_CHANNEL);
   }
 
   batch_.reset(new Batch());

@@ -27,7 +27,7 @@ void Sequencer::HandleInternalRequest(
     case Request::kForwardTxn: {
       // Received a single-home txn
       auto txn = req.mutable_forward_txn()->release_txn();
-      PutTransactionIntoBatch(txn);
+      PutSingleHomeTransactionIntoBatch(txn);
       break;
     }
     case Request::kForwardBatch: {
@@ -67,7 +67,8 @@ void Sequencer::HandlePeriodicWakeUp() {
   // Replicate batch to all machines
   for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
     for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-      Send(req, MakeMachineId(rep, part), SCHEDULER_CHANNEL);
+      auto machine_id = MakeMachineIdAsString(rep, part);
+      Send(req, machine_id, SCHEDULER_CHANNEL);
     }
   }
 
@@ -79,7 +80,7 @@ void Sequencer::ProcessMultiHomeBatch(internal::Batch* batch) {
   while (!batch->transactions().empty()) {
     auto txn = batch->mutable_transactions()->ReleaseLast();
     auto& master_metadata = txn->internal().master_metadata();
-    auto RemoveKeysMasteredRemotely = [&master_metadata, local_rep](
+    auto KeepLocalKeysOnly = [&master_metadata, local_rep](
         auto key_map) {
       auto it = key_map->begin();
       while (it != key_map->end()) {
@@ -92,16 +93,16 @@ void Sequencer::ProcessMultiHomeBatch(internal::Batch* batch) {
       }
     };
 
-    RemoveKeysMasteredRemotely(txn->mutable_read_set());
-    RemoveKeysMasteredRemotely(txn->mutable_write_set());
+    KeepLocalKeysOnly(txn->mutable_read_set());
+    KeepLocalKeysOnly(txn->mutable_write_set());
 
     txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
-    PutTransactionIntoBatch(txn);
+    PutSingleHomeTransactionIntoBatch(txn);
   }
 }
 
-void Sequencer::PutTransactionIntoBatch(Transaction* txn) {
+void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
   CHECK(
       txn->internal().type() == TransactionType::SINGLE_HOME
       || txn->internal().type() == TransactionType::LOCK_ONLY)

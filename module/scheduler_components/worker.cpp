@@ -139,7 +139,7 @@ bool Worker::PrepareTransaction() {
   if (!to_be_sent->empty() && txn_state_->participants.count(local_partition) > 0) {
     auto local_replica = config->GetLocalReplica();
     for (auto participant : txn_state_->active_participants) {
-      auto machine_id = MakeMachineId(local_replica, participant);
+      auto machine_id = MakeMachineIdAsString(local_replica, participant);
       SendToScheduler(request, std::move(machine_id));
     }
   }

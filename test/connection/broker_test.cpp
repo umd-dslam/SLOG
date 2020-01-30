@@ -34,7 +34,7 @@ TEST(BrokerTest, PingPong) {
     msg.Set(MM_PROTO, MakeEchoRequest("ping"));
     msg.Set(MM_FROM_CHANNEL, SENDER);
     msg.Set(MM_TO_CHANNEL, RECEIVER);
-    msg.SetIdentity(MakeMachineId(0, 1));
+    msg.SetIdentity(MakeMachineIdAsString(0, 1));
     channel->Send(std::move(msg));
 
     // Wait for pong

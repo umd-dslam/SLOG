@@ -17,58 +17,33 @@ using std::unordered_set;
 
 namespace slog {
 
-inline internal::MachineId MakeMachineIdProto(uint32_t replica, uint32_t partition) {
-  internal::MachineId machine_id;  
-  machine_id.set_replica(replica);
-  machine_id.set_partition(partition);
-  return machine_id;
-}
+internal::MachineId MakeMachineId(uint32_t replica, uint32_t partition);
+internal::MachineId MakeMachineId(const string& machine_id_str);
 
-inline internal::MachineId MakeMachineIdProto(const string& machine_id_str) {
-  auto split = machine_id_str.find(':');
-  if (split == string::npos) {
-    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
-  }
-  try {
-    auto replica_str = machine_id_str.substr(0, split);
-    auto partition_str = machine_id_str.substr(split + 1);
-
-    internal::MachineId machine_id;
-    machine_id.set_replica(std::stoul(replica_str));
-    machine_id.set_partition(std::stoul(partition_str));
-    return machine_id;
-  } catch (...) {
-    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
-  }
-}
-
-inline string MakeMachineId(uint32_t replica, uint32_t partition) {
-  return std::to_string(replica) + ":" + std::to_string(partition);
-}
-
-inline string MakeMachineId(const internal::MachineId& machine_id) {
-  return MakeMachineId(machine_id.replica(), machine_id.partition());
-}
+string MakeMachineIdAsString(uint32_t replica, uint32_t partition);
+string MakeMachineIdAsString(const internal::MachineId& machine_id);
 
 /**
  * Creates a new transaction
- * @param read_set        Read set of the transaction
- * @param write_set       Write set of the transaction
- * @param code            Code of the transaction (not to be executed)
- * @param master_metadata Metadata regarding its mastership. This is used for
- *                        testing purpose.
- * @return                A new transaction having given properties
+ * @param read_set            Read set of the transaction
+ * @param write_set           Write set of the transaction
+ * @param code                Code of the transaction (not to be executed)
+ * @param master_metadata     Metadata regarding its mastership. This is used for
+ *                            testing purpose.
+ * @param coordinating_server MachineId of the server in charge of responding the
+ *                            transaction result to the client.
+ * @return                    A new transaction having given properties
  */
 Transaction MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code = "",
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-    const internal::MachineId coordinating_server = MakeMachineIdProto("0:0"));
+    const internal::MachineId coordinating_server = MakeMachineId("0:0"));
 
 /**
- * This function inspects the internal metadata of a transaction then
- * determines whether a transaction is SINGLE_HOME, MULTI_HOME, or UNKNOWN.
+ * Inspects the internal metadata of a transaction then determines whether
+ * a transaction is SINGLE_HOME, MULTI_HOME, or UNKNOWN.
  * Pre-condition: all keys in master_metadata exist in either write set or 
  * read set of the transaction
  * 
@@ -78,6 +53,12 @@ Transaction MakeTransaction(
  */
 TransactionType SetTransactionType(Transaction& txn);
 
+/**
+ * Merges the results of two transactions
+ * 
+ * @param txn   The transaction that will hold the final merged result
+ * @param other The transaction to be merged with
+ */
 void MergeTransaction(Transaction& txn, const Transaction& other);
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);

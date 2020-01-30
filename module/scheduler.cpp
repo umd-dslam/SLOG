@@ -112,7 +112,7 @@ void Scheduler::ProcessForwardBatch(
     const string& from_machine_id) {
   auto machine_id = from_machine_id.empty() 
     ? config_->GetLocalMachineIdAsProto() 
-    : MakeMachineIdProto(from_machine_id);
+    : MakeMachineId(from_machine_id);
   auto from_replica = machine_id.replica();
 
   switch (forward_batch->part_case()) {
@@ -189,7 +189,7 @@ void Scheduler::TryUpdatingLocalLog() {
     forward_batch_order->set_batch_id(batch_id);
     forward_batch_order->set_slot(slot_id);
     for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-      SendSameChannel(request, MakeMachineId(rep, local_partition));
+      SendSameChannel(request, MakeMachineIdAsString(rep, local_partition));
     }
   }
 }
@@ -250,7 +250,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
       participants.begin(),
       participants.end(),
       local_partition) != participants.end()) {
-    auto coordinating_server = MakeMachineId(
+    auto coordinating_server = MakeMachineIdAsString(
           txn->internal().coordinating_server());
     Request req;
     auto forward_sub_txn = req.mutable_forward_sub_txn();
