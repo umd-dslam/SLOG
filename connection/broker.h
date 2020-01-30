@@ -47,7 +47,7 @@ namespace slog {
 class Broker {
 public:
   Broker(
-      shared_ptr<const Configuration> config, 
+      ConfigurationPtr config, 
       shared_ptr<zmq::context_t> context,
       long poll_timeout_ms = BROKER_POLL_TIMEOUT_MS);
   ~Broker();
@@ -79,7 +79,7 @@ private:
 
   zmq::pollitem_t GetRouterPollItem();
 
-  shared_ptr<const Configuration> config_;
+  ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   long poll_timeout_ms_;
   zmq::socket_t router_;

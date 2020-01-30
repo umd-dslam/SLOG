@@ -9,9 +9,7 @@ namespace slog {
 using internal::Batch;
 using internal::Request;
 
-MultiHomeOrderer::MultiHomeOrderer(
-    shared_ptr<Configuration> config,
-    Broker& broker) 
+MultiHomeOrderer::MultiHomeOrderer(ConfigurationPtr config, Broker& broker) 
   : BasicModule(
         broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL),
         config->GetBatchDuration()),

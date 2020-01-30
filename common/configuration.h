@@ -14,9 +14,13 @@ namespace slog {
 
 using internal::MachineId;
 
+class Configuration;
+
+using ConfigurationPtr = std::shared_ptr<const Configuration>;
+
 class Configuration {
 public:
-  static std::shared_ptr<Configuration> FromFile(
+  static ConfigurationPtr FromFile(
       const string& file_path,
       const string& local_address,
       uint32_t local_replica,
@@ -49,7 +53,7 @@ public:
 
   // TODO: How keys are partitioned is hardcoded for now. 
   //       Maybe find a more dynamic way to do this
-  uint32_t KeyToPartition(const Key& key) const;
+  uint32_t GetPartitionOfKey(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
 
 private:

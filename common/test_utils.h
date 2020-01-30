@@ -14,7 +14,7 @@ using std::unique_ptr;
 
 namespace slog {
 
-using ConfigVec = std::vector<shared_ptr<Configuration>>;
+using ConfigVec = std::vector<ConfigurationPtr>;
 
 internal::Request MakeEchoRequest(const string& data);
 internal::Response MakeEchoResponse(const string& data);
@@ -27,9 +27,13 @@ ConfigVec MakeTestConfigurations(
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 
+/**
+ * This is a fake SLOG system where we can only add a subset
+ * of modules to test them in isolation.
+ */
 class TestSlog {
 public:
-  TestSlog(shared_ptr<Configuration> config);
+  TestSlog(ConfigurationPtr config);
   void Data(Key&& key, Record&& record);
   void AddServerAndClient();
   void AddForwarder();
@@ -43,7 +47,7 @@ public:
   void SendTxn(const Transaction& txn);
 
 private:
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
   Broker broker_;

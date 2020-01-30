@@ -12,9 +12,7 @@ namespace slog {
 
 class Sequencer : public BasicModule {
 public:
-  Sequencer(
-      shared_ptr<Configuration> config,
-      Broker& broker);
+  Sequencer(ConfigurationPtr config, Broker& broker);
 
 protected:
   void HandleInternalRequest(
@@ -30,7 +28,7 @@ private:
   void ProcessMultiHomeBatch(internal::Request&& request);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   unique_ptr<PaxosClient> local_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;

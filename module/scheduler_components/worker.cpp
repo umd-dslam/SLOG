@@ -95,7 +95,7 @@ bool Worker::PrepareTransaction() {
   vector<Key> remote_read_keys;
   for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;
-    auto partition = config->KeyToPartition(key);
+    auto partition = config->GetPartitionOfKey(key);
     if (partition == local_partition) {
       Record record;
       storage_->Read(key, record);
@@ -115,7 +115,7 @@ bool Worker::PrepareTransaction() {
   vector<Key> remote_write_keys;
   for (auto& key_value : *txn->mutable_write_set()) {
     const auto& key = key_value.first;
-    auto partition = config->KeyToPartition(key);
+    auto partition = config->GetPartitionOfKey(key);
     if (partition == local_partition) {
 
       is_passive_participant = false;

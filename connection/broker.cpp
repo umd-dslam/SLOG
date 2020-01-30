@@ -19,7 +19,7 @@ namespace slog {
 using internal::Request;
 
 Broker::Broker(
-    shared_ptr<const Configuration> config, 
+    ConfigurationPtr config, 
     shared_ptr<zmq::context_t> context,
     long poll_timeout_ms) 
   : config_(config),

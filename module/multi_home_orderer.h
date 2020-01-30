@@ -10,9 +10,7 @@ namespace slog {
 
 class MultiHomeOrderer : public BasicModule {
 public:
-  MultiHomeOrderer(
-      shared_ptr<Configuration> config,
-      Broker& broker);
+  MultiHomeOrderer(ConfigurationPtr config, Broker& broker);
 
 protected:
   void HandleInternalRequest(
@@ -28,7 +26,7 @@ private:
   void ProcessForwardBatch(
       internal::ForwardBatch* forward_batch);
 
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   unique_ptr<PaxosClient> global_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId local_batch_id_counter_;

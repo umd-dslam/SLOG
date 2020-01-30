@@ -13,7 +13,7 @@ using internal::Response;
 const string Scheduler::WORKERS_ENDPOINT("inproc://workers");
 
 Scheduler::Scheduler(
-    shared_ptr<Configuration> config,
+    ConfigurationPtr config,
     zmq::context_t& context,
     Broker& broker,
     shared_ptr<Storage<Key, Record>> storage)

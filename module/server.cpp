@@ -10,7 +10,7 @@ using std::move;
 namespace slog {
 
 Server::Server(
-    shared_ptr<const Configuration> config,
+    ConfigurationPtr config,
     zmq::context_t& context,
     Broker& broker,
     shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)

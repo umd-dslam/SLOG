@@ -52,8 +52,7 @@ private:
 
 class PaxosTest : public ::testing::Test {
 protected:
-  void AddAndStartNewPaxos(
-      shared_ptr<Configuration> config) {
+  void AddAndStartNewPaxos(ConfigurationPtr config) {
     AddAndStartNewPaxos(
         config,
         config->GetAllMachineIds(),
@@ -61,7 +60,7 @@ protected:
   }
 
   void AddAndStartNewPaxos(
-      shared_ptr<Configuration> config,
+      ConfigurationPtr config,
       const vector<string>& members,
       const string& me) {
     auto context = make_shared<zmq::context_t>(1);

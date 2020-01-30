@@ -28,7 +28,7 @@ struct PendingResponse {
 class Server : public Module, ChannelHolder {
 public:
   Server(
-      shared_ptr<const Configuration> config,
+      ConfigurationPtr config,
       zmq::context_t& context,
       Broker& broker,
       shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index);
@@ -58,7 +58,7 @@ private:
 
   TxnId NextTxnId();
 
-  shared_ptr<const Configuration> config_;
+  ConfigurationPtr config_;
   zmq::socket_t client_socket_;
   std::vector<zmq::pollitem_t> poll_items_;
 

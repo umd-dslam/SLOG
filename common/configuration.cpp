@@ -26,7 +26,7 @@ uint32_t FNVHash(It begin, It end) {
 
 using std::runtime_error;
 
-std::shared_ptr<Configuration> Configuration::FromFile(
+ConfigurationPtr Configuration::FromFile(
     const std::string& file_path, 
     const std::string& local_address,
     uint32_t local_replica,
@@ -141,7 +141,7 @@ uint32_t Configuration::GetLeaderPartitionForMultiHomeOrdering() const {
   return GetNumPartitions() - 1;
 }
 
-uint32_t Configuration::KeyToPartition(const Key& key) const {
+uint32_t Configuration::GetPartitionOfKey(const Key& key) const {
   auto end = config_.partition_key_num_bytes() >= key.length() 
       ? key.end() 
       : key.begin() + config_.partition_key_num_bytes();
@@ -149,7 +149,7 @@ uint32_t Configuration::KeyToPartition(const Key& key) const {
 }
 
 bool Configuration::KeyIsInLocalPartition(const Key& key) const {
-  return KeyToPartition(key) == local_partition_;
+  return GetPartitionOfKey(key) == local_partition_;
 }
 
 } // namespace slog

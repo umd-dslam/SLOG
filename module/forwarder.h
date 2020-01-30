@@ -16,9 +16,7 @@ namespace slog {
 
 class Forwarder : public BasicModule {
 public:
-  Forwarder(
-      shared_ptr<Configuration> config,
-      Broker& broker);
+  Forwarder(ConfigurationPtr config, Broker& broker);
 
 protected:
   void HandleInternalRequest(
@@ -37,7 +35,7 @@ private:
    */
   void Forward(Transaction* txn);
 
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   unordered_map<TxnId, Transaction*> pending_transaction_;
 
   // A constant seed is fine so we don't need a random_device

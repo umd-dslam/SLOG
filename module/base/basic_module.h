@@ -35,7 +35,8 @@ private:
   bool NeedWakeUp() const;
 
   zmq::pollitem_t poll_item_;
-  long wake_up_every_ms_, poll_timeout_ms_;
+  long wake_up_every_ms_;
+  long poll_timeout_ms_;
   TimePoint wake_up_deadline_;
 };
 

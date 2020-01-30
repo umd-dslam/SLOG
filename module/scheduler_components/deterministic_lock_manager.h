@@ -47,7 +47,7 @@ private:
  */
 class DeterministicLockManager {
 public:
-  DeterministicLockManager(shared_ptr<Configuration> config);
+  DeterministicLockManager(ConfigurationPtr config);
 
   bool RegisterTxn(const Transaction& txn);
 
@@ -72,7 +72,7 @@ public:
   unordered_set<TxnId> ReleaseLocks(const Transaction& txn);
 
 private:
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
 };

@@ -18,9 +18,7 @@ bool TransactionContainsKey(const Transaction& txn, const Key& key) {
 
 } // namespace
 
-Forwarder::Forwarder(
-    shared_ptr<Configuration> config,
-    Broker& broker) 
+Forwarder::Forwarder(ConfigurationPtr config, Broker& broker) 
   : BasicModule(broker.AddChannel(FORWARDER_CHANNEL)),
     config_(config),
     RandomPartition(0, config->GetNumPartitions() - 1) {}

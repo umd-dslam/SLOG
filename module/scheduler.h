@@ -35,7 +35,7 @@ public:
   static const string WORKERS_ENDPOINT;
 
   Scheduler(
-      shared_ptr<Configuration> config,
+      ConfigurationPtr config,
       zmq::context_t& context,
       Broker& broker,
       shared_ptr<Storage<Key, Record>> storage);
@@ -76,7 +76,7 @@ private:
 
   void SendToWorker(internal::Request&& req, const string& worker);
 
-  shared_ptr<Configuration> config_;
+  ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
   vector<zmq::pollitem_t> poll_items_;
   vector<unique_ptr<ModuleRunner>> workers_;

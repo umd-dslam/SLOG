@@ -72,7 +72,7 @@ ConfigVec MakeTestConfigurations(
   return configs;
 }
 
-TestSlog::TestSlog(shared_ptr<Configuration> config)
+TestSlog::TestSlog(ConfigurationPtr config)
   : config_(config),
     context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage<Key, Record, Metadata>()),
@@ -82,7 +82,7 @@ TestSlog::TestSlog(shared_ptr<Configuration> config)
 
 void TestSlog::Data(Key&& key, Record&& record) {
   CHECK(config_->KeyIsInLocalPartition(key)) 
-      << "Key \"" << key << "\" belongs to partition " << config_->KeyToPartition(key);
+      << "Key \"" << key << "\" belongs to partition " << config_->GetPartitionOfKey(key);
   storage_->Write(key, record);
 }
 

@@ -103,8 +103,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-DeterministicLockManager::DeterministicLockManager(
-    shared_ptr<Configuration> config)
+DeterministicLockManager::DeterministicLockManager(ConfigurationPtr config)
   : config_(config) {}
 
 bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {

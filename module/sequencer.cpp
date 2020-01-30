@@ -9,9 +9,7 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(
-    shared_ptr<Configuration> config,
-    Broker& broker)
+Sequencer::Sequencer(ConfigurationPtr config, Broker& broker)
   : BasicModule(
         broker.AddChannel(SEQUENCER_CHANNEL),
         config->GetBatchDuration() /* wake_up_every_ms */),
