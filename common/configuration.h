@@ -48,7 +48,7 @@ public:
   uint32_t GetLeaderPartitionForMultiHomeOrdering() const;
 
   // TODO: How keys are partitioned is hardcoded for now. 
-  //       Later find a better place to put this method
+  //       Maybe find a more dynamic way to do this
   uint32_t KeyToPartition(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
 

@@ -25,11 +25,10 @@ Scheduler::Scheduler(
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
-    static_cast<void*>(worker_socket_),
-    0, /* fd */
-    ZMQ_POLLIN,
-    0 /* revent */
-  });
+      static_cast<void*>(worker_socket_),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */});
 
   for (size_t i = 0; i < config->GetNumWorkers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(*this, context, storage));
@@ -112,8 +111,8 @@ void Scheduler::ProcessForwardBatch(
     internal::ForwardBatch* forward_batch,
     const string& from_machine_id) {
   auto machine_id = from_machine_id.empty() 
-    ? config_->GetLocalMachineIdAsProto() 
-    : MakeMachineId(from_machine_id);
+      ? config_->GetLocalMachineIdAsProto() 
+      : MakeMachineId(from_machine_id);
   auto from_replica = machine_id.replica();
 
   switch (forward_batch->part_case()) {
@@ -148,6 +147,9 @@ void Scheduler::ProcessForwardBatch(
           break;
         }
         default:
+          LOG(ERROR) << "Invalid transaction type given to a batch. "
+                     << "Only SINGLE_HOME and MULTI_HOME are accepted. Received "
+                     << ENUM_NAME(batch->transaction_type(), TransactionType);
           break;
       }
 
@@ -312,6 +314,8 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);
 
+  // The transaction need always be sent to a worker before
+  // any remote reads is sent for that transaction
   // TODO: pretty sure that the order of messages follow the order of these
   // function calls but investigate a bit about ZMQ ordering to be sure
   SendToWorker(std::move(req), holder.worker);

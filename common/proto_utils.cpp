@@ -92,8 +92,8 @@ Transaction MakeTransaction(
       metadata.set_master(pair.second.first);
       metadata.set_counter(pair.second.second);
       txn.mutable_internal()
-        ->mutable_master_metadata()
-        ->insert({pair.first, std::move(metadata)});
+          ->mutable_master_metadata()
+          ->insert({pair.first, std::move(metadata)});
     }
   }
   txn.mutable_internal()
