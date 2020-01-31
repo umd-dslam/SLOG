@@ -19,16 +19,16 @@ class AsyncLog {
 public:
   AsyncLog(uint32_t start_from = 0) : next_(start_from) {}
   
-  void Insert(uint32_t position, T item) {
+  void Insert(uint32_t position, const T& item) {
     if (position < next_) {
       return;
     }
-    if (log_.count(position) > 0) {
+    auto ret = log_.emplace(position, item);
+    if (ret.second == false) {
       std::ostringstream os;
       os << "Log position " << position << " has already been taken";
       throw std::runtime_error(os.str());
     }
-    log_[position] = item;
   }
 
   bool HasNext() const {
