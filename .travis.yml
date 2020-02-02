@@ -1,5 +1,8 @@
 language: cpp
 
+before_install:
+  - cmake -version
+
 install:
   - ./install-deps.sh
 

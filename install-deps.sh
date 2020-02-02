@@ -26,7 +26,7 @@ else
   cd zeromq-4.3.2
   mkdir -p build
   cd build
-  cmake .. -D WITH_PERF_TOOL=OFF -D ZMQ_BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=$INSTALL_PREFIX
+  cmake .. -DWITH_PERF_TOOL=OFF -DZMQ_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX
   make -j$(nproc) install
   cd ../..
 
@@ -48,7 +48,7 @@ else
   cd cppzmq-4.5.0
   mkdir -p build
   cd build
-  cmake .. -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX
+  cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX
   make -j$(nproc) install
   cd ../..
 
