@@ -1,0 +1,8 @@
+language: cpp
+install: install-deps.sh
+script:
+  - mkdir -p build
+  - cd build
+  - cmake ..
+  - make
+  - ctest
