@@ -2,7 +2,7 @@
 
 # SLOG
 
-[![Build Status](https://travis-ci.org/ctring/SLOG.svg?branch=master)](https://travis-ci.org/ctring/SLOG) [![Coverage Status](https://coveralls.io/repos/github/ctring/SLOG/badge.svg?branch=master)](https://coveralls.io/github/ctring/SLOG?branch=master)
+[![Build Status](https://travis-ci.org/ctring/SLOG.svg?branch=master)](https://travis-ci.org/ctring/SLOG)
 
 This is a prototype of the system described in [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
