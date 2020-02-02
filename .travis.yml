@@ -1,5 +1,5 @@
 language: cpp
-install: install-deps.sh
+install: ./install-deps.sh
 script:
   - mkdir -p build
   - cd build
