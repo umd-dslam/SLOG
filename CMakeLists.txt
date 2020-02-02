@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12.4)
 project(slog)
 
-set(DEPENDENCIES_DIR ".dep")
+set(DEPENDENCIES_DIR ".deps")
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_STANDARD 14)

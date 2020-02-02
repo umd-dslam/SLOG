@@ -1,5 +1,13 @@
 language: cpp
 
+env:
+  - GLOG_v=1
+  - GLOG_logtostderr=1
+
+cache:
+  directories:
+    - .deps
+
 before_install:
   - cmake -version
 
@@ -11,4 +19,4 @@ script:
   - cd build
   - cmake ..
   - make -j$(nproc)
-  - ctest
+  - ctest --output-on-failure

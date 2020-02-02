@@ -4,9 +4,9 @@
 set -e
 
 # Install toolings to compile dependencies
-sudo apt install autoconf automake libtool curl make g++ unzip libreadline-dev libgtest-dev pkg-config || true
+sudo apt install autoconf automake libtool curl make g++ unzip libreadline-dev pkg-config || true
 
-INSTALL_PREFIX=$PWD/.dep
+INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
 mkdir -p $INSTALL_PREFIX
 cd $INSTALL_PREFIX
@@ -113,6 +113,27 @@ else
   echo "Installing glog"
   cd glog-0.3.4
   ./configure --prefix=$INSTALL_PREFIX
+  make -j$(nproc) install
+  cd ..
+
+  cd ..
+  rm -rf $DOWNLOAD_DIR
+fi
+
+if [ -n "$(find $INSTALL_PREFIX -name 'libgtest*')" ]; then
+  echo "Found gtest. Skipping installation."
+else
+  mkdir -p $DOWNLOAD_DIR
+  cd $DOWNLOAD_DIR
+  echo "Downloading gtest"
+  wget -nc https://github.com/google/googletest/archive/release-1.10.0.tar.gz
+  tar -xzf release-1.10.0.tar.gz
+  rm -r release-1.10.0.tar.gz
+
+  echo "Installing gtest"
+  cd googletest-release-1.10.0
+  mkdir build && cd build
+  cmake .. -DBUILD_SHARED_LIBS=ON -DINSTALL_GTEST=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX
   make -j$(nproc) install
   cd ..
 
