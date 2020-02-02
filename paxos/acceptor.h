@@ -10,6 +10,9 @@ class SimpleMultiPaxos;
 
 class Acceptor {
 public:
+  /**
+   * @param sender The enclosing Paxos class
+   */
   Acceptor(SimpleMultiPaxos& sender);
 
   void HandleRequest(

@@ -109,15 +109,16 @@ DeterministicLockManager::DeterministicLockManager(ConfigurationPtr config)
 bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
   auto txn_id = txn.internal().id();
   unordered_set<Key> all_keys;
-  auto AddToAllKeys = [&all_keys, this](auto& key_values) {
-    for (const auto& kv : key_values) {
-      if (config_->KeyIsInLocalPartition(kv.first)) {
-        all_keys.insert(kv.first);
-      }
+  for (const auto& kv : txn.read_set()) {
+    if (config_->KeyIsInLocalPartition(kv.first)) {
+      all_keys.insert(kv.first);
     }
-  };
-  AddToAllKeys(txn.read_set());
-  AddToAllKeys(txn.write_set());
+  }
+  for (const auto& kv : txn.write_set()) {
+    if (config_->KeyIsInLocalPartition(kv.first)) {
+      all_keys.insert(kv.first);
+    }
+  }
 
   num_locks_waited_[txn_id] += all_keys.size();
 
