@@ -18,7 +18,7 @@ using std::vector;
 namespace slog {
 
 /**
- * A Broker distributes messages in and out of a machine.
+ * A Broker distributes messages into and out of a machine.
  * It runs its own thread with the components depicted below
  * 
  *                   -----------------------
@@ -60,11 +60,11 @@ private:
   string MakeEndpoint(const string& addr = "") const;
 
   /**
-   * A broker only starts working after every other broker is up and send a READY
+   * A broker only starts working after every other broker is up and sends a READY
    * message to everyone. There is one caveat: if after the synchronization happens, 
    * a machine goes down, and restarts, that machine cannot join anymore since the
-   * READY messages are only sent once in the beginning. 
-   * In production system, HEARTBEAT messages should be periodically sent out instead
+   * READY messages are only sent once in the beginning.
+   * In a real system, HEARTBEAT messages should be periodically sent out instead
    * to mitigate this problem.
    */
   bool InitializeConnection();

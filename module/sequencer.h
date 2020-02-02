@@ -10,6 +10,20 @@
 
 namespace slog {
 
+/**
+ * A Sequencer batches transactions before sending to the Scheduler.
+ * 
+ * INPUT: ForwardTxn or ForwardBatch
+ * 
+ * OUTPUT: For ForwardTxn, a SINGLE_HOME txn is expected and then put 
+ *         into a batch before sending to the Scheduler in the same
+ *         machine.
+ * 
+ *         For ForwardBatch, MULTI_HOME txns are expected. For each txn,
+ *         a corresponding LockOnly txn is created and put into the
+ *         same batch as the SINGLE_HOME txn above. The MULTI_HOME txn
+ *         is sent to ALL Schedulers in the SAME region.
+ */
 class Sequencer : public BasicModule {
 public:
   Sequencer(ConfigurationPtr config, Broker& broker);
@@ -32,7 +46,6 @@ private:
   unique_ptr<PaxosClient> local_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
-  BatchId current_batch_id_;
 };
 
 } // namespace slog

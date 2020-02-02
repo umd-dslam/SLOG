@@ -223,6 +223,8 @@ void Worker::SendToScheduler(
     string&& forward_to_machine) {
   MMessage msg;
   msg.Set(MM_PROTO, req_or_res);
+  // MM_PROTO + 1 is a convention between the Scheduler and
+  // Worker to specify the destination of this message
   msg.Set(MM_PROTO + 1, std::move(forward_to_machine));
   msg.SendTo(scheduler_socket_);
 }

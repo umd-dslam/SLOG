@@ -9,10 +9,10 @@ namespace slog {
 class ChannelListener;
 
 /**
- * A Channel is the interface between a module (e.g. Server, Sequencer) and the
- * network layer. The Broker use the channels to pass message from the outside
- * into the internal modules. To get the messages, a module would obtain the
- * listener corresponding to a channel and poll messages via the listener.
+ * A Channel is the interface between a module (e.g. Sequencer) and the
+ * network layer. The Broker uses channels to pass message from the outside
+ * into the internal modules. To read the messages, a module need to obtain
+ * the listener corresponding to a channel and poll messages via the listener.
  */
 class Channel {
 public:

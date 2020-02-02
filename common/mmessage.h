@@ -30,11 +30,10 @@ namespace slog {
  * [identity][empty frame][body_0][body_1]...
  *  
  * Where 'identity' stores the identity of the sender and is optional.
- * Most frequently used messages are:
- * 
- * [identity][empty frame][request][from channel][to channel] 
- * 
- * [identity][empty frame][response][to channel]
+ * For example, some messages look like follows:
+ *
+ * [identity][empty][request][from channel][to channel]
+ * [identity][empty][response][empty][to channel]
  */
 class MMessage {
 public:

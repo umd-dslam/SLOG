@@ -135,9 +135,7 @@ void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
 
 BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
-  current_batch_id_ =
-      batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
-  return current_batch_id_;
+  return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
 }
 
 } // namespace slog

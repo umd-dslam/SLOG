@@ -18,8 +18,8 @@ Scheduler::Scheduler(
     Broker& broker,
     shared_ptr<Storage<Key, Record>> storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
-    // All single-home txn logs take indices in [0, num_replicas - 1],
-    // thus assigning num_replicas as the marker for multi-home txn log
+    // All single-home txn logs take indices in the [0, num_replicas - 1]
+    // range, num_replicas can be used as the marker for multi-home txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
     worker_socket_(context, ZMQ_ROUTER),
@@ -57,12 +57,16 @@ void Scheduler::Loop() {
   }
 
   if (HasMessageFromWorker()) {
+    // Receive from worker socket
     MMessage msg(worker_socket_);
     if (msg.IsProto<Request>()) {
-      // Forward requests from worker to remote machines
+      // A worker wants to send a request to worker on another 
+      // machine, so forwarding the request on its behalf
       Request forwarded_req;
       msg.GetProto(forwarded_req);
       string destination;
+      // MM_PROTO + 1 is a convention between the Scheduler and
+      // Worker to specify the destination of this message
       msg.GetString(destination, MM_PROTO + 1);
 
       SendSameChannel(forwarded_req, destination);
@@ -72,7 +76,7 @@ void Scheduler::Loop() {
       Response res;
       msg.GetProto(res);
       ready_workers_.push(msg.GetIdentity());
-
+      // Handle the results produced by the worker
       HandleResponseFromWorker(std::move(res));
     }
   }
@@ -149,7 +153,7 @@ void Scheduler::ProcessForwardBatch(
           break;
         }
         default:
-          LOG(ERROR) << "Invalid transaction type given to a batch. "
+          LOG(ERROR) << "Received batch with invalid transaction type. "
                      << "Only SINGLE_HOME and MULTI_HOME are accepted. Received "
                      << ENUM_NAME(batch->transaction_type(), TransactionType);
           break;
@@ -191,16 +195,15 @@ void Scheduler::ProcessRemoteReadResult(
     // Save the remote reads that come before the txn
     // is processed by this partition
     //
-    // TODO: If this request is not needed but still arrives and arrives AFTER
-    // the transaction is already commited, it will be stuck in early_remote_reads
-    // forever. Consider garbage collecting them.
+    // TODO: If this request is not needed but still arrives AFTER the transaction 
+    // is already commited, it will be stuck in early_remote_reads forever.
+    // Consider garbage collecting them if needed
     VLOG(1) << "Got early remote read result";
     holder.early_remote_reads.push_back(std::move(req));
   }
 }
 
 void Scheduler::TryUpdatingLocalLog() {
-  // Update the local log of the local region
   auto local_partition = config_->GetLocalPartition();
   while (local_interleaver_.HasNextBatch()) {
     auto slot_id_and_batch_id = local_interleaver_.NextBatch();
@@ -319,7 +322,7 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
   // TODO: pretty sure that the order of messages follow the order of these
-  // function calls but investigate a bit about ZMQ ordering to be sure
+  // function calls but should look a bit more into ZMQ ordering to be sure
   SendToWorker(std::move(req), holder.worker);
   for (auto& remote_read : holder.early_remote_reads) {
     SendToWorker(std::move(remote_read), holder.worker);

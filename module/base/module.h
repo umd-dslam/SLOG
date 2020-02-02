@@ -17,11 +17,10 @@ namespace slog {
  * to connect to a single channel from the broker so they usually
  * extend from BasicModule. Extending from this class is
  * only needed if a module needs more than one socket and
- * needs more flexibility in implementation (for example: Server)
+ * more flexibility in implementation (for example: Server)
  * 
- * A module cannot run on its own but only contains the instructions
- * for what to run. It has to be coupled with a ModuleRunner, which
- * at heart is an indefinite loop.
+ * A module cannot run on its own and only contains the instructions
+ * for what to run. It has to be coupled with a ModuleRunner.
  */
 class Module {
 public:

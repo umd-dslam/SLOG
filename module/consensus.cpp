@@ -19,10 +19,10 @@ vector<string> GlobalPaxos::GetMembers(ConfigurationPtr config) {
 
 GlobalPaxos::GlobalPaxos(ConfigurationPtr config, Broker& broker)
   : SimpleMultiPaxos(
-        GLOBAL_PAXOS,
-        broker,
-        GetMembers(config),
-        config->GetLocalMachineIdAsString()) {}
+      GLOBAL_PAXOS,
+      broker,
+      GetMembers(config),
+      config->GetLocalMachineIdAsString()) {}
 
 void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;

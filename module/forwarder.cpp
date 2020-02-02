@@ -16,6 +16,24 @@ bool TransactionContainsKey(const Transaction& txn, const Key& key) {
   return txn.read_set().contains(key) || txn.write_set().contains(key);
 }
 
+Request MakeLookupMasterRequest(const Transaction& txn) {
+  auto& metadata = txn.internal().master_metadata();
+  Request req;
+  auto lookup_master = req.mutable_lookup_master();
+  lookup_master->set_txn_id(txn.internal().id());
+  for (const auto& pair : txn.read_set()) {
+    if (!metadata.contains(pair.first)) {
+      lookup_master->add_keys(pair.first);
+    }
+  }
+  for (const auto& pair : txn.write_set()) {
+    if (!metadata.contains(pair.first)) {
+      lookup_master->add_keys(pair.first);
+    }
+  }
+  return req;
+}
+
 } // namespace
 
 Forwarder::Forwarder(ConfigurationPtr config, Broker& broker) 
@@ -52,24 +70,6 @@ void Forwarder::HandleInternalRequest(
         MakeMachineIdAsString(rep, part),
         SERVER_CHANNEL);
   }
-}
-
-Request Forwarder::MakeLookupMasterRequest(const Transaction& txn) {
-  auto& metadata = txn.internal().master_metadata();
-  Request req;
-  auto lookup_master = req.mutable_lookup_master();
-  lookup_master->set_txn_id(txn.internal().id());
-  for (const auto& pair : txn.read_set()) {
-    if (!metadata.contains(pair.first)) {
-      lookup_master->add_keys(pair.first);
-    }
-  }
-  for (const auto& pair : txn.write_set()) {
-    if (!metadata.contains(pair.first)) {
-      lookup_master->add_keys(pair.first);
-    }
-  }
-  return req;
 }
 
 void Forwarder::HandleInternalResponse(
@@ -121,15 +121,15 @@ void Forwarder::Forward(Transaction* txn) {
   auto& master_metadata = txn->internal().master_metadata();
 
   // Prepare a request to be forwarded to a sequencer
-  Request forward_request;
-  forward_request.mutable_forward_txn()->set_allocated_txn(txn);
+  Request forward_txn;
+  forward_txn.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->GetLocalReplica()) {
-      SendSameMachine(forward_request, SEQUENCER_CHANNEL);
+      SendSameMachine(forward_txn, SEQUENCER_CHANNEL);
     } else {
       auto partition = RandomPartition(re_);
       auto random_machine_in_home_replica = MakeMachineIdAsString(home_replica, partition);
@@ -138,7 +138,7 @@ void Forwarder::Forward(Transaction* txn) {
               << home_replica << ", part: " << partition << ")";
 
       Send(
-          forward_request,
+          forward_txn,
           random_machine_in_home_replica,
           SEQUENCER_CHANNEL);
     }
@@ -148,7 +148,7 @@ void Forwarder::Forward(Transaction* txn) {
         config_->GetLeaderPartitionForMultiHomeOrdering());
 
     Send(
-        forward_request,
+        forward_txn,
         destination,
         MULTI_HOME_ORDERER_CHANNEL);
   }

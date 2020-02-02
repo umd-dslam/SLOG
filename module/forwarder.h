@@ -14,6 +14,17 @@ using std::unordered_map;
 
 namespace slog {
 
+/**
+ * A Forwarder determines the type of a transaction (SINGLE_HOME vs. MULTI_HOME)
+ * then forwards it to the appropriate module.
+ * 
+ * To determine the type of a txn, it sends LookupMasterRequests to all Server
+ * modules in the same region and aggregates the responses.
+ * 
+ * INPUT: ForwardTransaction
+ * OUTPUT: If the txn is SINGLE_HOME, forward to the Sequencer in its home region.
+ *         If the txn is MULTI_HOME, forward to the GlobalPaxos for ordering.
+ */
 class Forwarder : public BasicModule {
 public:
   Forwarder(ConfigurationPtr config, Broker& broker);
@@ -28,8 +39,6 @@ protected:
       string&& from_machine_id) final;
 
 private:
-  internal::Request MakeLookupMasterRequest(const Transaction& txn);
-
   /**
    * Pre-condition: transaction type is not UNKNOWN
    */
