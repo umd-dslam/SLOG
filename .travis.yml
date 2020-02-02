@@ -1,8 +1,9 @@
 language: cpp
 
 env:
-  - GLOG_v=1
-  - GLOG_logtostderr=1
+  global:
+    - GLOG_v=1
+    - GLOG_logtostderr=1
 
 cache:
   directories:
