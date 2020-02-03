@@ -4,7 +4,8 @@
 set -e
 
 # Install toolings to compile dependencies
-sudo apt install autoconf automake libtool curl make g++ unzip libreadline-dev pkg-config || true
+apt-get update
+apt-get install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download

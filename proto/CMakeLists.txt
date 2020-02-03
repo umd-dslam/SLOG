@@ -10,3 +10,4 @@ set(PROTOS
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTOS})
 
 add_library(proto ${PROTO_SRCS})
+target_link_libraries(proto ${Protobuf_LIBRARIES})

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.12.4)
 project(slog)
 
+option(BUILD_CLIENT "Build the client" ON)
+
 set(DEPENDENCIES_DIR ".deps")
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -13,7 +15,7 @@ include_directories(${ZeroMQ_INCLUDE_DIR})
 find_package(cppzmq REQUIRED)
 include_directories(${cppzmq_INCLUDE_DIR})
 
-# Set this so that proto filenames do not have to be unique across directories
+SET(Protobuf_USE_STATIC_LIBS ON)
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 if (protobuf_VERBOSE)
@@ -21,13 +23,15 @@ if (protobuf_VERBOSE)
 endif()
 
 find_package(Glog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIRS})
+include_directories(${GLOG_INCLUDE_DIR})
 
 find_package(gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIRS})
 
-find_package(Readline REQUIRED)
-include_directories(${READLINE_INCLUDE_DIR})
+if (BUILD_CLIENT)
+  find_package(Readline REQUIRED)
+  include_directories(${READLINE_INCLUDE_DIR})
+endif()
 
 # Add root and build directory to include path. The build directory inclusion is
 # necessary for protobuf
@@ -50,14 +54,15 @@ set(SLOG_LIBS
   paxos
   proto)
 
-# All libraries to be linked to executables
+  # All libraries to be linked to executables
 set(EXTERNAL_LIBS
   ${Protobuf_LIBRARIES}
   ${ZeroMQ_STATIC_LIBRARY}
   ${cppzmq_STATIC_LIBRARY}
-  ${GLOG_LIBRARIES}
+  ${GLOG_STATIC_LIB}
   ${GFLAGS_LIBRARIES}
   ${READLINE_LIBRARIES})
+message(STATUS "External libs: ${EXTERNAL_LIBS}")
 
 # Create an executable for the services
 add_executable(slog service/slog.cpp)
@@ -66,8 +71,10 @@ target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
 add_executable(bm service/bm.cpp)
 target_link_libraries(bm ${SLOG_LIBS} ${EXTERNAL_LIBS})
 
-add_executable(client service/client.cpp)
-target_link_libraries(client ${SLOG_LIBS} ${EXTERNAL_LIBS})
+if (BUILD_CLIENT)
+  add_executable(client service/client.cpp)
+  target_link_libraries(client ${SLOG_LIBS} ${EXTERNAL_LIBS})
+endif()
 
 # =================================== Tests =============================================
 find_package(GTest)

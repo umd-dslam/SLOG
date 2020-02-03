@@ -1,49 +1,36 @@
-# Copied from https://github.com/BVLC/caffe/blob/master/cmake/Modules/FindGlog.cmake
+# - Find GLOG (logging.h, libglog.a, libglog.so, and libglog.so.0)
+# This module defines
+#  GLOG_INCLUDE_DIR, directory containing headers
+#  GLOG_SHARED_LIB, path to libglog's shared library
+#  GLOG_STATIC_LIB, path to libglog's static library
+#  GLOG_FOUND, whether glog has been found
+
 #
-# - Try to find Glog
+# The following only applies to changes made to this file as part of YugaByte development.
 #
-# The following variables are optionally searched for defaults
-#  GLOG_ROOT_DIR:            Base directory where all GLOG components are found
+# Portions Copyright (c) YugaByte, Inc.
 #
-# The following are set after configuration is done:
-#  GLOG_FOUND
-#  GLOG_INCLUDE_DIRS
-#  GLOG_LIBRARIES
-#  GLOG_LIBRARYRARY_DIRS
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License.  You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied.  See the License for the specific language governing permissions and limitations
+# under the License.
+#
+find_path(GLOG_INCLUDE_DIR glog/logging.h
+  # make sure we don't accidentally pick up a different version
+  NO_CMAKE_SYSTEM_PATH
+  NO_SYSTEM_ENVIRONMENT_PATH)
+find_library(GLOG_SHARED_LIB glog
+  NO_CMAKE_SYSTEM_PATH
+  NO_SYSTEM_ENVIRONMENT_PATH)
+find_library(GLOG_STATIC_LIB libglog.a
+  NO_CMAKE_SYSTEM_PATH
+  NO_SYSTEM_ENVIRONMENT_PATH)
 
 include(FindPackageHandleStandardArgs)
-
-set(GLOG_ROOT_DIR "" CACHE PATH "Folder contains Google glog")
-
-if(WIN32)
-    find_path(GLOG_INCLUDE_DIR glog/logging.h
-        PATHS ${GLOG_ROOT_DIR}/src/windows)
-else()
-    find_path(GLOG_INCLUDE_DIR glog/logging.h
-        PATHS ${GLOG_ROOT_DIR})
-endif()
-
-if(MSVC)
-    find_library(GLOG_LIBRARY_RELEASE libglog_static
-        PATHS ${GLOG_ROOT_DIR}
-        PATH_SUFFIXES Release)
-
-    find_library(GLOG_LIBRARY_DEBUG libglog_static
-        PATHS ${GLOG_ROOT_DIR}
-        PATH_SUFFIXES Debug)
-
-    set(GLOG_LIBRARY optimized ${GLOG_LIBRARY_RELEASE} debug ${GLOG_LIBRARY_DEBUG})
-else()
-    find_library(GLOG_LIBRARY glog
-        PATHS ${GLOG_ROOT_DIR}
-        PATH_SUFFIXES lib lib64)
-endif()
-
-find_package_handle_standard_args(Glog DEFAULT_MSG GLOG_INCLUDE_DIR GLOG_LIBRARY)
-
-if(GLOG_FOUND)
-  set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIR})
-  set(GLOG_LIBRARIES ${GLOG_LIBRARY})
-  mark_as_advanced(GLOG_ROOT_DIR GLOG_LIBRARY_RELEASE GLOG_LIBRARY_DEBUG
-                                 GLOG_LIBRARY GLOG_INCLUDE_DIR)
-endif()
+find_package_handle_standard_args(GLOG REQUIRED_VARS
+  GLOG_SHARED_LIB GLOG_STATIC_LIB GLOG_INCLUDE_DIR)

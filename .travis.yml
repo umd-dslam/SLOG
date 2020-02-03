@@ -18,6 +18,6 @@ install:
 script:
   - mkdir -p build
   - cd build
-  - cmake ..
+  - cmake .. -DBUILD_CLIENT=OFF
   - make -j$(nproc)
   - ctest --output-on-failure
