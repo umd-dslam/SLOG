@@ -13,7 +13,7 @@ before_install:
   - cmake -version
 
 install:
-  - ./install-deps.sh
+  - sudo ./install-deps.sh
 
 script:
   - mkdir -p build
