@@ -89,8 +89,8 @@ else
 
   echo "Installing gflags"
   cd gflags-2.2.2
-  mkdir -p build
-  cd build
+  mkdir -p build-tmp # folder has file named BUILD, macOS is not case-sensitive
+  cd build-tmp
   cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX ..
   make -j$(nproc) install
   cd ..
