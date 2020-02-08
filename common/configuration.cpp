@@ -1,9 +1,10 @@
 #include "common/configuration.h"
 
+#include <fcntl.h>
 #include <fstream>
-#include <sstream>
-#include <stdexcept>
 
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/text_format.h>
 #include <glog/logging.h>
 
@@ -25,22 +26,23 @@ uint32_t FNVHash(It begin, It end) {
 
 } // namespace
 
-using std::runtime_error;
+using std::string;
+using google::protobuf::io::ZeroCopyInputStream;
+using google::protobuf::io::FileInputStream;
 
 ConfigurationPtr Configuration::FromFile(
-    const std::string& file_path, 
-    const std::string& local_address,
+    const string& file_path, 
+    const string& local_address,
     uint32_t local_replica,
     uint32_t local_partition) {
-  std::ifstream ifs(file_path);
-  CHECK(ifs.is_open()) << "Configuration file not found";
-
-  std::stringstream ss;
-  ss << ifs.rdbuf();
-
+  int fd = open(file_path.c_str(), O_RDONLY);
+  ZeroCopyInputStream* input = new FileInputStream(fd);
   internal::Configuration config;
-  std::string str = ss.str();
-  google::protobuf::TextFormat::ParseFromString(str, &config);
+
+  google::protobuf::TextFormat::Parse(input, &config);
+
+  delete input;
+  close(fd);
 
   return std::make_shared<Configuration>(
       config, local_address, local_replica, local_partition);
@@ -48,7 +50,7 @@ ConfigurationPtr Configuration::FromFile(
 
 Configuration::Configuration(
     const internal::Configuration& config,
-    const std::string& local_address,
+    const string& local_address,
     uint32_t local_replica,
     uint32_t local_partition)
   : config_(config),
