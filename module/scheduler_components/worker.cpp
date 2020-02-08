@@ -18,7 +18,7 @@ Worker::Worker(
     scheduler_socket_(context, ZMQ_DEALER),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
-    stored_procedures_(new KeyValueStoredProcedures()) {
+    commands_(new KeyValueCommands()) {
   scheduler_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_item_ = {
     static_cast<void*>(scheduler_socket_),
@@ -180,7 +180,7 @@ void Worker::ExecuteAndCommitTransaction() {
   auto config = scheduler_.config_;
 
   // Execute the transaction code
-  stored_procedures_->Execute(*txn);
+  commands_->Execute(*txn);
 
   // Apply all writes to local storage if the transaction is not aborted
   if (txn->status() == TransactionStatus::COMMITTED) {

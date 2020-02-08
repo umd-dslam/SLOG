@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "common/proto_utils.h"
-#include "benchmark/stored_procedures.h"
+#include "benchmark/commands.h"
 
 using namespace std;
 using namespace slog;
 
-TEST(StoredProceduresTest, SimpleKeyValueProcedures) {
+TEST(CommandsTest, SimpleKeyValueProcedures) {
   auto txn = MakeTransaction(
       {"key1"},
       {"key2", "key3", "key4"},
@@ -16,7 +16,7 @@ TEST(StoredProceduresTest, SimpleKeyValueProcedures) {
       "COPY key1 key3\n");
   (*txn.mutable_read_set())["key1"] = "value1";
 
-  KeyValueStoredProcedures proc;
+  KeyValueCommands proc;
   proc.Execute(txn);
   ASSERT_EQ(txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn.read_set_size(), 1);
@@ -28,29 +28,29 @@ TEST(StoredProceduresTest, SimpleKeyValueProcedures) {
   ASSERT_EQ(txn.delete_set(0), "key4");
 }
 
-TEST(StoredProceduresTest, KeyValueAbortedNotEnoughArgs) {
+TEST(CommandsTest, KeyValueAbortedNotEnoughArgs) {
   auto txn = MakeTransaction(
       {},
       {"key1", "key2", "key3"},
       "SET key1");
 
-  KeyValueStoredProcedures proc;
+  KeyValueCommands proc;
   proc.Execute(txn);
   ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
 }
 
-TEST(StoredProceduresTest, KeyValueAbortedInvalidCommand) {
+TEST(CommandsTest, KeyValueAbortedInvalidCommand) {
   auto txn = MakeTransaction(
       {},
       {"key1", "key2", "key3"},
       "WRONG");
 
-  KeyValueStoredProcedures proc;
+  KeyValueCommands proc;
   proc.Execute(txn);
   ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
 }
 
-TEST(StoredProceduresTest, KeyValueOnlyWritesKeysInWriteSet) {
+TEST(CommandsTest, KeyValueOnlyWritesKeysInWriteSet) {
   auto txn = MakeTransaction(
       {"key1"},
       {"key2", "key3"},
@@ -59,7 +59,7 @@ TEST(StoredProceduresTest, KeyValueOnlyWritesKeysInWriteSet) {
       "SET key4 value4\n"
       "DEL key3");
 
-  KeyValueStoredProcedures proc;
+  KeyValueCommands proc;
   proc.Execute(txn);
   ASSERT_EQ(txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn.write_set_size(), 2);

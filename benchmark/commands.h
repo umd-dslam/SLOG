@@ -13,12 +13,12 @@ using std::string;
 
 namespace slog {
 
-class StoredProcedures {
+class Commands {
 public:
   virtual void Execute(Transaction& txn) = 0;
 };
 
-class KeyValueStoredProcedures : public StoredProcedures {
+class KeyValueCommands : public Commands {
 public:
   void Execute(Transaction& txn) final;
 
@@ -36,7 +36,7 @@ private:
   std::ostringstream abort_reason_;
 };
 
-class TPCCStoredProcedures : public StoredProcedures {
+class TPCCCommands : public Commands {
 public:
   void Execute(Transaction& txn) final;
 };

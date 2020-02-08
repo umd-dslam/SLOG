@@ -16,7 +16,7 @@ set(ALL_TESTS
   scheduler_test
   server_test
   sequencer_test
-  stored_procedures_test)
+  commands_test)
 
 add_executable(batch_log_test common/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
@@ -59,8 +59,8 @@ target_link_libraries(server_test test_utils)
 add_executable(sequencer_test module/sequencer_test.cpp)
 target_link_libraries(sequencer_test test_utils)
 
-add_executable(stored_procedures_test benchmark/stored_procedures_test.cpp)
-target_link_libraries(stored_procedures_test benchmark)
+add_executable(commands_test benchmark/commands_test.cpp)
+target_link_libraries(commands_test benchmark)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

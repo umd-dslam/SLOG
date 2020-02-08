@@ -4,7 +4,7 @@
 
 #include <zmq.hpp>
 
-#include "benchmark/stored_procedures.h"
+#include "benchmark/commands.h"
 #include "common/types.h"
 #include "module/base/module.h"
 #include "proto/transaction.pb.h"
@@ -50,7 +50,7 @@ private:
   Scheduler& scheduler_;
   zmq::socket_t scheduler_socket_;
   shared_ptr<Storage<Key, Record>> storage_;
-  unique_ptr<StoredProcedures> stored_procedures_;
+  unique_ptr<Commands> commands_;
   zmq::pollitem_t poll_item_;
   unique_ptr<TransactionState> txn_state_;
 };

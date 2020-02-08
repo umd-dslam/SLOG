@@ -1,4 +1,4 @@
-#include "benchmark/stored_procedures.h"
+#include "benchmark/commands.h"
 #include "common/proto_utils.h"
 #include <glog/logging.h>
 
@@ -40,11 +40,11 @@ size_t NextNTokens(
 } // namespace
 
 const std::unordered_map<string, size_t>
-KeyValueStoredProcedures::COMMAND_NUM_ARGS = {
+KeyValueCommands::COMMAND_NUM_ARGS = {
   {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}
 };
 
-void KeyValueStoredProcedures::Execute(Transaction& txn) {
+void KeyValueCommands::Execute(Transaction& txn) {
   Reset();
   auto& read_set = *txn.mutable_read_set();
   auto& write_set = *txn.mutable_write_set();
@@ -76,19 +76,19 @@ void KeyValueStoredProcedures::Execute(Transaction& txn) {
   }
 }
 
-void KeyValueStoredProcedures::Reset() {
+void KeyValueCommands::Reset() {
   pos_ = 0;
   aborted_ = false;
   abort_reason_.clear();
   abort_reason_.str(string());
 }
 
-std::ostringstream& KeyValueStoredProcedures::Abort() {
+std::ostringstream& KeyValueCommands::Abort() {
   aborted_ = true;
   return abort_reason_;
 }
 
-bool KeyValueStoredProcedures::NextCommand(const string& code) {
+bool KeyValueCommands::NextCommand(const string& code) {
   pos_ = NextToken(cmd_, code, pos_);
   if (pos_ == string::npos) {
     return false;
@@ -109,7 +109,7 @@ bool KeyValueStoredProcedures::NextCommand(const string& code) {
   return true;
 }
 
-void TPCCStoredProcedures::Execute(Transaction& /*txn*/) {
+void TPCCCommands::Execute(Transaction& /*txn*/) {
   
 }
 
