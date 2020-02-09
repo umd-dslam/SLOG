@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-import "machine_id.proto";
-import "transaction.proto";
+import "proto/machine_id.proto";
+import "proto/transaction.proto";
 
 package slog.internal;
 
