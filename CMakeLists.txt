@@ -53,7 +53,12 @@ include_directories(${CMAKE_BINARY_DIR})
 #               Protobuf
 #========================================
 
-set(PROTO_PREFIX proto)
+# Generating code from protobuf files is done here because we want
+# to do absolute import in the .proto file so that the importing style
+# is consistent across the codebase. More importantly, generated python
+# code will also use absolute import, which goes well with python 3
+# (implicit relative import is disable since python 3).
+
 # Turn this off so that protobuf_generate_cpp does not append directory
 # of each .proto file to the protobuf include path. Instead, the current
 # directory is used as the include path. Even if Protobuf_IMPORT_DIRS is
@@ -62,22 +67,51 @@ set(PROTO_PREFIX proto)
 # with the prefix of each file name and generate code with relative
 # import.
 set(PROTOBUF_GENERATE_CPP_APPEND_PATH OFF)
-# Generating code from protobuf files is done here because we want
-# to do absolute import in the .proto file so that the importing style
-# is consistent across the codebase. More importantly, generated python
-# code will also use absolute import, which goes well with python 3
-# (implicit relative import is disable since python 3).
-set(PROTOS 
+set(PROTO_PREFIX proto)
+
+# Generate cpp code
+protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/api.proto
   ${PROTO_PREFIX}/configuration.proto
   ${PROTO_PREFIX}/internal.proto
   ${PROTO_PREFIX}/machine_id.proto
   ${PROTO_PREFIX}/transaction.proto)
-
-# Generate cpp code
-protobuf_generate_cpp(PROTO_SRCS_CPP PROTO_HDRS ${PROTOS})
-add_library(proto ${PROTO_SRCS_CPP})
+add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
 target_link_libraries(proto ${Protobuf_LIBRARIES})
+
+# Generate python code
+# TODO(ctring): This code is not doing anything because we don't need
+#               to generate protobuf code for python at the moment; but
+#               I already wrote it anyway so just leaving this here in
+#               case we need it later. Uncomment the next line to use.
+# protobuf_generate_python(PROTO_PY_SRCS <some .proto files>)
+
+set(PROTO_PY_DEST_DIR ${CMAKE_SOURCE_DIR}/tools)
+set(PROTO_PY_DEST_SRCS "")
+
+# Copy generated python code to the "tools" directory
+foreach(FULL_PATH ${PROTO_PY_SRCS})
+  # /base/path/relative/path/file_name.py => relative/path/file_name.py
+  file(
+    RELATIVE_PATH
+    RELATIVE_DIR_AND_FILE_NAME
+    ${CMAKE_BINARY_DIR}
+    ${FULL_PATH})
+
+  # relative/path/file_name.py => relative/path
+  get_filename_component(RELATIVE_DIR ${RELATIVE_DIR_AND_FILE_NAME} DIRECTORY)
+
+  set(PROTO_PY_DEST_SRC ${PROTO_PY_DEST_DIR}/${RELATIVE_DIR_AND_FILE_NAME})
+  add_custom_command(
+    OUTPUT ${PROTO_PY_DEST_SRC}
+    COMMAND mkdir -p ${PROTO_PY_DEST_DIR}/${RELATIVE_DIR} && cp ${FULL_PATH} ${PROTO_PY_DEST_SRC}
+    DEPENDS ${FULL_PATH}
+  )
+  list(APPEND PROTO_PY_DEST_SRCS ${PROTO_PY_DEST_SRC})
+endforeach(FULL_PATH)
+
+# Trigger python code generation and copy commands
+add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 
 #========================================
 #            Subdirectories
