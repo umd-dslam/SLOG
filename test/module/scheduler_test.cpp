@@ -43,12 +43,12 @@ protected:
       input_[i] = test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL);
       output_[i] = test_slogs_[i]->AddChannel(SERVER_CHANNEL);
     }
-    test_slogs_[0]->Data("A", {"valueA", 0, 0});
-    test_slogs_[0]->Data("D", {"valueD", 0, 0});
-    test_slogs_[1]->Data("C", {"valueC", 0, 0});
-    test_slogs_[1]->Data("F", {"valueF", 0, 0});
-    test_slogs_[2]->Data("B", {"valueB", 0, 0});
-    test_slogs_[2]->Data("E", {"valueE", 0, 0});
+    test_slogs_[0]->Data("B", {"valueB", 0, 0});
+    test_slogs_[0]->Data("E", {"valueE", 0, 0});
+    test_slogs_[1]->Data("A", {"valueA", 0, 0});
+    test_slogs_[1]->Data("D", {"valueD", 0, 0});
+    test_slogs_[2]->Data("C", {"valueC", 0, 0});
+    test_slogs_[2]->Data("F", {"valueF", 0, 0});
 
     for (const auto& test_slog : test_slogs_) {
       test_slog->StartInNewThreads();
