@@ -15,9 +15,10 @@ namespace {
 
 template<class It>
 uint32_t FNVHash(It begin, It end) {
-  uint32_t hash = 2166136261;
+  uint64_t hash = 0x811c9dc5;
   for (auto it = begin; it != end; it++) {
-    hash = (hash * 1099511628211) ^ *it;
+    hash = (hash * 0x01000193) % (1LL << 32);
+    hash ^= *it;
   }
   return hash;
 }

@@ -106,23 +106,23 @@ private:
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {
   auto txn = MakeTransaction(
-      {"C"}, /* read_set */
-      {"F"},  /* write_set */
-      "GET C     \n"
-      "SET F newF\n", /* code */
+      {"A"}, /* read_set */
+      {"D"},  /* write_set */
+      "GET A     \n"
+      "SET D newD\n", /* code */
       {},
       MakeMachineId("0:1") /* coordinating server */);
   txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {1});
+  SendBatch(100, {txn}, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
   ASSERT_EQ(output_txn.write_set_size(), 1);
-  ASSERT_EQ(output_txn.write_set().at("F"), "newF");
+  ASSERT_EQ(output_txn.write_set().at("D"), "newD");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
