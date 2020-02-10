@@ -59,3 +59,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Data files
+*.dat
