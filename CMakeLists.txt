@@ -54,18 +54,20 @@ include_directories(${CMAKE_BINARY_DIR})
 #========================================
 
 # Generating code from protobuf files is done here because we want
-# to do absolute import in the .proto file so that the importing style
-# is consistent across the codebase. More importantly, generated python
-# code will also use absolute import, which goes well with python 3
-# (implicit relative import is disable since python 3).
+# to do absolute import in .proto files, consistent with the rest of
+# the codebase. More importantly, as implicit relative import is disabled
+# in python 3, we need absolute import for the generated python code to work.
 
-# Turn this off so that protobuf_generate_cpp does not append directory
-# of each .proto file to the protobuf include path. Instead, the current
-# directory is used as the include path. Even if Protobuf_IMPORT_DIRS is
-# set to be the current directory, we still don't want those additional
-# include paths; otherwise, protoc would use the longest path to match
-# with the prefix of each file name and generate code with relative
-# import.
+# Turn this off so that "protobuf_generate_cpp" won't append directory
+# of each .proto file to the protobuf include path, which should contain only
+# the project root directory. The reason is that protoc uses the longest path
+# to match with the prefix of each file name, generating relative import instead
+# of absolute import. For example, if the include path has:
+#   "slog/something/proto" and "slog/"
+# The path "slog/something/proto/messageA.proto" will become "messageA.proto",
+# because it is matched with "slog/something/proto". On the other hand, if only
+# "slog/" is present, we get "something/proto/messageA.proto", which is absolute
+# with respect to the project root "slog/"
 set(PROTOBUF_GENERATE_CPP_APPEND_PATH OFF)
 set(PROTO_PREFIX proto)
 
@@ -84,10 +86,9 @@ target_link_libraries(proto ${Protobuf_LIBRARIES})
 protobuf_generate_python(PROTO_PY_SRCS
   ${PROTO_PREFIX}/offline_data.proto)
 
+# Copy generated python code to the "tools" directory
 set(PROTO_PY_DEST_DIR ${CMAKE_SOURCE_DIR}/tools)
 set(PROTO_PY_DEST_SRCS "")
-
-# Copy generated python code to the "tools" directory
 foreach(FULL_PATH ${PROTO_PY_SRCS})
   # /base/path/relative/path/file_name.py => relative/path/file_name.py
   file(
@@ -108,7 +109,7 @@ foreach(FULL_PATH ${PROTO_PY_SRCS})
   list(APPEND PROTO_PY_DEST_SRCS ${PROTO_PY_DEST_SRC})
 endforeach(FULL_PATH)
 
-# Trigger python code generation and copy commands
+# Trigger the python code generation and copy commands
 add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 
 #========================================
