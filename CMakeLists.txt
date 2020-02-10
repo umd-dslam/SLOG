@@ -75,16 +75,14 @@ protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/configuration.proto
   ${PROTO_PREFIX}/internal.proto
   ${PROTO_PREFIX}/machine_id.proto
+  ${PROTO_PREFIX}/offline_data.proto
   ${PROTO_PREFIX}/transaction.proto)
 add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
 target_link_libraries(proto ${Protobuf_LIBRARIES})
 
 # Generate python code
-# TODO(ctring): This code is not doing anything because we don't need
-#               to generate protobuf code for python at the moment; but
-#               I already wrote it anyway so just leaving this here in
-#               case we need it later. Uncomment the next line to use.
-# protobuf_generate_python(PROTO_PY_SRCS <some .proto files>)
+protobuf_generate_python(PROTO_PY_SRCS
+  ${PROTO_PREFIX}/offline_data.proto)
 
 set(PROTO_PY_DEST_DIR ${CMAKE_SOURCE_DIR}/tools)
 set(PROTO_PY_DEST_SRCS "")
@@ -97,7 +95,7 @@ foreach(FULL_PATH ${PROTO_PY_SRCS})
     RELATIVE_DIR_AND_FILE_NAME
     ${CMAKE_BINARY_DIR}
     ${FULL_PATH})
-
+  
   # relative/path/file_name.py => relative/path
   get_filename_component(RELATIVE_DIR ${RELATIVE_DIR_AND_FILE_NAME} DIRECTORY)
 
