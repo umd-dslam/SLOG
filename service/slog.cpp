@@ -66,21 +66,25 @@ void LoadData(
   VLOG(1) << "First 10 datums are: ";
   for (uint32_t i = 0; i < num_datums; i++) {
     int sz;
+    // Read the size of the next datum
     if (!coded_input->ReadVarintSizeAsInt(&sz)) {
       LOG(FATAL) << "Error while reading data file";
     }
     string buf;
+    // Read the datum given the size
     if (!coded_input->ReadString(&buf, sz)) {
       LOG(FATAL) << "Error while reading data file";
     }
 
     slog::Datum datum;
+    // Parse raw bytes into protobuf object
     datum.ParseFromString(buf);
 
     if (i < 10) {
       VLOG(1) << datum.key() << " " << datum.record() << " " << datum.master();
     }
 
+    // Write to storage
     Record record(datum.record(), datum.master());
     storage.Write(datum.key(), record);
   }

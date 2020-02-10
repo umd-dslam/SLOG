@@ -193,6 +193,7 @@ class DataGenerator:
             datum_proto.key = encoded_key.decode()
             datum_proto.record = record
             datum_proto.master = master
+            # Size of the datum and the serialized datum
             datum = (
                 _VarintBytes(datum_proto.ByteSize()) +
                 datum_proto.SerializeToString()
