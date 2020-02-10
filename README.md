@@ -6,7 +6,7 @@
 
 This is a prototype of the system described in [SLOG: serializable, low-latency, geo-replicated transactions](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
-The following instructions work best on Ubuntu with CMake 3.13.4.
+The following instructions work best on Ubuntu with GCC 5+ and CMake 3.12.4+
 
 ## How to Build
 
