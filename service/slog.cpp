@@ -18,15 +18,19 @@ DEFINE_string(address, "", "Address of the local machine");
 DEFINE_uint32(replica, 0, "Replica number of the local machine");
 DEFINE_uint32(partition, 0, "Partition number of the local machine");
 
-using namespace slog;
-using namespace std;
+using slog::Storage;
+using slog::Broker;
+using slog::Key;
+using slog::Record;
+using slog::Metadata;
+using slog::MakeRunnerFor;
 
 using std::make_shared;
 
 int main(int argc, char* argv[]) {
-  InitializeService(argc, argv);
+  slog::InitializeService(argc, argv);
   
-  auto config = Configuration::FromFile(
+  auto config = slog::Configuration::FromFile(
       FLAGS_config, 
       FLAGS_address,
       FLAGS_replica,
@@ -34,32 +38,39 @@ int main(int argc, char* argv[]) {
   auto context = make_shared<zmq::context_t>(1);
   Broker broker(config, context);
 
-  auto storage = make_shared<MemOnlyStorage<Key, Record, Metadata>>();
-  auto server = MakeRunnerFor<Server>(config, *context, broker, storage);
+  auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
+  auto server = MakeRunnerFor<slog::Server>(config, *context, broker, storage);
 
-  vector<unique_ptr<ModuleRunner>> modules;
+  vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(
-      MakeRunnerFor<LocalPaxos>(config, broker));
+      MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(
-      MakeRunnerFor<Forwarder>(config, broker));
+      MakeRunnerFor<slog::Forwarder>(config, broker));
   modules.push_back(
-      MakeRunnerFor<Sequencer>(config, broker));
+      MakeRunnerFor<slog::Sequencer>(config, broker));
   modules.push_back(
-      MakeRunnerFor<Scheduler>(config, *context, broker, storage));
+      MakeRunnerFor<slog::Scheduler>(config, *context, broker, storage));
   
+  // Only one partition per replica participates in the global paxos process
   if (config->GetLeaderPartitionForMultiHomeOrdering() 
       == config->GetLocalPartition()) {
     modules.push_back(
-        MakeRunnerFor<GlobalPaxos>(config, broker));
+        MakeRunnerFor<slog::GlobalPaxos>(config, broker));
     modules.push_back(
-        MakeRunnerFor<MultiHomeOrderer>(config, broker));
+        MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
   }
 
-  // Only start the Broker after it is used to initialized all modules
+  // New modules cannot be bound to the broker after it starts so only start 
+  // the Broker after it is used to initialized all modules.
   broker.StartInNewThread();
+  
+  // Start modules in the own thread
   for (auto& module : modules) {
     module->StartInNewThread();
   }
+
+  // Run the server in this main thread so that the whole process
+  // does not immediately terminate after this line.
   server->Start();
 
   return 0;
