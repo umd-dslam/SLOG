@@ -129,7 +129,7 @@ void Scheduler::ProcessForwardBatch(
         case TransactionType::SINGLE_HOME: {
           VLOG(1) << "Received data for single-home batch " << batch->id()
               << " from [" << from_machine_id
-              << "]. Num txns: " << batch->transactions_size();
+              << "]. Number of txns: " << batch->transactions_size();
           // If this batch comes from the local region, put it into the local interleaver
           if (from_replica == config_->GetLocalReplica()) {
             local_interleaver_.AddBatchId(
@@ -144,7 +144,7 @@ void Scheduler::ProcessForwardBatch(
         case TransactionType::MULTI_HOME: {
           VLOG(1) << "Received data for multi-home batch " << batch->id()
               << " from [" << from_machine_id
-              << "]. Num txns: " << batch->transactions_size();
+              << "]. Number of txns: " << batch->transactions_size();
           // Multi-home txns are already ordered with respect to each other
           // and their IDs have been replaced with slot id in the orderer module
           // so here their id and slot id are the same

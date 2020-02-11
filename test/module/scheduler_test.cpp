@@ -205,3 +205,9 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
   ASSERT_EQ(output_txn.read_set().at("F"), "valueF");
   ASSERT_EQ(output_txn.write_set_size(), 0);
 }
+
+int main(int argc, char* argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  google::InstallFailureSignalHandler();
+  return RUN_ALL_TESTS();
+}
