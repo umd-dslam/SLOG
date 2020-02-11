@@ -43,6 +43,7 @@ void LoadData(
     ConfigurationPtr config,
     const string& data_dir) {
   if (data_dir.empty()) {
+    LOG(INFO) << "No initial data directory specified. Starting with an empty storage.";
     return;
   }
 
