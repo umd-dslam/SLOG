@@ -45,6 +45,7 @@ public:
 
   void StartInNewThreads();
   void SendTxn(const Transaction& txn);
+  Transaction RecvTxnResult();
 
 private:
   ConfigurationPtr config_;

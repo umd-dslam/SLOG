@@ -8,6 +8,7 @@ set(ALL_TESTS
   broker_test
   channel_test
   deterministic_lock_manager_test
+  e2e_test
   forwarder_test
   mem_only_storage_test
   mmessage_test
@@ -34,6 +35,9 @@ target_link_libraries(channel_test test_utils)
 add_executable(deterministic_lock_manager_test 
   module/scheduler_components/deterministic_lock_manager_test.cpp)
 target_link_libraries(deterministic_lock_manager_test test_utils)
+
+add_executable(e2e_test e2e/e2e_test.cpp)
+target_link_libraries(e2e_test test_utils)
 
 add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)

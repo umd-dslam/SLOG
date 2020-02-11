@@ -144,4 +144,18 @@ void TestSlog::SendTxn(const Transaction& txn) {
   msg.SendTo(client_socket_);
 }
 
+Transaction TestSlog::RecvTxnResult() {
+  {
+    MMessage msg(client_socket_);
+    api::Response res;
+    if (!msg.GetProto(res)) {
+      LOG(ERROR) << "Malformed response";
+    } else {
+      const auto& txn = res.txn().txn();
+      LOG(INFO) << "Received response. Stream id: " << res.stream_id();
+      return txn;
+    }
+  }
+}
+
 } // namespace slog
