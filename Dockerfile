@@ -26,4 +26,12 @@ FROM ubuntu:bionic AS runner
     WORKDIR /opt/slog
     COPY --from=builder /src/build/slog .
     COPY --from=builder /src/slog.conf .
-    ENTRYPOINT [ "./slog" ]
+    COPY --from=builder /src/tools/ tools/
+
+    RUN apt-get update
+    RUN apt-get -y install python3 python3-pip
+    RUN python3 -m pip install -r tools/requirements.txt
+    RUN chmod +x tools/*.py
+
+    ENV PATH="/opt/slog:${PATH}"
+    ENV PATH="/opt/slog/tools:${PATH}"
