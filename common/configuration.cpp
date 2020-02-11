@@ -60,9 +60,12 @@ Configuration::Configuration(
     local_address_(local_address),
     local_replica_(local_replica),
     local_partition_(local_partition) {
-
-  for (int i = 0; i < config.addresses_size(); i++) {
-    all_addresses_.push_back(config.addresses(i));
+  for (const auto& replica : config.replicas()) {
+    CHECK_EQ(replica.addresses_size(), config.num_partitions())
+        << "Number of addresses in each replica must match number of partitions.";
+    for (const auto& addr : replica.addresses()) {
+      all_addresses_.push_back(addr);
+    }
   }
   CHECK(std::find(
       all_addresses_.begin(),
@@ -81,7 +84,7 @@ const vector<string>& Configuration::GetAllAddresses() const {
 }
 
 uint32_t Configuration::GetNumReplicas() const {
-  return config_.num_replicas();
+  return config_.replicas_size();
 }
 
 uint32_t Configuration::GetNumPartitions() const {

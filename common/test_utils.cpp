@@ -44,12 +44,14 @@ ConfigVec MakeTestConfigurations(
   internal::Configuration common_config;
   common_config.set_protocol("ipc");
   common_config.set_broker_port(0);
-  common_config.set_num_replicas(num_replicas);
   common_config.set_num_partitions(num_partitions);
   common_config.set_partition_key_num_bytes(1);
   common_config.set_batch_duration(1);
-  for (int i = 0; i < num_machines; i++) {
-    common_config.add_addresses(addr + to_string(i));
+  for (int r = 0; r < num_replicas; r++) {
+    auto replica = common_config.add_replicas();
+    for (int p = 0; p < num_partitions; p++) {
+      replica->add_addresses(addr + to_string(r * num_partitions + p));
+    }
   }
 
   ConfigVec configs;
