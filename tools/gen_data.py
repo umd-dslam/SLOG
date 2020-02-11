@@ -87,23 +87,23 @@ class DataGenerator:
         self.record_size = record_size
         self.max_jobs = max_jobs
 
-    def key_to_partition(self, key: int) -> int:
+    def partition_of_key(self, key: int) -> int:
         return fnv_hash(encode_key(key)) % self.num_partitions
 
-    def gen_data(self, as_text) -> None:
+    def gen_data(self, as_text: bool) -> None:
         start_time = time.time()
 
-        # Identify the keys of each partition
         LOG.info(
             "Creating %d partitions from %d keys...", 
             self.num_partitions, self.num_records
         )
-        key_per_part = defaultdict(list)
+        # Distribute keys into the partitions
+        partition_to_keys = defaultdict(list)
         for key in range(0, self.num_records):
-            p = self.key_to_partition(key)
-            key_per_part[p].append(key)
+            p = self.partition_of_key(key)
+            partition_to_keys[p].append(key)
 
-        # Generate the actual data
+        # Compute the number of jobs
         num_jobs = (
             min(self.num_partitions, self.max_jobs)
             if self.max_jobs > 0 else self.num_partitions
@@ -115,7 +115,8 @@ class DataGenerator:
             obj=self,
         )
         with Pool(num_jobs) as pool:
-            pool.starmap(func, key_per_part.items())
+            # Map func(partition, key_list) to each item in the key map
+            pool.starmap(func, partition_to_keys.items())
 
         LOG.info("Done. Elapsed time: %.2f seconds", time.time() - start_time)
     
@@ -256,6 +257,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Keys and master are not randomly generated
+    # so this seed only affects record
     np.random.seed(0)
 
     DataGenerator(
