@@ -2,6 +2,14 @@ syntax = "proto3";
 
 package slog.internal;
 
+message Replica {
+    // List of all machine addresses in the system.
+    // This list must have the size equal to number of partitions
+    // If protocol is "tcp", these are IP addresses.
+    // If protocol is "icp", these are filesystem paths.
+    repeated bytes addresses = 1;
+}
+
 /**
  * The schema of a configuration file.
  */
@@ -9,23 +17,20 @@ message Configuration {
     // Protocol for the zmq sockets in the broker. Use "tcp" for
     // normal running and "icp" for unit and integration tests
     bytes protocol = 1;
-    // List of all machine addresses in the system. 
-    // If protocol is "tcp", these are IP addresses.
-    // If protocol is "icp", these are filesystem paths.
-    repeated bytes addresses = 2;
+    // Replica groups. Each group has a list of machine addresses
+    // with the size equal to number of partitions
+    repeated Replica replicas = 2;
     // Port for the zmq sockets in the broker. This is ignored if
     // the icp protocol is used
     uint32 broker_port = 3;
     // Port for the server
     uint32 server_port = 4;
-    // Number of replicas of the database
-    uint32 num_replicas = 5;
     // Number of partitions per replica
-    uint32 num_partitions = 6;
+    uint32 num_partitions = 5;
     // Length of the prefix of a key in bytes for partitioning
-    uint32 partition_key_num_bytes = 7;
+    uint32 partition_key_num_bytes = 6;
     // Number of worker threads for processing the transactions
-    uint32 num_workers = 8;
+    uint32 num_workers = 7;
     // How long the sequencer wait for batching
-    uint64 batch_duration = 9;
+    uint64 batch_duration = 8;
 }
