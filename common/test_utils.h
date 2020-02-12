@@ -40,6 +40,8 @@ public:
   void AddSequencer();
   void AddScheduler();
   void AddLocalPaxos();
+  void AddGlobalPaxos();
+  void AddMultiHomeOrderer();
 
   unique_ptr<Channel> AddChannel(const string& name);
 
@@ -57,6 +59,8 @@ private:
   ModuleRunnerPtr sequencer_;
   ModuleRunnerPtr scheduler_;
   ModuleRunnerPtr local_paxos_;
+  ModuleRunnerPtr global_paxos_;
+  ModuleRunnerPtr multi_home_orderer_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

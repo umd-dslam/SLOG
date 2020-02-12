@@ -18,11 +18,11 @@ using namespace slog;
 
 class E2ETest : public ::testing::Test {
 protected:
-  static const size_t NUM_MACHINES = 1;
+  static const size_t NUM_MACHINES = 4;
 
   void SetUp() {
     configs = MakeTestConfigurations(
-        "e2e", 1 /* num_replicas */, 1 /* num_partitions */);
+        "e2e", 2 /* num_replicas */, 2 /* num_partitions */);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
@@ -32,9 +32,20 @@ protected:
       test_slogs[i]->AddSequencer();
       test_slogs[i]->AddScheduler();
       test_slogs[i]->AddLocalPaxos();
+      test_slogs[i]->AddGlobalPaxos();
+      test_slogs[i]->AddMultiHomeOrderer();
     }
-    // // Replica 0
-    test_slogs[0]->Data("A", {"xxxxx", 0, 0});
+
+    // Replica 0
+    test_slogs[0]->Data("A", {"valA", 0, 0});
+    test_slogs[0]->Data("C", {"valC", 1, 1});
+    test_slogs[1]->Data("B", {"valB", 0, 1});
+    test_slogs[1]->Data("X", {"valX", 1, 0});
+    // Replica 1
+    test_slogs[2]->Data("A", {"valA", 0, 0});
+    test_slogs[2]->Data("C", {"valC", 1, 1});
+    test_slogs[3]->Data("B", {"valB", 0, 1});
+    test_slogs[3]->Data("X", {"valX", 1, 0});
 
     for (const auto& test_slog : test_slogs) {
       test_slog->StartInNewThreads();
@@ -45,9 +56,57 @@ protected:
   ConfigVec configs;
 };
 
+// This test submits multiple transactions to the system serially and checks the
+// read values for correctness.
+// TODO: submit transactions concurrently (multiple outcomes would be valid)
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
-  auto txn = MakeTransaction({"A"} /* read_set */, {}  /* write_set */);
+  auto txn1 = MakeTransaction(
+    {}, /* read_set */
+    {"A"},  /* write_set */
+    "SET A newA\n" /* code */);
+  auto txn2 = MakeTransaction({"A"} /* read_set */, {}  /* write_set */);
+
+  test_slogs[0]->SendTxn(txn1);
+  auto txn1_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn1_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn1_resp.internal().type());
+
+  test_slogs[0]->SendTxn(txn2);
+  auto txn2_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn2_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn2_resp.internal().type());
+  ASSERT_EQ("newA", txn2_resp.read_set().at("A"));
+}
+
+TEST_F(E2ETest, MultiPartitionTxn) {
+  auto txn = MakeTransaction({"A", "B"} /* read_set */, {}  /* write_set */);
+
   test_slogs[0]->SendTxn(txn);
   auto txn_resp = test_slogs[0]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+  ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+}
+
+TEST_F(E2ETest, MultiHomeTxn) {
+  auto txn = MakeTransaction({"A", "C"} /* read_set */, {}  /* write_set */);
+
+  test_slogs[1]->SendTxn(txn);
+  auto txn_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+  ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+}
+
+TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
+  auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
+
+  test_slogs[0]->SendTxn(txn);
+  auto txn_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+  ASSERT_EQ("valX", txn_resp.read_set().at("X"));
 }
