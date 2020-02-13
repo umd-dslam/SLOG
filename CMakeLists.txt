@@ -6,7 +6,7 @@ project(slog)
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
-
+option(BUILD_TESTS "Build the tests" ON)
 
 #========================================
 #               Setup
@@ -162,12 +162,16 @@ endif()
 #                Tests
 #========================================
 
-find_package(GTest)
-if (GTEST_FOUND)
-  message(STATUS "GTest found. Tests will be built")
-  include_directories(${GTEST_INCLUDE_DIRS})
-  enable_testing()
-  add_subdirectory(test)
+if (BUILD_TESTS)
+  find_package(GTest)
+  if (GTEST_FOUND)
+    message(STATUS "GTest found. Tests will be built")
+    include_directories(${GTEST_INCLUDE_DIRS})
+    enable_testing()
+    add_subdirectory(test)
+  else()
+    message(STATUS "GTest not found. No test will be built")
+  endif()
 else()
-  message(STATUS "GTest not found. No test will be built")
+  message(STATUS "BUILD_TESTS is off. No test will be built")
 endif()

@@ -18,7 +18,7 @@ FROM ubuntu:bionic AS builder
     RUN rm -rf build \
         && mkdir build \
         && cd build \
-        && cmake .. -DBUILD_CLIENT=OFF \
+        && cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTS=OFF\
         && make -j$(nproc) \
         && cd ..
 
