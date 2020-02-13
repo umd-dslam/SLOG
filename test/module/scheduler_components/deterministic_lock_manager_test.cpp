@@ -28,7 +28,7 @@ TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
   auto txn2 = MakeTransaction({"readX"}, {"ZZZZ"});
   txn2.mutable_internal()->set_id(200);
   ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
-  ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
+  ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
 }
 
 TEST(DeterministicLockManager, ReadLocks) {
@@ -171,7 +171,6 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
-
 TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   DeterministicLockManager lock_manager(configs[0]);
@@ -193,4 +192,18 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
   ASSERT_EQ(new_ready_txns.size(), 1);
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
+}
+
+TEST(DeterministicLockManager, GhostTxns) {
+  auto configs = MakeTestConfigurations("locking", 1, 2);
+  DeterministicLockManager lock_manager(configs[0]);
+  // "X" is in partition 1
+  auto txn1 = MakeTransaction({}, {"X"});
+  txn1.mutable_internal()->set_id(100);
+  ASSERT_FALSE(lock_manager.RegisterTxn(txn1));
+
+  // "Z" is in partition 1
+  auto txn2 = MakeTransaction({"Z"}, {});
+  txn2.mutable_internal()->set_id(101);
+  ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
 }
