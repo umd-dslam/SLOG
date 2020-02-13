@@ -29,10 +29,11 @@ struct PendingResponse {
  * A Server serves external requests from the clients. It also answers
  * requests about mastership of data.
  * 
- * INPUT: External TransactionRequest and LookUpMasterRequest
- * OUTPUT: For external TransactionRequest, it sends the txn internally
- *         and waits for internal responses before responding back to the
- *         client with an external TransactionResponse.
+ * INPUT:  External TransactionRequest and LookUpMasterRequest
+ * 
+ * OUTPUT: For external TransactionRequest, it forwards the txn internally
+ *         to appropriate modules and waits for internal responses before
+ *         responding back to the client with an external TransactionResponse.
  * 
  *         For LookUpMasterRequest, a LookUpMasterResponse is sent back to
  *         the requester.

@@ -21,7 +21,8 @@ namespace slog {
  * To determine the type of a txn, it sends LookupMasterRequests to all Server
  * modules in the same region and aggregates the responses.
  * 
- * INPUT: ForwardTransaction
+ * INPUT:  ForwardTransaction
+ * 
  * OUTPUT: If the txn is SINGLE_HOME, forward to the Sequencer in its home region.
  *         If the txn is MULTI_HOME, forward to the GlobalPaxos for ordering.
  */

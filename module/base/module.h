@@ -19,8 +19,8 @@ namespace slog {
  * only needed if a module needs more than one socket and
  * more flexibility in implementation (for example: Server)
  * 
- * A module cannot run on its own and only contains the instructions
- * for what to run. It has to be coupled with a ModuleRunner.
+ * A module only contains the instructions for what to run.
+ * To actually run, it has to be coupled with a ModuleRunner.
  */
 class Module {
 public:
