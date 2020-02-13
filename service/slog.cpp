@@ -133,16 +133,16 @@ int main(int argc, char* argv[]) {
         MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
   }
 
-  // New modules cannot be bound to the broker after it starts so only start 
-  // the Broker after it is used to initialized all modules.
+  // New modules cannot be bound to the broker after it starts so start 
+  // the Broker only after it is used to initialized all modules.
   broker.StartInNewThread();
   
-  // Start modules in the own thread
+  // Start modules in their own threads
   for (auto& module : modules) {
     module->StartInNewThread();
   }
 
-  // Run the server in this main thread so that the whole process
+  // Run the server in the current main thread so that the whole process
   // does not immediately terminate after this line.
   server->Start();
 

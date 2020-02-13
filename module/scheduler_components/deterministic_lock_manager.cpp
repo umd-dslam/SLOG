@@ -203,12 +203,12 @@ DeterministicLockManager::ExtractKeys(const Transaction& txn) {
     // If this key is also in write_set, give it write lock instead
     if (config_->KeyIsInLocalPartition(kv.first) 
         && !txn.write_set().contains(kv.first)) {
-      keys.push_back({kv.first, LockMode::READ});
+      keys.emplace_back(kv.first, LockMode::READ);
     }
   }
   for (const auto& kv : txn.write_set()) {
     if (config_->KeyIsInLocalPartition(kv.first)) {
-      keys.push_back({kv.first, LockMode::WRITE});
+      keys.emplace_back(kv.first, LockMode::WRITE);
     }
   }
   return keys;
