@@ -84,34 +84,40 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
 }
 
 TEST_F(E2ETest, MultiPartitionTxn) {
-  auto txn = MakeTransaction({"A", "B"} /* read_set */, {}  /* write_set */);
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction({"A", "B"} /* read_set */, {}  /* write_set */);
 
-  test_slogs[0]->SendTxn(txn);
-  auto txn_resp = test_slogs[0]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
-  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-  ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+    test_slogs[i]->SendTxn(txn);
+    auto txn_resp = test_slogs[i]->RecvTxnResult();
+    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+    ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+    ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+  }
 }
 
 TEST_F(E2ETest, MultiHomeTxn) {
-  auto txn = MakeTransaction({"A", "C"} /* read_set */, {}  /* write_set */);
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction({"A", "C"} /* read_set */, {}  /* write_set */);
 
-  test_slogs[1]->SendTxn(txn);
-  auto txn_resp = test_slogs[0]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
-  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-  ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+    test_slogs[i]->SendTxn(txn);
+    auto txn_resp = test_slogs[i]->RecvTxnResult();
+    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+    ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+  }
 }
 
 TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
-  auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
 
-  test_slogs[0]->SendTxn(txn);
-  auto txn_resp = test_slogs[0]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
-  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-  ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+    test_slogs[i]->SendTxn(txn);
+    auto txn_resp = test_slogs[i]->RecvTxnResult();
+    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+    ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+  }
 }
