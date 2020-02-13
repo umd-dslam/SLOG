@@ -8,18 +8,16 @@ import logging
 import numpy as np
 import os
 import string
-import sys
-if sys.version_info[0] == 3:
-    _get_byte = lambda c: c
-else:
-    _get_byte = ord
 import time
 
 from argparse import ArgumentParser
 from collections import defaultdict
 from functools import partial
+
 from google.protobuf.internal.encoder import _VarintBytes
 from multiprocessing import Pool
+
+from fnv_hash import fnv_hash
 from proto.offline_data_pb2 import Datum
 
 ALPHABET = np.array(list(string.ascii_lowercase + string.digits))
@@ -48,19 +46,6 @@ def encode_key(key: int) -> bytes:
     return base64.b64encode(
         key.to_bytes(8, byteorder='little')
     )
-
-
-def fnv_hash(value: bytes) -> int:
-    assert isinstance(value, bytes)
-
-    FNV_32_PRIME = 0x01000193
-    FNV_32_SIZE = 2**32
-
-    hash = 0x811c9dc5
-    for byte in value:
-        hash = (hash * FNV_32_PRIME) % FNV_32_SIZE
-        hash = hash ^ _get_byte(byte)
-    return hash
 
 
 class DataGenerator:
@@ -202,7 +187,7 @@ class DataGenerator:
         
         return datum
 
-
+# TODO(ctring): Take into account number of bytes actually used for partitioning
 if __name__ == "__main__":
     parser = ArgumentParser(
         "gen_data",

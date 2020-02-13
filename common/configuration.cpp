@@ -36,6 +36,9 @@ ConfigurationPtr Configuration::FromFile(
     uint32_t local_replica,
     uint32_t local_partition) {
   int fd = open(file_path.c_str(), O_RDONLY);
+  if (fd < 0) {
+    LOG(FATAL) << "Configuration file error: " << strerror(errno);
+  }
   ZeroCopyInputStream* input = new FileInputStream(fd);
   internal::Configuration config;
 

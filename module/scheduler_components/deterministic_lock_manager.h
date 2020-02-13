@@ -3,6 +3,7 @@
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/configuration.h"
 #include "common/constants.h"
@@ -13,6 +14,7 @@ using std::shared_ptr;
 using std::pair;
 using std::unordered_map;
 using std::unordered_set;
+using std::vector;
 
 namespace slog {
 
@@ -91,6 +93,8 @@ public:
   unordered_set<TxnId> ReleaseLocks(const Transaction& txn);
 
 private:
+  vector<pair<Key, LockMode>> ExtractKeys(const Transaction& txn);
+
   ConfigurationPtr config_;
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;

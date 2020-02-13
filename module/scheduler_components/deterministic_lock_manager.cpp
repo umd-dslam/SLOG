@@ -108,20 +108,13 @@ DeterministicLockManager::DeterministicLockManager(ConfigurationPtr config)
 
 bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
   auto txn_id = txn.internal().id();
-  unordered_set<Key> all_keys;
-  for (const auto& kv : txn.read_set()) {
-    if (config_->KeyIsInLocalPartition(kv.first)) {
-      all_keys.insert(kv.first);
-    }
-  }
-  for (const auto& kv : txn.write_set()) {
-    if (config_->KeyIsInLocalPartition(kv.first)) {
-      all_keys.insert(kv.first);
-    }
+  auto keys = ExtractKeys(txn);
+  if (keys.empty()) {
+    // None of the keys in this txn is in this partition
+    return false;
   }
 
-  num_locks_waited_[txn_id] += all_keys.size();
-
+  num_locks_waited_[txn_id] += keys.size();
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;
@@ -131,32 +124,33 @@ bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
 
 bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
-  for (const auto& pair : txn.read_set()) {
+  auto keys = ExtractKeys(txn);
+  if (keys.empty()) {
+    // None of the keys in this txn is in this partition
+    return false;
+  }
+  for (auto pair : keys) {
     auto key = pair.first;
-    // Ignore this key if it is not in the current partition
-    if (!config_->KeyIsInLocalPartition(key)) {
-      continue;
-    }
-    // If this key is also in the writeset, give it write lock instead
-    if (txn.write_set().contains(key)) {
-      continue;
-    }
-    if (!lock_table_[key].IsQueued(txn_id)
-        && lock_table_[key].AcquireReadLock(txn_id)) {
-      num_locks_waited_[txn_id]--;
+    auto mode = pair.second;
+    switch (mode) {
+      case LockMode::READ:
+        if (!lock_table_[key].IsQueued(txn_id)
+            && lock_table_[key].AcquireReadLock(txn_id)) {
+          num_locks_waited_[txn_id]--;
+        }
+        break;
+      case LockMode::WRITE:
+        if (!lock_table_[key].IsQueued(txn_id)
+            && lock_table_[key].AcquireWriteLock(txn_id)) {
+          num_locks_waited_[txn_id]--;
+        }
+        break;
+      default:
+        LOG(FATAL) << "Invalid lock mode";
+        break;
     }
   }
-  for (const auto& pair : txn.write_set()) {
-    auto key = pair.first;
-    // Ignore this key if it is not in the current partition
-    if (!config_->KeyIsInLocalPartition(key)) {
-      continue;
-    }
-    if (!lock_table_[key].IsQueued(txn_id)
-        && lock_table_[key].AcquireWriteLock(txn_id)) {
-      num_locks_waited_[txn_id]--;
-    }
-  }
+
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;
@@ -173,37 +167,52 @@ unordered_set<TxnId>
 DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
   unordered_set<TxnId> ready_txns;
   auto txn_id = txn.internal().id();
-  auto Release = 
-      [this, txn_id, &ready_txns]
-      (const auto& read_or_write_set) {
-    for (const auto& pair : read_or_write_set) {
-      auto key = pair.first;
-      if (!config_->KeyIsInLocalPartition(key)) {
-        continue;
-      }
+  auto keys = ExtractKeys(txn);
 
-      auto new_holders = lock_table_[key].Release(txn_id);
-      for (auto holder : new_holders) {
-        num_locks_waited_[holder]--;
-        if (num_locks_waited_[holder] == 0) {
-          num_locks_waited_.erase(holder);
-          ready_txns.insert(holder);
-        }
-      }
+  for (const auto& pair : keys) {
+    auto key = pair.first;
+    if (!config_->KeyIsInLocalPartition(key)) {
+      continue;
+    }
 
-      // Prevent the lock table from growing too big
-      if (lock_table_[key].mode == LockMode::UNLOCKED && 
-          lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
-        lock_table_.erase(key);
+    auto new_holders = lock_table_[key].Release(txn_id);
+    for (auto holder : new_holders) {
+      num_locks_waited_[holder]--;
+      if (num_locks_waited_[holder] == 0) {
+        num_locks_waited_.erase(holder);
+        ready_txns.insert(holder);
       }
     }
-  };
 
-  Release(txn.read_set());
-  Release(txn.write_set());
+    // Prevent the lock table from growing too big
+    if (lock_table_[key].mode == LockMode::UNLOCKED && 
+        lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
+      lock_table_.erase(key);
+    }
+  }
+
   num_locks_waited_.erase(txn_id);
 
   return ready_txns;
 }
+
+vector<pair<Key, LockMode>>
+DeterministicLockManager::ExtractKeys(const Transaction& txn) {
+  vector<pair<Key, LockMode>> keys;
+  for (const auto& kv : txn.read_set()) {
+    // If this key is also in write_set, give it write lock instead
+    if (config_->KeyIsInLocalPartition(kv.first) 
+        && !txn.write_set().contains(kv.first)) {
+      keys.push_back({kv.first, LockMode::READ});
+    }
+  }
+  for (const auto& kv : txn.write_set()) {
+    if (config_->KeyIsInLocalPartition(kv.first)) {
+      keys.push_back({kv.first, LockMode::WRITE});
+    }
+  }
+  return keys;
+}
+
 
 } // namespace slog
