@@ -121,3 +121,9 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
     ASSERT_EQ("valX", txn_resp.read_set().at("X"));
   }
 }
+
+int main(int argc, char* argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  google::InstallFailureSignalHandler();
+  return RUN_ALL_TESTS();
+}
