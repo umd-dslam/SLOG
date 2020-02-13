@@ -160,17 +160,15 @@ void TestSlog::SendTxn(const Transaction& txn) {
 }
 
 Transaction TestSlog::RecvTxnResult() {
-  {
     MMessage msg(client_socket_);
     api::Response res;
     if (!msg.GetProto(res)) {
-      LOG(ERROR) << "Malformed response";
+      LOG(FATAL) << "Malformed response to client transaction.";
+      return Transaction();
     } else {
       const auto& txn = res.txn().txn();
       LOG(INFO) << "Received response. Stream id: " << res.stream_id();
       return txn;
     }
   }
-}
-
 } // namespace slog
