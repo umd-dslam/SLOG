@@ -32,8 +32,13 @@ protected:
       test_slogs[i]->AddSequencer();
       test_slogs[i]->AddScheduler();
       test_slogs[i]->AddLocalPaxos();
-      test_slogs[i]->AddGlobalPaxos();
-      test_slogs[i]->AddMultiHomeOrderer();
+
+      // Only one partition per replica participates in the global paxos process
+      if (configs[i]->GetLeaderPartitionForMultiHomeOrdering() 
+          == configs[i]->GetLocalPartition()) {
+        test_slogs[i]->AddGlobalPaxos();
+        test_slogs[i]->AddMultiHomeOrderer();
+      }
     }
 
     // Replica 0
