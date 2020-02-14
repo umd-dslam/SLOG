@@ -68,7 +68,7 @@ void Scheduler::Loop() {
       // MM_PROTO + 1 is a convention between the Scheduler and
       // Worker to specify the destination of this message
       msg.GetString(destination, MM_PROTO + 1);
-
+      // Send to the Scheduler of the remote machine
       SendSameChannel(forwarded_req, destination);
     } else if (msg.IsProto<Response>()) {
       // A worker finishes processing a transaction. Mark this 
@@ -78,6 +78,9 @@ void Scheduler::Loop() {
       ready_workers_.push(msg.GetIdentity());
       // Handle the results produced by the worker
       HandleResponseFromWorker(std::move(res));
+      // Since we now have a free worker, try dispatching a ready
+      // txn if one is in queue.
+      TryDispatchingNextTransaction();
     }
   }
 }
@@ -239,7 +242,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
             auto& holder = all_txns_[txn_id];
             holder.txn.reset(txn);
             if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
-              DispatchTransaction(txn_id); 
+              EnqueueTransaction(txn_id); 
             }
             break;
           }
@@ -248,7 +251,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
             auto& holder = all_txns_[txn_id];
             holder.txn.reset(txn);
             if (lock_manager_.RegisterTxn(*holder.txn)) {
-              DispatchTransaction(txn_id); 
+              EnqueueTransaction(txn_id); 
             }
             break;
           }
@@ -257,7 +260,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
               auto txn_id = txn->internal().id();
               CHECK(all_txns_.count(txn_id) > 0) 
                   << "Txn " << txn_id << " is not found for dispatching";
-              DispatchTransaction(txn_id);
+              EnqueueTransaction(txn_id);
             }
             delete txn;
             break;
@@ -284,7 +287,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   // become ready thanks to this release.
   auto ready_txns = lock_manager_.ReleaseLocks(*txn);
   for (auto ready_txn_id : ready_txns) {
-    DispatchTransaction(ready_txn_id);
+    EnqueueTransaction(ready_txn_id);
   }
 
   // Send the txn back to the coordinating server if need to
@@ -307,14 +310,28 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   }
 }
 
-void Scheduler::DispatchTransaction(TxnId txn_id) {
+void Scheduler::EnqueueTransaction(TxnId txn_id) {
+  VLOG(1) << "Enqueued txn " << txn_id;
+  ready_txns_.push(txn_id);
+  TryDispatchingNextTransaction();
+}
+
+void Scheduler::TryDispatchingNextTransaction() {
+  if (ready_workers_.empty() || ready_txns_.empty()) {
+    return;
+  }
+  // Pop next ready txn in queue
+  auto txn_id = ready_txns_.front();
+  ready_txns_.pop();
   VLOG(1) << "Dispatched txn " << txn_id;
 
   auto& holder = all_txns_.at(txn_id);
 
+  // Pop next ready worker in queue
   holder.worker = ready_workers_.front();
   ready_workers_.pop();
 
+  // Prepare a request with the txn to be sent to the worker
   Request req;
   auto process_txn = req.mutable_process_txn();
   process_txn->set_txn_id(txn_id);

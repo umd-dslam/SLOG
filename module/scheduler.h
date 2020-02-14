@@ -72,7 +72,8 @@ private:
   void TryUpdatingLocalLog();
   void TryProcessingNextBatchesFromGlobalLog();
 
-  void DispatchTransaction(TxnId txn_id);
+  void EnqueueTransaction(TxnId txn_id);
+  void TryDispatchingNextTransaction();
 
   void SendToWorker(internal::Request&& req, const string& worker);
 
@@ -81,6 +82,7 @@ private:
   vector<zmq::pollitem_t> poll_items_;
   vector<unique_ptr<ModuleRunner>> workers_;
   queue<string> ready_workers_;
+  queue<TxnId> ready_txns_;
 
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
