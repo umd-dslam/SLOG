@@ -1,9 +1,10 @@
 #!/usr/bin/python3
-from __future__ import (
-    division, 
-    print_function
-)
+"""Data generation tool
 
+This tool generates data to be loaded at the startup of an SLOG cluster. It is
+designed to generate the same data for each replica even though it runs
+separately on different machines.
+"""
 import base64
 import logging
 import numpy as np
@@ -80,23 +81,30 @@ class DataGenerator:
         encoded = encode_key(key)
         return fnv_hash(encoded, self.partition_bytes) % self.num_partitions
 
-    def gen_data(self, as_text: bool) -> None:
+    def gen_data(self, partition: int, as_text: bool) -> None:
+        if partition >= self.num_partitions:
+            LOG.error(
+                "Partition number cannot be larger than number of partition!"
+            )
+            return
         start_time = time.time()
 
         LOG.info(
-            "Creating %d partitions from %d keys...", 
-            self.num_partitions, self.num_records
+            "Partitioning %d keys into %d partitions...", 
+            self.num_records,
+            self.num_partitions,
         )
         # Distribute keys into the partitions
         partition_to_keys = defaultdict(list)
         for key in range(0, self.num_records):
             p = self.partition_of_key(key)
-            partition_to_keys[p].append(key)
+            if partition < 0 or p == partition:
+                partition_to_keys[p].append(key)
 
         # Compute the number of jobs
         num_jobs = (
-            min(self.num_partitions, self.max_jobs)
-            if self.max_jobs > 0 else self.num_partitions
+            min(len(partition_to_keys), self.max_jobs)
+            if self.max_jobs > 0 else len(partition_to_keys)
         )
         LOG.info("Spawning %d jobs...", num_jobs)
         func = partial(
@@ -208,13 +216,20 @@ if __name__ == "__main__":
         help="Directory where the generated data files are located",
     )
     parser.add_argument(
-        "-p", "--num-partitions",
+        "-p", "--partition",
+        default=-1,
+        type=int,
+        help="Generate data for this partition only. Use -1 (default) to "
+             "generate data for all partitions"
+    )
+    parser.add_argument(
+        "-np", "--num-partitions",
         default=1,
         type=int,
         help="Number of partitions"
     )
     parser.add_argument(
-        "-r", "--num_replicas",
+        "-nr", "--num_replicas",
         default=1,
         type=int,
         help="Number of replicas"
@@ -270,5 +285,6 @@ if __name__ == "__main__":
         args.max_jobs,
         args.partition_bytes,
     ).gen_data(
+        partition=args.partition,
         as_text=args.as_text,
     )
