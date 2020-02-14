@@ -40,6 +40,7 @@ logging.basicConfig(
 LOG = logging.getLogger("gen_data")
 LOG_EVERY_SEC = 1
 
+
 def encode_key(key: int) -> bytes:
     """
     Encodes an integer key into a fixed length string
@@ -61,6 +62,7 @@ class DataGenerator:
         size_unit: str,
         record_size: int,
         max_jobs: int,
+        partition_bytes: int,
     ):
         self.data_dir = os.path.abspath(data_dir)
         self.prefix = prefix
@@ -72,9 +74,11 @@ class DataGenerator:
         self.num_records = int(num_records)
         self.record_size = record_size
         self.max_jobs = max_jobs
+        self.partition_bytes = partition_bytes
 
     def partition_of_key(self, key: int) -> int:
-        return fnv_hash(encode_key(key)) % self.num_partitions
+        encoded = encode_key(key)
+        return fnv_hash(encoded, self.partition_bytes) % self.num_partitions
 
     def gen_data(self, as_text: bool) -> None:
         start_time = time.time()
@@ -125,6 +129,11 @@ class DataGenerator:
         keys: list,
         as_text: bool,
     ) -> None:
+        # Set per-partition seed so that partitions have 
+        # different data. Keys and master are not randomly
+        # generated so this seed only affects records
+        np.random.seed(partition)
+
         file_name = os.path.join(
             self.data_dir,
             self.prefix + str(partition) + FILE_EXTENSION
@@ -188,7 +197,7 @@ class DataGenerator:
         
         return datum
 
-# TODO(ctring): Take into account number of bytes actually used for partitioning
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         "gen_data",
@@ -240,12 +249,15 @@ if __name__ == "__main__":
         help="Maximum number of jobs spawned to do work. For unlimited number "
              "of jobs, use 0."
     )
+    parser.add_argument(
+        "--partition-bytes",
+        type=int,
+        default=0,
+        help="Number of prefix bytes of a key used for computing its partition."
+             "Set to 0 (default) to use the whole key."
+    )
 
     args = parser.parse_args()
-
-    # Keys and master are not randomly generated
-    # so this seed only affects record
-    np.random.seed(0)
 
     DataGenerator(
         args.data_dir,
@@ -256,6 +268,7 @@ if __name__ == "__main__":
         args.size_unit,
         args.record_size,
         args.max_jobs,
+        args.partition_bytes,
     ).gen_data(
         as_text=args.as_text,
     )
