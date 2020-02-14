@@ -10,6 +10,7 @@
 #include "module/sequencer.h"
 #include "module/scheduler.h"
 #include "module/consensus.h"
+#include "module/multi_home_orderer.h"
 #include "proto/api.pb.h"
 
 using std::to_string;
@@ -108,6 +109,14 @@ void TestSlog::AddLocalPaxos() {
   local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_);
 }
 
+void TestSlog::AddGlobalPaxos() {
+  global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_);
+}
+
+void TestSlog::AddMultiHomeOrderer() {
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_);
+}
+
 unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
   return broker_.AddChannel(name);
 }
@@ -132,6 +141,12 @@ void TestSlog::StartInNewThreads() {
   if (local_paxos_) {
     local_paxos_->StartInNewThread();
   }
+  if (global_paxos_) {
+    global_paxos_->StartInNewThread();
+  }
+  if (multi_home_orderer_) {
+    multi_home_orderer_->StartInNewThread();
+  }
 }
 
 void TestSlog::SendTxn(const Transaction& txn) {
@@ -144,4 +159,16 @@ void TestSlog::SendTxn(const Transaction& txn) {
   msg.SendTo(client_socket_);
 }
 
+Transaction TestSlog::RecvTxnResult() {
+    MMessage msg(client_socket_);
+    api::Response res;
+    if (!msg.GetProto(res)) {
+      LOG(FATAL) << "Malformed response to client transaction.";
+      return Transaction();
+    } else {
+      const auto& txn = res.txn().txn();
+      LOG(INFO) << "Received response. Stream id: " << res.stream_id();
+      return txn;
+    }
+  }
 } // namespace slog
