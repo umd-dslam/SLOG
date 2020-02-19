@@ -83,10 +83,11 @@ class DataGenerator:
 
     def gen_data(self, partition: int, as_text: bool) -> None:
         if partition >= self.num_partitions:
-            LOG.error(
-                "Partition number cannot be larger than number of partition!"
+            raise IndexError(
+                "Partition number cannot be larger than or equal to "
+                "number of partition!"
             )
-            return
+
         start_time = time.time()
 
         LOG.info(
@@ -206,33 +207,18 @@ class DataGenerator:
         return datum
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser(
-        "gen_data",
-        description="Generate initial data for SLOG"
-    )
-    parser.add_argument(
-        "data_dir",
-        help="Directory where the generated data files are located",
-    )
+def add_exported_gen_data_arguments(parser):
+    '''
+    These arguments are also used in a different script so we want to avoid
+    maintaining multiple copies of them. By putting them in a separate function,
+    other scripts can simply import this function to use them.
+    '''
     parser.add_argument(
         "-p", "--partition",
         default=-1,
         type=int,
         help="Generate data for this partition only. Use -1 (default) to "
              "generate data for all partitions"
-    )
-    parser.add_argument(
-        "-np", "--num-partitions",
-        default=1,
-        type=int,
-        help="Number of partitions"
-    )
-    parser.add_argument(
-        "-nr", "--num_replicas",
-        default=1,
-        type=int,
-        help="Number of replicas"
     )
     parser.add_argument(
         "-s", "--size",
@@ -253,16 +239,34 @@ if __name__ == "__main__":
         help="Size of each record, in bytes."
     )
     parser.add_argument(
-        "--as-text",
-        action='store_true',
-        help="Generate data as human-readable text files"
-    )
-    parser.add_argument(
         "--max-jobs",
         type=int,
         default=0,
         help="Maximum number of jobs spawned to do work. For unlimited number "
              "of jobs, use 0."
+    )
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        "gen_data",
+        description="Generates initial data for SLOG"
+    )
+    parser.add_argument(
+        "data_dir",
+        help="Directory where the generated data files are located",
+    )
+    parser.add_argument(
+        "-np", "--num-partitions",
+        default=1,
+        type=int,
+        help="Number of partitions"
+    )
+    parser.add_argument(
+        "-nr", "--num-replicas",
+        default=1,
+        type=int,
+        help="Number of replicas"
     )
     parser.add_argument(
         "--partition-bytes",
@@ -271,6 +275,12 @@ if __name__ == "__main__":
         help="Number of prefix bytes of a key used for computing its partition."
              "Set to 0 (default) to use the whole key."
     )
+    parser.add_argument(
+        "--as-text",
+        action='store_true',
+        help="Generate data as human-readable text files"
+    )
+    add_exported_gen_data_arguments(parser)
 
     args = parser.parse_args()
 
