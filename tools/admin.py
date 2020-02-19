@@ -148,8 +148,13 @@ class Command:
     ##############################
     def new_client(self, addr):
         """
-        Gets a new Docker client for a given address.
+        Gets a new Docker client for a given address. If no address is given,
+        gets the local Docker client.
         """
+        if addr is None:
+            if self.local_client is None:
+                self.local_client = docker.from_env()
+            return self.local_client
         return docker.DockerClient(
             base_url=f'ssh://{USER}@{addr}',
         )
@@ -234,12 +239,6 @@ class StartCommand(Command):
         sync_config_cmd = (
             f"echo '{config_text}' > {SLOG_CONFIG_FILE_PATH}"
         )
-        broker_port = self.config.broker_port
-        server_port = self.config.server_port
-        port_mapping = {
-            broker_port: broker_port,
-            server_port: server_port,
-        }
         for rep, clients in enumerate(self.rep_to_clients):
             for part, (client, addr) in enumerate(clients):
                 if client is None:
@@ -264,7 +263,9 @@ class StartCommand(Command):
                         shell_cmd
                     ],
                     mounts=[SLOG_DATA_MOUNT],
-                    ports=port_mapping,
+                    # Expose all ports from container to host
+                    network_mode="host",
+                    # Avoid hanging this tool after starting the server
                     detach=True,
                 )
                 LOG.info(
