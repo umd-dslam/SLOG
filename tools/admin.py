@@ -200,6 +200,12 @@ class StartCommand(Command):
         sync_config_cmd = (
             f"echo '{config_text}' > {SLOG_CONFIG_FILE_PATH}"
         )
+        broker_port = self.config.broker_port
+        server_port = self.config.server_port
+        port_mapping = {
+            broker_port: broker_port,
+            server_port: server_port,
+        }
         for rep, clients in enumerate(self.rep_to_clients):
             for part, (client, addr) in enumerate(clients):
                 shell_cmd = (
@@ -221,6 +227,7 @@ class StartCommand(Command):
                             shell_cmd
                         ],
                         mounts=[SLOG_DATA_MOUNT],
+                        ports=port_mapping,
                         detach=True,
                     )
                     LOG.info(
