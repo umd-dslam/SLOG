@@ -5,6 +5,7 @@ This tool is used to automate controlling a cluster of SLOG servers with tasks
 such as starting a cluster, stopping a cluster, getting status, and more.
 """
 import docker
+import ipaddress
 import logging
 import os
 
@@ -36,7 +37,7 @@ SLOG_DATA_MOUNT = docker.types.Mount(
     type="bind",
 )
 SLOG_CONFIG_FILE_NAME = "slog.conf"
-SLOG_CONFIG_FILE_PATH = os.path.join(
+CONTAINER_SLOG_CONFIG_FILE_PATH = os.path.join(
     CONTAINER_DATA_DIR,
     SLOG_CONFIG_FILE_NAME
 )
@@ -53,7 +54,11 @@ def cleanup_container(
     try:
         c = client.containers.get(name)
         c.remove(force=True)
-        LOG.info("%s: Cleaned up container \"%s\"", addr, name)
+        LOG.info(
+            "%sCleaned up container \"%s\"",
+            f"{addr}: " if addr else "",
+            name,
+        )
     except:
         pass
 
@@ -84,11 +89,6 @@ class Command:
             "config",
             metavar="config_file",
             help="Path to a config file"
-        )
-        parser.add_argument(
-            "--local",
-            action='store_true',
-            help="Run the command on the local machine"
         )
         parser.set_defaults(run=self.__initialize_and_do_command)
         return parser
@@ -148,13 +148,8 @@ class Command:
     ##############################
     def new_client(self, addr):
         """
-        Gets a new Docker client for a given address. If no address is given,
-        gets the local Docker client.
+        Gets a new Docker client for a given address.
         """
-        if addr is None:
-            if self.local_client is None:
-                self.local_client = docker.from_env()
-            return self.local_client
         return docker.DockerClient(
             base_url=f'ssh://{USER}@{addr}',
         )
@@ -237,7 +232,7 @@ class StartCommand(Command):
     def do_command(self, args):
         config_text = text_format.MessageToString(self.config)
         sync_config_cmd = (
-            f"echo '{config_text}' > {SLOG_CONFIG_FILE_PATH}"
+            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
         )
         for rep, clients in enumerate(self.rep_to_clients):
             for part, (client, addr) in enumerate(clients):
@@ -247,7 +242,7 @@ class StartCommand(Command):
                     continue
                 shell_cmd = (
                     f"slog "
-                    f"--config {SLOG_CONFIG_FILE_PATH} "
+                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
                     f"--address {addr} "
                     f"--replica {rep} "
                     f"--partition {part} "
@@ -380,6 +375,12 @@ class LogsCommand(Command):
         except Exception as e:
             LOG.error(str(e))
 
+    def pull_slog_image(self, args):
+        """
+        Override this method to skip the image pulling step.
+        """
+        pass
+
     def do_command(self, args):
         if self.client is None:
             return
@@ -400,6 +401,158 @@ class LogsCommand(Command):
             print(c.logs().decode(), end="")
 
 
+class LocalCommand(Command):
+
+    NAME = "local"
+    HELP = "Control a cluster on the local machine"
+
+    # Local network
+    NETWORK_NAME = "slog_nw"
+    SUBNET = "172.28.0.0/16"
+    IP_RANGE = "172.28.5.0/24"
+
+    def create_subparser(self, subparsers):
+        parser = super().create_subparser(subparsers)
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument(
+            "--start",
+            action='store_true',
+            help="Start the local cluster"
+        )
+        group.add_argument(
+            "--stop",
+            action='store_true',
+            help="Stop the local cluster"
+        )
+        group.add_argument(
+            "--remove",
+            action="store_true",
+            help="Remove all containers of the local cluster"
+        )
+
+    def load_config(self, args):
+        super().load_config(args)
+        # Replace the addresses with auto-generated local addresses
+        address_generator = ipaddress.ip_network(self.IP_RANGE).hosts()
+        for rep in self.config.replicas:
+            del rep.addresses[:]
+            for p in range(self.config.num_partitions):
+                ip_address = str(next(address_generator))
+                rep.addresses.append(ip_address.encode())
+
+    def init_clients(self, args):
+        """
+        Override this method because we only need one client
+        """
+        self.client = docker.from_env()
+
+    def pull_slog_image(self, args):
+        """
+        Override this method because we only pull image from one client
+        """
+        if self.client is None:
+            return
+        LOG.info("Pulling latest docker image \"%s\"...", SLOG_IMG)
+        self.client.images.pull(SLOG_IMG)
+
+    def do_command(self, args):
+        if self.client is None:
+            return
+
+        if args.start:
+            self.__start()
+        elif args.stop:
+            self.__stop()
+        elif args.remove:
+            self.__remove()
+
+    def __start(self):
+        #
+        # Create a local network if one does not exist
+        #
+        nw_list = self.client.networks.list(names=[self.NETWORK_NAME])
+        if nw_list:
+            slog_nw = nw_list[0]
+            LOG.info("Reused network \"%s\"", self.NETWORK_NAME)
+        else:
+            ipam_pool = docker.types.IPAMPool(
+                subnet=self.SUBNET,
+                iprange=self.IP_RANGE
+            )
+            ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+            slog_nw = self.client.networks.create(
+                name=self.NETWORK_NAME,
+                driver="bridge",
+                check_duplicate=True,
+                ipam=ipam_config,
+            )
+            LOG.info("Created network \"%s\"", self.NETWORK_NAME)
+
+        #
+        # Spin up local Docker containers and connect them to the network
+        #
+        config_text = text_format.MessageToString(self.config)
+        sync_config_cmd = (
+            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
+        )
+        for r, rep in enumerate(self.config.replicas):
+            for p, addr_b in enumerate(rep.addresses):
+                addr = addr_b.decode()
+                shell_cmd = (
+                    f"slog "
+                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                    f"--address {addr} "
+                    f"--replica {r} "
+                    f"--partition {p} "
+                    f"--data-dir {CONTAINER_DATA_DIR} "
+                )
+                container_name = f"slog_{r}_{p}"
+                # Clean up old container with the same name
+                cleanup_container(self.client, container_name)
+                # Create and run the container
+                container = self.client.containers.create(
+                    SLOG_IMG,
+                    name=container_name,
+                    command=[
+                        "/bin/sh", "-c",
+                        sync_config_cmd + " && " +
+                        shell_cmd,
+                    ],
+                    mounts=[SLOG_DATA_MOUNT],
+                )
+
+                # Connect the container to the custom network.
+                # This has to happen before we start the container.
+                slog_nw.connect(container, ipv4_address=addr)
+
+                # Actually start the container
+                container.start()
+
+                LOG.info(
+                    "%s: Synced config and ran command: %s",
+                    addr,
+                    shell_cmd,
+                )
+        
+    
+    def __stop(self):
+        for r in range(len(self.config.replicas)):
+            for p in range (self.config.num_partitions):
+                try:
+                    container_name = f"slog_{r}_{p}"
+                    LOG.info("Stopping \"%s\"", container_name)
+                    c = self.client.containers.get(container_name)
+                    c.stop(timeout=0)
+                except docker.errors.NotFound:
+                    pass
+    
+    def __remove(self):
+        for r in range(len(self.config.replicas)):
+            for p in range (self.config.num_partitions):
+                container_name = f"slog_{r}_{p}"
+                cleanup_container(self.client, container_name)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         description="Controls deployment and experiment of SLOG"
@@ -413,6 +566,7 @@ if __name__ == "__main__":
         StopCommand,
         StatusCommand,
         LogsCommand,
+        LocalCommand,
     ]
     for command in COMMANDS:
         command().create_subparser(subparsers)
