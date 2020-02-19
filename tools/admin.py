@@ -59,10 +59,11 @@ class Command:
         return parser
 
     def __initialize_and_do_command(self, args):
-        self.initialize(args)
+        self.load_config_and_get_docker_clients(args)
+        self.pull_slog_image(args)
         self.do_command(args)
 
-    def initialize(self, args):
+    def load_config_and_get_docker_clients(self, args):
         with open(args.config, "r") as f:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
@@ -84,6 +85,7 @@ class Command:
 
             self.rep_to_clients.append(rep_clients)
 
+    def pull_slog_image(self, args):
         LOG.info(
             "Pulling SLOG image for each node. "
             "This might take a while on first run."
@@ -232,6 +234,30 @@ class StartCommand(Command):
                     )
 
 
+class StopCommand(Command):
+
+    NAME = "stop"
+    HELP = "Stop an SLOG cluster"
+
+    def pull_slog_image(self, args):
+        '''
+        Override this method to avoid the image pulling step.
+        '''
+        pass
+        
+    def do_command(self, args):
+        for rep, clients in enumerate(self.rep_to_clients):
+            for part, (client, addr) in enumerate(clients):
+                try:
+                    LOG.info("Stopping SLOG on %s...", addr)
+                    c = client.containers.get(StartCommand.NAME)
+                    c.stop(timeout=0)
+                except docker.errors.NotFound:
+                    pass
+                except:
+                    LOG.exception("Error while stopping SLOG on %s", addr)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         description="Controls deployment and experiment of SLOG"
@@ -242,6 +268,7 @@ if __name__ == "__main__":
     COMMANDS = [
         GenDataCommand,
         StartCommand,
+        StopCommand,
     ]
     for command in COMMANDS:
         command().create_subparser(subparsers)
