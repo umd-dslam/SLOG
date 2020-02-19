@@ -1,5 +1,9 @@
 #!/usr/bin/python3
+"""Admin tool
 
+This tool is used to automate controlling a cluster of SLOG servers with tasks
+such as starting a cluster, stopping a cluster, getting status, and more.
+"""
 import docker
 import logging
 import os
@@ -21,7 +25,6 @@ logging.basicConfig(
 LOG = logging.getLogger("admin")
 
 USER = "ubuntu"
-
 CONTAINER_DATA_DIR = "/var/tmp"
 HOST_DATA_DIR = "/var/tmp"
 
@@ -39,6 +42,16 @@ SLOG_CONFIG_FILE_PATH = os.path.join(
 
 
 class Command:
+    """Base class for a command.
+
+    This class contains the common implementation of all commands in this tool
+    such as parsing of common arguments, loading config file, and pulling new
+    SLOG image from docker repository.
+
+    All commands must extend from this class. A command may or may not override
+    any method but it must override and implement the `do_command` method as
+    well as all class variables to describe the command.
+    """
 
     NAME = "<not_implemented>"
     HELP = ""
@@ -65,6 +78,7 @@ class Command:
         self.do_command(args)
 
     def load_config_and_get_docker_clients(self, args):
+        # Load SLOG config
         with open(args.config, "r") as f:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
@@ -96,7 +110,8 @@ class Command:
             "Pulling SLOG image for each node. "
             "This might take a while on first run."
         )
-        # TODO(ctring): Use multiprocessing here to parallelizing image pulling
+        # TODO(ctring): Use multiprocessing to parallelizing
+        #               image pulling across machines.
         for client, addr in self.clients():
             LOG.info(
                 "%s: Pulling latest docker image \"%s\"...",
@@ -112,9 +127,9 @@ class Command:
     #       Helper methods
     ##############################
     def clients(self) -> Tuple[docker.DockerClient, str]:
-        '''
-        Generator to iterate through all docker clients
-        '''
+        """
+        Generator to iterate through all available docker clients
+        """
         for clients in self.rep_to_clients:
             for (client, addr) in clients:
                 if client is not None:
@@ -125,9 +140,10 @@ class Command:
         client: docker.DockerClient,
         addr: str,
     ) -> None:
-        '''
-        Cleans up the container for a client
-        '''
+        """
+        Cleans up a container whose name is the same as the name of the
+        corresponding command.
+        """
         try:
             c = client.containers.get(self.NAME)
             c.remove(force=True)
@@ -139,13 +155,16 @@ class Command:
         self,
         containers: List[Tuple[Container, str]]
     ) -> None:
+        """
+        Waits until all given containers stop.
+        """
         for c, addr in containers:
             res = c.wait()
         if res['StatusCode'] == 0:
-            LOG.info("%s finished successfully", addr)
+            LOG.info("%s: Done", addr)
         else:
             LOG.error(
-                "%s finished with non-zero status (%d). "
+                "%s: Finished with non-zero status (%d). "
                 "Check the logs of the container \"%s\" for more details",
                 addr,
                 res['StatusCode'],
@@ -173,26 +192,22 @@ class GenDataCommand(Command):
             f"--record-size {args.record_size} "
             f"--max-jobs {args.max_jobs} "
         )
-        LOG.info("Command to run: %s", shell_cmd)
         containers = []
         for client, addr in self.clients():
             self.cleanup_container(client, addr)
-            try:
-                c = client.containers.create(
-                    SLOG_IMG,
-                    name=self.NAME,
-                    command=shell_cmd,
-                    mounts=[SLOG_DATA_MOUNT],
-                )
-                c.start()
-                containers.append((c, addr))
-                LOG.info(
-                    "%s: ran command: %s",
-                    addr,
-                    shell_cmd
-                )
-            except:
-                LOG.exception("Unable to run command on %s", addr)
+            LOG.info(
+                "%s: Running command: %s",
+                addr,
+                shell_cmd
+            )
+            c = client.containers.create(
+                SLOG_IMG,
+                name=self.NAME,
+                command=shell_cmd,
+                mounts=[SLOG_DATA_MOUNT],
+            )
+            c.start()
+            containers.append((c, addr))
         
         self.wait_for_containers(containers)
         
@@ -228,28 +243,23 @@ class StartCommand(Command):
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
                 self.cleanup_container(client, addr)
-                try:
-                    client.containers.run(
-                        SLOG_IMG,
-                        name=self.NAME,
-                        command=[
-                            "/bin/sh", "-c",
-                            sync_config_cmd + " && " +
-                            shell_cmd
-                        ],
-                        mounts=[SLOG_DATA_MOUNT],
-                        ports=port_mapping,
-                        detach=True,
-                    )
-                    LOG.info(
-                        "%s: Synced config and ran command: %s",
-                        addr,
+                client.containers.run(
+                    SLOG_IMG,
+                    name=self.NAME,
+                    command=[
+                        "/bin/sh", "-c",
+                        sync_config_cmd + " && " +
                         shell_cmd
-                    )
-                except:
-                    LOG.exception(
-                        "Unable to run command on %s", addr
-                    )
+                    ],
+                    mounts=[SLOG_DATA_MOUNT],
+                    ports=port_mapping,
+                    detach=True,
+                )
+                LOG.info(
+                    "%s: Synced config and ran command: %s",
+                    addr,
+                    shell_cmd
+                )
 
 
 class StopCommand(Command):
@@ -258,9 +268,9 @@ class StopCommand(Command):
     HELP = "Stop an SLOG cluster"
 
     def pull_slog_image(self, args):
-        '''
+        """
         Override this method to skip the image pulling step.
-        '''
+        """
         pass
         
     def do_command(self, args):
@@ -271,8 +281,6 @@ class StopCommand(Command):
                 c.stop(timeout=0)
             except docker.errors.NotFound:
                 pass
-            except:
-                LOG.exception("Error while stopping SLOG on %s", addr)
 
 
 class StatusCommand(Command):
@@ -281,9 +289,9 @@ class StatusCommand(Command):
     HELP = "Show the status of an SLOG cluster"
 
     def pull_slog_image(self, args):
-        '''
+        """
         Override this method to skip the image pulling step.
-        '''
+        """
         pass
         
     def do_command(self, args):
