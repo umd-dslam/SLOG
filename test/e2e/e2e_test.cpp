@@ -22,7 +22,7 @@ protected:
 
   void SetUp() {
     configs = MakeTestConfigurations(
-        "e2e", 2 /* num_replicas */, 2 /* num_partitions */);
+        "e2e", 2 /* num_replicas */, 2 /* num_partitions */, 10 /* seed */);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);

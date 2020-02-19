@@ -52,7 +52,8 @@ void LoadData(
   
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
-    LOG(FATAL) << "Data loading error: " << strerror(errno);
+    LOG(ERROR) << "Data loading error: " << strerror(errno) << ". Starting with an empty storage";
+    return;
   }
 
   ZeroCopyInputStream* raw_input(new FileInputStream(fd));
