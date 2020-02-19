@@ -2,10 +2,15 @@
 
 import docker
 import logging
+import os
 
 import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
+from typing import List, Tuple
+
+from docker.models.containers import Container
+
 from gen_data import add_exported_gen_data_arguments
 from proto.configuration_pb2 import Configuration
 
@@ -17,26 +22,20 @@ LOG = logging.getLogger("admin")
 
 USER = "ubuntu"
 
-CONTAINER_DATA_PATH = "/var/tmp"
-HOST_DATA_PATH = "/var/tmp"
+CONTAINER_DATA_DIR = "/var/tmp"
+HOST_DATA_DIR = "/var/tmp"
 
 SLOG_IMG = "ctring/slog"
 SLOG_DATA_MOUNT = docker.types.Mount(
-    target=CONTAINER_DATA_PATH,
-    source=HOST_DATA_PATH,
+    target=CONTAINER_DATA_DIR,
+    source=HOST_DATA_DIR,
     type="bind",
 )
-
-
-def cleanup_container(
-    client: docker.DockerClient,
-    container_name: str
-) -> None:
-    try:
-        c = client.containers.get(container_name)
-        c.remove(force=True)
-    except:
-        return
+SLOG_CONFIG_FILE_NAME = "slog.conf"
+SLOG_CONFIG_FILE_PATH = os.path.join(
+    CONTAINER_DATA_DIR,
+    SLOG_CONFIG_FILE_NAME
+)
 
 
 class Command:
@@ -60,19 +59,15 @@ class Command:
         return parser
 
     def __initialize_and_do_command(self, args):
-        self.__initialize(args)
+        self.initialize(args)
         self.do_command(args)
 
-    def clients(self):
-        for rep in self.rep_to_clients:
-            for client in rep:
-                yield client
-
-    def __initialize(self, args):
+    def initialize(self, args):
         with open(args.config, "r") as f:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
         
+        # Initialize Docker clients
         self.rep_to_clients = []
         for rep in self.config.replicas:
             rep_clients = []
@@ -88,7 +83,7 @@ class Command:
                     LOG.exception("Unable to connect to %s", addr_str)
 
             self.rep_to_clients.append(rep_clients)
-        
+
         LOG.info(
             "Pulling SLOG image for each node. "
             "This might take a while on first run."
@@ -96,7 +91,7 @@ class Command:
         # TODO(ctring): Use multiprocessing here to parallelizing image pulling
         for client, addr in self.clients():
             LOG.info(
-                "Attempting to pull new docker image \"%s\" for %s",
+                "Pulling latest docker image \"%s\" for %s...",
                 SLOG_IMG,
                 addr,
             )
@@ -104,6 +99,49 @@ class Command:
 
     def do_command(self, args):
         raise NotImplementedError
+
+    ##############################
+    #       Helper methods
+    ##############################
+    def clients(self):
+        '''
+        Generator to iterate through all docker clients
+        '''
+        for clients in self.rep_to_clients:
+            for client in clients:
+                yield client
+    
+    def cleanup_container(
+        self,
+        client: docker.DockerClient,
+        addr: str,
+    ) -> None:
+        '''
+        Cleans up the container for a client
+        '''
+        try:
+            c = client.containers.get(self.NAME)
+            c.remove(force=True)
+            LOG.info("Cleaned up container \"%s\" on %s", self.NAME, addr)
+        except:
+            pass
+    
+    def wait_for_containers(
+        self,
+        containers: List[Tuple[Container, str]]
+    ) -> None:
+        for c, addr in containers:
+            res = c.wait()
+        if res['StatusCode'] == 0:
+            LOG.info("%s finished successfully", addr)
+        else:
+            LOG.error(
+                "%s finished with non-zero status (%d). "
+                "Check the logs of the container \"%s\" for more details",
+                addr,
+                res['StatusCode'],
+                self.NAME,
+            )
 
 
 class GenDataCommand(Command):
@@ -117,7 +155,7 @@ class GenDataCommand(Command):
 
     def do_command(self, args):
         shell_cmd = (
-            f"tools/gen_data.py {CONTAINER_DATA_PATH} "
+            f"tools/gen_data.py {CONTAINER_DATA_DIR} "
             f"--num-replicas {len(self.config.replicas)} "
             f"--num-partitions {self.config.num_partitions} "
             f"--partition {args.partition} "
@@ -129,7 +167,7 @@ class GenDataCommand(Command):
         LOG.info("Command to run: %s", shell_cmd)
         containers = []
         for client, addr in self.clients():
-            cleanup_container(client, self.NAME)
+            self.cleanup_container(client, addr)
             try:
                 c = client.containers.create(
                     SLOG_IMG,
@@ -139,36 +177,59 @@ class GenDataCommand(Command):
                 )
                 c.start()
                 containers.append((c, addr))
-                LOG.info("Command run on %s", addr)
-            except:
-                LOG.exception("Unable to create docker container for %s", addr)
-
-        for c, addr in containers:
-            res = c.wait()
-            if res['StatusCode'] == 0:
-                LOG.info("%s finished successfully", addr)
-            else:
-                LOG.error(
-                    "%s failed to run the command. Status code: %d. Error: %s",
+                LOG.info(
+                    "%s: ran command: %s",
                     addr,
-                    res['StatusCode'],
-                    res['Error'],
+                    shell_cmd
                 )
-
-
-# class StartCommand(Command):
-
-#     NAME = "start"
-#     HELP = "Start an SLOG cluster"
-
-#     def create_subparser(self, subparsers):
-#         parser = super().create_subparser(subparsers)
+            except:
+                LOG.exception("Unable to run command on %s", addr)
+        
+        self.wait_for_containers(containers)
         
 
-#     def do_command(self, args):
-#         config = load_config(args.config)
-#         DOCKER.containers.run(SLOG_IMG, "./slog -p")
-#         print(config)
+class StartCommand(Command):
+
+    NAME = "start"
+    HELP = "Start an SLOG cluster"
+        
+    def do_command(self, args):
+        config_text = text_format.MessageToString(self.config)
+        sync_config_cmd = (
+            f"echo '{config_text}' > {SLOG_CONFIG_FILE_PATH}"
+        )
+        for rep, clients in enumerate(self.rep_to_clients):
+            for part, (client, addr) in enumerate(clients):
+                shell_cmd = (
+                    f"slog "
+                    f"--config {SLOG_CONFIG_FILE_PATH} "
+                    f"--address {addr} "
+                    f"--replica {rep} "
+                    f"--partition {part} "
+                    f"--data-dir {CONTAINER_DATA_DIR} "
+                )
+                self.cleanup_container(client, addr)
+                try:
+                    client.containers.run(
+                        SLOG_IMG,
+                        name=self.NAME,
+                        command=[
+                            "/bin/sh", "-c",
+                            sync_config_cmd + " && " +
+                            shell_cmd
+                        ],
+                        mounts=[SLOG_DATA_MOUNT],
+                        detach=True,
+                    )
+                    LOG.info(
+                        "%s: synced config and ran command: %s",
+                        addr,
+                        shell_cmd
+                    )
+                except:
+                    LOG.exception(
+                        "Unable to run command on %s", addr
+                    )
 
 
 if __name__ == "__main__":
@@ -180,7 +241,7 @@ if __name__ == "__main__":
 
     COMMANDS = [
         GenDataCommand,
-        # StartCommand,
+        StartCommand,
     ]
     for command in COMMANDS:
         command().create_subparser(subparsers)
