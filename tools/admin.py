@@ -63,6 +63,20 @@ def cleanup_container(
         pass
 
 
+def get_container_status(client: docker.DockerClient, name: str) -> str:
+    if client is None:
+        return "network unavailable"
+    else:
+        try:
+            c = client.containers.get(name)
+            return c.status
+        except docker.errors.NotFound:
+            return "container not started"
+        except:
+            pass
+    return "unknown"
+
+
 class Command:
     """Base class for a command.
 
@@ -108,6 +122,7 @@ class Command:
     def init_clients(self, args):
         self.rep_to_clients = []
         self.num_clients = 0
+        # Create a docker client for each node
         for rep in self.config.replicas:
             rep_clients = []
             for addr in rep.addresses:
@@ -306,17 +321,7 @@ class StatusCommand(Command):
         for rep, clients in enumerate(self.rep_to_clients):
             print(f"Replica {rep}:")
             for part, (client, addr) in enumerate(clients):
-                status = "unknown"
-                if client is None:
-                    status = "network unavailable"
-                else:
-                    try:
-                        c = client.containers.get(SLOG_CONTAINER_NAME)
-                        status = c.status
-                    except docker.errors.NotFound:
-                        status = "container not started"
-                    except:
-                        pass
+                status = get_container_status(client, SLOG_CONTAINER_NAME)
                 print(f"\tPartition {part} ({addr}): {status}")
 
 
@@ -429,6 +434,11 @@ class LocalCommand(Command):
             action="store_true",
             help="Remove all containers of the local cluster"
         )
+        group.add_argument(
+            "--status",
+            action="store_true",
+            help="Get status of the local cluster",
+        )
 
     def load_config(self, args):
         super().load_config(args)
@@ -465,6 +475,8 @@ class LocalCommand(Command):
             self.__stop()
         elif args.remove:
             self.__remove()
+        elif args.status:
+            self.__status()
 
     def __start(self):
         #
@@ -551,6 +563,14 @@ class LocalCommand(Command):
             for p in range (self.config.num_partitions):
                 container_name = f"slog_{r}_{p}"
                 cleanup_container(self.client, container_name)
+
+    def __status(self):
+        for r, rep in enumerate(self.config.replicas):
+            print(f"Replica {r}:")
+            for p, addr in enumerate(rep.addresses):
+                container_name = f"slog_{r}_{p}"
+                status = get_container_status(self.client, container_name)
+                print(f"\tPartition {p} ({addr.decode()}): {status}")
 
 
 if __name__ == "__main__":
