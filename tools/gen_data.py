@@ -126,10 +126,10 @@ class DataGenerator:
         as_text: bool,
         obj: object,
     ):
-        '''
+        """
         Wrapper for the class method __gen_data_per_partition so that it can be
         used in multiprocessing.
-        '''
+        """
         obj.__gen_data_per_partition(partition, keys, as_text)
 
     def __gen_data_per_partition(
@@ -208,11 +208,11 @@ class DataGenerator:
 
 
 def add_exported_gen_data_arguments(parser):
-    '''
+    """
     These arguments are also used in a different script so we want to avoid
     maintaining multiple copies of them. By putting them in a separate function,
     other scripts can simply import this function to use them.
-    '''
+    """
     parser.add_argument(
         "-p", "--partition",
         default=-1,
