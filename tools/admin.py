@@ -45,6 +45,7 @@ class Command:
 
     def __init__(self):
         self.rep_to_clients = []
+        self.num_clients = 0
         self.config = None
 
     def create_subparser(self, subparsers):
@@ -70,6 +71,7 @@ class Command:
         
         # Initialize Docker clients
         self.rep_to_clients = []
+        self.num_clients = 0
         for rep in self.config.replicas:
             rep_clients = []
             for addr in rep.addresses:
@@ -79,13 +81,17 @@ class Command:
                         base_url=f'ssh://{USER}@{addr_str}',
                     )
                     rep_clients.append((client, addr_str))
+                    self.num_clients += 1
                     LOG.info("Connected to %s", addr_str)
-                except:
-                    LOG.exception("Unable to connect to %s", addr_str)
+                except Exception as e:
+                    rep_clients.append((None, addr_str))
+                    LOG.error(str(e))
 
             self.rep_to_clients.append(rep_clients)
 
     def pull_slog_image(self, args):
+        if self.num_clients == 0:
+            return
         LOG.info(
             "Pulling SLOG image for each node. "
             "This might take a while on first run."
@@ -93,9 +99,9 @@ class Command:
         # TODO(ctring): Use multiprocessing here to parallelizing image pulling
         for client, addr in self.clients():
             LOG.info(
-                "Pulling latest docker image \"%s\" for %s...",
-                SLOG_IMG,
+                "%s: Pulling latest docker image \"%s\"...",
                 addr,
+                SLOG_IMG,
             )
             client.images.pull(SLOG_IMG)
 
@@ -105,13 +111,14 @@ class Command:
     ##############################
     #       Helper methods
     ##############################
-    def clients(self):
+    def clients(self) -> Tuple[docker.DockerClient, str]:
         '''
         Generator to iterate through all docker clients
         '''
         for clients in self.rep_to_clients:
-            for client in clients:
-                yield client
+            for (client, addr) in clients:
+                if client is not None:
+                    yield (client, addr)
     
     def cleanup_container(
         self,
@@ -124,7 +131,7 @@ class Command:
         try:
             c = client.containers.get(self.NAME)
             c.remove(force=True)
-            LOG.info("Cleaned up container \"%s\" on %s", self.NAME, addr)
+            LOG.info("%s: Cleaned up container \"%s\"", addr, self.NAME)
         except:
             pass
     
@@ -208,6 +215,10 @@ class StartCommand(Command):
         }
         for rep, clients in enumerate(self.rep_to_clients):
             for part, (client, addr) in enumerate(clients):
+                if client is None:
+                    # Skip this node because we cannot
+                    # initialize a docker client
+                    continue
                 shell_cmd = (
                     f"slog "
                     f"--config {SLOG_CONFIG_FILE_PATH} "
@@ -231,7 +242,7 @@ class StartCommand(Command):
                         detach=True,
                     )
                     LOG.info(
-                        "%s: synced config and ran command: %s",
+                        "%s: Synced config and ran command: %s",
                         addr,
                         shell_cmd
                     )
@@ -248,21 +259,49 @@ class StopCommand(Command):
 
     def pull_slog_image(self, args):
         '''
-        Override this method to avoid the image pulling step.
+        Override this method to skip the image pulling step.
+        '''
+        pass
+        
+    def do_command(self, args):
+        for (client, addr) in self.clients():
+            try:
+                LOG.info("Stopping SLOG on %s...", addr)
+                c = client.containers.get(StartCommand.NAME)
+                c.stop(timeout=0)
+            except docker.errors.NotFound:
+                pass
+            except:
+                LOG.exception("Error while stopping SLOG on %s", addr)
+
+
+class StatusCommand(Command):
+
+    NAME = "status"
+    HELP = "Show the status of an SLOG cluster"
+
+    def pull_slog_image(self, args):
+        '''
+        Override this method to skip the image pulling step.
         '''
         pass
         
     def do_command(self, args):
         for rep, clients in enumerate(self.rep_to_clients):
+            print(f"Replica {rep}:")
             for part, (client, addr) in enumerate(clients):
-                try:
-                    LOG.info("Stopping SLOG on %s...", addr)
-                    c = client.containers.get(StartCommand.NAME)
-                    c.stop(timeout=0)
-                except docker.errors.NotFound:
-                    pass
-                except:
-                    LOG.exception("Error while stopping SLOG on %s", addr)
+                status = "unknown"
+                if client is None:
+                    status = "network unavailable"
+                else:
+                    try:
+                        c = client.containers.get(StartCommand.NAME)
+                        status = c.status
+                    except docker.errors.NotFound:
+                        status = "container not started"
+                    except:
+                        pass
+                print(f"\tPartition {part} ({addr}): {status}")
 
 
 if __name__ == "__main__":
@@ -276,6 +315,7 @@ if __name__ == "__main__":
         GenDataCommand,
         StartCommand,
         StopCommand,
+        StatusCommand,
     ]
     for command in COMMANDS:
         command().create_subparser(subparsers)
