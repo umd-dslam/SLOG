@@ -4,3 +4,4 @@ build
 .deps
 .dockerignore
 *.dat
+venv
