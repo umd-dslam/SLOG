@@ -50,22 +50,26 @@ void KeyValueCommands::Execute(Transaction& txn) {
   auto& write_set = *txn.mutable_write_set();
   auto& delete_set = *txn.mutable_delete_set();
 
-  while (NextCommand(txn.code())) {
-    if (cmd_ == "SET") {
-      if (write_set.contains(args_[0])) {
-        write_set[args_[0]] = std::move(args_[1]);
-      }
-    } else if (cmd_ == "DEL") {
-      if (write_set.contains(args_[0])) {
-        delete_set.Add(std::move(args_[0]));
-      }
-    } else if (cmd_ == "COPY") {
-      const auto& src = args_[0];
-      const auto& dst = args_[1];
-      if (read_set.contains(src) && write_set.contains(dst)) {
-        write_set[dst] = read_set.at(src);
+  if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
+    while (NextCommand(txn.code())) {
+      if (cmd_ == "SET") {
+        if (write_set.contains(args_[0])) {
+          write_set[args_[0]] = std::move(args_[1]);
+        }
+      } else if (cmd_ == "DEL") {
+        if (write_set.contains(args_[0])) {
+          delete_set.Add(std::move(args_[0]));
+        }
+      } else if (cmd_ == "COPY") {
+        const auto& src = args_[0];
+        const auto& dst = args_[1];
+        if (read_set.contains(src) && write_set.contains(dst)) {
+          write_set[dst] = read_set.at(src);
+        }
       }
     }
+  } else if (txn.procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+    // TODO change key metadata
   }
 
   if (aborted_) {
