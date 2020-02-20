@@ -102,16 +102,18 @@ class Command:
         parser.add_argument(
             "config",
             metavar="config_file",
-            help="Path to a config file"
+            help="Path to a config file",
         )
         parser.set_defaults(run=self.__initialize_and_do_command)
         return parser
 
     def __initialize_and_do_command(self, args):
+        # The initialization phase is broken down into smaller methods so
+        # that subclasses can override them with different behaviors
         self.load_config(args)
         self.init_clients(args)
         self.pull_slog_image(args)
-
+        # Perform the command
         self.do_command(args)
 
     def load_config(self, args):
@@ -143,9 +145,9 @@ class Command:
             return
         LOG.info(
             "Pulling SLOG image for each node. "
-            "This might take a while on first run."
+            "This might take a while."
         )
-        # TODO(ctring): Use multiprocessing to parallelizing
+        # TODO(ctring): Use multiprocessing to parallelize
         #               image pulling across machines.
         for client, addr in self.clients():
             LOG.info(
@@ -187,16 +189,16 @@ class Command:
         """
         for c, addr in containers:
             res = c.wait()
-        if res['StatusCode'] == 0:
-            LOG.info("%s: Done", addr)
-        else:
-            LOG.error(
-                "%s: Finished with non-zero status (%d). "
-                "Check the logs of the container \"%s\" for more details",
-                addr,
-                res['StatusCode'],
-                self.NAME,
-            )
+            if res['StatusCode'] == 0:
+                LOG.info("%s: Done", addr)
+            else:
+                LOG.error(
+                    "%s: Finished with non-zero status (%d). "
+                    "Check the logs of the container \"%s\" for more details",
+                    addr,
+                    res['StatusCode'],
+                    c.name,
+                )
 
 
 class GenDataCommand(Command):
@@ -231,6 +233,7 @@ class GenDataCommand(Command):
                 SLOG_IMG,
                 name=self.NAME,
                 command=shell_cmd,
+                # Mount a directory on the host into the container
                 mounts=[SLOG_DATA_MOUNT],
             )
             c.start()
@@ -245,6 +248,7 @@ class StartCommand(Command):
     HELP = "Start an SLOG cluster"
         
     def do_command(self, args):
+        # Prepare a command to update the config file
         config_text = text_format.MessageToString(self.config)
         sync_config_cmd = (
             f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
@@ -272,6 +276,7 @@ class StartCommand(Command):
                         sync_config_cmd + " && " +
                         shell_cmd
                     ],
+                    # Mount a directory on the host into the container
                     mounts=[SLOG_DATA_MOUNT],
                     # Expose all ports from container to host
                     network_mode="host",
@@ -301,6 +306,7 @@ class StopCommand(Command):
             try:
                 LOG.info("Stopping SLOG on %s...", addr)
                 c = client.containers.get(SLOG_CONTAINER_NAME)
+                # Set timeout to 0 to kill the container immediately
                 c.stop(timeout=0)
             except docker.errors.NotFound:
                 pass
@@ -360,6 +366,7 @@ class LogsCommand(Command):
         self.addr = None
         try:
             if args.a is not None:
+                # Check if the given address is specified in the config
                 addr_is_in_replica = (
                     args.a.encode() in rep.addresses
                     for rep in self.config.replicas
@@ -409,7 +416,7 @@ class LogsCommand(Command):
 class LocalCommand(Command):
 
     NAME = "local"
-    HELP = "Control a cluster on the local machine"
+    HELP = "Control a cluster that run on the local machine"
 
     # Local network
     NETWORK_NAME = "slog_nw"
@@ -442,7 +449,7 @@ class LocalCommand(Command):
 
     def load_config(self, args):
         super().load_config(args)
-        # Replace the addresses with auto-generated local addresses
+        # Replace the addresses in the config with auto-generated addresses
         address_generator = ipaddress.ip_network(self.IP_RANGE).hosts()
         for rep in self.config.replicas:
             del rep.addresses[:]
@@ -458,7 +465,7 @@ class LocalCommand(Command):
 
     def pull_slog_image(self, args):
         """
-        Override this method because we only pull image from one client
+        Override this method because we only pull image for one client
         """
         if self.client is None:
             return
@@ -545,7 +552,6 @@ class LocalCommand(Command):
                     addr,
                     shell_cmd,
                 )
-        
     
     def __stop(self):
         for r in range(len(self.config.replicas)):
