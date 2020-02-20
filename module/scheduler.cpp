@@ -23,7 +23,7 @@ Scheduler::Scheduler(
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
     worker_socket_(context, ZMQ_ROUTER),
-    lock_manager_(config) {
+    lock_manager_(config, storage) {
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
@@ -241,8 +241,16 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
             auto txn_id = txn->internal().id();
             auto& holder = all_txns_[txn_id];
             holder.txn.reset(txn);
-            if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
-              EnqueueTransaction(txn_id); 
+            switch (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
+              case LockRequestResult::Success:
+                EnqueueTransaction(txn_id);
+                break;
+              case LockRequestResult::RemasterWait:
+                break;
+              case LockRequestResult::RemasterAbort:
+                break;
+              case LockRequestResult::Fail:
+                break;
             }
             break;
           }
@@ -250,17 +258,34 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
             auto txn_id = txn->internal().id();
             auto& holder = all_txns_[txn_id];
             holder.txn.reset(txn);
-            if (lock_manager_.RegisterTxn(*holder.txn)) {
-              EnqueueTransaction(txn_id); 
+            switch (lock_manager_.RegisterTxn(*holder.txn)) {
+              case LockRequestResult::Success:
+                EnqueueTransaction(txn_id);
+                break;
+              case LockRequestResult::RemasterWait:
+                break;
+              case LockRequestResult::RemasterAbort:
+                break;
+              case LockRequestResult::Fail:
+                break;
             }
             break;
           }
           case TransactionType::LOCK_ONLY: {
-            if (lock_manager_.AcquireLocks(*txn)) {
-              auto txn_id = txn->internal().id();
-              CHECK(all_txns_.count(txn_id) > 0) 
-                  << "Txn " << txn_id << " is not found for dispatching";
-              EnqueueTransaction(txn_id);
+            switch (lock_manager_.AcquireLocks(*txn)) {
+              case LockRequestResult::Success: {
+                  auto txn_id = txn->internal().id();
+                  CHECK(all_txns_.count(txn_id) > 0) 
+                      << "Txn " << txn_id << " is not found for dispatching";
+                  EnqueueTransaction(txn_id);
+                  break;
+              }
+              case LockRequestResult::RemasterWait:
+                break;
+              case LockRequestResult::RemasterAbort:
+                break;
+              case LockRequestResult::Fail:
+                break;
             }
             delete txn;
             break;
