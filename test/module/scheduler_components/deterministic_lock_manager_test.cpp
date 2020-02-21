@@ -10,7 +10,7 @@ using namespace slog;
 class DeterministicLockManagerTest : public ::testing::Test {
 protected:
   void SetUp() {
-    return;
+    storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
   }
 
   shared_ptr<Storage<Key, Record>> storage;
@@ -215,4 +215,34 @@ TEST_F(DeterministicLockManagerTest, GhostTxns) {
   auto txn2 = MakeTransaction({"Z"}, {});
   txn2.mutable_internal()->set_id(101);
   ASSERT_FALSE(lock_manager.AcquireLocks(txn2));
+}
+
+//////// REMASTERING ////////
+
+TEST_F(DeterministicLockManagerTest, CheckCounters) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0], storage);
+  storage->Write("A", Record("valueA", 0, 1));
+  auto txn1 = MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}});
+  auto txn2 = MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}});
+  auto txn3 = MakeTransaction({"A"}, {}, "some code", {{"A", {0, 0}}});
+
+  ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Valid);
+  ASSERT_EQ(lock_manager.VerifyMaster(txn2), VerifyMasterResult::Waiting);
+  ASSERT_EQ(lock_manager.VerifyMaster(txn3), VerifyMasterResult::Aborted);
+}
+
+TEST_F(DeterministicLockManagerTest, CheckMultipleCounters) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0], storage);
+  storage->Write("A", Record("valueA", 0, 1));
+  storage->Write("B", Record("valueB", 0, 1));
+  storage->Write("C", Record("valueC", 0, 1));
+  auto txn1 = MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 1}}});
+  auto txn2 = MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}});
+  auto txn3 = MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}});
+
+  ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Valid);
+  ASSERT_EQ(lock_manager.VerifyMaster(txn2), VerifyMasterResult::Waiting);
+  ASSERT_EQ(lock_manager.VerifyMaster(txn3), VerifyMasterResult::Aborted);
 }

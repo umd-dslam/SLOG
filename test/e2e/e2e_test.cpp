@@ -86,11 +86,6 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
 TEST_F(E2ETest, MultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A", "B"} /* read_set */, {}  /* write_set */);
-    // MakeTransaction(
-    //   {},
-    //   {"A", "B"},
-    //   "some code",
-    //   {{"A", {1, 0}}, {"D", {0, 0}}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
