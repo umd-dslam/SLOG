@@ -107,39 +107,28 @@ DeterministicLockManager::DeterministicLockManager(ConfigurationPtr config, shar
   : config_(config), storage_(storage) {}
 
 
-LockRequestResult DeterministicLockManager::RegisterTxn(const Transaction& txn) {
+bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
   auto txn_id = txn.internal().id();
   auto keys = ExtractKeys(txn);
   if (keys.empty()) {
     // None of the keys in this txn is in this partition
-    return LockRequestResult::Fail;
+    return false;
   }
 
   num_locks_waited_[txn_id] += keys.size();
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
-    return LockRequestResult::Success;
+    return true;
   }
-  return LockRequestResult::Fail;
+  return false;
 }
 
-LockRequestResult DeterministicLockManager::AcquireLocks(const Transaction& txn) {
+bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
   auto keys = ExtractKeys(txn);
   if (keys.empty()) {
     // None of the keys in this txn is in this partition
-    return LockRequestResult::Fail;
-  }
-
-  switch (VerifyCounters(txn, keys)) {
-    case VerifyCountersResult::Valid:
-      break;
-    case VerifyCountersResult::Early:
-      return LockRequestResult::RemasterWait;
-      break;
-    case VerifyCountersResult::Behind:
-      num_locks_waited_.erase(txn_id);
-      return LockRequestResult::RemasterAbort;
+    return false;
   }
 
   for (auto pair : keys) {
@@ -166,12 +155,12 @@ LockRequestResult DeterministicLockManager::AcquireLocks(const Transaction& txn)
 
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
-    return LockRequestResult::Success;
+    return true;
   }
-  return LockRequestResult::Fail;
+  return false;
 }
 
-LockRequestResult DeterministicLockManager::RegisterTxnAndAcquireLocks(const Transaction& txn) {
+bool DeterministicLockManager::RegisterTxnAndAcquireLocks(const Transaction& txn) {
   RegisterTxn(txn);
   return AcquireLocks(txn);
 }
@@ -209,32 +198,32 @@ DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
   return ready_txns;
 }
 
-DeterministicLockManager::VerifyCountersResult
-DeterministicLockManager::VerifyCounters(const Transaction& txn, vector<pair<Key, LockMode>> keys) {
-
+VerifyMasterResult
+DeterministicLockManager::VerifyMaster(const Transaction& txn) {
+  auto keys = ExtractKeys(txn);
   if (keys.empty()) {
     // None of the keys in this txn is in this partition
-    return VerifyCountersResult::Valid;
+    return VerifyMasterResult::Valid;
   }
 
-  auto master_metadata = txn.internal().master_metadata();
+  auto txn_master_metadata = txn.internal().master_metadata();
 
-  auto needs_to_wait = false;
+  std::unordered_map<Key, int32_t> ahead_counters;
   for (auto pair : keys) {
     auto key = pair.first;
-    CHECK(master_metadata.contains(key))
+    CHECK(txn_master_metadata.contains(key))
               << "Master metadata for key \"" << key << "\" is missing";
 
     Record record;
     bool found = storage_->Read(key, record);
     if (found) {
-      auto txn_metadata = master_metadata.at(key);
+      auto txn_metadata = txn_master_metadata.at(key);
       auto stored_metadata = record.metadata;
 
-      if (txn_metadata.counter() < stored_metadata.counter) {
-        needs_to_wait = true;
-      } else if (txn_metadata.counter() > stored_metadata.counter) {
-        return VerifyCountersResult::Behind;
+      if (txn_metadata.counter() > stored_metadata.counter) {
+        ahead_counters[key] += txn_metadata.counter() - stored_metadata.counter;
+      } else if (txn_metadata.counter() < stored_metadata.counter) {
+        return VerifyMasterResult::Aborted;
       } else {
         CHECK(txn_metadata.master() == stored_metadata.master)
                 << "Metadata is invalid, different masters with the same counter";
@@ -243,11 +232,39 @@ DeterministicLockManager::VerifyCounters(const Transaction& txn, vector<pair<Key
       // TODO: verify if counter is 0?
     }
   }
-  if (needs_to_wait){
-    return VerifyCountersResult::Early;
+  if (ahead_counters.size()){
+    auto waiting_remaster_entry = make_pair(txn.internal().id(), ahead_counters);
+    for (auto key : ahead_counters) {
+      keys_waiting_remaster_[key.first].insert(&waiting_remaster_entry);
+    }
+    return VerifyMasterResult::Waiting;
   } else {
-    return VerifyCountersResult::Valid;
+    return VerifyMasterResult::Valid;
   }
+}
+
+unordered_set<TxnId> DeterministicLockManager::RemasterOccured(unordered_set<Key> keys) {
+  unordered_set<TxnId> unblocked;
+
+  for (auto key : keys) {
+    for (auto entry : keys_waiting_remaster_[key]) {
+      auto txn_id = entry->first;
+      auto waiting_map = entry->second;
+
+      waiting_map[key] -= 1;
+      if (waiting_map[key] == 0) {
+        waiting_map.erase(key);
+      }
+      if (waiting_map.empty()) {
+        unblocked.insert(txn_id);
+        keys_waiting_remaster_[key].erase(entry);
+      }
+      if (keys_waiting_remaster_[key].empty()) {
+        keys_waiting_remaster_.erase(key);
+      }
+    }
+  }
+  return unblocked;
 }
 
 vector<pair<Key, LockMode>>

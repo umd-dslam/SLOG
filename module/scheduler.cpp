@@ -234,68 +234,59 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
 
       while (!transactions->empty()) {
         auto txn = transactions->ReleaseLast();
-        auto txn_type = txn->internal().type();
-
-        switch (txn_type) {
-          case TransactionType::SINGLE_HOME: {
-            auto txn_id = txn->internal().id();
-            auto& holder = all_txns_[txn_id];
-            holder.txn.reset(txn);
-            switch (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
-              case LockRequestResult::Success:
-                EnqueueTransaction(txn_id);
-                break;
-              case LockRequestResult::RemasterWait:
-                break;
-              case LockRequestResult::RemasterAbort:
-                break;
-              case LockRequestResult::Fail:
-                break;
-            }
-            break;
-          }
-          case TransactionType::MULTI_HOME: {
-            auto txn_id = txn->internal().id();
-            auto& holder = all_txns_[txn_id];
-            holder.txn.reset(txn);
-            switch (lock_manager_.RegisterTxn(*holder.txn)) {
-              case LockRequestResult::Success:
-                EnqueueTransaction(txn_id);
-                break;
-              case LockRequestResult::RemasterWait:
-                break;
-              case LockRequestResult::RemasterAbort:
-                break;
-              case LockRequestResult::Fail:
-                break;
-            }
-            break;
-          }
-          case TransactionType::LOCK_ONLY: {
-            switch (lock_manager_.AcquireLocks(*txn)) {
-              case LockRequestResult::Success: {
-                  auto txn_id = txn->internal().id();
-                  CHECK(all_txns_.count(txn_id) > 0) 
-                      << "Txn " << txn_id << " is not found for dispatching";
-                  EnqueueTransaction(txn_id);
-                  break;
-              }
-              case LockRequestResult::RemasterWait:
-                break;
-              case LockRequestResult::RemasterAbort:
-                break;
-              case LockRequestResult::Fail:
-                break;
-            }
-            delete txn;
-            break;
-          }
-          default:
-            LOG(ERROR) << "Unknown transaction type";
-            break;
-        }
+        SendToLockManager(txn);
       }
     }
+  }
+}
+
+void Scheduler::SendToLockManager(Transaction* txn) {
+  auto txn_id = txn->internal().id();
+  auto txn_type = txn->internal().type();
+
+  switch (lock_manager_.VerifyMaster(*txn)) {
+    case VerifyMasterResult::Valid: {
+      break;
+    }
+    case VerifyMasterResult::Waiting: {
+      txns_waiting_remaster_[txn_id] = txn;
+      return;
+    }
+    case VerifyMasterResult::Aborted: {
+      txn->set_status(TransactionStatus::ABORTED_WITHOUT_LOCKS);
+      return;
+    }
+  }
+
+  switch (txn_type) {
+    case TransactionType::SINGLE_HOME: {
+      auto& holder = all_txns_[txn_id];
+      holder.txn.reset(txn);
+      if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
+        EnqueueTransaction(txn_id); 
+      }
+      break;
+    }
+    case TransactionType::MULTI_HOME: {
+      auto& holder = all_txns_[txn_id];
+      holder.txn.reset(txn);
+      if (lock_manager_.RegisterTxn(*holder.txn)) {
+        EnqueueTransaction(txn_id); 
+      }
+      break;
+    }
+    case TransactionType::LOCK_ONLY: {
+      if (lock_manager_.AcquireLocks(*txn)) {
+        CHECK(all_txns_.count(txn_id) > 0) 
+            << "Txn " << txn_id << " is not found for dispatching";
+        EnqueueTransaction(txn_id);
+      }
+      delete txn;
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unknown transaction type";
+      break;
   }
 }
 

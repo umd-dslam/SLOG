@@ -71,6 +71,7 @@ private:
 
   void TryUpdatingLocalLog();
   void TryProcessingNextBatchesFromGlobalLog();
+  void SendToLockManager(Transaction* txn);
 
   void EnqueueTransaction(TxnId txn_id);
   void TryDispatchingNextTransaction();
@@ -89,6 +90,7 @@ private:
   DeterministicLockManager lock_manager_;
 
   unordered_map<TxnId, TransactionHolder> all_txns_;
+  unordered_map<TxnId, Transaction*> txns_waiting_remaster_;
 };
 
 } // namespace slog

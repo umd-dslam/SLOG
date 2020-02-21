@@ -21,7 +21,9 @@ using std::vector;
 namespace slog {
 
 enum class LockMode { UNLOCKED, READ, WRITE };
-enum LockRequestResult { Success, Fail, RemasterAbort, RemasterWait };
+// enum LockRequestResult { Success, Fail, RemasterAbort, RemasterWait };
+enum VerifyMasterResult {Valid = 1, Waiting = 2, Aborted = 3};
+
 
 /**
  * The object of this class represent the locking state of a key.
@@ -68,7 +70,7 @@ public:
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  LockRequestResult RegisterTxn(const Transaction& txn);
+  bool RegisterTxn(const Transaction& txn);
 
   /**
    * Tries to acquire all locks for a given transaction. If not
@@ -79,13 +81,13 @@ public:
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  LockRequestResult AcquireLocks(const Transaction& txn);
+  bool AcquireLocks(const Transaction& txn);
 
   /**
    * Convenient method to perform txn registration and 
    * lock acquisition at the same time.
    */
-  LockRequestResult RegisterTxnAndAcquireLocks(const Transaction& txn);
+  bool RegisterTxnAndAcquireLocks(const Transaction& txn);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -97,15 +99,18 @@ public:
    */
   unordered_set<TxnId> ReleaseLocks(const Transaction& txn);
 
+  VerifyMasterResult VerifyMaster(const Transaction& txn);
+
+  unordered_set<TxnId> RemasterOccured(unordered_set<Key> keys);
+
 private:
-  enum VerifyCountersResult {Valid = 1, Early = 2, Behind = 3};
-  VerifyCountersResult VerifyCounters(const Transaction& txn, vector<pair<Key, LockMode>>);
   vector<pair<Key, LockMode>> ExtractKeys(const Transaction& txn);
 
   ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
+  unordered_map<Key, unordered_set<pair<TxnId, unordered_map<Key, int32_t>>*>> keys_waiting_remaster_;
 };
 
 } // namespace slog

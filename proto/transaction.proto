@@ -14,6 +14,7 @@ enum TransactionStatus {
     NOT_STARTED = 0;
     COMMITTED = 1;
     ABORTED = 2;
+    ABORTED_WITHOUT_LOCKS = 3; // Remaster caused abort
 }
 
 message MasterMetadata {
