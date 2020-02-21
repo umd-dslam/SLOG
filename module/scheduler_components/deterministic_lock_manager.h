@@ -101,7 +101,7 @@ public:
 
   VerifyMasterResult VerifyMaster(const Transaction& txn);
 
-  unordered_set<TxnId> RemasterOccured(unordered_set<Key> keys);
+  unordered_set<TxnId> RemasterOccured(Key key);
 
 private:
   vector<pair<Key, LockMode>> ExtractKeys(const Transaction& txn);

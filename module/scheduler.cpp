@@ -306,6 +306,18 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
     EnqueueTransaction(ready_txn_id);
   }
 
+  // If a remaster transaction, trigger any unblocked txns
+  if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+    for (auto pair : txn->write_set()) {
+      auto unblocked_txns = lock_manager_.RemasterOccured(pair.first);
+      for (auto unblocked_txn_id : unblocked_txns) {
+        auto unblocked_txn = txns_waiting_remaster_[unblocked_txn_id];
+        txns_waiting_remaster_.erase(unblocked_txn_id);
+        SendToLockManager(unblocked_txn);
+      }
+    }
+  }
+
   // Send the txn back to the coordinating server if need to
   auto local_partition = config_->GetLocalPartition();
   auto& participants = res.process_txn().participants();

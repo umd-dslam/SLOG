@@ -243,27 +243,26 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
   }
 }
 
-unordered_set<TxnId> DeterministicLockManager::RemasterOccured(unordered_set<Key> keys) {
+unordered_set<TxnId> DeterministicLockManager::RemasterOccured(Key key) {
   unordered_set<TxnId> unblocked;
 
-  for (auto key : keys) {
-    for (auto entry : keys_waiting_remaster_[key]) {
-      auto txn_id = entry->first;
-      auto waiting_map = entry->second;
+  for (auto entry : keys_waiting_remaster_[key]) {
+    auto txn_id = entry->first;
+    auto waiting_map = entry->second;
 
-      waiting_map[key] -= 1;
-      if (waiting_map[key] == 0) {
-        waiting_map.erase(key);
-      }
-      if (waiting_map.empty()) {
-        unblocked.insert(txn_id);
-        keys_waiting_remaster_[key].erase(entry);
-      }
-      if (keys_waiting_remaster_[key].empty()) {
-        keys_waiting_remaster_.erase(key);
-      }
+    waiting_map[key] -= 1;
+    if (waiting_map[key] == 0) {
+      waiting_map.erase(key);
+    }
+    if (waiting_map.empty()) {
+      unblocked.insert(txn_id);
+      keys_waiting_remaster_[key].erase(entry);
+    }
+    if (keys_waiting_remaster_[key].empty()) {
+      keys_waiting_remaster_.erase(key);
     }
   }
+  
   return unblocked;
 }
 
