@@ -207,16 +207,21 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
   }
 
   auto txn_master_metadata = txn.internal().master_metadata();
+  if (txn_master_metadata.empty()) { // allow this to not be set for testing
+    LOG(WARNING) << "Master metadata empty: txn id " << txn.internal().id();
+    return VerifyMasterResult::Valid;
+  }
 
   std::unordered_map<Key, int32_t> ahead_counters;
   for (auto pair : keys) {
     auto key = pair.first;
-    CHECK(txn_master_metadata.contains(key))
-              << "Master metadata for key \"" << key << "\" is missing";
 
     Record record;
     bool found = storage_->Read(key, record);
     if (found) {
+      CHECK(txn_master_metadata.contains(key))
+              << "Master metadata for key \"" << key << "\" is missing";
+
       auto txn_metadata = txn_master_metadata.at(key);
       auto stored_metadata = record.metadata;
 
@@ -232,7 +237,7 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
       // TODO: verify if counter is 0?
     }
   }
-  if (ahead_counters.size()){
+  if (!ahead_counters.empty()){
     auto waiting_remaster_entry = make_pair(txn.internal().id(), ahead_counters);
     for (auto key : ahead_counters) {
       keys_waiting_remaster_[key.first].insert(&waiting_remaster_entry);
