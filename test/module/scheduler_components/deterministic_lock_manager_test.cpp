@@ -247,7 +247,7 @@ TEST_F(DeterministicLockManagerTest, CheckMultipleCounters) {
   ASSERT_EQ(lock_manager.VerifyMaster(txn3), VerifyMasterResult::Aborted);
 }
 
-TEST_F(DeterministicLockManagerTest, RemasterQueue) {
+TEST_F(DeterministicLockManagerTest, RemasterQueueSingleKey) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   DeterministicLockManager lock_manager(configs[0], storage);
   storage->Write("A", Record("valueA", 0, 1));
@@ -258,4 +258,39 @@ TEST_F(DeterministicLockManagerTest, RemasterQueue) {
   auto unblocked = lock_manager.RemasterOccured("A");
   ASSERT_EQ(unblocked.size(), 1);
   ASSERT_EQ(unblocked.count(100), 1);
+}
+
+TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleKeys) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0], storage);
+  storage->Write("A", Record("valueA", 0, 1));
+  storage->Write("B", Record("valueB", 0, 1));
+  auto txn1 = MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 3}}});
+  txn1.mutable_internal()->set_id(100);
+
+  ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Waiting);
+  ASSERT_EQ(lock_manager.RemasterOccured("B").size(), 0);
+  ASSERT_EQ(lock_manager.RemasterOccured("A").size(), 0);
+  auto unblocked = lock_manager.RemasterOccured("B");
+  ASSERT_EQ(unblocked.size(), 1);
+  ASSERT_EQ(unblocked.count(100), 1);
+}
+
+TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleTxns) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0], storage);
+  storage->Write("A", Record("valueA", 0, 1));
+  storage->Write("B", Record("valueB", 0, 1));
+  auto txn1 = MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}});
+  txn1.mutable_internal()->set_id(100);
+  auto txn2 = MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 2}}});
+  txn2.mutable_internal()->set_id(101);
+
+  ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Waiting);
+  ASSERT_EQ(lock_manager.VerifyMaster(txn2), VerifyMasterResult::Waiting);
+  ASSERT_EQ(lock_manager.RemasterOccured("B").size(), 0);
+  auto unblocked = lock_manager.RemasterOccured("A");
+  ASSERT_EQ(unblocked.size(), 2);
+  ASSERT_EQ(unblocked.count(100), 1);
+  ASSERT_EQ(unblocked.count(101), 1);
 }
