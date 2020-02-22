@@ -104,6 +104,37 @@ Transaction MakeTransaction(
   return txn;
 }
 
+Transaction MakeRemasterTransaction(
+    const unordered_set<Key>& write_set,
+    const uint32_t new_master,
+    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
+    const internal::MachineId coordinating_server) {
+  Transaction txn;
+  for (const auto& key : write_set) {
+    txn.mutable_write_set()->insert({key, ""});
+  }
+  txn.set_new_master(new_master);
+  txn.set_status(TransactionStatus::NOT_STARTED);
+
+  for (const auto& pair : master_metadata) {
+    const auto& key = pair.first;
+    if (write_set.count(key) > 0) {
+      MasterMetadata metadata;
+      metadata.set_master(pair.second.first);
+      metadata.set_counter(pair.second.second);
+      txn.mutable_internal()
+          ->mutable_master_metadata()
+          ->insert({pair.first, std::move(metadata)});
+    }
+  }
+  txn.mutable_internal()
+      ->mutable_coordinating_server()
+      ->CopyFrom(coordinating_server);
+
+  SetTransactionType(txn);
+  return txn;
+}
+
 TransactionType SetTransactionType(Transaction& txn) {
   auto txn_internal = txn.mutable_internal();
   auto& txn_master_metadata = txn_internal->master_metadata();

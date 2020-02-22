@@ -2,6 +2,8 @@
 
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
+#include "proto/api.pb.h"
+
 
 using std::make_shared;
 
@@ -253,7 +255,6 @@ void Scheduler::SendToLockManager(Transaction* txn) {
       return;
     }
     case VerifyMasterResult::Aborted: {
-      txn->set_status(TransactionStatus::ABORTED_WITHOUT_LOCKS);
       return;
     }
   }

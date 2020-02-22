@@ -212,6 +212,7 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
     return VerifyMasterResult::Valid;
   }
 
+  // keeps track of counters that will need to be waited on
   std::unordered_map<Key, int32_t> ahead_counters;
   for (auto pair : keys) {
     auto key = pair.first;
@@ -241,8 +242,9 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
     auto txn_id = txn.internal().id();
     num_remasters_waited_[txn_id] = ahead_counters;
 
+    // add the txn to the overall queue for each key
     for (auto key : ahead_counters) {
-      keys_waiting_remaster_[key.first].insert(txn_id);
+      keys_waiting_remaster_[key.first].push_back(txn_id);
     }
     return VerifyMasterResult::Waiting;
   } else {
@@ -250,28 +252,30 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
   }
 }
 
-unordered_set<TxnId> DeterministicLockManager::RemasterOccured(Key key) {
-  unordered_set<TxnId> unblocked;
+list<TxnId> DeterministicLockManager::RemasterOccured(Key key) {
+  list<TxnId> unblocked;
 
   if (keys_waiting_remaster_.count(key) == 0) {
     return unblocked;
   }
 
   for (auto txn_id : keys_waiting_remaster_[key]) {
+    // the number of remasters this txn needs for each key
     auto& waiting_map = num_remasters_waited_[txn_id];
 
     waiting_map[key] -= 1;
-    if (waiting_map[key] == 0) {
+    if (waiting_map[key] == 0) { // no longer waiting on this key
       waiting_map.erase(key);
-      if (waiting_map.empty()) {
-        unblocked.insert(txn_id);
+      if (waiting_map.empty()) { // no longer waiting on any key
+        unblocked.push_back(txn_id);
         num_remasters_waited_.erase(txn_id);
       }
     }
   }
 
+  // remove the unblocked txns from the queue
   for (auto txn_id : unblocked) {
-    keys_waiting_remaster_[key].erase(txn_id);
+    keys_waiting_remaster_[key].remove(txn_id);
     if (keys_waiting_remaster_[key].empty()) {
       keys_waiting_remaster_.erase(key);
     }

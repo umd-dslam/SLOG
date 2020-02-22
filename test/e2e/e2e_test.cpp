@@ -122,6 +122,48 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
   }
 }
 
+TEST_F(E2ETest, RemasterChangesMetadata) {
+  auto remaster_txn = MakeRemasterTransaction({"A"}, 1, {{"A", {0, 0}}});
+  auto txn1 = MakeTransaction({"A"}, {}, "GET A", {{"A", {1, 1}}});
+  
+  test_slogs[0]->SendTxn(remaster_txn);
+  auto txn_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+
+  test_slogs[0]->SendTxn(txn1);
+  auto txn_resp2 = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp2.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp2.internal().type());
+  ASSERT_EQ("valA", txn_resp2.read_set().at("A"));
+}
+
+TEST_F(E2ETest, RemasterUnblocks) {
+  auto remaster_txn = MakeRemasterTransaction({"A"}, 1, {{"A", {0, 0}}});
+  auto txn1 = MakeTransaction({"A"}, {}, "GET A", {{"A", {1, 1}}});
+  
+  test_slogs[0]->SendTxn(txn1);
+  test_slogs[0]->SendTxn(remaster_txn);
+  auto txn_resp = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+
+  auto txn_resp2 = test_slogs[0]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp2.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp2.internal().type());
+  ASSERT_EQ("valA", txn_resp2.read_set().at("A"));
+}
+
+// TEST_F(E2ETest, OldMetadata) {
+//   auto txn1 = MakeTransaction({"C"}, {}, "GET C", {{"C", {1, 1}}});
+  
+//   test_slogs[2]->SendTxn(txn1);
+//   // auto txn_resp = test_slogs[2]->RecvTxnResult();
+//   // ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+//   // ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+//   // ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+// }
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   google::InstallFailureSignalHandler();

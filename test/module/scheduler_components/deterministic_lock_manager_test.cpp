@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include "common/test_utils.h"
 #include "common/proto_utils.h"
@@ -6,6 +6,7 @@
 
 using namespace std;
 using namespace slog;
+using ::testing::ElementsAre;
 
 class DeterministicLockManagerTest : public ::testing::Test {
 protected:
@@ -256,8 +257,7 @@ TEST_F(DeterministicLockManagerTest, RemasterQueueSingleKey) {
 
   ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Waiting);
   auto unblocked = lock_manager.RemasterOccured("A");
-  ASSERT_EQ(unblocked.size(), 1);
-  ASSERT_EQ(unblocked.count(100), 1);
+  ASSERT_THAT(unblocked, ElementsAre(100));
 }
 
 TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleKeys) {
@@ -272,8 +272,7 @@ TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleKeys) {
   ASSERT_EQ(lock_manager.RemasterOccured("B").size(), 0);
   ASSERT_EQ(lock_manager.RemasterOccured("A").size(), 0);
   auto unblocked = lock_manager.RemasterOccured("B");
-  ASSERT_EQ(unblocked.size(), 1);
-  ASSERT_EQ(unblocked.count(100), 1);
+  ASSERT_THAT(unblocked, ElementsAre(100));
 }
 
 TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleTxns) {
@@ -290,7 +289,5 @@ TEST_F(DeterministicLockManagerTest, RemasterQueueMultipleTxns) {
   ASSERT_EQ(lock_manager.VerifyMaster(txn2), VerifyMasterResult::Waiting);
   ASSERT_EQ(lock_manager.RemasterOccured("B").size(), 0);
   auto unblocked = lock_manager.RemasterOccured("A");
-  ASSERT_EQ(unblocked.size(), 2);
-  ASSERT_EQ(unblocked.count(100), 1);
-  ASSERT_EQ(unblocked.count(101), 1);
+  ASSERT_THAT(unblocked, ElementsAre(100, 101));
 }

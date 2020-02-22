@@ -179,32 +179,51 @@ void Worker::ExecuteAndCommitTransaction() {
   auto& txn = scheduler_.all_txns_.at(txn_id).txn;
   auto config = scheduler_.config_;
 
-  // Execute the transaction code
-  commands_->Execute(*txn);
+  if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
+    // Execute the transaction code
+    commands_->Execute(*txn);
 
-  // Apply all writes to local storage if the transaction is not aborted
-  if (txn->status() == TransactionStatus::COMMITTED) {
-    auto& master_metadata = txn->internal().master_metadata();
+    // Apply all writes to local storage if the transaction is not aborted
+    if (txn->status() == TransactionStatus::COMMITTED) {
+      auto& master_metadata = txn->internal().master_metadata();
+      for (const auto& key_value : txn->write_set()) {
+        const auto& key = key_value.first;
+        if (config->KeyIsInLocalPartition(key)) {
+          const auto& value = key_value.second;
+          Record record;
+          bool found = storage_->Read(key_value.first, record);
+          if (!found) {
+            CHECK(master_metadata.contains(key))
+                << "Master metadata for key \"" << key << "\" is missing";
+            record.metadata = master_metadata.at(key);
+          }
+          record.value = value;
+          storage_->Write(key, record);
+        }
+      }
+      for (const auto& key : txn->delete_set()) {
+        if (config->KeyIsInLocalPartition(key)) {
+          storage_->Delete(key);
+        }
+      }
+    }
+  } else if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+    CHECK(txn->write_set().size() == 1) << "Remaster Txns are currently only supported with one key. Multiple in tid: " << txn_id;
     for (const auto& key_value : txn->write_set()) {
       const auto& key = key_value.first;
       if (config->KeyIsInLocalPartition(key)) {
-        const auto& value = key_value.second;
         Record record;
         bool found = storage_->Read(key_value.first, record);
         if (!found) {
-          CHECK(master_metadata.contains(key))
-              << "Master metadata for key \"" << key << "\" is missing";
-          record.metadata = master_metadata.at(key);
+          LOG(FATAL) << "Remastering key that does not exist: " << key;
         }
-        record.value = value;
+        record.metadata = Metadata(txn->new_master(), record.metadata.counter + 1);
         storage_->Write(key, record);
       }
     }
-    for (const auto& key : txn->delete_set()) {
-      if (config->KeyIsInLocalPartition(key)) {
-        storage_->Delete(key);
-      }
-    }
+    txn->set_status(TransactionStatus::COMMITTED);
+  } else {
+    LOG(FATAL) << "Transaction procedure not set: tid " << txn_id;
   }
 
   // Response back to the scheduler

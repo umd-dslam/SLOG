@@ -42,6 +42,23 @@ Transaction MakeTransaction(
     const internal::MachineId coordinating_server = MakeMachineId("0:0"));
 
 /**
+ * Creates a new transaction
+ * @param read_set            Read set of the transaction
+ * @param write_set           Write set of the transaction
+ * @param code                Code of the transaction (not to be executed)
+ * @param master_metadata     Metadata regarding its mastership. This is used for
+ *                            testing purpose.
+ * @param coordinating_server MachineId of the server in charge of responding the
+ *                            transaction result to the client.
+ * @return                    A new transaction having given properties
+ */
+Transaction MakeRemasterTransaction(
+    const unordered_set<Key>& write_set,
+    const uint32_t new_master,
+    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
+    const internal::MachineId coordinating_server = MakeMachineId("0:0"));
+
+/**
  * Inspects the internal metadata of a transaction then determines whether
  * a transaction is SINGLE_HOME, MULTI_HOME, or UNKNOWN.
  * Pre-condition: all keys in master_metadata exist in either write set or 
