@@ -61,7 +61,7 @@ Configuration::Configuration(
     local_replica_(local_replica),
     local_partition_(local_partition) {
   for (const auto& replica : config.replicas()) {
-    CHECK_EQ(replica.addresses_size(), config.num_partitions())
+    CHECK_EQ((uint32_t)replica.addresses_size(), config.num_partitions())
         << "Number of addresses in each replica must match number of partitions.";
     for (const auto& addr : replica.addresses()) {
       all_addresses_.push_back(addr);

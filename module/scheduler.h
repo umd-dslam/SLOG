@@ -40,7 +40,6 @@ public:
       Broker& broker,
       shared_ptr<Storage<Key, Record>> storage);
 
-protected:
   void SetUp() final;
 
   void Loop() final;

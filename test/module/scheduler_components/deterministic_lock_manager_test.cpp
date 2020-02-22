@@ -54,7 +54,7 @@ TEST(DeterministicLockManager, WriteLocks) {
   ASSERT_TRUE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
   ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager.ReleaseLocks(txn1).size(), 1);
+  ASSERT_EQ(lock_manager.ReleaseLocks(txn1).size(), 1U);
   // Make sure the lock is already held by txn2
   ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn1));
 }
@@ -81,7 +81,7 @@ TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
   auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
-  ASSERT_EQ(new_ready_txns.size(), 2);
+  ASSERT_EQ(new_ready_txns.size(), 2U);
   ASSERT_TRUE(new_ready_txns.count(200) > 0);
   ASSERT_TRUE(new_ready_txns.count(400) > 0);
 }
@@ -101,11 +101,11 @@ TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
   ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn3));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(200) > 0);
 
   new_ready_txns = lock_manager.ReleaseLocks(txn2);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(300) > 0);
 }
 
@@ -121,7 +121,7 @@ TEST(DeterministicLockManager, PrioritizeWriteLock) {
   ASSERT_FALSE(lock_manager.RegisterTxnAndAcquireLocks(txn2));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn1);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(200) > 0);
 }
 
@@ -144,7 +144,7 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_TRUE(lock_manager.AcquireLocks(txn2_lockonly2));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
@@ -167,7 +167,7 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_TRUE(lock_manager.RegisterTxn(txn2));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
@@ -190,7 +190,7 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_TRUE(lock_manager.AcquireLocks(txn2_lockonly2));
 
   auto new_ready_txns = lock_manager.ReleaseLocks(txn2);
-  ASSERT_EQ(new_ready_txns.size(), 1);
+  ASSERT_EQ(new_ready_txns.size(), 1U);
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 

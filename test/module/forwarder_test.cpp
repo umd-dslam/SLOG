@@ -109,11 +109,11 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
       TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   const auto& master_metadata =
       forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2, master_metadata.size());
-  ASSERT_EQ(0, master_metadata.at("A").master());
-  ASSERT_EQ(0, master_metadata.at("A").counter());
-  ASSERT_EQ(0, master_metadata.at("B").master());
-  ASSERT_EQ(1, master_metadata.at("B").counter());
+  ASSERT_EQ(2U, master_metadata.size());
+  ASSERT_EQ(0U, master_metadata.at("A").master());
+  ASSERT_EQ(0U, master_metadata.at("A").counter());
+  ASSERT_EQ(0U, master_metadata.at("B").master());
+  ASSERT_EQ(1U, master_metadata.at("B").counter());
 }
 
 TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
@@ -135,11 +135,11 @@ TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
       TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   const auto& master_metadata =
       forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2, master_metadata.size());
-  ASSERT_EQ(0, master_metadata.at("A").master());
-  ASSERT_EQ(0, master_metadata.at("A").counter());
-  ASSERT_EQ(0, master_metadata.at("B").master());
-  ASSERT_EQ(1, master_metadata.at("B").counter());
+  ASSERT_EQ(2U, master_metadata.size());
+  ASSERT_EQ(0U, master_metadata.at("A").master());
+  ASSERT_EQ(0U, master_metadata.at("A").counter());
+  ASSERT_EQ(0U, master_metadata.at("B").master());
+  ASSERT_EQ(1U, master_metadata.at("B").counter());
 }
 
 TEST_F(ForwarderTest, ForwardToAnotherRegion) {
@@ -163,11 +163,11 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     ASSERT_EQ(
         TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     const auto& master_metadata = forwarded_txn->internal().master_metadata();
-    ASSERT_EQ(2, master_metadata.size());
-    ASSERT_EQ(1, master_metadata.at("C").master());
-    ASSERT_EQ(1, master_metadata.at("C").counter());
-    ASSERT_EQ(1, master_metadata.at("X").master());
-    ASSERT_EQ(0, master_metadata.at("X").counter());
+    ASSERT_EQ(2U, master_metadata.size());
+    ASSERT_EQ(1U, master_metadata.at("C").master());
+    ASSERT_EQ(1U, master_metadata.at("C").counter());
+    ASSERT_EQ(1U, master_metadata.at("X").master());
+    ASSERT_EQ(0U, master_metadata.at("X").counter());
   }
 
   {
@@ -180,9 +180,9 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     ASSERT_EQ(
         TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     const auto& master_metadata = forwarded_txn->internal().master_metadata();
-    ASSERT_EQ(1, master_metadata.size());
-    ASSERT_EQ(0, master_metadata.at("A").master());
-    ASSERT_EQ(0, master_metadata.at("A").counter());
+    ASSERT_EQ(1U, master_metadata.size());
+    ASSERT_EQ(0U, master_metadata.at("A").master());
+    ASSERT_EQ(0U, master_metadata.at("A").counter());
   }
 }
 
@@ -200,11 +200,11 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
   ASSERT_EQ(
       TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   const auto& master_metadata = forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2, master_metadata.size());
+  ASSERT_EQ(2U, master_metadata.size());
   ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, master_metadata.at("NEW").master());
-  ASSERT_EQ(0, master_metadata.at("NEW").counter());
+  ASSERT_EQ(0U, master_metadata.at("NEW").counter());
   ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, master_metadata.at("KEY").master());
-  ASSERT_EQ(0, master_metadata.at("KEY").counter());
+  ASSERT_EQ(0U, master_metadata.at("KEY").counter());
 }
 
 TEST_F(ForwarderTest, ForwardMultiHome) {
@@ -226,9 +226,9 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
       TransactionType::MULTI_HOME, forwarded_txn->internal().type());
   const auto& master_metadata =
       forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2, master_metadata.size());
-  ASSERT_EQ(0, master_metadata.at("A").master());
-  ASSERT_EQ(0, master_metadata.at("A").counter());
-  ASSERT_EQ(1, master_metadata.at("C").master());
-  ASSERT_EQ(1, master_metadata.at("C").counter());
+  ASSERT_EQ(2U, master_metadata.size());
+  ASSERT_EQ(0U, master_metadata.at("A").master());
+  ASSERT_EQ(0U, master_metadata.at("A").counter());
+  ASSERT_EQ(1U, master_metadata.at("C").master());
+  ASSERT_EQ(1U, master_metadata.at("C").counter());
 }

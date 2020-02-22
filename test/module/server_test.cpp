@@ -46,11 +46,11 @@ TEST(ServerTest, LookupMaster) {
   ASSERT_TRUE(msg.GetProto(res));
   ASSERT_TRUE(res.has_lookup_master());
   auto lookup_result = res.lookup_master().master_metadata();
-  ASSERT_EQ(2, lookup_result.size());
-  ASSERT_EQ(0, lookup_result["A"].master());
-  ASSERT_EQ(1, lookup_result["A"].counter());
-  ASSERT_EQ(1, lookup_result["B"].master());
-  ASSERT_EQ(1, lookup_result["B"].counter());
+  ASSERT_EQ(2U, lookup_result.size());
+  ASSERT_EQ(0U, lookup_result["A"].master());
+  ASSERT_EQ(1U, lookup_result["A"].counter());
+  ASSERT_EQ(1U, lookup_result["B"].master());
+  ASSERT_EQ(1U, lookup_result["B"].counter());
   ASSERT_EQ(1, res.lookup_master().new_keys_size());
   ASSERT_EQ("D", res.lookup_master().new_keys(0));
 }

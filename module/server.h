@@ -46,9 +46,10 @@ public:
       Broker& broker,
       shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index);
 
-private:
   void SetUp() final;
   void Loop() final;
+
+private:
 
   bool HasMessageFromChannel() const;
   bool HasMessageFromClient() const;
