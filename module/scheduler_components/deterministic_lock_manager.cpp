@@ -238,9 +238,11 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
     }
   }
   if (!ahead_counters.empty()){
-    auto waiting_remaster_entry = make_pair(txn.internal().id(), ahead_counters);
+    auto txn_id = txn.internal().id();
+    num_remasters_waited_[txn_id] = ahead_counters;
+
     for (auto key : ahead_counters) {
-      keys_waiting_remaster_[key.first].insert(&waiting_remaster_entry);
+      keys_waiting_remaster_[key.first].insert(txn_id);
     }
     return VerifyMasterResult::Waiting;
   } else {
@@ -251,20 +253,20 @@ DeterministicLockManager::VerifyMaster(const Transaction& txn) {
 unordered_set<TxnId> DeterministicLockManager::RemasterOccured(Key key) {
   unordered_set<TxnId> unblocked;
 
-  for (auto entry : keys_waiting_remaster_[key]) {
-    auto txn_id = entry->first;
-    auto waiting_map = entry->second;
+  for (auto txn_id : keys_waiting_remaster_[key]) {
+    auto waiting_map = num_remasters_waited_[txn_id];
 
     waiting_map[key] -= 1;
     if (waiting_map[key] == 0) {
       waiting_map.erase(key);
-    }
-    if (waiting_map.empty()) {
-      unblocked.insert(txn_id);
-      keys_waiting_remaster_[key].erase(entry);
-    }
-    if (keys_waiting_remaster_[key].empty()) {
-      keys_waiting_remaster_.erase(key);
+      if (waiting_map.empty()) {
+        unblocked.insert(txn_id);
+        num_remasters_waited_.erase(txn_id);
+        keys_waiting_remaster_[key].erase(txn_id);
+        if (keys_waiting_remaster_[key].empty()) {
+          keys_waiting_remaster_.erase(key);
+        }
+      }
     }
   }
   
@@ -288,6 +290,5 @@ DeterministicLockManager::ExtractKeys(const Transaction& txn) {
   }
   return keys;
 }
-
 
 } // namespace slog

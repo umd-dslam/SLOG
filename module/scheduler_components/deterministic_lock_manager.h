@@ -110,7 +110,9 @@ private:
   shared_ptr<Storage<Key, Record>> storage_;
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
-  unordered_map<Key, unordered_set<pair<TxnId, unordered_map<Key, int32_t>>*>> keys_waiting_remaster_;
+  
+  unordered_map<Key, unordered_set<TxnId>> keys_waiting_remaster_;
+  unordered_map<TxnId, unordered_map<Key, int32_t>> num_remasters_waited_;
 };
 
 } // namespace slog

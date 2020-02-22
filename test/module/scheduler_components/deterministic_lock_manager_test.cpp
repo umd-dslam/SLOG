@@ -246,3 +246,16 @@ TEST_F(DeterministicLockManagerTest, CheckMultipleCounters) {
   ASSERT_EQ(lock_manager.VerifyMaster(txn2), VerifyMasterResult::Waiting);
   ASSERT_EQ(lock_manager.VerifyMaster(txn3), VerifyMasterResult::Aborted);
 }
+
+TEST_F(DeterministicLockManagerTest, RemasterQueue) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager(configs[0], storage);
+  storage->Write("A", Record("valueA", 0, 1));
+  auto txn1 = MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}});
+  txn1.mutable_internal()->set_id(100);
+
+  ASSERT_EQ(lock_manager.VerifyMaster(txn1), VerifyMasterResult::Waiting);
+  auto unblocked = lock_manager.RemasterOccured("A");
+  ASSERT_EQ(unblocked.size(), 1);
+  ASSERT_EQ(unblocked.count(100), 1);
+}
