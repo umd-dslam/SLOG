@@ -133,7 +133,7 @@ bool Broker::InitializeConnection() {
       const auto& addr = ready.ip_address();
       const auto& machine_id = ready.machine_id();
       auto machine_id_str = MakeMachineIdAsString(
-            machine_id.replica(), machine_id.partition());
+          machine_id.replica(), machine_id.partition());
 
       if (needed_machine_ids.count(machine_id_str) == 0) {
         continue;
@@ -166,7 +166,7 @@ void Broker::Run() {
     return;
   }
 
-  // Handle the unhandled messages
+  // Handle the unhandled messages received during initializing
   while (running_ && !unhandled_incoming_messages_.empty()) {
     HandleIncomingMessage(
         move(unhandled_incoming_messages_.back()));

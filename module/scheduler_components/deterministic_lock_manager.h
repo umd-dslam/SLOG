@@ -21,9 +21,9 @@ namespace slog {
 enum class LockMode { UNLOCKED, READ, WRITE };
 
 /**
- * The object of this class represent the locking state of a key.
+ * An object of this class represents the locking state of a key.
  * It contains the IDs of transactions that are holding and waiting
- * the lock and the mode of the lock being held with.
+ * the lock and the mode of the lock.
  */
 class LockState {
 public:

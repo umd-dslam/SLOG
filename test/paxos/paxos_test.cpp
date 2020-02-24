@@ -98,8 +98,8 @@ TEST_F(PaxosTest, ProposeWithoutForwarding) {
   clients[0]->Propose(111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
-    ASSERT_EQ(0, ret.first);
-    ASSERT_EQ(111, ret.second);
+    ASSERT_EQ(0U, ret.first);
+    ASSERT_EQ(111U, ret.second);
   }
 }
 
@@ -112,8 +112,8 @@ TEST_F(PaxosTest, ProposeWithForwarding) {
   clients[1]->Propose(111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
-    ASSERT_EQ(0, ret.first);
-    ASSERT_EQ(111, ret.second);
+    ASSERT_EQ(0U, ret.first);
+    ASSERT_EQ(111U, ret.second);
   }
 }
 
@@ -126,22 +126,22 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
   clients[0]->Propose(111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
-    ASSERT_EQ(0, ret.first);
-    ASSERT_EQ(111, ret.second);
+    ASSERT_EQ(0U, ret.first);
+    ASSERT_EQ(111U, ret.second);
   }
 
   clients[1]->Propose(222);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
-    ASSERT_EQ(1, ret.first);
-    ASSERT_EQ(222, ret.second);
+    ASSERT_EQ(1U, ret.first);
+    ASSERT_EQ(222U, ret.second);
   }
 
   clients[2]->Propose(333);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
-    ASSERT_EQ(2, ret.first);
-    ASSERT_EQ(333, ret.second);
+    ASSERT_EQ(2U, ret.first);
+    ASSERT_EQ(333U, ret.second);
   }
 }
 
@@ -161,8 +161,8 @@ TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   for (auto& paxos : paxi) {
     if (paxos->IsMember()) {
       auto ret = paxos->Poll();
-      ASSERT_EQ(0, ret.first);
-      ASSERT_EQ(111, ret.second);
+      ASSERT_EQ(0U, ret.first);
+      ASSERT_EQ(111U, ret.second);
     }
   }
 }

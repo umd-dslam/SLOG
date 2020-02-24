@@ -10,7 +10,7 @@
 #include "third_party/rapidjson/stringbuffer.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
-DEFINE_uint32(port, 5051, "Port number of the SLOG server to connect to");
+DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
 DEFINE_string(txn_file, "txn.json", "Path to a JSON file containing the transaction");
 
 using namespace slog;
