@@ -1,6 +1,7 @@
 #include "module/scheduler_components/deterministic_lock_manager.h"
 
 #include <glog/logging.h>
+#include "common/transaction_utils.h"
 
 using std::make_pair;
 using std::move;
