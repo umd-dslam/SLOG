@@ -60,7 +60,7 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
   }
 
   // Check if no keys are blocked at all
-  if (!ahead_counters.empty()){
+  if (ahead_counters.empty()){
     auto no_key_indirectly_blocked = true;
     for (auto key : txn_holder.keys_in_partition) {
       if (indirectly_blocked_queue.count(key.first)) {
