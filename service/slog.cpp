@@ -2,12 +2,9 @@
 #include <vector>
 #include <fcntl.h>
 
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-
-#include "common/service_utils.h"
 #include "common/configuration.h"
+#include "common/offline_data_reader.h"
+#include "common/service_utils.h"
 #include "connection/broker.h"
 #include "module/consensus.h"
 #include "module/forwarder.h"
@@ -24,10 +21,6 @@ DEFINE_string(address, "", "Address of the local machine");
 DEFINE_uint32(replica, 0, "Replica number of the local machine");
 DEFINE_uint32(partition, 0, "Partition number of the local machine");
 DEFINE_string(data_dir, "", "Directory containing intial data");
-
-using google::protobuf::io::ZeroCopyInputStream;
-using google::protobuf::io::FileInputStream;
-using google::protobuf::io::CodedInputStream;
 
 using slog::Broker;
 using slog::ConfigurationPtr;
@@ -49,50 +42,28 @@ void LoadData(
 
   auto data_file = data_dir + "/" + 
       std::to_string(config->GetLocalPartition()) + ".dat";
-  
+
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
     LOG(ERROR) << "Data loading error: " << strerror(errno) << ". Starting with an empty storage";
     return;
   }
 
-  ZeroCopyInputStream* raw_input(new FileInputStream(fd));
-  CodedInputStream* coded_input(new CodedInputStream(raw_input));
-
-  uint32_t num_datums;
-  if (!coded_input->ReadVarint32(&num_datums)) {
-    LOG(FATAL) << "Error while reading data file";
-  }
-  LOG(INFO) << "Loading " << num_datums << " datums...";
+  slog::OfflineDataReader reader(fd);
+  LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums...";
 
   VLOG(1) << "First 10 datums are: ";
-  for (uint32_t i = 0; i < num_datums; i++) {
-    int sz;
-    // Read the size of the next datum
-    if (!coded_input->ReadVarintSizeAsInt(&sz)) {
-      LOG(FATAL) << "Error while reading data file";
-    }
-    string buf;
-    // Read the datum given the size
-    if (!coded_input->ReadString(&buf, sz)) {
-      LOG(FATAL) << "Error while reading data file";
-    }
-
-    slog::Datum datum;
-    // Parse raw bytes into protobuf object
-    datum.ParseFromString(buf);
-
-    if (i < 10) {
+  int c = 10;
+  while (reader.HasNextDatum()) {
+    auto datum = reader.GetNextDatum();
+    if (c > 0) {
       VLOG(1) << datum.key() << " " << datum.record() << " " << datum.master();
+      c--;
     }
-
     // Write to storage
     Record record(datum.record(), datum.master());
     storage.Write(datum.key(), record);
   }
-
-  delete coded_input;
-  delete raw_input;
   close(fd);
 }
 

@@ -128,6 +128,7 @@ set(SLOG_LIBS
   common
   connection
   module
+  offline_data_reader
   paxos
   proto)
 
