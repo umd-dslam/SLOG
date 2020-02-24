@@ -8,6 +8,7 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/types.h"
+#include "common/transaction_utils.h"
 
 #include "storage/storage.h"
 
@@ -24,20 +25,17 @@ enum class VerifyMasterResult {VALID, WAITING, ABORT};
 
 
 /**
- * A deterministic lock manager grants locks for transactions in
- * the order that they request. If transaction X, appears before
- * transaction Y in the log, thus requesting lock before transaction Y,
- * then X always gets all locks before Y.
- * 
- * The lock manager also conducts the final check of master metadata.
+ * The remaster queue manager also conducts the check of master metadata.
  * If a remaster has occured since the transaction was forwarded, it may
- * need to be restarted.
+ * need to be restarted. If the transaction arrived before a remaster that
+ * the forwarder included in the metadata, then it will need to wait.
  */
 class RemasterQueueManager {
 public:
   RemasterQueueManager(
     ConfigurationPtr config,
-    shared_ptr<Storage<Key, Record>> storage);
+    shared_ptr<Storage<Key, Record>> storage,
+    shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns);
 
   /**
    * Checks the counters of the transaction's master metadata.
@@ -52,7 +50,7 @@ public:
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  VerifyMasterResult VerifyMaster(const Transaction& txn);
+  VerifyMasterResult VerifyMaster(const TransactionHolder& txn_holder);
 
   /**
    * Updates the queue of transactions waiting for remasters,
@@ -62,16 +60,23 @@ public:
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */
-  list<TxnId> RemasterOccured(Key key);
+  list<TxnId> RemasterOccured(Key key, const uint32_t remaster_counter);
 
 private:
+  void InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn);
+  void TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked);
+
   ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;
+  shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns_;
   
-  // Queues for the transactions waiting for each key
-  unordered_map<Key, list<TxnId>> keys_waiting_remaster_;
-  // Status of each transaction (how many remasters of each key it needs)
-  unordered_map<TxnId, unordered_map<Key, int32_t>> num_remasters_waited_;
+  // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
+  // arrivals break tie
+  unordered_map<Key, list<pair<TxnId, uint32_t>>> blocked_queue;
+
+  // Queues of keys that are blocked waiting for other keys of the transaction to be remastered, or for other
+  // transactions ahead in order.
+  unordered_map<Key, list<TxnId>> indirectly_blocked_queue;
 };
 
 } // namespace slog

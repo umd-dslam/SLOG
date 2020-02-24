@@ -8,6 +8,7 @@
 #include "common/configuration.h"
 #include "common/transaction_utils.h"
 #include "common/types.h"
+#include "common/transaction_utils.h"
 #include "connection/broker.h"
 #include "data_structure/batch_log.h"
 #include "module/base/basic_module.h"
