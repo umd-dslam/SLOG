@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/proto_utils.h"
-#include "benchmark/commands.h"
+#include "module/scheduler_components/commands.h"
 
 using namespace std;
 using namespace slog;

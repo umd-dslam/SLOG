@@ -13,6 +13,11 @@ using std::unordered_map;
 
 namespace slog {
 
+/**
+ * A BatchInterleaver interleaves batches from different batch queues.
+ * The order for which queue to dequeue from is given in the manner
+ * similar to an asynchronous log.
+ */
 class BatchInterleaver {
 public:
   BatchInterleaver();

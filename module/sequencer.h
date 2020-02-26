@@ -15,14 +15,15 @@ namespace slog {
  * 
  * INPUT:  ForwardTxn or ForwardBatch
  * 
- * OUTPUT: For ForwardTxn, a SINGLE_HOME txn is extracted and put 
- *         into a batch before sending to the Scheduler in the same
- *         machine.
+ * OUTPUT: For ForwardTxn, it has to contains a SINGLE_HOME txn, which is put 
+ *         into a batch. The ID of this batch is sent to the local paxos
+ *         process for ordering, and simultaneously, this batch is sent to the 
+ *         Scheduler of all machines across all regions.
  * 
  *         For ForwardBatch, MULTI_HOME txns are extracted from the batch. 
  *         For each MULTI_HOME txn, a corresponding LockOnly txn is created
  *         and put into the same batch as the SINGLE_HOME txn above. The 
- *         MULTI_HOME txn is sent to ALL Schedulers in the SAME region.
+ *         MULTI_HOME txn is sent to all Schedulers in the SAME region.
  */
 class Sequencer : public BasicModule {
 public:

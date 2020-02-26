@@ -108,7 +108,7 @@ void Server::HandleInternalRequest(
           move(from_channel));
       break;
     case internal::Request::kForwardSubTxn:
-      ProcessForwardSubtxnRequest(
+      ProcessForwardSubtxn(
           req.mutable_forward_sub_txn(),
           move(from_machine_id));
       break;
@@ -126,21 +126,24 @@ void Server::ProcessLookUpMasterRequest(
   internal::Response response;
   auto lookup_response = response.mutable_lookup_master();
   lookup_response->set_txn_id(lookup_master->txn_id());
-
   auto metadata_map = lookup_response->mutable_master_metadata();
   auto new_keys = lookup_response->mutable_new_keys();
   while (!lookup_master->keys().empty()) {
     auto key = lookup_master->mutable_keys()->ReleaseLast();
+
     if (!config_->KeyIsInLocalPartition(*key)) {
+      // Ignore keys that the current partition does not have
       delete key;
     } else {
       Metadata metadata;
       if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
+        // If key exists, add the metadata of current key to the response
         auto& response_metadata = (*metadata_map)[*key];
         response_metadata.set_master(metadata.master);
         response_metadata.set_counter(metadata.counter);
         delete key;
       } else {
+        // Otherwise, add it to the list indicating this is a new key
         new_keys->AddAllocated(key);
       }
     }
@@ -148,7 +151,7 @@ void Server::ProcessLookUpMasterRequest(
   Send(response, from_machine_id, from_channel);
 }
 
-void Server::ProcessForwardSubtxnRequest(
+void Server::ProcessForwardSubtxn(
     internal::ForwardSubtransaction* forward_sub_txn,
     string&& from_machine_id) {
   auto txn_id = forward_sub_txn->txn().internal().id();
@@ -159,6 +162,12 @@ void Server::ProcessForwardSubtxnRequest(
   }
   auto& pr = pending_responses_.at(txn_id);
   auto sub_txn_origin = forward_sub_txn->partition();
+  // If this is the first sub-transaction, initialize the
+  // pending response with this sub-transaction as the starting
+  // point and populate the list of partitions that we are still
+  // waiting for sub-transactions from. Otherwise, remove the
+  // partition of this sub-transaction from the awaiting list and
+  // merge the sub-txn to the current txn.
   if (!pr.initialized) {
     pr.txn = forward_sub_txn->release_txn();
     pr.awaited_partitions.clear();
@@ -172,6 +181,8 @@ void Server::ProcessForwardSubtxnRequest(
     MergeTransaction(*pr.txn, forward_sub_txn->txn());
   }
 
+  // If all sub-txns are received, response back to the client and
+  // clean up all tracking data for this txn.
   if (pr.awaited_partitions.empty()) {
     SendAPIResponse(txn_id);
   }

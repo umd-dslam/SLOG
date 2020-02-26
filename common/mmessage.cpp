@@ -97,11 +97,10 @@ void MMessage::Set(size_t index, string&& data) {
   body_to_any_cache_.clear();
 }
 
-bool MMessage::GetString(string& out, size_t index) const {
+void MMessage::GetString(string& out, size_t index) const {
   CHECK(index < body_.size()) 
       << "Index out of bound. Size: " << body_.size() << ". Index: " << index;
   out = body_[index];
-  return true;
 }
 
 void MMessage::SendTo(zmq::socket_t& socket) const {

@@ -122,15 +122,6 @@ add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(module)
 add_subdirectory(paxos)
-set(SLOG_LIBS
-  batch_log
-  benchmark
-  common
-  connection
-  module
-  offline_data_reader
-  paxos
-  proto)
 
 # All libraries to be linked to executables
 set(EXTERNAL_LIBS
@@ -142,21 +133,35 @@ set(EXTERNAL_LIBS
   ${READLINE_LIBRARIES})
 message(STATUS "External libs: ${EXTERNAL_LIBS}")
 
-
 #========================================
 #            Executables
 #========================================
 
 # Create an executable for the services
 add_executable(slog service/slog.cpp)
-target_link_libraries(slog ${SLOG_LIBS} ${EXTERNAL_LIBS})
+target_link_libraries(slog 
+  batch_log
+  common
+  connection
+  module
+  offline_data_reader
+  paxos
+  proto
+  ${EXTERNAL_LIBS})
 
 add_executable(bm service/bm.cpp)
-target_link_libraries(bm ${SLOG_LIBS} ${EXTERNAL_LIBS})
+target_link_libraries(bm 
+  benchmark
+  common
+  offline_data_reader
+  ${EXTERNAL_LIBS})
 
 if (BUILD_CLIENT)
   add_executable(client service/client.cpp)
-  target_link_libraries(client ${SLOG_LIBS} ${EXTERNAL_LIBS})
+  target_link_libraries(client 
+    common
+    proto
+    ${EXTERNAL_LIBS})
 endif()
 
 

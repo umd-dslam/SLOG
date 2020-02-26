@@ -4,9 +4,9 @@
 
 #include <zmq.hpp>
 
-#include "benchmark/commands.h"
 #include "common/types.h"
 #include "module/base/module.h"
+#include "module/scheduler_components/commands.h"
 #include "proto/transaction.pb.h"
 #include "proto/internal.pb.h"
 #include "storage/storage.h"

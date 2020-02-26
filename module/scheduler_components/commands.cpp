@@ -1,4 +1,4 @@
-#include "benchmark/commands.h"
+#include "module/scheduler_components/commands.h"
 #include "common/proto_utils.h"
 #include <glog/logging.h>
 

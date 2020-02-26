@@ -64,7 +64,15 @@ private:
       internal::LookupMasterRequest* lookup_master,
       string&& from_machine_id,
       string&& from_channel);
-  void ProcessForwardSubtxnRequest(
+
+  /**
+   * After a transaction is processed by different partitions, each
+   * involving partition will send a sub-transaction with the processing
+   * result to the coordinating server. The coordinating server will be
+   * in charge of merging these sub-transactions and responding back to
+   * the client.
+   */
+  void ProcessForwardSubtxn(
       internal::ForwardSubtransaction* forward_sub_txn,
       string&& from_machine_id);
 

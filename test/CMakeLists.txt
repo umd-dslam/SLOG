@@ -7,6 +7,7 @@ set(ALL_TESTS
   batch_interleaver_test
   broker_test
   channel_test
+  commands_test
   deterministic_lock_manager_test
   e2e_test
   forwarder_test
@@ -16,8 +17,7 @@ set(ALL_TESTS
   proto_utils_test
   scheduler_test
   server_test
-  sequencer_test
-  commands_test)
+  sequencer_test)
 
 add_executable(batch_log_test common/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
@@ -31,6 +31,9 @@ target_link_libraries(broker_test test_utils)
 
 add_executable(channel_test connection/channel_test.cpp)
 target_link_libraries(channel_test test_utils)
+
+add_executable(commands_test module/scheduler_components/commands_test.cpp)
+target_link_libraries(commands_test test_utils)
 
 add_executable(deterministic_lock_manager_test 
   module/scheduler_components/deterministic_lock_manager_test.cpp)
@@ -62,9 +65,6 @@ target_link_libraries(server_test test_utils)
 
 add_executable(sequencer_test module/sequencer_test.cpp)
 target_link_libraries(sequencer_test test_utils)
-
-add_executable(commands_test benchmark/commands_test.cpp)
-target_link_libraries(commands_test benchmark)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)
