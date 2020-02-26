@@ -45,7 +45,9 @@ void LoadData(
 
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
-    LOG(ERROR) << "Data loading error: " << strerror(errno) << ". Starting with an empty storage";
+    LOG(ERROR) << "Error while loading \"" << data_file << "\": "
+               << strerror(errno)
+               << ". Starting with an empty storage.";
     return;
   }
 
@@ -75,6 +77,14 @@ int main(int argc, char* argv[]) {
       FLAGS_address,
       FLAGS_replica,
       FLAGS_partition);
+  const auto& all_addresses = config->GetAllAddresses();
+  CHECK(std::find(
+      all_addresses.begin(),
+      all_addresses.end(),
+      config->GetLocalAddress()) != all_addresses.end())
+      << "The configuration does not contain the provided "
+      << "local machine ID: \"" << config->GetLocalAddress() << "\"";
+
   auto context = make_shared<zmq::context_t>(1);
   Broker broker(config, context);
 

@@ -1,29 +1,18 @@
 #pragma once
 
-#include <string>
-
-#include <zmq.hpp>
-
-#include "module/base/module.h"
-
-using std::string;
+#include "proto/transaction.pb.h"
 
 namespace slog {
 
-class WorkloadGenerator : public Module {
+/**
+ * Base class for a workload generator
+ */
+class WorkloadGenerator {
 public:
-  WorkloadGenerator(
-      std::shared_ptr<zmq::context_t> context,
-      const std::string& host, 
-      uint32_t port);
-
-private:
-  void SetUp() final;
-  void Loop() final;
-
-  zmq::socket_t socket_;
-  string host_;
-  uint32_t port_;
+  /**
+   * Gets the next transaction in the workload
+   */
+  virtual Transaction NextTransaction() = 0;
 };
 
 } // namespace slog

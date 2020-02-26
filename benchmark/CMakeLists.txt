@@ -1,7 +1,6 @@
 project(benchmark)
 
-add_library(benchmark workload_generator.cpp)
-
+add_library(benchmark basic_workload.cpp)
 target_link_libraries(benchmark
   common
   module
