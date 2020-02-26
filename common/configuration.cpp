@@ -67,12 +67,6 @@ Configuration::Configuration(
       all_addresses_.push_back(addr);
     }
   }
-  CHECK(std::find(
-      all_addresses_.begin(),
-      all_addresses_.end(),
-      local_address) != all_addresses_.end())
-      << "The configuration does not contain the provided "
-      << "local machine ID: \"" << local_address << "\"";
 }
 
 const string& Configuration::GetProtocol() const {
@@ -81,6 +75,10 @@ const string& Configuration::GetProtocol() const {
 
 const vector<string>& Configuration::GetAllAddresses() const {
   return all_addresses_;
+}
+
+const string& Configuration::GetAddress(uint32_t replica, uint32_t partition) const {
+  return config_.replicas(replica).addresses(partition);
 }
 
 uint32_t Configuration::GetNumReplicas() const {

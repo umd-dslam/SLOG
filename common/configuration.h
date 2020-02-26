@@ -22,9 +22,9 @@ class Configuration {
 public:
   static ConfigurationPtr FromFile(
       const string& file_path,
-      const string& local_address,
-      uint32_t local_replica,
-      uint32_t local_partition);
+      const string& local_address = "",
+      uint32_t local_replica = 0U,
+      uint32_t local_partition = 0U);
 
   Configuration(
       const internal::Configuration& config,
@@ -34,6 +34,7 @@ public:
 
   const string& GetProtocol() const;
   const vector<string>& GetAllAddresses() const;
+  const string& GetAddress(uint32_t replica, uint32_t partition) const;
   uint32_t GetBrokerPort() const;
   uint32_t GetServerPort() const;
   uint32_t GetNumReplicas() const;
