@@ -4,8 +4,8 @@
 #include "common/proto_utils.h"
 #include "common/service_utils.h"
 #include "common/types.h"
-#include "benchmark/basic_workload.h"
 #include "proto/api.pb.h"
+#include "workload/basic_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_uint32(replica, 0, "Replica number of the local machine");
