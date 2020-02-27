@@ -3,7 +3,7 @@
 #include <random>
 #include <vector>
 
-#include "benchmark/workload_generator.h"
+#include "workload/workload_generator.h"
 #include "common/configuration.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"

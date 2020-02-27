@@ -1,4 +1,4 @@
-#include "benchmark/basic_workload.h"
+#include "workload/basic_workload.h"
 
 #include <algorithm>
 #include <iomanip>

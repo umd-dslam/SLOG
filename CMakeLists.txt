@@ -117,11 +117,11 @@ add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 #            Subdirectories
 #========================================
 
-add_subdirectory(benchmark)
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(module)
 add_subdirectory(paxos)
+add_subdirectory(workload)
 
 # All libraries to be linked to executables
 set(EXTERNAL_LIBS
@@ -149,9 +149,9 @@ target_link_libraries(slog
   proto
   ${EXTERNAL_LIBS})
 
-add_executable(bm service/bm.cpp)
-target_link_libraries(bm 
-  benchmark
+add_executable(benchmark service/benchmark.cpp)
+target_link_libraries(benchmark 
+  workload
   common
   offline_data_reader
   ${EXTERNAL_LIBS})
