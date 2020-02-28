@@ -62,6 +62,14 @@ void LoadData(
       VLOG(1) << datum.key() << " " << datum.record() << " " << datum.master();
       c--;
     }
+
+    CHECK(config->KeyIsInLocalPartition(datum.key()))
+        << "Key " << datum.key()
+        << " does not belong to partition " << config->GetLocalPartition();
+
+    CHECK_LT(datum.master(), config->GetNumReplicas())
+        << "Master number exceeds number of replicas";
+
     // Write to storage
     Record record(datum.record(), datum.master());
     storage.Write(datum.key(), record);
@@ -84,6 +92,10 @@ int main(int argc, char* argv[]) {
       config->GetLocalAddress()) != all_addresses.end())
       << "The configuration does not contain the provided "
       << "local machine ID: \"" << config->GetLocalAddress() << "\"";
+  CHECK_LT(config->GetLocalReplica(), config->GetNumReplicas())
+      << "Replica numbers must be within number of replicas";
+  CHECK_LT(config->GetLocalPartition(), config->GetNumPartitions())
+      << "Partition number must be within number of partitions";
 
   auto context = make_shared<zmq::context_t>(1);
   Broker broker(config, context);

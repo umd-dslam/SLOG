@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import sys
 if sys.version_info[0] == 3:
     _get_byte = lambda c: c

@@ -123,8 +123,7 @@ BasicWorkload::BasicWorkload(
     while (reader.HasNextDatum()) {
       auto datum = reader.GetNextDatum();
       CHECK_LT(datum.master(), config->GetNumReplicas())
-          << "Datum is mastered at a non-existent replica: " << datum.master()
-          << ". Number of replicas from config: " << config->GetNumReplicas();
+          << "Master number exceeds number of replicas";
 
       partition_to_key_lists_[partition][datum.master()].AddKey(datum.key());
     }

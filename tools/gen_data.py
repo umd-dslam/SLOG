@@ -12,6 +12,8 @@ import os
 import string
 import time
 
+import google.protobuf.text_format as text_format
+
 from argparse import ArgumentParser
 from collections import defaultdict
 from functools import partial
@@ -20,6 +22,7 @@ from google.protobuf.internal.encoder import _VarintBytes
 from multiprocessing import Pool
 
 from fnv_hash import fnv_hash
+from proto.configuration_pb2 import Configuration
 from proto.offline_data_pb2 import Datum
 
 ALPHABET = np.array(list(string.ascii_lowercase + string.digits))
@@ -91,9 +94,11 @@ class DataGenerator:
         start_time = time.time()
 
         LOG.info(
-            "Partitioning %d keys into %d partitions...", 
+            "Partitioning %d keys into %d partitions using "
+            "the first %d bytes of each key...", 
             self.num_records,
             self.num_partitions,
+            self.partition_bytes,
         )
         # Distribute keys into the partitions
         partition_to_keys = defaultdict(list)
@@ -209,9 +214,8 @@ class DataGenerator:
 
 def add_exported_gen_data_arguments(parser):
     """
-    These arguments are also used in a different script so we want to avoid
-    maintaining multiple copies of them. By putting them in a separate function,
-    other scripts can simply import this function to use them.
+    Putting these arguments here so that other scripts (e.g. admin.py) can reuse
+    them by importing this function.
     """
     parser.add_argument(
         "-p", "--partition",
@@ -257,23 +261,30 @@ if __name__ == "__main__":
         help="Directory where the generated data files are located",
     )
     parser.add_argument(
+        "-c", "--config",
+        help="Generate data based on information provided by the config file",
+    )
+    parser.add_argument(
         "-np", "--num-partitions",
         default=1,
         type=int,
-        help="Number of partitions"
+        help="Number of partitions. If --config is used, this option will "
+             "not be used."
     )
     parser.add_argument(
         "-nr", "--num-replicas",
         default=1,
         type=int,
-        help="Number of replicas"
+        help="Number of replicas. If --config is used, this option will "
+             "not be used."
     )
     parser.add_argument(
         "--partition-bytes",
         type=int,
         default=0,
         help="Number of prefix bytes of a key used for computing its partition."
-             "Set to 0 (default) to use the whole key."
+             "Set to 0 (default) to use the whole key. If --config is used, "
+             "this option will not be used."
     )
     parser.add_argument(
         "--as-text",
@@ -284,16 +295,27 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    num_partitions = args.num_partitions
+    num_replicas = args.num_replicas
+    partition_bytes = args.partition_bytes
+    if args.config is not None:
+        with open(args.config, "r") as f:
+            config = Configuration()
+            text_format.Parse(f.read(), config)
+            num_partitions = config.num_partitions
+            num_replicas = len(config.replicas)
+            partition_bytes = config.partition_key_num_bytes
+
     DataGenerator(
         args.data_dir,
         "",
-        args.num_replicas,
-        args.num_partitions,
+        num_replicas,
+        num_partitions,
         args.size,
         args.size_unit,
         args.record_size,
         args.max_jobs,
-        args.partition_bytes,
+        partition_bytes,
     ).gen_data(
         partition=args.partition,
         as_text=args.as_text,
