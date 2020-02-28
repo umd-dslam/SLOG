@@ -27,3 +27,6 @@ target_link_libraries(module
   base_module
   paxos
   scheduler_components)
+
+add_library(ticker ticker.cpp)
+target_link_libraries(ticker base_module common)
