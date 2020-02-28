@@ -4,6 +4,7 @@
 #include "common/proto_utils.h"
 #include "common/service_utils.h"
 #include "common/types.h"
+#include "module/ticker.h"
 #include "proto/api.pb.h"
 #include "workload/basic_workload.h"
 
@@ -34,15 +35,20 @@ using std::vector;
 using namespace slog;
 
 zmq::context_t context(1);
+// For controlling rate
+unique_ptr<ModuleRunner> ticker;
+// Connection
 vector<unique_ptr<zmq::socket_t>> server_sockets;
+unique_ptr<zmq::socket_t> ticker_socket;
 vector<zmq::pollitem_t> poll_items;
+// Workload
 unique_ptr<WorkloadGenerator> workload;
-TimePoint start_time;
 
 struct TransactionInfo {
   TransactionType type;
   TimePoint sending_time;
 };
+TimePoint start_time;
 uint64_t txn_counter = 0;
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
 
@@ -53,32 +59,17 @@ int main(int argc, char* argv[]) {
   InitializeService(argc, argv);
   InitializeBenchmark();
 
-  // Variables to maintain the transaction submission rate
-  long wake_up_every_ms = 1000 / FLAGS_rate;
-  long poll_timeout_ms = wake_up_every_ms;
-  auto wake_up_deadline = Clock::now() + milliseconds(wake_up_every_ms);
-
   LOG(INFO) << "Start sending transactions";
   start_time = Clock::now();
   while (!StopConditionMet()) {
-    if (zmq::poll(poll_items, poll_timeout_ms)) {
-      for (size_t i = 0; i < server_sockets.size(); i++) {
-        if (poll_items[i].revents & ZMQ_POLLIN) {
-          MMessage msg(*server_sockets[i]);
-          api::Response res;
-          if (!msg.GetProto(res)) {
-            LOG(ERROR) << "Malformed response";
-          } else {
-            if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
-              LOG(ERROR) << "Received response for a non-outstanding txn. Dropping";
-            } else {
-              // TODO: collect stats here
-              // const auto& txn = res.txn().txn();
-            }
-          }
-        }
-      }
-    } else {
+    zmq::poll(poll_items);
+
+    // Check if the ticker ticks
+    if (poll_items[0].revents & ZMQ_POLLIN) {
+      // Receive the empty message then throw away
+      zmq::message_t msg;
+      ticker_socket->recv(msg);
+
       auto txn = workload->NextTransaction();
       if (FLAGS_print_txn) {
         LOG(INFO) << txn << "\nTxn counter: " << txn_counter;
@@ -91,17 +82,28 @@ int main(int argc, char* argv[]) {
         msg.Push(req);
         // TODO: Add an option to randomly send to any server in the same region
         msg.SendTo(*server_sockets[0]);
+        outstanding_txns[txn_counter] = {};
       }
       txn_counter++;
     }
-
-    // Update poll_timeout_ms to maintain the txn sending rate
-    auto now = Clock::now();
-    while (now >= wake_up_deadline) {
-      wake_up_deadline += milliseconds(wake_up_every_ms);
+    // Check if we received a response from the server
+    for (size_t i = 1; i < poll_items.size(); i++) {
+      if (poll_items[i].revents & ZMQ_POLLIN) {
+        MMessage msg(*server_sockets[i-1]);
+        api::Response res;
+        if (!msg.GetProto(res)) {
+          LOG(ERROR) << "Malformed response";
+        } else {
+          if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
+            LOG(ERROR) << "Received response for a non-outstanding txn. Dropping";
+          } else {
+            // TODO: collect stats here
+            const auto& txn = res.txn().txn();
+            LOG(INFO) << txn;
+          }
+        }
+      }
     }
-    auto time_diff = duration_cast<milliseconds>(wake_up_deadline - now);
-    poll_timeout_ms = 1 + time_diff.count();
   }
 
   // TODO: collect and print more stats here
@@ -115,6 +117,19 @@ void InitializeBenchmark() {
   if (FLAGS_duration > 0 && FLAGS_num_txns > 0) {
     LOG(FATAL) << "Only either \"duration\" or \"num_txns\" can be set"; 
   }
+  
+  // Create a ticker and subscribe to it
+  ticker = MakeRunnerFor<Ticker>(context, FLAGS_rate);
+  ticker->StartInNewThread();
+  ticker_socket = make_unique<zmq::socket_t>(context, ZMQ_SUB);
+  ticker_socket->connect(Ticker::ENDPOINT);
+  ticker_socket->setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  // This has to be pushed to poll_items before the server sockets
+  poll_items.push_back({
+      static_cast<void*>(*ticker_socket),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */});
 
   ConfigurationPtr config =
       Configuration::FromFile(FLAGS_config, "", FLAGS_replica);

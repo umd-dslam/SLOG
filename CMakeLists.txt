@@ -151,9 +151,9 @@ target_link_libraries(slog
 
 add_executable(benchmark service/benchmark.cpp)
 target_link_libraries(benchmark 
-  workload
   common
-  offline_data_reader
+  ticker
+  workload
   ${EXTERNAL_LIBS})
 
 if (BUILD_CLIENT)
