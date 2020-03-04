@@ -147,6 +147,9 @@ void RemasterQueueManager::TryToUnblock(const Key unblocked_key, list<TxnId>& un
   if (all_keys_front) {
     for (auto key : keys) {
       indirectly_blocked_queue.at(key.first).pop_front();
+      if (indirectly_blocked_queue.at(key.first).empty()) {
+        indirectly_blocked_queue.erase(key.first);
+      }
     }
     unblocked.push_back(txn_id);
     for (auto key : keys) {
