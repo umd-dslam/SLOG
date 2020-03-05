@@ -63,7 +63,19 @@ public:
   list<TxnId> RemasterOccured(Key key, const uint32_t remaster_counter);
 
 private:
+  /**
+   * Insert the key into the priority queue sorted by counter. This way remasters can
+   * unblock txns starting from the front of the queue, and stop when they reach a
+   * larger counter.
+   */
   void InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn);
+
+  /**
+   * A txn can be unblocked if it is at the front of the indirectly_blocked_queue for
+   * all of its keys. This function will try to unblock the txn at the key specified,
+   * and if successful it will continue recursively on the keys of the transaction that
+   * was unblocked.
+   */
   void TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked);
 
   ConfigurationPtr config_;

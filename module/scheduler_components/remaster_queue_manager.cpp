@@ -7,7 +7,6 @@ using std::make_pair;
 
 namespace slog {
 
-
 RemasterQueueManager::RemasterQueueManager(
       ConfigurationPtr config,
       shared_ptr<Storage<Key, Record>> storage,
@@ -89,10 +88,11 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
 
 void RemasterQueueManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn) {
   auto txn_id = txn.internal().id();
-
   auto entry = make_pair(txn_id, counter);
+
+  // Iterate until at end or counter is smaller than next element. Maintains priority queue
   auto itr = blocked_queue[key].begin();
-  while (itr != blocked_queue[key].end() && (*itr).second > counter) {
+  while (itr != blocked_queue[key].end() && (*itr).second >= counter) {
     itr++;
   }
   blocked_queue[key].insert(itr, entry);
@@ -100,29 +100,32 @@ void RemasterQueueManager::InsertIntoBlockedQueue(const Key key, const uint32_t 
 
 list<TxnId> RemasterQueueManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
   list<TxnId> unblocked;
+  list<TxnId> shouldAbort;
 
   // No txns waiting for this remaster
   if (blocked_queue.count(key) == 0) {
     return unblocked;
   }
 
-  auto indirectly_blocked_queue_empty = indirectly_blocked_queue[key].empty();
+  // If this queue already has elements, then no txns will be unblocked
+  auto indirectly_blocked_queue_empty = (indirectly_blocked_queue.count(key) == 0);
 
   // Move keys to indirectly_blocked_queue
-  for (auto txn_pair : blocked_queue[key]) {
-    auto txn_id = txn_pair.first;
-    auto txn_counter = txn_pair.second;
-    if (txn_counter < remaster_counter) {
+  auto moved_keys = false;
+  auto itr = blocked_queue[key].begin();
+  while (itr != blocked_queue[key].end() && (*itr).second <= remaster_counter) {
+    auto txn_id = (*itr).first;
+    if ((*itr).second < remaster_counter) {
+      // TODO abort these
       LOG(FATAL) << "Remaster is invalidating txns already in the queue";
-    } else if (txn_counter == remaster_counter) {
-      indirectly_blocked_queue[key].push_back(txn_id);
-    } else {
-      break;
     }
+    indirectly_blocked_queue[key].push_back(txn_id);
+    moved_keys = true;
+    itr = blocked_queue[key].erase(itr);
   }
 
   // Try to unblock txns
-  if (indirectly_blocked_queue_empty) {
+  if (indirectly_blocked_queue_empty && moved_keys) {
     TryToUnblock(key, unblocked);
   }
   
@@ -134,25 +137,32 @@ void RemasterQueueManager::TryToUnblock(const Key unblocked_key, list<TxnId>& un
     return;
   }
 
-  auto txn_id = indirectly_blocked_queue[unblocked_key].front();
+  auto txn_id = indirectly_blocked_queue.at(unblocked_key).front(); // size > 0, otherwise queue is deleted
   auto keys = all_txns_->at(txn_id).keys_in_partition;
   
-  auto all_keys_front = true;
+  // Check if txn is front of queue for all keys
   for (auto key : keys) {
     if (indirectly_blocked_queue.count(key.first) == 0 || indirectly_blocked_queue.at(key.first).front() != txn_id) {
-      all_keys_front = false;
-      break;
+      return;
     }
   }
-  if (all_keys_front) {
-    for (auto key : keys) {
-      indirectly_blocked_queue.at(key.first).pop_front();
-      if (indirectly_blocked_queue.at(key.first).empty()) {
-        indirectly_blocked_queue.erase(key.first);
-      }
+
+  // Remove unblocked txn from queues
+  for (auto key : keys) {
+    indirectly_blocked_queue.at(key.first).pop_front();
+  }
+  unblocked.push_back(txn_id);
+
+  // Garbage collect empty queues
+  for (auto key : keys) {
+    if (indirectly_blocked_queue.at(key.first).empty()) {
+      indirectly_blocked_queue.erase(key.first);
     }
-    unblocked.push_back(txn_id);
-    for (auto key : keys) {
+  }
+
+  // Recurse on updated queues
+  for (auto key : keys) {
+    if (indirectly_blocked_queue.count(key.first)) {
       TryToUnblock(key.first, unblocked);
     }
   }
