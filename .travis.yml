@@ -10,9 +10,14 @@ cache:
     - .deps
 
 before_install:
-  - cmake -version
+  - cd /tmp
+  - wget https://github.com/Kitware/CMake/releases/download/v3.12.4/cmake-3.12.4-Linux-x86_64.sh -O cmake-install.sh
+  - chmod u+x cmake-install.sh
+  - sudo ./cmake-install.sh --skip-license --prefix=/usr
+  - rm cmake-install.sh
 
 install:
+  - cd $TRAVIS_BUILD_DIR
   - sudo ./install-deps.sh
 
 script:
