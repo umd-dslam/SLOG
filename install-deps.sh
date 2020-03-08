@@ -6,6 +6,7 @@ set -e
 # Install toolings to compile dependencies
 apt-get update
 apt-get -y install autoconf automake cmake libtool curl unzip libreadline-dev pkg-config wget || true
+cmake --version
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
