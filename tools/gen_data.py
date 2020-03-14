@@ -249,6 +249,14 @@ def add_exported_gen_data_arguments(parser):
         help="Maximum number of jobs spawned to do work. For unlimited number "
              "of jobs, use 0."
     )
+    parser.add_argument(
+        "--partition-bytes",
+        type=int,
+        default=0,
+        help="Number of prefix bytes of a key used for computing its partition."
+             "Set to 0 (default) to use the whole key. If --config is used, "
+             "this option will not be used."
+    )
 
 
 if __name__ == "__main__":
@@ -277,14 +285,6 @@ if __name__ == "__main__":
         type=int,
         help="Number of replicas. If --config is used, this option will "
              "not be used."
-    )
-    parser.add_argument(
-        "--partition-bytes",
-        type=int,
-        default=0,
-        help="Number of prefix bytes of a key used for computing its partition."
-             "Set to 0 (default) to use the whole key. If --config is used, "
-             "this option will not be used."
     )
     parser.add_argument(
         "--as-text",

@@ -12,9 +12,10 @@ import os
 import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from docker.models.containers import Container
+from paramiko.ssh_exception import PasswordRequiredException
 
 from gen_data import add_exported_gen_data_arguments
 from proto.configuration_pb2 import Configuration
@@ -77,6 +78,22 @@ def get_container_status(client: docker.DockerClient, name: str) -> str:
     return "unknown"
 
 
+def parse_envs(envs: List[str]) -> Dict[str, str]:
+    '''Parses a list of environment variables
+
+    This function transform a list of strings such as ["env1=a", "env2=b"] into:
+    {
+        env: a,
+        env: b,
+    }
+
+    '''
+    if envs is None:
+        return {}
+    env_var_tuples = [env.split('=') for env in envs]
+    return {env[0]: env[1] for env in env_var_tuples}
+
+
 class Command:
     """Base class for a command.
 
@@ -104,6 +121,21 @@ class Command:
             metavar="config_file",
             help="Path to a config file",
         )
+        parser.add_argument(
+            "--no-pull",
+            action="store_true",
+            help="Skip image pulling step"
+        )
+        parser.add_argument(
+            "--image",
+            default=SLOG_IMG,
+            help="Name of the Docker image to use"
+        )
+        parser.add_argument(
+            "--user", "-u",
+            default=USER,
+            help="Username of the target machines"
+        )
         parser.set_defaults(run=self.__initialize_and_do_command)
         return parser
 
@@ -130,18 +162,29 @@ class Command:
             for addr in rep.addresses:
                 addr_str = addr.decode()
                 try:
-                    client = self.new_client(addr_str)
+                    client = self.new_client(args.user, addr_str)
                     rep_clients.append((client, addr_str))
                     self.num_clients += 1
                     LOG.info("Connected to %s", addr_str)
+                except PasswordRequiredException as e:
+                    rep_clients.append((None, addr_str))
+                    LOG.error(
+                        "Failed to authenticate when trying to connect to %s. "
+                        "Check username or key files",
+                        f"{args.user}@{addr_str}",
+                    )
                 except Exception as e:
                     rep_clients.append((None, addr_str))
-                    LOG.error(str(e))
+                    LOG.exception(e)
 
             self.rep_to_clients.append(rep_clients)
 
     def pull_slog_image(self, args):
-        if self.num_clients == 0:
+        if self.num_clients == 0 or args.no_pull:
+            LOG.info(
+                "Skipped image pulling. Using the local version of \"%s\"", 
+                args.image,
+            )
             return
         LOG.info(
             "Pulling SLOG image for each node. "
@@ -153,9 +196,9 @@ class Command:
             LOG.info(
                 "%s: Pulling latest docker image \"%s\"...",
                 addr,
-                SLOG_IMG,
+                args.image,
             )
-            client.images.pull(SLOG_IMG)
+            client.images.pull(args.image)
 
     def do_command(self, args):
         raise NotImplementedError
@@ -163,12 +206,12 @@ class Command:
     ##############################
     #       Helper methods
     ##############################
-    def new_client(self, addr):
+    def new_client(self, user, addr):
         """
         Gets a new Docker client for a given address.
         """
         return docker.DockerClient(
-            base_url=f'ssh://{USER}@{addr}',
+            base_url=f'ssh://{user}@{addr}',
         )
 
     def clients(self) -> Tuple[docker.DockerClient, str]:
@@ -215,6 +258,7 @@ class GenDataCommand(Command):
             f"tools/gen_data.py {CONTAINER_DATA_DIR} "
             f"--num-replicas {len(self.config.replicas)} "
             f"--num-partitions {self.config.num_partitions} "
+            f"--partition-bytes {self.config.partition_key_num_bytes} "
             f"--partition {args.partition} "
             f"--size {args.size} "
             f"--size-unit {args.size_unit} "
@@ -230,7 +274,7 @@ class GenDataCommand(Command):
                 shell_cmd
             )
             c = client.containers.create(
-                SLOG_IMG,
+                args.image,
                 name=self.NAME,
                 command=shell_cmd,
                 # Mount a directory on the host into the container
@@ -246,6 +290,15 @@ class StartCommand(Command):
 
     NAME = "start"
     HELP = "Start an SLOG cluster"
+
+    def create_subparser(self, subparsers):
+        parser = super().create_subparser(subparsers)
+        parser.add_argument(
+            "-e",
+            nargs="*",
+            help="Environment variables to pass to the container. For example, "
+                 "use -e GLOG_v=1 to turn on verbose logging at level 1."
+        )
         
     def do_command(self, args):
         # Prepare a command to update the config file
@@ -253,6 +306,13 @@ class StartCommand(Command):
         sync_config_cmd = (
             f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
         )
+
+        # Clean up everything first so that the old running session does not
+        # mess up with broker synchronization of the new session
+        for rep, clients in enumerate(self.rep_to_clients):
+            for part, (client, addr) in enumerate(clients):
+                cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
+
         for rep, clients in enumerate(self.rep_to_clients):
             for part, (client, addr) in enumerate(clients):
                 if client is None:
@@ -267,9 +327,8 @@ class StartCommand(Command):
                     f"--partition {part} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
-                cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
                 client.containers.run(
-                    SLOG_IMG,
+                    args.image,
                     name=SLOG_CONTAINER_NAME,
                     command=[
                         "/bin/sh", "-c",
@@ -282,6 +341,7 @@ class StartCommand(Command):
                     network_mode="host",
                     # Avoid hanging this tool after starting the server
                     detach=True,
+                    environment=parse_envs(args.e),
                 )
                 LOG.info(
                     "%s: Synced config and ran command: %s",
@@ -371,7 +431,7 @@ class LogsCommand(Command):
                     args.a.encode() in rep.addresses
                     for rep in self.config.replicas
                 )
-                if all(addr_is_in_replica):
+                if any(addr_is_in_replica):
                     self.addr = args.a
                 else:
                     LOG.error(
@@ -382,10 +442,14 @@ class LogsCommand(Command):
                 r, p = args.rp
                 self.addr = self.config.replicas[r].addresses[p].decode()
 
-            self.client = self.new_client(self.addr)
+            self.client = self.new_client(args.user, self.addr)
             LOG.info("Connected to %s", self.addr)
-        except Exception as e:
-            LOG.error(str(e))
+        except PasswordRequiredException as e:
+            LOG.error(
+                "Failed to authenticate when trying to connect to %s. "
+                "Check username or key files",
+                f"{args.user}@{self.addr}",
+            )
 
     def pull_slog_image(self, args):
         """
@@ -446,6 +510,12 @@ class LocalCommand(Command):
             action="store_true",
             help="Get status of the local cluster",
         )
+        parser.add_argument(
+            "-e",
+            nargs="*",
+            help="Environment variables to pass to the container. For example, "
+                 "use -e GLOG_v=1 to turn on verbose logging at level 1."
+        )
 
     def load_config(self, args):
         super().load_config(args)
@@ -467,10 +537,14 @@ class LocalCommand(Command):
         """
         Override this method because we only pull image for one client
         """
-        if self.client is None:
+        if self.client is None or args.no_pull:
+            LOG.info(
+                "Skipped image pulling. Using the local version of \"%s\"", 
+                args.image,
+            )
             return
-        LOG.info("Pulling latest docker image \"%s\"...", SLOG_IMG)
-        self.client.images.pull(SLOG_IMG)
+        LOG.info("Pulling latest docker image \"%s\"...", args.image)
+        self.client.images.pull(args.image)
 
     def do_command(self, args):
         if self.client is None:
@@ -514,6 +588,14 @@ class LocalCommand(Command):
         sync_config_cmd = (
             f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
         )
+
+        # Clean up everything first so that the old running session does not
+        # mess up with broker synchronization of the new session
+        for r, rep in enumerate(self.config.replicas):
+            for p, _ in enumerate(rep.addresses):
+                container_name = f"slog_{r}_{p}"
+                cleanup_container(self.client, container_name)
+
         for r, rep in enumerate(self.config.replicas):
             for p, addr_b in enumerate(rep.addresses):
                 addr = addr_b.decode()
@@ -526,11 +608,9 @@ class LocalCommand(Command):
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
                 container_name = f"slog_{r}_{p}"
-                # Clean up old container with the same name
-                cleanup_container(self.client, container_name)
                 # Create and run the container
                 container = self.client.containers.create(
-                    SLOG_IMG,
+                    args.image,
                     name=container_name,
                     command=[
                         "/bin/sh", "-c",
@@ -538,6 +618,7 @@ class LocalCommand(Command):
                         shell_cmd,
                     ],
                     mounts=[SLOG_DATA_MOUNT],
+                    environment=parse_envs(args.e)
                 )
 
                 # Connect the container to the custom network.
