@@ -130,7 +130,7 @@ void Scheduler::ProcessForwardBatch(
  
       switch (batch->transaction_type()) {
         case TransactionType::SINGLE_HOME: {
-          VLOG(1) << "Received data for single-home batch " << batch->id()
+          VLOG(2) << "Received data for single-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
           // If this batch comes from the local region, put it into the local interleaver
@@ -145,7 +145,7 @@ void Scheduler::ProcessForwardBatch(
           break;
         }
         case TransactionType::MULTI_HOME: {
-          VLOG(1) << "Received data for multi-home batch " << batch->id()
+          VLOG(2) << "Received data for multi-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
           // Multi-home txns are already ordered with respect to each other
@@ -167,7 +167,7 @@ void Scheduler::ProcessForwardBatch(
     case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
 
-      VLOG(1) << "Received order for batch " << batch_order.batch_id()
+      VLOG(2) << "Received order for batch " << batch_order.batch_id()
               << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
 
       all_logs_[from_replica].AddSlot(
@@ -182,7 +182,7 @@ void Scheduler::ProcessForwardBatch(
 
 void Scheduler::ProcessLocalQueueOrder(
     const internal::LocalQueueOrder& order) {
-  VLOG(1) << "Received local queue order. Slot id: "
+  VLOG(2) << "Received local queue order. Slot id: "
           << order.slot() << ". Queue id: " << order.queue_id(); 
   local_interleaver_.AddSlot(order.slot(), order.queue_id());
 }
@@ -311,7 +311,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
 }
 
 void Scheduler::EnqueueTransaction(TxnId txn_id) {
-  VLOG(1) << "Enqueued txn " << txn_id;
+  VLOG(2) << "Enqueued txn " << txn_id;
   ready_txns_.push(txn_id);
   TryDispatchingNextTransaction();
 }
@@ -323,7 +323,7 @@ void Scheduler::TryDispatchingNextTransaction() {
   // Pop next ready txn in queue
   auto txn_id = ready_txns_.front();
   ready_txns_.pop();
-  VLOG(1) << "Dispatched txn " << txn_id;
+  VLOG(2) << "Dispatched txn " << txn_id;
 
   auto& holder = all_txns_.at(txn_id);
 
@@ -344,6 +344,9 @@ void Scheduler::TryDispatchingNextTransaction() {
   for (auto& remote_read : holder.early_remote_reads) {
     SendToWorker(std::move(remote_read), holder.worker);
   }
+  VLOG_EVERY_N(1, 10) << std::endl 
+      << "Number of ready txns: " << ready_txns_.size() << std::endl
+      << "Number of all txns: " << all_txns_.size();
 }
 
 void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {

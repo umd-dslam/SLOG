@@ -8,7 +8,7 @@
 #include "workload/basic_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
-DEFINE_uint32(replica, 0, "Replica number of the local machine");
+DEFINE_uint32(replica, 0, "The region where the current machine is located");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
 DEFINE_uint32(
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
     } else {
       auto txn = workload->NextTransaction();
       if (FLAGS_print_txn) {
-        LOG(INFO) << txn;
+        LOG(INFO) << txn << "\nTxn counter: " << txn_counter;
       }
       if (!FLAGS_dry_run) {
         api::Request req;

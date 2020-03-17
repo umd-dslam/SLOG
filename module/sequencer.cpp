@@ -57,7 +57,7 @@ void Sequencer::HandlePeriodicWakeUp() {
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(1) << "Finished batch " << batch_id
+  VLOG(2) << "Finished batch " << batch_id
           << ". Sending out for ordering and replicating";
 
   Request req;

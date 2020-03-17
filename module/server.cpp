@@ -156,8 +156,8 @@ void Server::ProcessForwardSubtxn(
     string&& from_machine_id) {
   auto txn_id = forward_sub_txn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
-    LOG(ERROR) << "Got sub-txn from [" << from_machine_id 
-               << "] but there is no pending response for transaction " << txn_id;
+    VLOG(3) << "Got sub-txn from [" << from_machine_id 
+            << "] but there is no pending response for transaction " << txn_id;
     return;
   }
   auto& pr = pending_responses_.at(txn_id);

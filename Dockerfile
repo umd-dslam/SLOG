@@ -23,15 +23,20 @@ FROM ubuntu:bionic AS builder
         && cd ..
 
 FROM ubuntu:bionic AS runner
+    # If set (to anything), only create an image with only slog
+    ARG SLOG_ONLY
+
     WORKDIR /opt/slog
     COPY --from=builder /src/build/slog .
     COPY --from=builder /src/slog.conf .
     COPY --from=builder /src/tools/ tools/
 
-    RUN apt-get update
-    RUN apt-get -y install python3 python3-pip
-    RUN python3 -m pip install -r tools/requirements.txt
-    RUN chmod +x tools/*.py
+    RUN if [ -z "$SLOG_ONLY" ]; then \
+        apt-get update; \
+        apt-get -y install python3 python3-pip; \
+        python3 -m pip install -r tools/requirements.txt; \
+        chmod +x tools/*.py; \
+        fi
 
     ENV PATH="/opt/slog:${PATH}"
     ENV PATH="/opt/slog/tools:${PATH}"
