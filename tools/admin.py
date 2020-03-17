@@ -12,6 +12,7 @@ import os
 import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
+from threading import Thread
 from typing import Dict, List, Tuple
 
 from docker.models.containers import Container
@@ -190,15 +191,20 @@ class Command:
             "Pulling SLOG image for each node. "
             "This might take a while."
         )
-        # TODO(ctring): Use multiprocessing to parallelize
-        #               image pulling across machines.
+
+        threads = []
         for client, addr in self.clients():
             LOG.info(
                 "%s: Pulling latest docker image \"%s\"...",
                 addr,
                 args.image,
             )
-            client.images.pull(args.image)
+            th = Thread(target=client.images.pull, args=(args.image,))
+            th.start()
+            threads.append(th)
+
+        for th in threads:
+            th.join()
 
     def do_command(self, args):
         raise NotImplementedError
