@@ -33,7 +33,7 @@ Scheduler::Scheduler(
       0 /* revent */});
 
   for (size_t i = 0; i < config->GetNumWorkers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(*this, context, storage));
+    workers_.push_back(MakeRunnerFor<Worker>(config, context, storage));
   }
 }
 
@@ -240,7 +240,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
           case TransactionType::SINGLE_HOME: {
             auto txn_id = txn->internal().id();
             auto& holder = all_txns_[txn_id];
-            holder.txn.reset(txn);
+            holder.txn = txn;
             if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
               EnqueueTransaction(txn_id); 
             }
@@ -249,7 +249,7 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
           case TransactionType::MULTI_HOME: {
             auto txn_id = txn->internal().id();
             auto& holder = all_txns_[txn_id];
-            holder.txn.reset(txn);
+            holder.txn = txn;
             if (lock_manager_.RegisterTxn(*holder.txn)) {
               EnqueueTransaction(txn_id); 
             }
@@ -280,7 +280,7 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   }
   // This txn is done so remove it from the txn list
   auto txn_id = res.process_txn().txn_id();
-  auto txn = all_txns_.at(txn_id).txn.release();
+  auto txn = all_txns_[txn_id].txn;
   all_txns_.erase(txn_id);
 
   // Release locks held by this txn. Dispatch the txns that
@@ -325,7 +325,7 @@ void Scheduler::TryDispatchingNextTransaction() {
   ready_txns_.pop();
   VLOG(2) << "Dispatched txn " << txn_id;
 
-  auto& holder = all_txns_.at(txn_id);
+  auto& holder = all_txns_[txn_id];
 
   // Pop next ready worker in queue
   holder.worker = ready_workers_.front();
@@ -334,7 +334,7 @@ void Scheduler::TryDispatchingNextTransaction() {
   // Prepare a request with the txn to be sent to the worker
   Request req;
   auto process_txn = req.mutable_process_txn();
-  process_txn->set_txn_id(txn_id);
+  process_txn->set_txn_ptr(reinterpret_cast<uint64_t>(holder.txn));
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction

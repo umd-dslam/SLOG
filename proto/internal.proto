@@ -107,7 +107,7 @@ message LocalQueueOrder {
 }
 
 message ProcessTransactionRequest {
-    uint32 txn_id = 1;
+    uint64 txn_ptr = 1;
 }
 
 message RemoteReadResult {

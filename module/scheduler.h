@@ -25,7 +25,7 @@ using std::vector;
 namespace slog {
 
 struct TransactionHolder {
-  unique_ptr<Transaction> txn;
+  Transaction* txn;
   string worker;
   vector<internal::Request> early_remote_reads;
 };
