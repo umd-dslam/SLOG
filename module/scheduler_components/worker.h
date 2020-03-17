@@ -4,6 +4,7 @@
 
 #include <zmq.hpp>
 
+#include "common/configuration.h"
 #include "common/types.h"
 #include "module/base/module.h"
 #include "module/scheduler_components/commands.h"
@@ -17,13 +18,11 @@ using std::unordered_set;
 
 namespace slog {
 
-class Scheduler;
-
 struct TransactionState {
 
-  TransactionState(TxnId txn_id) : txn_id(txn_id) {}
+  TransactionState(Transaction* txn) : txn(txn) {}
 
-  TxnId txn_id;
+  Transaction* txn;
   unordered_set<uint32_t> awaited_passive_participants;
   unordered_set<uint32_t> active_participants;
   unordered_set<uint32_t> participants;
@@ -32,7 +31,7 @@ struct TransactionState {
 class Worker : public Module {
 public:
   Worker(
-      Scheduler& scheduler,
+      ConfigurationPtr config,
       zmq::context_t& context,
       shared_ptr<Storage<Key, Record>> storage);
   void SetUp() final;
@@ -47,7 +46,7 @@ private:
       const google::protobuf::Message& req_or_res,
       string&& forward_to_machine = "");
 
-  Scheduler& scheduler_;
+  ConfigurationPtr config_;
   zmq::socket_t scheduler_socket_;
   shared_ptr<Storage<Key, Record>> storage_;
   unique_ptr<Commands> commands_;
