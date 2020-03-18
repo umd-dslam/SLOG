@@ -89,7 +89,10 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest commit) {
 void Leader::HandleResponse(
     const Response& res,
     const string& from_machine_id) {
-  for (auto& tracker : quorum_trackers_) {
+  // Iterate using indices instead of iterator because we may add new trackers to
+  // this list, which would validate the iterator.
+  for (size_t i = 0; i < quorum_trackers_.size(); i++) {
+    auto& tracker = quorum_trackers_[i];
     bool state_changed = tracker->HandleResponse(res, from_machine_id);
     if (state_changed) {
       const auto raw_tracker = tracker.get();
@@ -128,10 +131,8 @@ void Leader::StartNewAcceptance(uint32_t value) {
 }
 
 void Leader::AcceptanceStateChanged(AcceptanceTracker* acceptance) {
-  // The check for member size is an optimization. Without this check, we'll send commit
-  // messages twice: once when quorum is reached and once when all acceptance messages are
-  // received. When member size <= 2, the state COMPLETE would overshadow QUORUM_REACHED,
-  // so we only need to check for COMPLETE in this case. Otherwise, QUORUM_REACHED is enough.
+  // When member size is <= 2, a tracker will reach the COMPLETE state, bypassing
+  // the QUORUM_REACHED state, so we have a separate check for such special case.
   if (acceptance->GetState() == QuorumState::QUORUM_REACHED
       || (members_.size() <= 2 && acceptance->GetState() == QuorumState::COMPLETE)) {
     auto slot = acceptance->slot;

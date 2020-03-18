@@ -106,20 +106,32 @@ Transaction MakeTransaction(
 
 TransactionType SetTransactionType(Transaction& txn) {
   auto txn_internal = txn.mutable_internal();
-  auto& txn_master_metadata = txn_internal->master_metadata();
-  auto total_num_keys = static_cast<size_t>(
-      txn.read_set_size() + txn.write_set_size());
+  auto& master_metadata = txn_internal->master_metadata();
 
-  if (txn_master_metadata.size() != total_num_keys) {
+  bool all_master_metadata_received = true;
+  for (auto& pair : txn.read_set()) {
+    if (!master_metadata.contains(pair.first)) {
+      all_master_metadata_received = false;
+      break;
+    }
+  }
+  for (auto& pair : txn.write_set()) {
+    if (!master_metadata.contains(pair.first)) {
+      all_master_metadata_received = false;
+      break;
+    }
+  }
+
+  if (!all_master_metadata_received) {
     txn_internal->set_type(TransactionType::UNKNOWN);
     return txn_internal->type();
   }
 
   bool is_single_home = true;
-  // Get master of the first key. If this is a single-home txn, it should
-  // be the same for all keys
-  const auto& home_replica = txn_master_metadata.begin()->second.master();
-  for (const auto& pair : txn_master_metadata) {
+  // If this is a single-home txn, home of all other keys must
+  // be the same as that of the first key
+  const auto& home_replica = master_metadata.begin()->second.master();
+  for (const auto& pair : master_metadata) {
     if (pair.second.master() != home_replica) {
       is_single_home = false;
       break;
