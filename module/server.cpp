@@ -97,7 +97,10 @@ void Server::HandleAPIRequest(MMessage&& msg) {
             config_->GetLocalMachineIdAsProto());
 
     CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
+    // The message object is holding the address of the requesting client so we keep it
+    // for later use.
     pending_responses_[txn_id].response = msg;
+    pending_responses_[txn_id].stream_id = request.stream_id();
 
     internal::Request forward_request;
     forward_request.mutable_forward_txn()->set_allocated_txn(txn);

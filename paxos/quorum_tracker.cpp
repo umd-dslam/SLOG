@@ -25,6 +25,8 @@ bool QuorumTracker::HandleResponse(
     state_ = QuorumState::COMPLETE;
     return true;
   }
+  // Check whether the current state is already QUORUM_REACHED so that
+  // we only report state change once
   if (sz > num_members_ / 2 && state_ != QuorumState::QUORUM_REACHED) {
     state_ = QuorumState::QUORUM_REACHED;
     return true;

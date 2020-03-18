@@ -85,7 +85,6 @@ void Forwarder::HandleInternalResponse(
   const auto& lookup_master = res.lookup_master();
   auto txn_id = lookup_master.txn_id();
   if (pending_transaction_.count(txn_id) == 0) {
-    LOG(ERROR) << "Transaction " << txn_id << " is not waiting for master info";
     return;
   }
 
@@ -129,6 +128,7 @@ void Forwarder::Forward(Transaction* txn) {
     // Otherwise, forward to the sequencer of a random machine in its home region
     auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->GetLocalReplica()) {
+      VLOG(2) << "Current region is home of txn " << txn_id;
       SendSameMachine(forward_txn, SEQUENCER_CHANNEL);
     } else {
       auto partition = RandomPartition(re_);
@@ -146,6 +146,8 @@ void Forwarder::Forward(Transaction* txn) {
     auto destination = MakeMachineIdAsString(
         config_->GetLocalReplica(),
         config_->GetLeaderPartitionForMultiHomeOrdering());
+
+    VLOG(2) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
     Send(
         forward_txn,
