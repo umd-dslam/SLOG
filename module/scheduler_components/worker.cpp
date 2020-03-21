@@ -54,7 +54,10 @@ void Worker::Loop() {
         // Immediately execute and commit this transaction if this
         // machine is a passive participant or if it is an active
         // one but does not have to wait for other partitions
+        VLOG(3) << "Execute txn " << txn->internal().id() << " after preparing";
         ExecuteAndCommitTransaction();
+      } else {
+        VLOG(3) << "Awaiting remote read result for txn " << txn->internal().id();
       }
       break;
     }
@@ -67,7 +70,10 @@ void Worker::Loop() {
       if (ApplyRemoteReadResult(remote_read_result)) {
         // Execute and commit this transaction when all remote reads
         // are received
+        VLOG(3) << "Execute txn " << remote_read_result.txn_id() << " after receving remote read result";
         ExecuteAndCommitTransaction();
+      } else {
+        VLOG(3) << "Awaiting remote read result for txn " << txn_state_->txn->internal().id();
       }
       break;
     }
@@ -105,7 +111,7 @@ bool Worker::PrepareTransaction() {
     }
     txn_state_->participants.insert(partition);
   }
-  // Remove all keys that are to be read in a remote partition
+  // Remove all keys that are to be read by a remote partition
   for (const auto& key : remote_read_keys) {
     txn->mutable_read_set()->erase(key);
   }
@@ -127,7 +133,7 @@ bool Worker::PrepareTransaction() {
     }
     txn_state_->participants.insert(partition);
   }
-  // Remove all keys that are to be written in a remote partition
+  // Remove all keys that are to be written by a remote partition
   for (const auto& key : remote_write_keys) {
     txn->mutable_write_set()->erase(key);
   }

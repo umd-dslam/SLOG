@@ -199,8 +199,11 @@ void Scheduler::ProcessRemoteReadResult(
     internal::Request&& req) {
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
-  if (holder.txn != nullptr) {
-    VLOG(2) << "Got remote read result";
+  // A transaction might have a holder but not run yet if there is not
+  // enough worker. In that case, a remote read is still considered an
+  // early remote read.
+  if (holder.txn != nullptr && !holder.worker.empty()) {
+    VLOG(2) << "Got remote read result for txn " << txn_id;
     SendToWorker(std::move(req), holder.worker);
   } else {
     // Save the remote reads that come before the txn
@@ -209,7 +212,7 @@ void Scheduler::ProcessRemoteReadResult(
     // TODO: If this request is not needed but still arrives AFTER the transaction 
     // is already commited, it will be stuck in early_remote_reads forever.
     // Consider garbage collecting them if needed
-    VLOG(2) << "Got early remote read result";
+    VLOG(2) << "Got early remote read result for txn " << txn_id;
     holder.early_remote_reads.push_back(std::move(req));
   }
 }
@@ -227,11 +230,11 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   auto txn = all_txns_[txn_id].txn;
   all_txns_.erase(txn_id);
 
-  // Release locks held by this txn. Dispatch the txns that
+  // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto ready_txns = lock_manager_.ReleaseLocks(*txn);
-  for (auto ready_txn_id : ready_txns) {
-    EnqueueTransaction(ready_txn_id);
+  auto unlocked_txns = lock_manager_.ReleaseLocks(*txn);
+  for (auto unlocked_txn : unlocked_txns) {
+    EnqueueTransaction(unlocked_txn);
   }
 
   // Send the txn back to the coordinating server if need to
@@ -291,6 +294,8 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
         switch (txn_type) {
           case TransactionType::SINGLE_HOME: {
             auto txn_id = txn->internal().id();
+            // TODO: remove txn holder if the txn does not touch anything
+            // in the current partition
             auto& holder = all_txns_[txn_id];
             holder.txn = txn;
             if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
@@ -300,6 +305,8 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
           }
           case TransactionType::MULTI_HOME: {
             auto txn_id = txn->internal().id();
+            // TODO: remove txn holder if the txn does not touch anything
+            // in the current partition
             auto& holder = all_txns_[txn_id];
             holder.txn = txn;
             if (lock_manager_.RegisterTxn(*holder.txn)) {

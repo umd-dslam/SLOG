@@ -26,7 +26,7 @@ namespace slog {
 
 struct TransactionHolder {
   Transaction* txn;
-  string worker;
+  string worker = "";
   vector<internal::Request> early_remote_reads;
 };
 
