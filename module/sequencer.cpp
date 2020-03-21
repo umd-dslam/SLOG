@@ -113,7 +113,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_txn->mutable_write_set()->insert(key_value);
       }
     }
-
+    // TODO: Ignore lock only txns with no key
     PutSingleHomeTransactionIntoBatch(lock_only_txn);
   }
 
