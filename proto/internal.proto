@@ -42,7 +42,7 @@ message Request {
         LocalQueueOrder local_queue_order = 10;
         ProcessTransactionRequest process_txn = 11;
         RemoteReadResult remote_read_result = 12;
-        ForwardSubtransaction forward_sub_txn = 13;
+        CompletedSubtransaction completed_subtxn = 13;
     }
 }
 
@@ -116,7 +116,7 @@ message RemoteReadResult {
     map<string, string> reads = 3;
 }
 
-message ForwardSubtransaction {
+message CompletedSubtransaction {
     Transaction txn = 1;
     uint32 partition = 2;
     repeated uint32 involved_partitions = 3;

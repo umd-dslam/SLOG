@@ -12,6 +12,7 @@
 #include "connection/broker.h"
 #include "module/base/module.h"
 #include "storage/lookup_master_index.h"
+#include "proto/api.pb.h"
 
 using std::shared_ptr;
 using std::unordered_map;
@@ -20,6 +21,10 @@ namespace slog {
 
 struct PendingResponse {
   MMessage response;
+  uint32_t stream_id;
+};
+
+struct CompletedTransaction {
   Transaction* txn;
   std::unordered_set<uint32_t> awaited_partitions;
   bool initialized;
@@ -72,11 +77,9 @@ private:
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void ProcessForwardSubtxn(
-      internal::ForwardSubtransaction* forward_sub_txn,
-      string&& from_machine_id);
+  void ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn);
 
-  void SendAPIResponse(TxnId txn_id);
+  void SendAPIResponse(TxnId txn_id, api::Response&& res);
 
   TxnId NextTxnId();
 
@@ -89,6 +92,7 @@ private:
   uint32_t server_id_;
   TxnId txn_id_counter_;
   unordered_map<TxnId, PendingResponse> pending_responses_;
+  unordered_map<TxnId, CompletedTransaction> completed_txns_;
 };
 
 } // namespace slog

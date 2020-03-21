@@ -80,10 +80,10 @@ protected:
       output_[receiver]->Receive(msg);
       internal::Request req;
       CHECK(msg.GetProto(req));
-      CHECK_EQ(req.type_case(), internal::Request::kForwardSubTxn);
-      auto forward_sub_txn = req.forward_sub_txn();
-      CHECK_EQ((uint32_t)forward_sub_txn.involved_partitions_size(), num_partitions);
-      auto sub_txn = forward_sub_txn.txn();
+      CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);
+      auto completed_subtxn = req.completed_subtxn();
+      CHECK_EQ((uint32_t)completed_subtxn.involved_partitions_size(), num_partitions);
+      auto sub_txn = completed_subtxn.txn();
 
       if (first_time) {
         txn = sub_txn;

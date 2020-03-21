@@ -300,11 +300,11 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
     auto coordinating_server = MakeMachineIdAsString(
           txn->internal().coordinating_server());
     Request req;
-    auto forward_sub_txn = req.mutable_forward_sub_txn();
-    forward_sub_txn->set_allocated_txn(txn);
-    forward_sub_txn->set_partition(config_->GetLocalPartition());
+    auto completed_sub_txn = req.mutable_completed_subtxn();
+    completed_sub_txn->set_allocated_txn(txn);
+    completed_sub_txn->set_partition(config_->GetLocalPartition());
     for (auto p : participants) {
-      forward_sub_txn->add_involved_partitions(p);
+      completed_sub_txn->add_involved_partitions(p);
     }
     Send(req, coordinating_server, SERVER_CHANNEL);
   }

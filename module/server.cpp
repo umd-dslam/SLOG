@@ -2,7 +2,6 @@
 
 #include "common/constants.h"
 #include "common/proto_utils.h"
-#include "proto/api.pb.h"
 #include "proto/internal.pb.h"
 
 using std::move;
@@ -28,6 +27,10 @@ Server::Server(
       0 /* revent */});
 }
 
+/***********************************************
+                SetUp and Loop
+***********************************************/
+
 void Server::SetUp() {
   string endpoint = 
       "tcp://*:" + std::to_string(config_->GetServerPort());
@@ -42,8 +45,10 @@ void Server::Loop() {
   if (HasMessageFromChannel()) {
     MMessage msg;
     ReceiveFromChannel(msg);
-    internal::Request req;
-    if (msg.GetProto(req)) {
+
+    if (msg.IsProto<internal::Request>()) {
+      internal::Request req;
+      msg.GetProto(req);
       auto from_machine_id = msg.GetIdentity();
       string from_channel;
       msg.GetString(from_channel, MM_FROM_CHANNEL);
@@ -69,6 +74,10 @@ bool Server::HasMessageFromChannel() const {
 bool Server::HasMessageFromClient() const {
   return poll_items_[1].revents & ZMQ_POLLIN;
 }
+
+/***********************************************
+                  API Requests
+***********************************************/
 
 void Server::HandleAPIRequest(MMessage&& msg) {
   api::Request request;
@@ -96,6 +105,10 @@ void Server::HandleAPIRequest(MMessage&& msg) {
   }
 }
 
+/***********************************************
+              Internal Requests
+***********************************************/
+
 void Server::HandleInternalRequest(
     internal::Request&& req,
     string&& from_machine_id,
@@ -107,10 +120,8 @@ void Server::HandleInternalRequest(
           move(from_machine_id),
           move(from_channel));
       break;
-    case internal::Request::kForwardSubTxn:
-      ProcessForwardSubtxn(
-          req.mutable_forward_sub_txn(),
-          move(from_machine_id));
+    case internal::Request::kCompletedSubtxn:
+      ProcessCompletedSubtxn(req.mutable_completed_subtxn());
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
@@ -151,54 +162,55 @@ void Server::ProcessLookUpMasterRequest(
   Send(response, from_machine_id, from_channel);
 }
 
-void Server::ProcessForwardSubtxn(
-    internal::ForwardSubtransaction* forward_sub_txn,
-    string&& from_machine_id) {
-  auto txn_id = forward_sub_txn->txn().internal().id();
+void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {
+  auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
-    VLOG(3) << "Got sub-txn from [" << from_machine_id 
-            << "] but there is no pending response for transaction " << txn_id;
     return;
   }
-  auto& pr = pending_responses_.at(txn_id);
-  auto sub_txn_origin = forward_sub_txn->partition();
+  auto& finished_txn = completed_txns_[txn_id];
+  auto sub_txn_origin = completed_subtxn->partition();
   // If this is the first sub-transaction, initialize the
-  // pending response with this sub-transaction as the starting
+  // finished transaction with this sub-transaction as the starting
   // point and populate the list of partitions that we are still
   // waiting for sub-transactions from. Otherwise, remove the
   // partition of this sub-transaction from the awaiting list and
   // merge the sub-txn to the current txn.
-  if (!pr.initialized) {
-    pr.txn = forward_sub_txn->release_txn();
-    pr.awaited_partitions.clear();
-    for (auto p :forward_sub_txn->involved_partitions()) {
+  if (!finished_txn.initialized) {
+    finished_txn.txn = completed_subtxn->release_txn();
+    finished_txn.awaited_partitions.clear();
+    for (auto p : completed_subtxn->involved_partitions()) {
       if (p != sub_txn_origin) {
-        pr.awaited_partitions.insert(p);
+        finished_txn.awaited_partitions.insert(p);
       }
     }
-    pr.initialized = true;
-  } else if (pr.awaited_partitions.erase(sub_txn_origin)) {
-    MergeTransaction(*pr.txn, forward_sub_txn->txn());
+    finished_txn.initialized = true;
+  } else if (finished_txn.awaited_partitions.erase(sub_txn_origin)) {
+    MergeTransaction(*finished_txn.txn, completed_subtxn->txn());
   }
 
   // If all sub-txns are received, response back to the client and
   // clean up all tracking data for this txn.
-  if (pr.awaited_partitions.empty()) {
-    SendAPIResponse(txn_id);
+  if (finished_txn.awaited_partitions.empty()) {
+    api::Response response;
+    auto txn_response = response.mutable_txn();
+    txn_response->set_allocated_txn(finished_txn.txn);
+    SendAPIResponse(txn_id, std::move(response));
+
+    completed_txns_.erase(txn_id);
   }
 }
 
-void Server::SendAPIResponse(TxnId txn_id) {
-  auto& pr = pending_responses_.at(txn_id);
-  api::Response response;
-  auto txn_response = response.mutable_txn();
-  txn_response->set_allocated_txn(pr.txn);
-  pr.response.Set(MM_PROTO, response);
-  pr.response.SendTo(client_socket_);
+/***********************************************
+                    Helpers
+***********************************************/
 
+void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
+  auto& pr = pending_responses_.at(txn_id);
+  res.set_stream_id(pr.stream_id);
+  pr.response.Set(MM_PROTO, res);
+  pr.response.SendTo(client_socket_);
   pending_responses_.erase(txn_id);
 }
-
 
 TxnId Server::NextTxnId() {
   txn_id_counter_++;
