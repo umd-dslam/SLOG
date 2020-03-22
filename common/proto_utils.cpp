@@ -130,6 +130,7 @@ TransactionType SetTransactionType(Transaction& txn) {
   bool is_single_home = true;
   // If this is a single-home txn, home of all other keys must
   // be the same as that of the first key
+  // TODO: check and report empty transaction
   const auto& home_replica = master_metadata.begin()->second.master();
   for (const auto& pair : master_metadata) {
     if (pair.second.master() != home_replica) {
