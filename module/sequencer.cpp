@@ -57,12 +57,12 @@ void Sequencer::HandlePeriodicWakeUp() {
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(2) << "Finished batch " << batch_id
+  VLOG(3) << "Finished batch " << batch_id
           << ". Sending out for ordering and replicating";
 
   Request req;
   auto forward_batch = req.mutable_forward_batch();
-  // minus 1 so that it starts from 0
+  // minus 1 so that batch id counter starts from 0
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
   forward_batch->set_allocated_batch_data(batch_.release());
 

@@ -68,11 +68,11 @@ private:
   void ProcessRemoteReadResult(
       internal::Request&& request);
 
-  void TryUpdatingLocalLog();
-  void TryProcessingNextBatchesFromGlobalLog();
+  void MaybeUpdateLocalLog();
+  void MaybeProcessNextBatchesFromGlobalLog();
 
   void EnqueueTransaction(TxnId txn_id);
-  void TryDispatchingNextTransaction();
+  void MaybeDispatchNextTransaction();
 
   void SendToWorker(internal::Request&& req, const string& worker);
 

@@ -37,6 +37,10 @@ Scheduler::Scheduler(
   }
 }
 
+/***********************************************
+                SetUp and Loop
+***********************************************/
+
 void Scheduler::SetUp() {
   worker_socket_.bind(WORKERS_ENDPOINT);
   for (auto& worker : workers_) {
@@ -53,7 +57,7 @@ void Scheduler::Loop() {
     Request req;
     if (msg.GetProto(req)) {
       HandleInternalRequest(std::move(req), msg.GetIdentity());
-    } 
+    }
   }
 
   if (HasMessageFromWorker()) {
@@ -80,7 +84,7 @@ void Scheduler::Loop() {
       HandleResponseFromWorker(std::move(res));
       // Since we now have a free worker, try dispatching a ready
       // txn if one is in queue.
-      TryDispatchingNextTransaction();
+      MaybeDispatchNextTransaction();
     }
   }
 }
@@ -92,6 +96,10 @@ bool Scheduler::HasMessageFromChannel() const {
 bool Scheduler::HasMessageFromWorker() const {
   return poll_items_[1].revents & ZMQ_POLLIN;
 }
+
+/***********************************************
+              Internal Requests
+***********************************************/
 
 void Scheduler::HandleInternalRequest(
     Request&& req,
@@ -112,8 +120,8 @@ void Scheduler::HandleInternalRequest(
                  << CASE_NAME(req.type_case(), Request) << "\"";
       break;
   }
-  TryUpdatingLocalLog();
-  TryProcessingNextBatchesFromGlobalLog();
+  MaybeUpdateLocalLog();
+  MaybeProcessNextBatchesFromGlobalLog();
 }
 
 void Scheduler::ProcessForwardBatch(
@@ -130,7 +138,7 @@ void Scheduler::ProcessForwardBatch(
  
       switch (batch->transaction_type()) {
         case TransactionType::SINGLE_HOME: {
-          VLOG(2) << "Received data for single-home batch " << batch->id()
+          VLOG(1) << "Received data for single-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
           // If this batch comes from the local region, put it into the local interleaver
@@ -145,7 +153,7 @@ void Scheduler::ProcessForwardBatch(
           break;
         }
         case TransactionType::MULTI_HOME: {
-          VLOG(2) << "Received data for multi-home batch " << batch->id()
+          VLOG(1) << "Received data for multi-home batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
           // Multi-home txns are already ordered with respect to each other
@@ -167,7 +175,7 @@ void Scheduler::ProcessForwardBatch(
     case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
 
-      VLOG(2) << "Received order for batch " << batch_order.batch_id()
+      VLOG(1) << "Received order for batch " << batch_order.batch_id()
               << " from [" << from_machine_id << "]. Slot: " << batch_order.slot();
 
       all_logs_[from_replica].AddSlot(
@@ -182,7 +190,7 @@ void Scheduler::ProcessForwardBatch(
 
 void Scheduler::ProcessLocalQueueOrder(
     const internal::LocalQueueOrder& order) {
-  VLOG(2) << "Received local queue order. Slot id: "
+  VLOG(1) << "Received local queue order. Slot id: "
           << order.slot() << ". Queue id: " << order.queue_id(); 
   local_interleaver_.AddSlot(order.slot(), order.queue_id());
 }
@@ -192,7 +200,7 @@ void Scheduler::ProcessRemoteReadResult(
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
   if (holder.txn != nullptr) {
-    VLOG(1) << "Got remote read result";
+    VLOG(2) << "Got remote read result";
     SendToWorker(std::move(req), holder.worker);
   } else {
     // Save the remote reads that come before the txn
@@ -201,12 +209,56 @@ void Scheduler::ProcessRemoteReadResult(
     // TODO: If this request is not needed but still arrives AFTER the transaction 
     // is already commited, it will be stuck in early_remote_reads forever.
     // Consider garbage collecting them if needed
-    VLOG(1) << "Got early remote read result";
+    VLOG(2) << "Got early remote read result";
     holder.early_remote_reads.push_back(std::move(req));
   }
 }
 
-void Scheduler::TryUpdatingLocalLog() {
+/***********************************************
+              Worker Responses
+***********************************************/
+
+void Scheduler::HandleResponseFromWorker(Response&& res) {
+  if (res.type_case() != Response::kProcessTxn) {
+    return;
+  }
+  // This txn is done so remove it from the txn list
+  auto txn_id = res.process_txn().txn_id();
+  auto txn = all_txns_[txn_id].txn;
+  all_txns_.erase(txn_id);
+
+  // Release locks held by this txn. Dispatch the txns that
+  // become ready thanks to this release.
+  auto ready_txns = lock_manager_.ReleaseLocks(*txn);
+  for (auto ready_txn_id : ready_txns) {
+    EnqueueTransaction(ready_txn_id);
+  }
+
+  // Send the txn back to the coordinating server if need to
+  auto local_partition = config_->GetLocalPartition();
+  auto& participants = res.process_txn().participants();
+  if (std::find(
+      participants.begin(),
+      participants.end(),
+      local_partition) != participants.end()) {
+    auto coordinating_server = MakeMachineIdAsString(
+          txn->internal().coordinating_server());
+    Request req;
+    auto completed_sub_txn = req.mutable_completed_subtxn();
+    completed_sub_txn->set_allocated_txn(txn);
+    completed_sub_txn->set_partition(config_->GetLocalPartition());
+    for (auto p : participants) {
+      completed_sub_txn->add_involved_partitions(p);
+    }
+    Send(req, coordinating_server, SERVER_CHANNEL);
+  }
+}
+
+/***********************************************
+                Logs Management
+***********************************************/
+
+void Scheduler::MaybeUpdateLocalLog() {
   auto local_partition = config_->GetLocalPartition();
   while (local_interleaver_.HasNextBatch()) {
     auto slot_id_and_batch_id = local_interleaver_.NextBatch();
@@ -224,7 +276,7 @@ void Scheduler::TryUpdatingLocalLog() {
   }
 }
 
-void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
+void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
   // Interleave batches from local logs of all regions and the log of multi-home txn
   for (auto& pair : all_logs_) {
     auto& local_log = pair.second;
@@ -274,49 +326,17 @@ void Scheduler::TryProcessingNextBatchesFromGlobalLog() {
   }
 }
 
-void Scheduler::HandleResponseFromWorker(Response&& res) {
-  if (res.type_case() != Response::kProcessTxn) {
-    return;
-  }
-  // This txn is done so remove it from the txn list
-  auto txn_id = res.process_txn().txn_id();
-  auto txn = all_txns_[txn_id].txn;
-  all_txns_.erase(txn_id);
-
-  // Release locks held by this txn. Dispatch the txns that
-  // become ready thanks to this release.
-  auto ready_txns = lock_manager_.ReleaseLocks(*txn);
-  for (auto ready_txn_id : ready_txns) {
-    EnqueueTransaction(ready_txn_id);
-  }
-
-  // Send the txn back to the coordinating server if need to
-  auto local_partition = config_->GetLocalPartition();
-  auto& participants = res.process_txn().participants();
-  if (std::find(
-      participants.begin(),
-      participants.end(),
-      local_partition) != participants.end()) {
-    auto coordinating_server = MakeMachineIdAsString(
-          txn->internal().coordinating_server());
-    Request req;
-    auto completed_sub_txn = req.mutable_completed_subtxn();
-    completed_sub_txn->set_allocated_txn(txn);
-    completed_sub_txn->set_partition(config_->GetLocalPartition());
-    for (auto p : participants) {
-      completed_sub_txn->add_involved_partitions(p);
-    }
-    Send(req, coordinating_server, SERVER_CHANNEL);
-  }
-}
+/***********************************************
+              Transaction Dispatch
+***********************************************/
 
 void Scheduler::EnqueueTransaction(TxnId txn_id) {
   VLOG(2) << "Enqueued txn " << txn_id;
   ready_txns_.push(txn_id);
-  TryDispatchingNextTransaction();
+  MaybeDispatchNextTransaction();
 }
 
-void Scheduler::TryDispatchingNextTransaction() {
+void Scheduler::MaybeDispatchNextTransaction() {
   if (ready_workers_.empty() || ready_txns_.empty()) {
     return;
   }
@@ -344,9 +364,6 @@ void Scheduler::TryDispatchingNextTransaction() {
   for (auto& remote_read : holder.early_remote_reads) {
     SendToWorker(std::move(remote_read), holder.worker);
   }
-  VLOG_EVERY_N(1, 10) << std::endl 
-      << "Number of ready txns: " << ready_txns_.size() << std::endl
-      << "Number of all txns: " << all_txns_.size();
 }
 
 void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {

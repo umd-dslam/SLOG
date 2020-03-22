@@ -53,7 +53,7 @@ void MultiHomeOrderer::HandlePeriodicWakeUp() {
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(2) << "Finished multi-home batch " << batch_id
+  VLOG(1) << "Finished multi-home batch " << batch_id
           << ". Sending out for ordering and replicating";
   
   Request req;
