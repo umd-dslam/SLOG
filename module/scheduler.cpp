@@ -199,8 +199,8 @@ void Scheduler::ProcessRemoteReadResult(
     internal::Request&& req) {
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
-  // A transaction might have a holder but not run yet if there is not
-  // enough worker. In that case, a remote read is still considered an
+  // A transaction might have a holder but not run yet if there are not
+  // enough workers. In that case, a remote read is still considered an
   // early remote read.
   if (holder.txn != nullptr && !holder.worker.empty()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
