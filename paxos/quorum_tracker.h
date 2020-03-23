@@ -28,7 +28,7 @@ public:
       const internal::Response& res,
       const string& from_machine_id);
     
-  QuorumState GetState();
+  QuorumState GetState() const;
  
 protected:
   virtual bool ResponseIsValid(const internal::Response& res) = 0;

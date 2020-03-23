@@ -91,7 +91,8 @@ void Leader::HandleResponse(
     const string& from_machine_id) {
   // Iterate using indices instead of iterator because we may add new trackers to
   // this list, which would validate the iterator.
-  for (size_t i = 0; i < quorum_trackers_.size(); i++) {
+  auto num_quorum_trackers = quorum_trackers_.size();
+  for (size_t i = 0; i < num_quorum_trackers; i++) {
     auto& tracker = quorum_trackers_[i];
     bool state_changed = tracker->HandleResponse(res, from_machine_id);
     if (state_changed) {
@@ -130,9 +131,9 @@ void Leader::StartNewAcceptance(uint32_t value) {
   SendToAllMembers(request);
 }
 
-void Leader::AcceptanceStateChanged(AcceptanceTracker* acceptance) {
-  // When member size is <= 2, a tracker will reach the COMPLETE state, bypassing
-  // the QUORUM_REACHED state, so we have a separate check for such special case.
+void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
+  // When member size is <= 2, a tracker will reach the COMPLETE state without ever
+  // reaching the QUORUM_REACHED state, so we have a separate check for that case.
   if (acceptance->GetState() == QuorumState::QUORUM_REACHED
       || (members_.size() <= 2 && acceptance->GetState() == QuorumState::COMPLETE)) {
     auto slot = acceptance->slot;
@@ -153,7 +154,7 @@ void Leader::StartNewCommit(SlotId slot) {
   SendToAllMembers(request);
 }
 
-void Leader::CommitStateChanged(CommitTracker* /* commit */) {
+void Leader::CommitStateChanged(const CommitTracker* /* commit */) {
   // TODO: Retransmit request after we implement heartbeat
 }
 

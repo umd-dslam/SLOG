@@ -53,10 +53,10 @@ private:
   void ProcessCommitRequest(const internal::PaxosCommitRequest commit);
 
   void StartNewAcceptance(uint32_t value);
-  void AcceptanceStateChanged(AcceptanceTracker* acceptance);
+  void AcceptanceStateChanged(const AcceptanceTracker* acceptance);
 
   void StartNewCommit(SlotId slot);
-  void CommitStateChanged(CommitTracker* commit);
+  void CommitStateChanged(const CommitTracker* commit);
 
   void SendToAllMembers(const internal::Request& request);
 

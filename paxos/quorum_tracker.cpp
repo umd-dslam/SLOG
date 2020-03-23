@@ -38,7 +38,7 @@ void QuorumTracker::Abort() {
   state_ = QuorumState::ABORTED;
 }
 
-QuorumState QuorumTracker::GetState() {
+QuorumState QuorumTracker::GetState() const {
   return state_;
 }
 
