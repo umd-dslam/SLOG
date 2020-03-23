@@ -28,7 +28,7 @@ const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
 const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;
 
 /****************************
- *      Statistics Keys
+ *      Statistic Keys
  ****************************/
 
 const char ALL_TXNS[] = "all_txns";

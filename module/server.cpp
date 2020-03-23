@@ -90,9 +90,15 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     return;
   }
 
+  // While this is called txn id, we use it for any kind of request
   auto txn_id = NextTxnId();
   CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
+
+  // The message object holds the address of the client so we keep it here
+  // to response to the client later
   pending_responses_[txn_id].response = msg;
+  // Stream id is used by a client to match up request-response on its side.
+  // The server does not use this and just echos it back to the client.
   pending_responses_[txn_id].stream_id = request.stream_id();
   
   switch (request.type_case()) {
