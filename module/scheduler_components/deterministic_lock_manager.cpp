@@ -196,6 +196,27 @@ DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
   return ready_txns;
 }
 
+void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
+  using rapidjson::StringRef;
+
+  auto& alloc = stats.GetAllocator();
+  stats.AddMember(StringRef(NUM_LOCKED_KEYS), lock_table_.size(), alloc);
+  stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
+
+  if (level >= 1) {
+    rapidjson::Value num_locks(rapidjson::kArrayType);
+    for (const auto& pair : num_locks_waited_) {
+      rapidjson::Value txn_and_locks(rapidjson::kArrayType);
+      txn_and_locks
+          .PushBack(pair.first, alloc)
+          .PushBack(pair.second, alloc);
+      num_locks.PushBack(std::move(txn_and_locks), alloc);
+    }
+    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), std::move(num_locks), alloc);
+  }
+}
+
+
 vector<pair<Key, LockMode>>
 DeterministicLockManager::ExtractKeys(const Transaction& txn) {
   vector<pair<Key, LockMode>> keys;

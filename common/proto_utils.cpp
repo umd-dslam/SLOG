@@ -122,7 +122,7 @@ TransactionType SetTransactionType(Transaction& txn) {
     }
   }
 
-  if (!all_master_metadata_received) {
+  if (!all_master_metadata_received) {  
     txn_internal->set_type(TransactionType::UNKNOWN);
     return txn_internal->type();
   }
