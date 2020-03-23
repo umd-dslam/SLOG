@@ -6,6 +6,6 @@
 
 namespace slog {
 
-void InitializeService(int argc, char* argv[]);
+void InitializeService(int* argc, char*** argv);
 
 } // namespace slog

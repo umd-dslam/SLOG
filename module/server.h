@@ -64,6 +64,7 @@ private:
       internal::Request&& req,
       string&& from_machine_id,
       string&& from_channel);
+  void HandleInternalResponse(internal::Response&& res);
 
   void ProcessLookUpMasterRequest(
       internal::LookupMasterRequest* lookup_master,

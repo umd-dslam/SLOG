@@ -56,6 +56,10 @@ void Server::Loop() {
           move(req),
           move(from_machine_id),
           move(from_channel));
+    } else if (msg.IsProto<internal::Response>()) {
+      internal::Response res;
+      msg.GetProto(res);
+      HandleInternalResponse(move(res));
     }
   }
 
@@ -85,26 +89,50 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     LOG(ERROR) << "Invalid request from client";
     return;
   }
+
+  auto txn_id = NextTxnId();
+  CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
+  pending_responses_[txn_id].response = msg;
+  pending_responses_[txn_id].stream_id = request.stream_id();
   
-  if (request.type_case() == api::Request::kTxn) {
-    auto txn_id = NextTxnId();
-    auto txn = request.mutable_txn()->release_txn();
-    auto txn_internal = txn->mutable_internal();
-    txn_internal->set_id(txn_id);
-    txn_internal
-        ->mutable_coordinating_server()
-        ->CopyFrom(
-            config_->GetLocalMachineIdAsProto());
+  switch (request.type_case()) {
+    case api::Request::kTxn: {
+      auto txn = request.mutable_txn()->release_txn();
+      auto txn_internal = txn->mutable_internal();
+      txn_internal->set_id(txn_id);
+      txn_internal
+          ->mutable_coordinating_server()
+          ->CopyFrom(
+              config_->GetLocalMachineIdAsProto());
 
-    CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
-    // The message object is holding the address of the requesting client so we keep it
-    // for later use.
-    pending_responses_[txn_id].response = msg;
-    pending_responses_[txn_id].stream_id = request.stream_id();
+      internal::Request forward_request;
+      forward_request.mutable_forward_txn()->set_allocated_txn(txn);
+      SendSameMachine(forward_request, FORWARDER_CHANNEL);
+      break;
+    }
+    case api::Request::kStats: {
+      internal::Request stats_request;
 
-    internal::Request forward_request;
-    forward_request.mutable_forward_txn()->set_allocated_txn(txn);
-    SendSameMachine(forward_request, FORWARDER_CHANNEL);
+      auto level = request.stats().level();
+      stats_request.mutable_stats()->set_id(txn_id);
+      stats_request.mutable_stats()->set_level(level);
+
+      // Send to appropriate module based on provided information
+      switch (request.stats().module()) {
+        case api::StatsModule::SCHEDULER:
+          SendSameMachine(stats_request, SCHEDULER_CHANNEL);
+          break;
+        default:
+          LOG(ERROR) << "Invalid module for stats request";
+          break;
+      }
+      break;
+    }
+    default:
+      pending_responses_.erase(txn_id);
+      LOG(ERROR) << "Unexpected request type received: \""
+                 << CASE_NAME(request.type_case(), api::Request) << "\"";
+      break;
   }
 }
 
@@ -197,10 +225,27 @@ void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed
     api::Response response;
     auto txn_response = response.mutable_txn();
     txn_response->set_allocated_txn(finished_txn.txn);
-    SendAPIResponse(txn_id, std::move(response));
+    SendAPIResponse(txn_id, move(response));
 
     completed_txns_.erase(txn_id);
   }
+}
+
+/***********************************************
+              Internal Responses
+***********************************************/
+
+void Server::HandleInternalResponse(internal::Response&& res) {
+  if (res.type_case() != internal::Response::kStats) {
+    LOG(ERROR) << "Unexpected response type received: \""
+               << CASE_NAME(res.type_case(), internal::Response) << "\"";
+    return;
+  }
+  api::Response response;
+  auto stats_response = response.mutable_stats();
+  stats_response->set_allocated_stats_json(
+      res.mutable_stats()->release_stats_json());
+  SendAPIResponse(res.stats().id(), std::move(response));
 }
 
 /***********************************************

@@ -9,6 +9,8 @@
 #include "common/constants.h"
 #include "common/types.h"
 
+#include "third_party/rapidjson/document.h"
+
 using std::list;
 using std::shared_ptr;
 using std::pair;
@@ -91,6 +93,13 @@ public:
    *            all of their locks thanks to this release.
    */
   unordered_set<TxnId> ReleaseLocks(const Transaction& txn);
+
+  /**
+   * Gets current statistics of the lock manager
+   * 
+   * @param stats A JSON object where the statistics are stored into
+   */
+  void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
   vector<pair<Key, LockMode>> ExtractKeys(const Transaction& txn);

@@ -78,7 +78,7 @@ void LoadData(
 }
 
 int main(int argc, char* argv[]) {
-  slog::InitializeService(argc, argv);
+  slog::InitializeService(&argc, &argv);
   
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 

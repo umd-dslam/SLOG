@@ -4,10 +4,10 @@
 
 namespace slog {
 
-void InitializeService(int argc, char* argv[]) {
-  google::InitGoogleLogging(argv[0]);
+void InitializeService(int* argc, char*** argv) {
+  google::InitGoogleLogging((*argv)[0]);
   google::InstallFailureSignalHandler();
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(argc, argv, true /* remove_flags */);
   FLAGS_logtostderr = true;
   FLAGS_colorlogtostderr = true;
   // Verify that the version of the library that we linked against is

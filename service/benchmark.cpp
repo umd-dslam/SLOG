@@ -56,7 +56,7 @@ void InitializeBenchmark();
 bool StopConditionMet();
 
 int main(int argc, char* argv[]) {
-  InitializeService(argc, argv);
+  InitializeService(&argc, &argv);
   InitializeBenchmark();
 
   LOG(INFO) << "Start sending transactions";

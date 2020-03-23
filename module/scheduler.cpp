@@ -3,6 +3,10 @@
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
+#include "third_party/rapidjson/document.h"
+#include "third_party/rapidjson/stringbuffer.h"
+#include "third_party/rapidjson/writer.h"
+
 using std::make_shared;
 
 namespace slog {
@@ -115,6 +119,9 @@ void Scheduler::HandleInternalRequest(
     case Request::kRemoteReadResult:
       ProcessRemoteReadResult(std::move(req));
       break;
+    case Request::kStats:
+      ProcessStatsRequest(req.stats());
+      break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
                  << CASE_NAME(req.type_case(), Request) << "\"";
@@ -215,6 +222,38 @@ void Scheduler::ProcessRemoteReadResult(
     VLOG(2) << "Got early remote read result for txn " << txn_id;
     holder.early_remote_reads.push_back(std::move(req));
   }
+}
+
+void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  stats.AddMember(StringRef(NUM_READY_WORKERS), ready_workers_.size(), alloc);
+  stats.AddMember(StringRef(NUM_READY_TXNS), ready_txns_.size(), alloc);
+  stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
+  if (level >= 1) {
+    rapidjson::Value all_txn_ids(rapidjson::kArrayType);
+    for (auto pair : all_txns_) {
+      all_txn_ids.PushBack(pair.first, alloc);
+    }
+    stats.AddMember(StringRef(ALL_TXNS), std::move(all_txn_ids), alloc);
+  }
+
+  lock_manager_.GetStats(stats, level);
+
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+  
+  internal::Response res;
+  res.mutable_stats()->set_id(stats_request.id());
+  res.mutable_stats()->set_stats_json(buf.GetString());
+  SendSameMachine(res, SERVER_CHANNEL);
 }
 
 /***********************************************

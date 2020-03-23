@@ -43,6 +43,7 @@ message Request {
         ProcessTransactionRequest process_txn = 11;
         RemoteReadResult remote_read_result = 12;
         CompletedSubtransaction completed_subtxn = 13;
+        StatsRequest stats = 14;
     }
 }
 
@@ -122,6 +123,11 @@ message CompletedSubtransaction {
     repeated uint32 involved_partitions = 3;
 }
 
+message StatsRequest {
+    uint32 id = 1;
+    uint32 level = 2;
+}
+
 /***********************************************
                     RESPONSES
 ***********************************************/
@@ -135,6 +141,7 @@ message Response {
         PaxosAcceptResponse paxos_accept = 3;
         PaxosCommitResponse paxos_commit = 4;
         ProcessTransactionResponse process_txn = 5;
+        StatsResponse stats = 6;
     }
 }
 
@@ -165,4 +172,9 @@ message PaxosCommitResponse {
 message ProcessTransactionResponse {
     uint32 txn_id = 1;
     repeated uint32 participants = 2;
+}
+
+message StatsResponse {
+    uint32 id = 1;
+    bytes stats_json = 2;
 }
