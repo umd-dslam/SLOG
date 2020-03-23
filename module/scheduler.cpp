@@ -233,6 +233,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   stats.SetObject();
   auto& alloc = stats.GetAllocator();
 
+  // Add stats about current transactions in the system
   stats.AddMember(StringRef(NUM_READY_WORKERS), ready_workers_.size(), alloc);
   stats.AddMember(StringRef(NUM_READY_TXNS), ready_txns_.size(), alloc);
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
@@ -244,12 +245,14 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
     stats.AddMember(StringRef(ALL_TXNS), std::move(all_txn_ids), alloc);
   }
 
+  // Add stats from the lock manager
   lock_manager_.GetStats(stats, level);
 
+  // Write JSON object to a buffer and send back to the server
   rapidjson::StringBuffer buf;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
   stats.Accept(writer);
-  
+
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());

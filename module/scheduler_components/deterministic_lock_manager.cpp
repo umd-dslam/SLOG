@@ -204,6 +204,7 @@ void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t lev
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
 
   if (level >= 1) {
+    // Collect number of locks waited per txn
     rapidjson::Value num_locks(rapidjson::kArrayType);
     for (const auto& pair : num_locks_waited_) {
       rapidjson::Value txn_and_locks(rapidjson::kArrayType);
