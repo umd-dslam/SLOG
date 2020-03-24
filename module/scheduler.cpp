@@ -239,7 +239,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
   if (level >= 1) {
     rapidjson::Value all_txn_ids(rapidjson::kArrayType);
-    for (auto pair : all_txns_) {
+    for (const auto& pair : all_txns_) {
       all_txn_ids.PushBack(pair.first, alloc);
     }
     stats.AddMember(StringRef(ALL_TXNS), std::move(all_txn_ids), alloc);
