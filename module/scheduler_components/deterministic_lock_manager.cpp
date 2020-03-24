@@ -103,18 +103,12 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-DeterministicLockManager::DeterministicLockManager(ConfigurationPtr config)
-  : config_(config) {}
-
-bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
-  auto txn_id = txn.internal().id();
-  auto keys = ExtractKeys(txn);
-  if (keys.empty()) {
-    // None of the keys in this txn is in this partition
+bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+  if (txn_holder.KeysInPartition().empty()) {
     return false;
   }
-
-  num_locks_waited_[txn_id] += keys.size();
+  auto txn_id = txn_holder.GetTransaction()->internal().id();
+  num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;
@@ -122,14 +116,12 @@ bool DeterministicLockManager::RegisterTxn(const Transaction& txn) {
   return false;
 }
 
-bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
-  auto txn_id = txn.internal().id();
-  auto keys = ExtractKeys(txn);
-  if (keys.empty()) {
-    // None of the keys in this txn is in this partition
+bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+  if (txn_holder.KeysInPartition().empty()) {
     return false;
   }
-  for (auto pair : keys) {
+  auto txn_id = txn_holder.GetTransaction()->internal().id();
+  for (auto pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
     auto mode = pair.second;
     switch (mode) {
@@ -158,22 +150,18 @@ bool DeterministicLockManager::AcquireLocks(const Transaction& txn) {
   return false;
 }
 
-bool DeterministicLockManager::RegisterTxnAndAcquireLocks(const Transaction& txn) {
-  RegisterTxn(txn);
-  return AcquireLocks(txn);
+bool DeterministicLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+  AcceptTransaction(txn_holder);
+  return AcquireLocks(txn_holder);
 }
 
 unordered_set<TxnId>
-DeterministicLockManager::ReleaseLocks(const Transaction& txn) {
+DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> ready_txns;
-  auto txn_id = txn.internal().id();
-  auto keys = ExtractKeys(txn);
+  auto txn_id = txn_holder.GetTransaction()->internal().id();
 
-  for (const auto& pair : keys) {
+  for (const auto& pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
-    if (!config_->KeyIsInLocalPartition(key)) {
-      continue;
-    }
 
     auto new_holders = lock_table_[key].Release(txn_id);
     for (auto holder : new_holders) {
@@ -216,25 +204,5 @@ void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t lev
     stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), std::move(num_locks), alloc);
   }
 }
-
-
-vector<pair<Key, LockMode>>
-DeterministicLockManager::ExtractKeys(const Transaction& txn) {
-  vector<pair<Key, LockMode>> keys;
-  for (const auto& kv : txn.read_set()) {
-    // If this key is also in write_set, give it write lock instead
-    if (config_->KeyIsInLocalPartition(kv.first) 
-        && !txn.write_set().contains(kv.first)) {
-      keys.emplace_back(kv.first, LockMode::READ);
-    }
-  }
-  for (const auto& kv : txn.write_set()) {
-    if (config_->KeyIsInLocalPartition(kv.first)) {
-      keys.emplace_back(kv.first, LockMode::WRITE);
-    }
-  }
-  return keys;
-}
-
 
 } // namespace slog
