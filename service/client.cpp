@@ -65,11 +65,11 @@ void ExecuteTxn(const char* txn_file) {
       metadata[mem.name.GetString()] = {mem.value.GetUint(), 0};
     }
   }
-  auto txn = new Transaction(MakeTransaction(
+  auto txn = MakeTransaction(
       read_set,
       write_set,
       d["code"].GetString(),
-      metadata));
+      metadata);
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);

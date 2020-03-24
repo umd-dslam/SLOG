@@ -12,7 +12,7 @@ public:
   /**
    * Gets the next transaction in the workload
    */
-  virtual Transaction NextTransaction() = 0;
+  virtual Transaction* NextTransaction() = 0;
 };
 
 } // namespace slog

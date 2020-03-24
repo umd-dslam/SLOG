@@ -34,7 +34,7 @@ string MakeMachineIdAsString(const internal::MachineId& machine_id);
  *                            transaction result to the client.
  * @return                    A new transaction having given properties
  */
-Transaction MakeTransaction(
+Transaction* MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code = "",
