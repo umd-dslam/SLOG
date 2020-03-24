@@ -14,18 +14,18 @@ TEST(CommandsTest, SimpleKeyValueProcedures) {
       "SET key2 value2\n"
       "DEL key4\n"
       "COPY key1 key3\n");
-  (*txn.mutable_read_set())["key1"] = "value1";
+  (*(txn->mutable_read_set()))["key1"] = "value1";
 
   KeyValueCommands proc;
-  proc.Execute(txn);
-  ASSERT_EQ(txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(txn.read_set_size(), 1);
-  ASSERT_EQ(txn.read_set().at("key1"), "value1");
-  ASSERT_EQ(txn.write_set_size(), 3);
-  ASSERT_EQ(txn.write_set().at("key2"), "value2");
-  ASSERT_EQ(txn.write_set().at("key3"), "value1");
-  ASSERT_EQ(txn.delete_set_size(), 1);
-  ASSERT_EQ(txn.delete_set(0), "key4");
+  proc.Execute(*txn);
+  ASSERT_EQ(txn->status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn->read_set_size(), 1);
+  ASSERT_EQ(txn->read_set().at("key1"), "value1");
+  ASSERT_EQ(txn->write_set_size(), 3);
+  ASSERT_EQ(txn->write_set().at("key2"), "value2");
+  ASSERT_EQ(txn->write_set().at("key3"), "value1");
+  ASSERT_EQ(txn->delete_set_size(), 1);
+  ASSERT_EQ(txn->delete_set(0), "key4");
 }
 
 TEST(CommandsTest, KeyValueAbortedNotEnoughArgs) {
@@ -35,8 +35,8 @@ TEST(CommandsTest, KeyValueAbortedNotEnoughArgs) {
       "SET key1");
 
   KeyValueCommands proc;
-  proc.Execute(txn);
-  ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
+  proc.Execute(*txn);
+  ASSERT_EQ(txn->status(), TransactionStatus::ABORTED);
 }
 
 TEST(CommandsTest, KeyValueAbortedInvalidCommand) {
@@ -46,8 +46,8 @@ TEST(CommandsTest, KeyValueAbortedInvalidCommand) {
       "WRONG");
 
   KeyValueCommands proc;
-  proc.Execute(txn);
-  ASSERT_EQ(txn.status(), TransactionStatus::ABORTED);
+  proc.Execute(*txn);
+  ASSERT_EQ(txn->status(), TransactionStatus::ABORTED);
 }
 
 TEST(CommandsTest, KeyValueOnlyWritesKeysInWriteSet) {
@@ -60,10 +60,10 @@ TEST(CommandsTest, KeyValueOnlyWritesKeysInWriteSet) {
       "DEL key3");
 
   KeyValueCommands proc;
-  proc.Execute(txn);
-  ASSERT_EQ(txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(txn.write_set_size(), 2);
-  ASSERT_EQ(txn.write_set().at("key2"), "value2");
-  ASSERT_EQ(txn.delete_set_size(), 1);
-  ASSERT_EQ(txn.delete_set(0), "key3");
+  proc.Execute(*txn);
+  ASSERT_EQ(txn->status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn->write_set_size(), 2);
+  ASSERT_EQ(txn->write_set().at("key2"), "value2");
+  ASSERT_EQ(txn->delete_set_size(), 1);
+  ASSERT_EQ(txn->delete_set(0), "key3");
 }

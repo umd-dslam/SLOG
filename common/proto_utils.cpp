@@ -69,21 +69,21 @@ string MakeMachineIdAsString(const MachineId& machine_id) {
   return MakeMachineIdAsString(machine_id.replica(), machine_id.partition());
 }
 
-Transaction MakeTransaction(
+Transaction* MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code,
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
     const internal::MachineId coordinating_server) {
-  Transaction txn;
+  Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
-    txn.mutable_read_set()->insert({key, ""});
+    txn->mutable_read_set()->insert({key, ""});
   }
   for (const auto& key : write_set) {
-    txn.mutable_write_set()->insert({key, ""});
+    txn->mutable_write_set()->insert({key, ""});
   }
-  txn.set_code(code);
-  txn.set_status(TransactionStatus::NOT_STARTED);
+  txn->set_code(code);
+  txn->set_status(TransactionStatus::NOT_STARTED);
 
   for (const auto& pair : master_metadata) {
     const auto& key = pair.first;
@@ -91,16 +91,16 @@ Transaction MakeTransaction(
       MasterMetadata metadata;
       metadata.set_master(pair.second.first);
       metadata.set_counter(pair.second.second);
-      txn.mutable_internal()
+      txn->mutable_internal()
           ->mutable_master_metadata()
           ->insert({pair.first, std::move(metadata)});
     }
   }
-  txn.mutable_internal()
+  txn->mutable_internal()
       ->mutable_coordinating_server()
       ->CopyFrom(coordinating_server);
 
-  SetTransactionType(txn);
+  SetTransactionType(*txn);
   return txn;
 }
 

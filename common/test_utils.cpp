@@ -151,11 +151,11 @@ void TestSlog::StartInNewThreads() {
   }
 }
 
-void TestSlog::SendTxn(const Transaction& txn) {
+void TestSlog::SendTxn(Transaction* txn) {
   CHECK(server_ != nullptr) << "TestSlog does not have a server";
   api::Request request;
   auto txn_req = request.mutable_txn();
-  txn_req->mutable_txn()->CopyFrom(txn);
+  txn_req->set_allocated_txn(txn);
   MMessage msg;
   msg.Push(request);
   msg.SendTo(client_socket_);

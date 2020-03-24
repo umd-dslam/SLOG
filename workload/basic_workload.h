@@ -42,7 +42,7 @@ public:
       double multi_home_pct,
       double multi_partition_pct);
 
-  Transaction NextTransaction() final;
+  Transaction* NextTransaction() final;
 
 private:
   ConfigurationPtr config_;

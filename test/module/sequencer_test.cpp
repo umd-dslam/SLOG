@@ -60,14 +60,14 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
       {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   Request req;
-  req.mutable_forward_txn()->mutable_txn()->CopyFrom(txn);
+  req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
 
   SendToSequencer(req);
 
   auto batch = ReceiveBatch();
   ASSERT_NE(batch, nullptr);
   ASSERT_EQ(batch->transactions_size(), 1);
-  ASSERT_EQ(batch->transactions().at(0), txn);
+  ASSERT_EQ(batch->transactions().at(0), *txn);
   ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
 
   delete batch;
@@ -88,8 +88,8 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
 
   Request req;
   auto mh_batch = req.mutable_forward_batch()->mutable_batch_data();
-  mh_batch->add_transactions()->CopyFrom(txn1);
-  mh_batch->add_transactions()->CopyFrom(txn2);
+  mh_batch->add_transactions()->CopyFrom(*txn1);
+  mh_batch->add_transactions()->CopyFrom(*txn2);
   mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
   SendToSequencer(req);
 
@@ -118,10 +118,10 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
         ASSERT_EQ(batch->transactions_size(), 2);
 
         auto mh_txn1 = batch->transactions().at(0);
-        ASSERT_EQ(mh_txn1, txn1);
+        ASSERT_EQ(mh_txn1, *txn1);
         
         auto mh_txn2 = batch->transactions().at(1);
-        ASSERT_EQ(mh_txn2, txn2);
+        ASSERT_EQ(mh_txn2, *txn2);
         break;
       }
       default:

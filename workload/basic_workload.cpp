@@ -131,7 +131,7 @@ BasicWorkload::BasicWorkload(
   }
 }
 
-Transaction BasicWorkload::NextTransaction() {
+Transaction* BasicWorkload::NextTransaction() {
   CHECK_LE(NUM_WRITES, NUM_RECORDS) 
       << "Number of writes cannot exceed number of records in a txn!";
 

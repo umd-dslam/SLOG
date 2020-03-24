@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
       }
       if (!FLAGS_dry_run) {
         api::Request req;
-        req.mutable_txn()->mutable_txn()->CopyFrom(txn);
+        req.mutable_txn()->set_allocated_txn(txn);
         req.set_stream_id(txn_counter);
         MMessage msg;
         msg.Push(req);

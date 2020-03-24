@@ -46,7 +46,7 @@ public:
   unique_ptr<Channel> AddChannel(const string& name);
 
   void StartInNewThreads();
-  void SendTxn(const Transaction& txn);
+  void SendTxn(Transaction* txn);
   Transaction RecvTxnResult();
 
 private:

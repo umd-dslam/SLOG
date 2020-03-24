@@ -9,13 +9,13 @@ using namespace std;
 using namespace slog;
 
 internal::Request MakeSingleHomeBatch(
-    BatchId batch_id, const vector<Transaction>& txns) {
+    BatchId batch_id, const vector<Transaction*>& txns) {
   internal::Request req;
   auto batch = req.mutable_forward_batch()->mutable_batch_data();
   batch->set_id(batch_id);
   batch->set_transaction_type(TransactionType::SINGLE_HOME);
   for (auto txn : txns) {
-    batch->mutable_transactions()->Add(move(txn));
+    batch->mutable_transactions()->AddAllocated(txn);
   }
   return req;
 }
@@ -55,13 +55,14 @@ protected:
     }
   }
 
-  void SendBatch(
+  void SendBatchToEachPartition(
         BatchId batch_id,
-        const vector<Transaction>& txns,
+        const vector<Transaction*>& txns,
         const vector<size_t>& partitions) {
+    auto batch = MakeSingleHomeBatch(batch_id, txns);
     for (auto partition : partitions) {
       MMessage msg;
-      msg.Set(MM_PROTO, MakeSingleHomeBatch(batch_id, txns));
+      msg.Set(MM_PROTO, batch);
       msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
       input_[partition]->Send(msg);
 
@@ -112,9 +113,9 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       "SET D newD\n", /* code */
       {},
       MakeMachineId("0:1") /* coordinating server */);
-  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {0});
+  SendBatchToEachPartition(100, {txn}, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -130,9 +131,9 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
       {"A"}, /* read_set */
       {"C"},  /* write_set */
       "COPY A C" /* code */);
-  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {0, 1, 2});
+  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -149,9 +150,9 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
       {"B", "C"},  /* write_set */
       "COPY C B\n"
       "COPY B C\n" /* code */);
-  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {0, 1, 2});
+  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -171,9 +172,9 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
       "SET A newA\n"
       "SET B newB\n"
       "SET C newC\n" /* code */);
-  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {0, 1, 2});
+  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -192,9 +193,9 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
       "GET D\n"
       "GET E\n"
       "GET F\n" /* code */);
-  txn.mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatch(100, {txn}, {0, 1, 2});
+  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
