@@ -8,6 +8,7 @@
 #include "third_party/rapidjson/writer.h"
 
 using std::make_shared;
+using std::move;
 
 namespace slog {
 
@@ -26,8 +27,7 @@ Scheduler::Scheduler(
     // range, num_replicas can be used as the marker for multi-home txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
-    worker_socket_(context, ZMQ_ROUTER),
-    lock_manager_(config) {
+    worker_socket_(context, ZMQ_ROUTER) {
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
@@ -60,7 +60,7 @@ void Scheduler::Loop() {
     ReceiveFromChannel(msg);
     Request req;
     if (msg.GetProto(req)) {
-      HandleInternalRequest(std::move(req), msg.GetIdentity());
+      HandleInternalRequest(move(req), msg.GetIdentity());
     }
   }
 
@@ -85,7 +85,7 @@ void Scheduler::Loop() {
       msg.GetProto(res);
       ready_workers_.push(msg.GetIdentity());
       // Handle the results produced by the worker
-      HandleResponseFromWorker(std::move(res));
+      HandleResponseFromWorker(move(res));
       // Since we now have a free worker, try dispatching a ready
       // txn if one is in queue.
       MaybeDispatchNextTransaction();
@@ -117,7 +117,7 @@ void Scheduler::HandleInternalRequest(
       ProcessLocalQueueOrder(req.local_queue_order());
       break;
     case Request::kRemoteReadResult:
-      ProcessRemoteReadResult(std::move(req));
+      ProcessRemoteReadResult(move(req));
       break;
     case Request::kStats:
       ProcessStatsRequest(req.stats());
@@ -156,7 +156,7 @@ void Scheduler::ProcessForwardBatch(
                 batch->id());
           }
           
-          all_logs_[from_replica].AddBatch(std::move(batch));
+          all_logs_[from_replica].AddBatch(move(batch));
           break;
         }
         case TransactionType::MULTI_HOME: {
@@ -167,7 +167,7 @@ void Scheduler::ProcessForwardBatch(
           // and their IDs have been replaced with slot id in the orderer module
           // so here their id and slot id are the same
           all_logs_[kMultiHomeTxnLogMarker].AddSlot(batch->id(), batch->id());
-          all_logs_[kMultiHomeTxnLogMarker].AddBatch(std::move(batch));
+          all_logs_[kMultiHomeTxnLogMarker].AddBatch(move(batch));
           break;
         }
         default:
@@ -209,9 +209,9 @@ void Scheduler::ProcessRemoteReadResult(
   // A transaction might have a holder but not run yet if there are not
   // enough workers. In that case, a remote read is still considered an
   // early remote read.
-  if (holder.txn != nullptr && !holder.worker.empty()) {
+  if (holder.GetTransaction() != nullptr && !holder.GetWorker().empty()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
-    SendToWorker(std::move(req), holder.worker);
+    SendToWorker(move(req), holder.GetWorker());
   } else {
     // Save the remote reads that come before the txn
     // is processed by this partition
@@ -220,7 +220,7 @@ void Scheduler::ProcessRemoteReadResult(
     // is already commited, it will be stuck in early_remote_reads forever.
     // Consider garbage collecting them if needed
     VLOG(2) << "Got early remote read result for txn " << txn_id;
-    holder.early_remote_reads.push_back(std::move(req));
+    holder.EarlyRemoteReads().emplace_back(move(req));
   }
 }
 
@@ -242,7 +242,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
     for (const auto& pair : all_txns_) {
       all_txn_ids.PushBack(pair.first, alloc);
     }
-    stats.AddMember(StringRef(ALL_TXNS), std::move(all_txn_ids), alloc);
+    stats.AddMember(StringRef(ALL_TXNS), move(all_txn_ids), alloc);
   }
 
   // Add stats from the lock manager
@@ -269,15 +269,15 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
   }
   // This txn is done so remove it from the txn list
   auto txn_id = res.process_txn().txn_id();
-  auto txn = all_txns_[txn_id].txn;
-  all_txns_.erase(txn_id);
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unlocked_txns = lock_manager_.ReleaseLocks(*txn);
+  auto unlocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
   for (auto unlocked_txn : unlocked_txns) {
-    EnqueueTransaction(unlocked_txn);
+    EnqueueTransactionForDispatching(unlocked_txn);
   }
+  auto txn = all_txns_[txn_id].ReleaseTransaction();
+  all_txns_.erase(txn_id);
 
   // Send the txn back to the coordinating server if need to
   auto local_partition = config_->GetLocalPartition();
@@ -335,35 +335,32 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
 
         switch (txn_type) {
           case TransactionType::SINGLE_HOME: {
-            auto txn_id = txn->internal().id();
-            // TODO: remove txn holder if the txn does not touch anything
-            // in the current partition
-            auto& holder = all_txns_[txn_id];
-            holder.txn = txn;
-            if (lock_manager_.RegisterTxnAndAcquireLocks(*holder.txn)) {
-              EnqueueTransaction(txn_id); 
+            if (AcceptTransaction(txn)) {
+              auto txn_id = txn->internal().id();
+              if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
+                EnqueueTransactionForDispatching(txn_id);
+              }
             }
             break;
           }
           case TransactionType::MULTI_HOME: {
-            auto txn_id = txn->internal().id();
-            // TODO: remove txn holder if the txn does not touch anything
-            // in the current partition
-            auto& holder = all_txns_[txn_id];
-            holder.txn = txn;
-            if (lock_manager_.RegisterTxn(*holder.txn)) {
-              EnqueueTransaction(txn_id); 
+            if (AcceptTransaction(txn)) {
+              auto txn_id = txn->internal().id();
+              if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
+                EnqueueTransactionForDispatching(txn_id); 
+              }
             }
             break;
           }
           case TransactionType::LOCK_ONLY: {
-            if (lock_manager_.AcquireLocks(*txn)) {
+            // We discard lock_only txn right away so only need a tmp holder
+            TransactionHolder tmp_holder(config_, txn);
+            if (lock_manager_.AcquireLocks(tmp_holder)) {
               auto txn_id = txn->internal().id();
               CHECK(all_txns_.count(txn_id) > 0) 
                   << "Txn " << txn_id << " is not found for dispatching";
-              EnqueueTransaction(txn_id);
+              EnqueueTransactionForDispatching(txn_id);
             }
-            delete txn;
             break;
           }
           default:
@@ -375,11 +372,23 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
   }
 }
 
+bool Scheduler::AcceptTransaction(Transaction* txn) {
+  auto txn_id = txn->internal().id();
+  auto& holder = all_txns_[txn_id];
+
+  holder.SetTransaction(config_, txn);
+  if (holder.KeysInPartition().empty()) {
+    all_txns_.erase(txn_id);
+    return false;
+  }
+  return true;
+}
+
 /***********************************************
               Transaction Dispatch
 ***********************************************/
 
-void Scheduler::EnqueueTransaction(TxnId txn_id) {
+void Scheduler::EnqueueTransactionForDispatching(TxnId txn_id) {
   VLOG(2) << "Enqueued txn " << txn_id;
   ready_txns_.push(txn_id);
   MaybeDispatchNextTransaction();
@@ -397,21 +406,24 @@ void Scheduler::MaybeDispatchNextTransaction() {
   auto& holder = all_txns_[txn_id];
 
   // Pop next ready worker in queue
-  holder.worker = ready_workers_.front();
+  holder.SetWorker(ready_workers_.front());
   ready_workers_.pop();
 
   // Prepare a request with the txn to be sent to the worker
   Request req;
   auto process_txn = req.mutable_process_txn();
-  process_txn->set_txn_ptr(reinterpret_cast<uint64_t>(holder.txn));
+  process_txn->set_txn_ptr(reinterpret_cast<uint64_t>(holder.GetTransaction()));
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
   // TODO: pretty sure that the order of messages follow the order of these
   // function calls but should look a bit more into ZMQ ordering to be sure
-  SendToWorker(std::move(req), holder.worker);
-  for (auto& remote_read : holder.early_remote_reads) {
-    SendToWorker(std::move(remote_read), holder.worker);
+  SendToWorker(move(req), holder.GetWorker());
+  while (!holder.EarlyRemoteReads().empty()) {
+    SendToWorker(
+        move(holder.EarlyRemoteReads().back()),
+        holder.GetWorker());
+    holder.EarlyRemoteReads().pop_back();
   }
 }
 

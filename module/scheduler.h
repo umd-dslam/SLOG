@@ -7,6 +7,7 @@
 
 #include "common/batch_log.h"
 #include "common/configuration.h"
+#include "common/transaction_utils.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/basic_module.h"
@@ -23,12 +24,6 @@ using std::unordered_set;
 using std::vector;
 
 namespace slog {
-
-struct TransactionHolder {
-  Transaction* txn;
-  string worker = "";
-  vector<internal::Request> early_remote_reads;
-};
 
 class Scheduler : public Module, ChannelHolder {
 public:
@@ -66,7 +61,8 @@ private:
   void MaybeUpdateLocalLog();
   void MaybeProcessNextBatchesFromGlobalLog();
 
-  void EnqueueTransaction(TxnId txn_id);
+  bool AcceptTransaction(Transaction* txn);
+  void EnqueueTransactionForDispatching(TxnId txn_id);
   void MaybeDispatchNextTransaction();
 
   void SendToWorker(internal::Request&& req, const string& worker);

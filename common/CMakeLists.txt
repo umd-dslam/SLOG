@@ -5,6 +5,7 @@ add_library(common
   mmessage.cpp
   proto_utils.cpp
   service_utils.cpp
+  transaction_utils.cpp
   types.h)
 target_link_libraries(common proto)
 

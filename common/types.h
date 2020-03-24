@@ -39,4 +39,6 @@ using Clock = steady_clock;
 using TimePoint = Clock::time_point;
 using Duration = Clock::duration;
 
+enum class LockMode { UNLOCKED, READ, WRITE };
+
 } // namespace slog

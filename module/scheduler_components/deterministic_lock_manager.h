@@ -7,6 +7,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
+#include "common/transaction_utils.h"
 #include "common/types.h"
 
 #include "third_party/rapidjson/document.h"
@@ -19,8 +20,6 @@ using std::unordered_set;
 using std::vector;
 
 namespace slog {
-
-enum class LockMode { UNLOCKED, READ, WRITE };
 
 /**
  * An object of this class represents the locking state of a key.
@@ -51,8 +50,6 @@ private:
  */
 class DeterministicLockManager {
 public:
-  DeterministicLockManager(ConfigurationPtr config);
-
   /**
    * Counts the number of locks a txn needs.
    * 
@@ -61,38 +58,38 @@ public:
    * txn. Calling this function would bring the number of waited
    * locks back to 0, meaning all locks are granted.
    * 
-   * @param txn The transaction to be registered.
+   * @param txn_holder Holder of the transaction to be registered.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  bool RegisterTxn(const Transaction& txn);
+  bool AcceptTransaction(const TransactionHolder& txn_holder);
 
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
    * for the current holders to release.
    * 
-   * @param txn The transaction whose locks are acquired.
+   * @param txn_holder Holder of the transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  bool AcquireLocks(const Transaction& txn);
+  bool AcquireLocks(const TransactionHolder& txn);
 
   /**
    * Convenient method to perform txn registration and 
    * lock acquisition at the same time.
    */
-  bool RegisterTxnAndAcquireLocks(const Transaction& txn);
+  bool AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
    * 
-   * @param txn The transaction whose locks are released.
+   * @param txn_holder Holder of the transaction whose locks are released.
    *            LockOnly txn is not accepted.
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  unordered_set<TxnId> ReleaseLocks(const Transaction& txn);
+  unordered_set<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager
@@ -102,9 +99,6 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  vector<pair<Key, LockMode>> ExtractKeys(const Transaction& txn);
-
-  ConfigurationPtr config_;
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
 };
