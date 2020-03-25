@@ -12,12 +12,6 @@ using std::vector;
 
 namespace slog {
 
-const uint32_t MP_NUM_PARTITIONS = 2;
-const uint32_t MH_NUM_HOMES = 2;
-const uint32_t NUM_RECORDS = 10;
-const uint32_t NUM_WRITES = 4;
-const uint32_t VALUE_SIZE = 50; // bytes
-
 class KeyList {
 public:
   KeyList(size_t num_hot_keys = 0);

@@ -148,7 +148,7 @@ Transaction* BasicWorkload::NextTransaction() {
   // Decide if this is a multi-home txn or not
   discrete_distribution<> shmh({100 - multi_home_pct_, multi_home_pct_});
   bool is_multi_home = shmh(re_);
-  
+
   // Select a number of homes to choose from for each record
   auto candidate_homes = Choose(
       config_->GetNumReplicas(),
@@ -162,26 +162,26 @@ Transaction* BasicWorkload::NextTransaction() {
   // For logging
   vector<pair<uint32_t, uint32_t>> picked_sources;
 
-  // Fill txn with read operators
-  for (size_t i = 0; i < NUM_RECORDS - NUM_WRITES; i++) {
-    auto partition = PickOne(candidate_partitions, re_);
-    auto home = PickOne(candidate_homes, re_);
-    // TODO: Add hot keys later
-    auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
-    code << "GET " << key << " ";
-    read_set.insert(key);
-
-    picked_sources.emplace_back(partition, home);
-  }
-
   // Fill txn with write operators
   for (size_t i = 0; i < NUM_WRITES; i++) {
-    auto partition = PickOne(candidate_partitions, re_);
-    auto home = PickOne(candidate_homes, re_);
+    auto partition = candidate_partitions[i % candidate_partitions.size()];
+    auto home = candidate_homes[i % candidate_homes.size()];
     // TODO: Add hot keys later
     auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
     code << "SET " << key << " " << RandomString(VALUE_SIZE, re_) << " ";
     write_set.insert(key);
+
+    picked_sources.emplace_back(partition, home);
+  }
+
+  // Fill txn with read operators
+  for (size_t i = 0; i < NUM_RECORDS - NUM_WRITES; i++) {
+    auto partition = candidate_partitions[(NUM_WRITES + i) % candidate_partitions.size()];
+    auto home = candidate_homes[(NUM_WRITES + i) % candidate_homes.size()];
+    // TODO: Add hot keys later
+    auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
+    code << "GET " << key << " ";
+    read_set.insert(key);
 
     picked_sources.emplace_back(partition, home);
   }
