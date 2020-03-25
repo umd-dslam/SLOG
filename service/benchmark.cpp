@@ -1,4 +1,6 @@
 #include <sstream>
+#include <iostream>
+#include <iomanip>
 
 #include "common/configuration.h"
 #include "common/proto_utils.h"
@@ -27,91 +29,99 @@ DEFINE_double(mp, 0, "Percentage of multi-partition transactions");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_bool(print_txn, false, "Print the each generated transactions");
 
+using namespace slog;
+
+using std::cout;
+using std::endl;
+using std::fixed;
 using std::make_unique;
 using std::move;
 using std::unique_ptr;
+using std::unordered_map;
 using std::vector;
 
-using namespace slog;
+template<typename T>
+uint64_t TimeElapsedSince(TimePoint tp) {
+  return duration_cast<T>(Clock::now() - tp).count();
+}
 
+const uint32_t STATS_PRINT_EVERY_MS = 1000;
+
+/**
+ * Connection stuff
+ */
 zmq::context_t context(1);
-// For controlling rate
-unique_ptr<ModuleRunner> ticker;
-// Connection
 vector<unique_ptr<zmq::socket_t>> server_sockets;
 unique_ptr<zmq::socket_t> ticker_socket;
 vector<zmq::pollitem_t> poll_items;
-// Workload
+
+/**
+ * Used for controlling rate
+ * Note: This must be declared after `context` so that
+ *       it is destructed before `context`.
+ */
+unique_ptr<ModuleRunner> ticker;
+
+/**
+ * Selected workload
+ */
 unique_ptr<WorkloadGenerator> workload;
 
+/**
+ * Data structure for keeping track of the transactions
+ */
 struct TransactionInfo {
   TransactionType type;
   TimePoint sending_time;
 };
-TimePoint start_time;
-uint64_t txn_counter = 0;
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
 
-void InitializeBenchmark();
-bool StopConditionMet();
+/**
+ * Statistics
+ */
+struct Statistics {
+  TimePoint start_time;
+  uint64_t txn_counter = 0;
+  uint32_t resp_counter = 0;
 
-int main(int argc, char* argv[]) {
-  InitializeService(&argc, &argv);
-  InitializeBenchmark();
-
-  LOG(INFO) << "Start sending transactions";
-  start_time = Clock::now();
-  while (!StopConditionMet()) {
-    zmq::poll(poll_items);
-
-    // Check if the ticker ticks
-    if (poll_items[0].revents & ZMQ_POLLIN) {
-      // Receive the empty message then throw away
-      zmq::message_t msg;
-      ticker_socket->recv(msg);
-
-      auto txn = workload->NextTransaction();
-      if (FLAGS_print_txn) {
-        LOG(INFO) << txn << "\nTxn counter: " << txn_counter;
-      }
-      if (!FLAGS_dry_run) {
-        api::Request req;
-        req.mutable_txn()->set_allocated_txn(txn);
-        req.set_stream_id(txn_counter);
-        MMessage msg;
-        msg.Push(req);
-        // TODO: Add an option to randomly send to any server in the same region
-        msg.SendTo(*server_sockets[0]);
-        outstanding_txns[txn_counter] = {};
-      }
-      txn_counter++;
+  void MaybePrint() {
+    if (TimeElapsedSince<milliseconds>(time_last_print_) < STATS_PRINT_EVERY_MS) {
+      return;
     }
-    // Check if we received a response from the server
-    for (size_t i = 1; i < poll_items.size(); i++) {
-      if (poll_items[i].revents & ZMQ_POLLIN) {
-        MMessage msg(*server_sockets[i-1]);
-        api::Response res;
-        if (!msg.GetProto(res)) {
-          LOG(ERROR) << "Malformed response";
-        } else {
-          if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
-            LOG(ERROR) << "Received response for a non-outstanding txn. Dropping";
-          } else {
-            // TODO: collect stats here
-            const auto& txn = res.txn().txn();
-            LOG(INFO) << txn;
-          }
-        }
-      }
-    }
+    Print();
+    time_last_print_ = Clock::now();
   }
 
-  // TODO: collect and print more stats here
-  LOG(INFO) << "Elapsed time: " 
-            << duration_cast<seconds>(Clock::now() - start_time).count()
-            << " seconds";
-  return 0;
-}
+  void FinalPrint() {
+    Print();
+    cout << "Elapsed time: " << TimeElapsedSince<seconds>(start_time)
+         << " seconds" << endl;
+  }
+
+private:
+  TimePoint time_last_print_;
+
+  TimePoint time_last_throughput_;
+  uint32_t resp_last_throughput_ = 0;
+
+  double Throughput() {
+    double time_since_last_compute_sec =
+        TimeElapsedSince<milliseconds>(time_last_throughput_) / 1000.0;
+    double throughput = (resp_counter - resp_last_throughput_) / time_since_last_compute_sec;
+    time_last_throughput_ = Clock::now();
+    resp_last_throughput_ = resp_counter;
+    return throughput;
+  }
+
+  void Print() {
+    cout.precision(1);
+    cout << endl;
+    cout << "Transactions sent: " << txn_counter << endl;
+    cout << "Responses received: " << resp_counter << endl;
+    cout << "Throughput: " << fixed << Throughput() << " txns/s" << endl;
+  }
+
+} stats;
 
 void InitializeBenchmark() {
   if (FLAGS_duration > 0 && FLAGS_num_txns > 0) {
@@ -159,12 +169,103 @@ void InitializeBenchmark() {
   workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_mh, FLAGS_mp);
 }
 
+bool StopConditionMet();
+void SendNextTransaction();
+void ReceiveResult(int from_socket);
+
+void RunBenchmark() {
+  LOG(INFO) << "Transaction profile:" << endl
+            << "NUM_RECORDS = " << NUM_RECORDS << endl
+            << "NUM_WRITES = " << NUM_WRITES << endl
+            << "VALUE_SIZE = " << VALUE_SIZE << endl
+            << "MP_NUM_PARTITIONS = " << MP_NUM_PARTITIONS << endl
+            << "MH_NUM_HOMES = " << MH_NUM_HOMES << endl;
+
+  stats.start_time = Clock::now();
+  while (!StopConditionMet() || !outstanding_txns.empty()) {
+    if (zmq::poll(poll_items, 10)) {
+      // Check if the ticker ticks
+      if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
+
+        // Receive the empty message then throw away
+        zmq::message_t msg;
+        ticker_socket->recv(msg);
+
+        SendNextTransaction();
+      }
+      // Check if we received a response from the server
+      for (size_t i = 1; i < poll_items.size(); i++) {
+        if (poll_items[i].revents & ZMQ_POLLIN) {
+          ReceiveResult(i - 1);
+        }
+      }
+    }
+    stats.MaybePrint();
+  }
+  stats.FinalPrint();
+}
+
 bool StopConditionMet() {
   if (FLAGS_duration > 0) {
-    auto elapsed_time = duration_cast<seconds>(Clock::now() - start_time);
-    return elapsed_time.count() >= FLAGS_duration;
+    return TimeElapsedSince<seconds>(stats.start_time) >= FLAGS_duration;
   } else if (FLAGS_num_txns > 0) {
-    return txn_counter >= FLAGS_num_txns;
+    return stats.txn_counter >= FLAGS_num_txns;
   }
   return false;
+}
+
+void SendNextTransaction() {
+  auto txn = workload->NextTransaction();
+  if (FLAGS_print_txn) {
+    LOG(INFO) << txn;
+  }
+
+  stats.txn_counter++;
+
+  if (FLAGS_dry_run) {
+    return;
+  }
+  api::Request req;
+  req.mutable_txn()->set_allocated_txn(txn);
+  req.set_stream_id(stats.txn_counter);
+  MMessage msg;
+  msg.Push(req);
+  // TODO: Add an option to randomly send to any server in the same region
+  msg.SendTo(*server_sockets[0]);
+  // TODO: Fill in transaction info here
+  outstanding_txns[stats.txn_counter] = {};
+}
+
+void ReceiveResult(int from_socket) {
+  MMessage msg(*server_sockets[from_socket]);
+  api::Response res;
+
+  if (!msg.GetProto(res)) {
+    LOG(ERROR) << "Malformed response";
+    return;
+  }
+
+  if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
+    auto txn_id = res.txn().txn().internal().id();
+    LOG(ERROR) << "Received response for a non-outstanding txn "
+                << "(stream_id = " << res.stream_id()
+                << ", txn_id = " << txn_id << "). Dropping...";
+  } 
+
+  stats.resp_counter++;
+  
+  outstanding_txns.erase(res.stream_id());
+
+  // TODO: collect stats of individual txn
+  // const auto& txn = res.txn().txn();
+}
+
+int main(int argc, char* argv[]) {
+  InitializeService(&argc, &argv);
+  
+  InitializeBenchmark();
+  
+  RunBenchmark();
+ 
+  return 0;
 }
