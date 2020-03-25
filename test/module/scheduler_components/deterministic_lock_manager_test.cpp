@@ -241,3 +241,18 @@ TEST(DeterministicLockManager, GhostTxns) {
   TransactionHolder holder2(configs[0], txn2);
   ASSERT_FALSE(lock_manager.AcquireLocks(holder2));
 }
+
+TEST(DeterministicLockManager, BlockedLockOnlyTxn) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  DeterministicLockManager lock_manager;
+
+  auto txn1 = MakeTransaction({"A"}, {"B"});
+  txn1->mutable_internal()->set_id(100);
+  TransactionHolder holder1(configs[0], txn1);
+  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
+
+  auto txn2 = MakeTransaction({}, {"B"});
+  txn2->mutable_internal()->set_id(101);
+  TransactionHolder holder2(configs[0], txn2);
+  ASSERT_FALSE(lock_manager.AcquireLocks(holder2));
+}

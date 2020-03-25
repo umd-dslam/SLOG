@@ -29,6 +29,20 @@ public:
   bool HasNextBatch() const;
   pair<SlotId, BatchId> NextBatch();
 
+  /* For debugging */
+  size_t NumBufferedSlots() const {
+    return slots_.NumBufferredItems();
+  }
+
+  /* For debugging */
+  unordered_map<uint32_t, size_t> NumBufferedBatchesPerQueue() const {
+    unordered_map<uint32_t, size_t> queue_sizes;
+    for (const auto& pair : batch_queues_) {
+      queue_sizes[pair.first] = pair.second.NumBufferredItems();
+    }
+    return queue_sizes;
+  }
+
 private:
   void UpdateReadyBatches();
 

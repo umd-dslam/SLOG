@@ -51,6 +51,11 @@ public:
     return std::make_pair(position, std::move(result));
   }
 
+  /* For debugging */
+  size_t NumBufferredItems() const {
+    return log_.size();
+  }
+
 private:
   std::unordered_map<uint32_t, T> log_;
   uint32_t next_;

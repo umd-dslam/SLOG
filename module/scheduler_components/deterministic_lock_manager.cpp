@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 using std::make_pair;
+using std::move;
 
 namespace slog {
 
@@ -39,14 +40,14 @@ bool LockState::AcquireWriteLock(TxnId txn_id) {
     case LockMode::READ:
     case LockMode::WRITE:
       waiters_.insert(txn_id);
-      waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
+      waiter_queue_.push_back(make_pair(txn_id, LockMode::WRITE));
       return false;
     default:
       return false;
   }
 }
 
-bool LockState::IsQueued(TxnId txn_id) {
+bool LockState::Contains(TxnId txn_id) {
   return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0;
 }
 
@@ -67,13 +68,13 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
 
   holders_.erase(txn_id);
 
-  // If there are still holders of this lock, do nothing
+  // If there are still holders for this lock, do nothing
   if (!holders_.empty()) {
     // No new transaction get the lock
     return {};
   }
 
-  // If all holders release the lock but no waiters, the current state is
+  // If all holders release the lock but there is no waiter, the current state is
   // changed to unlocked
   if (waiters_.empty()) {
     mode = LockMode::UNLOCKED;
@@ -121,31 +122,39 @@ bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder)
     return false;
   }
   auto txn_id = txn_holder.GetTransaction()->internal().id();
+  int num_locks_acquired = 0;
   for (auto pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
     auto mode = pair.second;
-    switch (mode) {
-      case LockMode::READ:
-        if (!lock_table_[key].IsQueued(txn_id)
-            && lock_table_[key].AcquireReadLock(txn_id)) {
-          num_locks_waited_[txn_id]--;
-        }
-        break;
-      case LockMode::WRITE:
-        if (!lock_table_[key].IsQueued(txn_id)
-            && lock_table_[key].AcquireWriteLock(txn_id)) {
-          num_locks_waited_[txn_id]--;
-        }
-        break;
-      default:
-        LOG(FATAL) << "Invalid lock mode";
-        break;
+    if (!lock_table_[key].Contains(txn_id)) {
+      auto before_mode = lock_table_[key].mode;
+      switch (mode) {
+        case LockMode::READ:
+          if (lock_table_[key].AcquireReadLock(txn_id)) {
+            num_locks_acquired++;
+          }
+          break;
+        case LockMode::WRITE:
+          if (lock_table_[key].AcquireWriteLock(txn_id)) {
+            num_locks_acquired++;
+          }
+          break;
+        default:
+          LOG(FATAL) << "Invalid lock mode";
+          break;
+      }
+      if (before_mode == LockMode::UNLOCKED && lock_table_[key].mode != before_mode) {
+        num_locked_keys_++;
+      }
     }
   }
 
-  if (num_locks_waited_[txn_id] == 0) {
-    num_locks_waited_.erase(txn_id);
-    return true;
+  if (num_locks_acquired > 0) {
+    num_locks_waited_[txn_id] -= num_locks_acquired;
+    if (num_locks_waited_[txn_id] == 0) {
+      num_locks_waited_.erase(txn_id);
+      return true;
+    }
   }
   return false;
 }
@@ -163,19 +172,21 @@ DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   for (const auto& pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
 
-    auto new_holders = lock_table_[key].Release(txn_id);
-    for (auto holder : new_holders) {
-      num_locks_waited_[holder]--;
-      if (num_locks_waited_[holder] == 0) {
-        num_locks_waited_.erase(holder);
-        ready_txns.insert(holder);
+    auto new_grantees = lock_table_[key].Release(txn_id);
+     // Prevent the lock table from growing too big
+    if (lock_table_[key].mode == LockMode::UNLOCKED) {
+      num_locked_keys_--;
+      if (lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
+        lock_table_.erase(key);
       }
     }
 
-    // Prevent the lock table from growing too big
-    if (lock_table_[key].mode == LockMode::UNLOCKED && 
-        lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
-      lock_table_.erase(key);
+    for (auto new_txn : new_grantees) {
+      num_locks_waited_[new_txn]--;
+      if (num_locks_waited_[new_txn] == 0) {
+        num_locks_waited_.erase(new_txn);
+        ready_txns.insert(new_txn);
+      }
     }
   }
 
@@ -188,20 +199,54 @@ void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t lev
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();
-  stats.AddMember(StringRef(NUM_LOCKED_KEYS), lock_table_.size(), alloc);
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
 
   if (level >= 1) {
     // Collect number of locks waited per txn
     rapidjson::Value num_locks(rapidjson::kArrayType);
     for (const auto& pair : num_locks_waited_) {
-      rapidjson::Value txn_and_locks(rapidjson::kArrayType);
-      txn_and_locks
-          .PushBack(pair.first, alloc)
-          .PushBack(pair.second, alloc);
-      num_locks.PushBack(std::move(txn_and_locks), alloc);
+      rapidjson::Value entry(rapidjson::kArrayType);
+      entry
+          .PushBack(pair.first, alloc)   /* txn */
+          .PushBack(pair.second, alloc); /* num locks */
+      num_locks.PushBack(move(entry), alloc);
     }
-    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), std::move(num_locks), alloc);
+    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), move(num_locks), alloc);
+  }
+
+  stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);
+  if (level >= 2) {
+    // Collect data from lock tables
+    rapidjson::Value lock_table(rapidjson::kArrayType);
+    for (const auto& pair : lock_table_) {
+      auto& key = pair.first;
+      auto& lock_state = pair.second;
+      if (lock_state.mode == LockMode::UNLOCKED) {
+        continue;
+      }
+
+      rapidjson::Value holders(rapidjson::kArrayType);
+      for (auto holder : lock_state.GetHolders()) {
+        holders.PushBack(holder, alloc);
+      }
+
+      rapidjson::Value waiters(rapidjson::kArrayType);
+      for (auto waiter : lock_state.GetWaiters()) {
+        rapidjson::Value txn_and_mode(rapidjson::kArrayType);
+        txn_and_mode.PushBack(waiter.first, alloc)
+                    .PushBack(static_cast<uint32_t>(waiter.second), alloc);
+        waiters.PushBack(txn_and_mode, alloc);
+      }
+
+      rapidjson::Value entry(rapidjson::kArrayType);
+      rapidjson::Value key_json(key.c_str(), alloc);
+      entry.PushBack(key_json, alloc)
+           .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
+           .PushBack(move(holders), alloc)
+           .PushBack(move(waiters), alloc);
+      lock_table.PushBack(move(entry), alloc);
+    }
+    stats.AddMember(StringRef(LOCK_TABLE), move(lock_table), alloc);
   }
 }
 

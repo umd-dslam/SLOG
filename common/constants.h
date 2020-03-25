@@ -38,5 +38,10 @@ const char NUM_READY_TXNS[] = "num_ready_txns";
 const char NUM_LOCKED_KEYS[] = "num_locked_keys";
 const char NUM_TXNS_WAITING_FOR_LOCK[] = "num_txns_waiting_for_lock";
 const char NUM_LOCKS_WAITED_PER_TXN[] = "num_locks_waited_per_txn";
+const char LOCK_TABLE[] = "lock_table";
+const char LOCAL_LOG_NUM_BUFFERED_SLOTS[] = "local_log_num_buffered_slots";
+const char LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE[] = "local_log_num_buffered_batches_per_queue";
+const char GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION[] = "global_log_num_buffered_slots_per_region";
+const char GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION[] = "global_log_num_buffered_batches_per_region";
 
 } // namespace slog

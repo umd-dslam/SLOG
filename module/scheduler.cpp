@@ -1,5 +1,7 @@
 #include "module/scheduler.h"
 
+#include <stack>
+
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
@@ -23,8 +25,8 @@ Scheduler::Scheduler(
     Broker& broker,
     shared_ptr<Storage<Key, Record>> storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
-    // All single-home txn logs take indices in the [0, num_replicas - 1]
-    // range, num_replicas can be used as the marker for multi-home txn log
+    // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
+    // range, num_replicas can be used as the marker for MULTI-HOME txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
     worker_socket_(context, ZMQ_ROUTER) {
@@ -145,7 +147,7 @@ void Scheduler::ProcessForwardBatch(
  
       switch (batch->transaction_type()) {
         case TransactionType::SINGLE_HOME: {
-          VLOG(1) << "Received data for single-home batch " << batch->id()
+          VLOG(1) << "Received data for SINGLE-HOME batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
           // If this batch comes from the local region, put it into the local interleaver
@@ -160,10 +162,10 @@ void Scheduler::ProcessForwardBatch(
           break;
         }
         case TransactionType::MULTI_HOME: {
-          VLOG(1) << "Received data for multi-home batch " << batch->id()
+          VLOG(1) << "Received data for MULTI-HOME batch " << batch->id()
               << " from [" << from_machine_id
               << "]. Number of txns: " << batch->transactions_size();
-          // Multi-home txns are already ordered with respect to each other
+          // MULTI-HOME txns are already ordered with respect to each other
           // and their IDs have been replaced with slot id in the orderer module
           // so here their id and slot id are the same
           all_logs_[kMultiHomeTxnLogMarker].AddSlot(batch->id(), batch->id());
@@ -233,7 +235,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   stats.SetObject();
   auto& alloc = stats.GetAllocator();
 
-  // Add stats about current transactions in the system
+  // Add stats for current transactions in the system
   stats.AddMember(StringRef(NUM_READY_WORKERS), ready_workers_.size(), alloc);
   stats.AddMember(StringRef(NUM_READY_TXNS), ready_txns_.size(), alloc);
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
@@ -244,6 +246,39 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
     }
     stats.AddMember(StringRef(ALL_TXNS), move(all_txn_ids), alloc);
   }
+
+  // Add stats for local logs
+  stats.AddMember(StringRef(LOCAL_LOG_NUM_BUFFERED_SLOTS), local_interleaver_.NumBufferedSlots(), alloc);
+  rapidjson::Value buffered_batches_per_queue(rapidjson::kArrayType);
+  for (const auto& pair : local_interleaver_.NumBufferedBatchesPerQueue()) {
+    rapidjson::Value queue_and_batches(rapidjson::kArrayType);
+    queue_and_batches
+        .PushBack(pair.first, alloc)
+        .PushBack(pair.second, alloc);
+    buffered_batches_per_queue.PushBack(move(queue_and_batches), alloc);
+  }
+  stats.AddMember(StringRef(LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE), buffered_batches_per_queue, alloc);
+
+  // Add stats for global logs
+  rapidjson::Value buffered_slots_per_region(rapidjson::kArrayType);
+  for (const auto& pair : all_logs_) {
+    rapidjson::Value region_and_slots(rapidjson::kArrayType);
+    region_and_slots
+        .PushBack(pair.first, alloc)
+        .PushBack(pair.second.NumBufferedSlots(), alloc);
+    buffered_slots_per_region.PushBack(move(region_and_slots), alloc);
+  }
+  stats.AddMember(StringRef(GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION), buffered_slots_per_region, alloc);
+
+  rapidjson::Value buffered_batches_per_region(rapidjson::kArrayType);
+  for (const auto& pair : all_logs_) {
+    rapidjson::Value region_and_batches(rapidjson::kArrayType);
+    region_and_batches
+        .PushBack(pair.first, alloc)
+        .PushBack(pair.second.NumBufferedBatches(), alloc);
+    buffered_batches_per_region.PushBack(move(region_and_batches), alloc);
+  }
+  stats.AddMember(StringRef(GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION), buffered_batches_per_region, alloc);
 
   // Add stats from the lock manager
   lock_manager_.GetStats(stats, level);
@@ -272,9 +307,9 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unlocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
-  for (auto unlocked_txn : unlocked_txns) {
-    EnqueueTransactionForDispatching(unlocked_txn);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
+  for (auto unblocked_txn : unblocked_txns) {
+    EnqueueTransactionForDispatching(unblocked_txn);
   }
   auto txn = all_txns_[txn_id].ReleaseTransaction();
   all_txns_.erase(txn_id);
@@ -322,21 +357,35 @@ void Scheduler::MaybeUpdateLocalLog() {
 }
 
 void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
-  // Interleave batches from local logs of all regions and the log of multi-home txn
+  // Interleave batches from local logs of all regions and the log of MULTI-HOME txn
   for (auto& pair : all_logs_) {
     auto& local_log = pair.second;
     while (local_log.HasNextBatch()) {
       auto batch = local_log.NextBatch().second;
       auto transactions = batch->mutable_transactions();
 
+      VLOG(1) << "Processing batch " << batch->id() << " from global log";
+
+      // Calling ReleaseLast creates an incorrect order of transactions in a batch; thus,
+      // buffering them in a stack to reverse the order.
+      std::stack<Transaction*> buffer;
       while (!transactions->empty()) {
-        auto txn = transactions->ReleaseLast();
+        buffer.push(transactions->ReleaseLast());
+      }
+
+      while (!buffer.empty()) {
+        auto txn = buffer.top();
+        buffer.pop();
+
         auto txn_type = txn->internal().type();
 
         switch (txn_type) {
           case TransactionType::SINGLE_HOME: {
             if (AcceptTransaction(txn)) {
               auto txn_id = txn->internal().id();
+
+              VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
+
               if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
                 EnqueueTransactionForDispatching(txn_id);
               }
@@ -346,6 +395,9 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
           case TransactionType::MULTI_HOME: {
             if (AcceptTransaction(txn)) {
               auto txn_id = txn->internal().id();
+
+              VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
+
               if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
                 EnqueueTransactionForDispatching(txn_id); 
               }
@@ -355,11 +407,17 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
           case TransactionType::LOCK_ONLY: {
             // We discard lock_only txn right away so only need a tmp holder
             TransactionHolder tmp_holder(config_, txn);
-            if (lock_manager_.AcquireLocks(tmp_holder)) {
+
+            if (!tmp_holder.KeysInPartition().empty()) {
               auto txn_id = txn->internal().id();
-              CHECK(all_txns_.count(txn_id) > 0) 
-                  << "Txn " << txn_id << " is not found for dispatching";
-              EnqueueTransactionForDispatching(txn_id);
+
+              VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
+
+              if (lock_manager_.AcquireLocks(tmp_holder)) {
+                CHECK(all_txns_.count(txn_id) > 0) 
+                    << "Txn " << txn_id << " is not found for dispatching";
+                EnqueueTransactionForDispatching(txn_id);
+              }
             }
             break;
           }
@@ -391,6 +449,7 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
 void Scheduler::EnqueueTransactionForDispatching(TxnId txn_id) {
   VLOG(2) << "Enqueued txn " << txn_id;
   ready_txns_.push(txn_id);
+  // Since we now have a ready txn in queue, try dispatching a txn in the queue
   MaybeDispatchNextTransaction();
 }
 
