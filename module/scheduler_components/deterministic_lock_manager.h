@@ -31,15 +31,24 @@ public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
   unordered_set<TxnId> Release(TxnId txn_id);
-  bool IsQueued(TxnId txn_id);
+  bool Contains(TxnId txn_id);
 
   LockMode mode = LockMode::UNLOCKED;
+
+  /* For debugging */
+  const unordered_set<TxnId>& GetHolders() const {
+    return holders_;
+  }
+
+  /* For debugging */
+  const list<pair<TxnId, LockMode>>& GetWaiters() const {
+    return waiter_queue_;
+  }
 
 private:
   unordered_set<TxnId> holders_;
   unordered_set<TxnId> waiters_;
   list<pair<TxnId, LockMode>> waiter_queue_;
-
 };
 
 /**
@@ -101,6 +110,7 @@ public:
 private:
   unordered_map<Key, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
+  uint32_t num_locked_keys_ = 0;
 };
 
 } // namespace slog

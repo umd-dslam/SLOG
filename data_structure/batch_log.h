@@ -21,6 +21,16 @@ public:
   bool HasNextBatch() const;
   std::pair<SlotId, BatchPtr> NextBatch();
 
+  /* For debugging */
+  size_t NumBufferedSlots() const {
+    return slots_.NumBufferredItems();
+  }
+
+  /* For debugging */
+  size_t NumBufferedBatches() const {
+    return batches_.size();
+  }
+
 private:
   void UpdateReadyBatches();
 
