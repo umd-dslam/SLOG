@@ -84,11 +84,9 @@ private:
   
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
-  unordered_map<Key, list<pair<TxnId, uint32_t>>> blocked_queue_;
+  unordered_map<Key, list<pair<Transaction&, uint32_t>>> blocked_queue_;
 
-  // Queues of keys that are blocked waiting for other keys of the transaction to be remastered, or for other
-  // transactions ahead in order.
-  unordered_map<Key, list<TxnId>> indirectly_blocked_queue;
+  unordered_map<Key, uint32_t> counters_;
 };
 
 } // namespace slog

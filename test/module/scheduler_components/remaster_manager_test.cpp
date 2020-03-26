@@ -102,3 +102,13 @@ TEST_F(RemasterManagerTest, RemasterQueueMultipleTxns) {
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2), ElementsAre());
   ASSERT_THAT(remaster_manager->RemasterOccured("A", 2), ElementsAre(100, 101));
 }
+
+TEST_F(RemasterManagerTest, AvoidsDeadlock) {
+  storage->Write("A", Record("valueA", 0, 1));
+  storage->Write("B", Record("valueB", 0, 1));
+  auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}}), 101);
+  auto& txn2 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}}), 100);
+
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::VALID);
+}

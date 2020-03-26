@@ -15,14 +15,14 @@ RemasterManager::RemasterManager(
 
 VerifyMasterResult
 RemasterManager::VerifyMaster(const TransactionHolder& txn_holder) {
-  auto txn = *txn_holder.txn;
-  auto keys = txn_holder.keys_in_partition;
+  auto& txn = *txn_holder.txn;
+  auto& keys = txn_holder.keys_in_partition;
   if (keys.empty()) {
     // None of the keys in this txn is in this partition
     return VerifyMasterResult::VALID;
   }
 
-  auto txn_master_metadata = txn.internal().master_metadata();
+  auto& txn_master_metadata = txn.internal().master_metadata();
   // This should only be the case for testing
   // TODO: add metadata to test cases, make this fatal
   if (txn_master_metadata.empty()) {
@@ -32,38 +32,37 @@ RemasterManager::VerifyMaster(const TransactionHolder& txn_holder) {
 
   // keeps track of counters that will need to be waited on
   std::unordered_map<Key, int32_t> ahead_counters;
-  for (auto pair : keys) {
+  for (auto& pair : keys) {
     auto key = pair.first;
     auto txn_metadata = txn_master_metadata.at(key);
 
-    Record record;
-    // TODO: this is not thread safe, the lock is not currently held
-    bool found = storage_->Read(key, record);
-    if (found) {
-      CHECK(txn_master_metadata.contains(key))
+    // Check with storage to get current counter
+    if (counters_.count(key) == 0) {
+      Record record;
+      bool found = storage_->Read(key, record);
+      if (found) {
+        CHECK(txn_master_metadata.contains(key))
               << "Master metadata for key \"" << key << "\" is missing";
-      auto stored_metadata = record.metadata;
-
-      if (txn_metadata.counter() > stored_metadata.counter) {
-        ahead_counters[key] = txn_metadata.counter();
-      } else if (txn_metadata.counter() < stored_metadata.counter) {
-        return VerifyMasterResult::ABORT;
+        counters_[key] = record.metadata.counter;
       } else {
-        CHECK(txn_metadata.master() == stored_metadata.master)
-                << "Metadata is invalid, different masters with the same counter";
+        counters_[key] = 0;
       }
-    } else { // key not in storage
-      if (txn_metadata.counter() > 0) {
-        ahead_counters[key] = txn_metadata.counter();
-      }
+    }
+    auto stored_counter = counters_.at(key);
+
+    if (txn_metadata.counter() > stored_counter) {
+      ahead_counters[key] = txn_metadata.counter();
+    } else if (txn_metadata.counter() < stored_counter) {
+      return VerifyMasterResult::ABORT;
     }
   }
 
   // Check if no keys are blocked at all
   if (ahead_counters.empty()){
     auto no_key_indirectly_blocked = true;
-    for (auto key : txn_holder.keys_in_partition) {
-      if (indirectly_blocked_queue.count(key.first)) {
+    for (auto& pair : keys) {
+      auto key = pair.first;
+      if (blocked_queue_.count(key)) {
         no_key_indirectly_blocked = false;
         break;
       }
@@ -74,22 +73,17 @@ RemasterManager::VerifyMaster(const TransactionHolder& txn_holder) {
   }
 
   // add the txn to the queue for each key
-  for (auto key : txn_holder.keys_in_partition) {
-    // key is waiting on remaster, directly blocked
-    if (ahead_counters.count(key.first)) {
-      auto counter = ahead_counters[key.first];
-      InsertIntoBlockedQueue(key.first, counter, txn);
-    } else { // key is not blocked by remaster
-      auto txn_id = txn.internal().id();
-      indirectly_blocked_queue[key.first].push_back(txn_id);
-    }
+  for (auto& pair : keys) {
+    auto key = pair.first;
+    auto counter = txn_master_metadata.at(key).counter();
+    InsertIntoBlockedQueue(key, counter, txn);
   }
   return VerifyMasterResult::WAITING;
 }
 
 void RemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn) {
   auto txn_id = txn.internal().id();
-  auto entry = make_pair(txn_id, counter);
+  auto entry = make_pair(txn, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
   auto itr = blocked_queue_[key].begin();
@@ -106,6 +100,15 @@ list<TxnId> RemasterManager::RemasterOccured(Key key, const uint32_t remaster_co
   // No txns waiting for this remaster
   if (blocked_queue_.count(key) == 0) {
     return unblocked;
+  }
+
+  CHECK(remaster_counter == counters_.at(key) + 1) << "Remaster didn't increase cached counter by 1";
+  counters_[key] = remaster_counter;
+
+  auto itr = blocked_queue_[key].begin();
+  while (itr != blocked_queue_[key].end() && (*itr).second <= remaster_counter) {
+    CHECK((*itr).second == remaster_counter) << "Old counters stuck in remaster queue"
+    TryToUnblock(key, unblocked);
   }
 
   // If this queue already has elements, then no txns will be unblocked
@@ -131,6 +134,17 @@ list<TxnId> RemasterManager::RemasterOccured(Key key, const uint32_t remaster_co
   }
   
   return unblocked;
+}
+
+void RemasterManager::TryToUnblock(const Key unblocked_key) {
+  if (blocked_queue_.count(unblocked_key) == 0) {
+    return;
+  }
+
+  auto& txn_pair = blocked_queue_.at(unblocked_key).front();
+  auto& txn = txn_pair.first;
+  
+  for (auto& pair)
 }
 
 void RemasterManager::TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked) {
