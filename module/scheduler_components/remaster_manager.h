@@ -35,7 +35,7 @@ public:
   RemasterManager(
     ConfigurationPtr config,
     shared_ptr<Storage<Key, Record>> storage,
-    shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns);
+    shared_ptr<TransactionMap> all_txns);
 
   /**
    * Checks the counters of the transaction's master metadata.
@@ -80,7 +80,7 @@ private:
 
   ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;
-  shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns_;
+  shared_ptr<TransactionMap> all_txns_;
   
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie

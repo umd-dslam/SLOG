@@ -15,13 +15,13 @@ protected:
   void SetUp() {
     configs = MakeTestConfigurations("locking", 1, 1);
     storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
-    all_txns = make_shared<unordered_map<TxnId, TransactionHolder>>();
+    all_txns = make_shared<TransactionMap>();
     remaster_manager = make_unique<RemasterManager>(configs[0], storage, all_txns);
   }
 
   ConfigVec configs;
   shared_ptr<Storage<Key, Record>> storage;
-  shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns;
+  shared_ptr<TransactionMap> all_txns;
   unique_ptr<RemasterManager> remaster_manager;
 
   TransactionHolder& MakeHolder(Transaction txn, TxnId txn_id) {
