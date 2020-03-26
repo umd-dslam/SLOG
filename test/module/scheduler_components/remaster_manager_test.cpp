@@ -2,7 +2,7 @@
 
 #include "common/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/remaster_queue_manager.h"
+#include "module/scheduler_components/remaster_manager.h"
 
 using namespace std;
 using namespace slog;
@@ -10,19 +10,19 @@ using ::testing::ElementsAre;
 using ::testing::IsEmpty;
 using std::make_pair;
 
-class RemasterQueueManagerTest : public ::testing::Test {
+class RemasterManagerTest : public ::testing::Test {
 protected:
   void SetUp() {
     configs = MakeTestConfigurations("locking", 1, 1);
     storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
     all_txns = make_shared<unordered_map<TxnId, TransactionHolder>>();
-    remaster_manager = make_unique<RemasterQueueManager>(configs[0], storage, all_txns);
+    remaster_manager = make_unique<RemasterManager>(configs[0], storage, all_txns);
   }
 
   ConfigVec configs;
   shared_ptr<Storage<Key, Record>> storage;
   shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns;
-  unique_ptr<RemasterQueueManager> remaster_manager;
+  unique_ptr<RemasterManager> remaster_manager;
 
   TransactionHolder& MakeHolder(Transaction txn, TxnId txn_id) {
     txn.mutable_internal()->set_id(txn_id);
@@ -35,7 +35,7 @@ protected:
   }
 };
 
-TEST_F(RemasterQueueManagerTest, CheckCounters) {
+TEST_F(RemasterManagerTest, CheckCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 100);
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 101);
@@ -46,7 +46,7 @@ TEST_F(RemasterQueueManagerTest, CheckCounters) {
   ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
 }
 
-TEST_F(RemasterQueueManagerTest, CheckMultipleCounters) {
+TEST_F(RemasterManagerTest, CheckMultipleCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   storage->Write("C", Record("valueC", 0, 1));
@@ -59,7 +59,7 @@ TEST_F(RemasterQueueManagerTest, CheckMultipleCounters) {
   ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
 }
 
-TEST_F(RemasterQueueManagerTest, CheckIndirectBlocking) {
+TEST_F(RemasterManagerTest, CheckIndirectBlocking) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 2}}}), 100);
@@ -71,7 +71,7 @@ TEST_F(RemasterQueueManagerTest, CheckIndirectBlocking) {
   ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::VALID);
 }
 
-TEST_F(RemasterQueueManagerTest, RemasterQueueSingleKey) {
+TEST_F(RemasterManagerTest, RemasterQueueSingleKey) {
   storage->Write("A", Record("valueA", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
 
@@ -80,7 +80,7 @@ TEST_F(RemasterQueueManagerTest, RemasterQueueSingleKey) {
   ASSERT_THAT(unblocked, ElementsAre(100));
 }
 
-TEST_F(RemasterQueueManagerTest, RemasterQueueMultipleKeys) {
+TEST_F(RemasterManagerTest, RemasterQueueMultipleKeys) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 3}}}), 100);
@@ -91,7 +91,7 @@ TEST_F(RemasterQueueManagerTest, RemasterQueueMultipleKeys) {
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 3), ElementsAre(100));
 }
 
-TEST_F(RemasterQueueManagerTest, RemasterQueueMultipleTxns) {
+TEST_F(RemasterManagerTest, RemasterQueueMultipleTxns) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}}), 100);

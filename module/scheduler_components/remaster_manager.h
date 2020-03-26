@@ -21,8 +21,8 @@ using std::vector;
 
 namespace slog {
 
+using TransactionMap = unordered_map<TxnId, TransactionHolder>;
 enum class VerifyMasterResult {VALID, WAITING, ABORT};
-
 
 /**
  * The remaster queue manager also conducts the check of master metadata.
@@ -30,9 +30,9 @@ enum class VerifyMasterResult {VALID, WAITING, ABORT};
  * need to be restarted. If the transaction arrived before a remaster that
  * the forwarder included in the metadata, then it will need to wait.
  */
-class RemasterQueueManager {
+class RemasterManager {
 public:
-  RemasterQueueManager(
+  RemasterManager(
     ConfigurationPtr config,
     shared_ptr<Storage<Key, Record>> storage,
     shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns);
@@ -84,7 +84,7 @@ private:
   
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
-  unordered_map<Key, list<pair<TxnId, uint32_t>>> blocked_queue;
+  unordered_map<Key, list<pair<TxnId, uint32_t>>> blocked_queue_;
 
   // Queues of keys that are blocked waiting for other keys of the transaction to be remastered, or for other
   // transactions ahead in order.

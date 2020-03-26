@@ -1,4 +1,4 @@
-#include "module/scheduler_components/remaster_queue_manager.h"
+#include "module/scheduler_components/remaster_manager.h"
 
 #include <glog/logging.h>
 #include "common/transaction_utils.h"
@@ -7,14 +7,14 @@ using std::make_pair;
 
 namespace slog {
 
-RemasterQueueManager::RemasterQueueManager(
-      ConfigurationPtr config,
-      shared_ptr<Storage<Key, Record>> storage,
-      shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns)
+RemasterManager::RemasterManager(
+    ConfigurationPtr config,
+    shared_ptr<Storage<Key, Record>> storage,
+    shared_ptr<unordered_map<TxnId, TransactionHolder>> all_txns)
   : config_(config), storage_(storage), all_txns_(all_txns) {}
 
 VerifyMasterResult
-RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
+RemasterManager::VerifyMaster(const TransactionHolder& txn_holder) {
   auto txn = *txn_holder.txn;
   auto keys = txn_holder.keys_in_partition;
   if (keys.empty()) {
@@ -37,6 +37,7 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
     auto txn_metadata = txn_master_metadata.at(key);
 
     Record record;
+    // TODO: this is not thread safe, the lock is not currently held
     bool found = storage_->Read(key, record);
     if (found) {
       CHECK(txn_master_metadata.contains(key))
@@ -44,7 +45,7 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
       auto stored_metadata = record.metadata;
 
       if (txn_metadata.counter() > stored_metadata.counter) {
-        ahead_counters[key] += txn_metadata.counter();
+        ahead_counters[key] = txn_metadata.counter();
       } else if (txn_metadata.counter() < stored_metadata.counter) {
         return VerifyMasterResult::ABORT;
       } else {
@@ -53,7 +54,7 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
       }
     } else { // key not in storage
       if (txn_metadata.counter() > 0) {
-        ahead_counters[key] += txn_metadata.counter();
+        ahead_counters[key] = txn_metadata.counter();
       }
     }
   }
@@ -86,24 +87,24 @@ RemasterQueueManager::VerifyMaster(const TransactionHolder& txn_holder) {
   return VerifyMasterResult::WAITING;
 }
 
-void RemasterQueueManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn) {
+void RemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn) {
   auto txn_id = txn.internal().id();
   auto entry = make_pair(txn_id, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
-  auto itr = blocked_queue[key].begin();
-  while (itr != blocked_queue[key].end() && (*itr).second >= counter) {
+  auto itr = blocked_queue_[key].begin();
+  while (itr != blocked_queue_[key].end() && (*itr).second >= counter) {
     itr++;
   }
-  blocked_queue[key].insert(itr, entry);
+  blocked_queue_[key].insert(itr, entry);
 }
 
-list<TxnId> RemasterQueueManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
+list<TxnId> RemasterManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
   list<TxnId> unblocked;
   list<TxnId> shouldAbort;
 
   // No txns waiting for this remaster
-  if (blocked_queue.count(key) == 0) {
+  if (blocked_queue_.count(key) == 0) {
     return unblocked;
   }
 
@@ -112,8 +113,8 @@ list<TxnId> RemasterQueueManager::RemasterOccured(Key key, const uint32_t remast
 
   // Move keys to indirectly_blocked_queue
   auto moved_keys = false;
-  auto itr = blocked_queue[key].begin();
-  while (itr != blocked_queue[key].end() && (*itr).second <= remaster_counter) {
+  auto itr = blocked_queue_[key].begin();
+  while (itr != blocked_queue_[key].end() && (*itr).second <= remaster_counter) {
     auto txn_id = (*itr).first;
     if ((*itr).second < remaster_counter) {
       // TODO abort these
@@ -121,7 +122,7 @@ list<TxnId> RemasterQueueManager::RemasterOccured(Key key, const uint32_t remast
     }
     indirectly_blocked_queue[key].push_back(txn_id);
     moved_keys = true;
-    itr = blocked_queue[key].erase(itr);
+    itr = blocked_queue_[key].erase(itr);
   }
 
   // Try to unblock txns
@@ -132,7 +133,7 @@ list<TxnId> RemasterQueueManager::RemasterOccured(Key key, const uint32_t remast
   return unblocked;
 }
 
-void RemasterQueueManager::TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked) {
+void RemasterManager::TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked) {
   if (indirectly_blocked_queue.count(unblocked_key) == 0) {
     return;
   }

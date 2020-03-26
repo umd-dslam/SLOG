@@ -12,7 +12,7 @@ add_library(scheduler_components
   scheduler_components/batch_interleaver.cpp
   scheduler_components/commands.cpp
   scheduler_components/deterministic_lock_manager.cpp
-  scheduler_components/remaster_queue_manager.cpp
+  scheduler_components/remaster_manager.cpp
   scheduler_components/worker.cpp)
 target_link_libraries(scheduler_components common)
 

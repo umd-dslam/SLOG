@@ -1,6 +1,9 @@
 #pragma once
 
 #include <vector>
+#include "common/configuration.h"
+#include "common/constants.h"
+#include "common/types.h"
 
 #include "common/configuration.h"
 #include "common/types.h"
