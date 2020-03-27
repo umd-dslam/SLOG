@@ -18,13 +18,12 @@ RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
   auto txn = txn_holder.GetTransaction();
   auto& keys = txn_holder.KeysInPartition();
   if (keys.empty()) {
-    // None of the keys in this txn is in this partition
+    // None of the keys in this txn are in this partition
     return VerifyMasterResult::VALID;
   }
 
   auto& txn_master_metadata = txn->internal().master_metadata();
   // This should only be the case for testing
-  // TODO: add metadata to test cases, make this fatal
   if (txn_master_metadata.empty()) {
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return VerifyMasterResult::VALID;
@@ -97,7 +96,6 @@ void RemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t count
 
 list<TxnReplicaId> RemasterManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
   list<TxnReplicaId> unblocked;
-  // list<TxnId> shouldAbort;
 
   // No txns waiting for this remaster
   if (blocked_queue_.count(key) == 0) {

@@ -28,7 +28,7 @@ using TransactionMap = unordered_map<TxnReplicaId, TransactionHolder>;
 enum class VerifyMasterResult {VALID, WAITING, ABORT};
 
 /**
- * The remaster queue manager also conducts the check of master metadata.
+ * The remaster queue manager conducts the check of master metadata.
  * If a remaster has occured since the transaction was forwarded, it may
  * need to be restarted. If the transaction arrived before a remaster that
  * the forwarder included in the metadata, then it will need to wait.
@@ -49,7 +49,8 @@ public:
    * - If Waiting, the counters were ahead (meaning that a remaster
    * has occured at another region before the local). The
    * transaction will be put in a queue to wait for the remaster
-   * to be executed locally.
+   * to be executed locally. Or, the transaction is blocked behind
+   * another transaction that is waiting.
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
@@ -88,6 +89,7 @@ private:
   // arrivals break tie
   unordered_map<Key, list<pair<TxnReplicaId, uint32_t>>> blocked_queue_;
 
+  // Cached counter value for each key that's currently in the queue
   unordered_map<Key, uint32_t> counters_;
 
   shared_ptr<TransactionMap> all_txns_;
