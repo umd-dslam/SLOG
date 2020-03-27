@@ -16,7 +16,7 @@ protected:
     configs = MakeTestConfigurations("locking", 1, 1);
     storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
     all_txns = make_shared<TransactionMap>();
-    remaster_manager = make_unique<RemasterManager>(configs[0], storage, all_txns);
+    remaster_manager = make_unique<RemasterManager>(storage, all_txns);
   }
 
   ConfigVec configs;

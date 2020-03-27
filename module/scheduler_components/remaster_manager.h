@@ -5,7 +5,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/configuration.h"
 #include "common/constants.h"
 #include "common/types.h"
 #include "common/transaction_utils.h"
@@ -36,7 +35,6 @@ enum class VerifyMasterResult {VALID, WAITING, ABORT};
 class RemasterManager {
 public:
   RemasterManager(
-    ConfigurationPtr config,
     shared_ptr<Storage<Key, Record>> storage,
     shared_ptr<TransactionMap> all_txns);
 
@@ -75,14 +73,13 @@ private:
   void InsertIntoBlockedQueue(const Key key, const uint32_t counter, const TxnReplicaId txn_replica_id);
 
   /**
-   * A txn can be unblocked if it is at the front of the indirectly_blocked_queue for
+   * A txn can be unblocked if it is at the front of the queue for
    * all of its keys. This function will try to unblock the txn at the key specified,
    * and if successful it will continue recursively on the keys of the transaction that
    * was unblocked.
    */
   void TryToUnblock(const Key unblocked_key, list<TxnReplicaId>& unblocked);
 
-  ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;
   
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest

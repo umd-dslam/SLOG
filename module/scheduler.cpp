@@ -27,7 +27,8 @@ Scheduler::Scheduler(
     // range, num_replicas can be used as the marker for MULTI-HOME txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
-    worker_socket_(context, ZMQ_ROUTER) {
+    worker_socket_(context, ZMQ_ROUTER),
+    remaster_manager_(storage, make_shared<TransactionMap>(all_txns_)) {
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
   worker_socket_.setsockopt(ZMQ_SNDHWM, 0);
@@ -384,66 +385,106 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
         auto txn = buffer.top();
         buffer.pop();
 
-        auto txn_type = txn->internal().type();
-
-        switch (txn_type) {
-          case TransactionType::SINGLE_HOME: {
-            if (AcceptTransaction(txn)) {
-              auto txn_id = txn->internal().id();
-
-              VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
-
-              if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
-                DispatchTransaction(txn_id);
+        if (AcceptTransaction(txn)) {
+          auto txn_type = txn->internal().type();
+          auto txn_replica_id = txn->internal().replica_id();
+          switch (txn_type) {
+            case TransactionType::SINGLE_HOME: {
+              switch (remaster_manager_.VerifyMaster(txn_replica_id)) {
+                case VerifyMasterResult::VALID: {
+                  SendToLockManager(txn);
+                  break;
+                }
+                case VerifyMasterResult::ABORT: {
+                  // TODO abort
+                  break;
+                }
               }
+              break;
             }
-            break;
-          }
-          case TransactionType::MULTI_HOME: {
-            if (AcceptTransaction(txn)) {
-              auto txn_id = txn->internal().id();
-
-              VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
-
-              if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
-                DispatchTransaction(txn_id); 
+            case TransactionType::MULTI_HOME: {
+              SendToLockManager(txn);
+              break;
+            }
+            case TransactionType::LOCK_ONLY: {
+              switch (remaster_manager_.VerifyMaster(txn_replica_id)) {
+                case VerifyMasterResult::VALID: {
+                  SendToLockManager(txn);
+                  break;
+                }
+                case VerifyMasterResult::ABORT: {
+                  // TODO abort
+                  break;
+                }
               }
+              break;
             }
-            break;
           }
-          case TransactionType::LOCK_ONLY: {
-            // We discard lock_only txn right away so only need a tmp holder
-            TransactionHolder tmp_holder(config_, txn);
-
-            if (!tmp_holder.KeysInPartition().empty()) {
-              auto txn_id = txn->internal().id();
-
-              VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
-
-              if (lock_manager_.AcquireLocks(tmp_holder)) {
-                CHECK(all_txns_.count(txn_id) > 0) 
-                    << "Txn " << txn_id << " is not found for dispatching";
-                DispatchTransaction(txn_id);
-              }
-            }
-            break;
-          }
-          default:
-            LOG(ERROR) << "Unknown transaction type";
-            break;
         }
+
       }
     }
   }
 }
 
+void Scheduler::SendToLockManager(Transaction* txn) {
+  auto txn_type = txn->internal().type();
+
+  switch (txn_type) {
+    case TransactionType::SINGLE_HOME: {
+      if (AcceptTransaction(txn)) {
+        auto txn_id = txn->internal().id();
+
+        VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
+
+        if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
+          DispatchTransaction(txn_id);
+        }
+      }
+      break;
+    }
+    case TransactionType::MULTI_HOME: {
+      if (AcceptTransaction(txn)) {
+        auto txn_id = txn->internal().id();
+
+        VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
+
+        if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
+          DispatchTransaction(txn_id); 
+        }
+      }
+      break;
+    }
+    case TransactionType::LOCK_ONLY: {
+      // We discard lock_only txn right away so only need a tmp holder
+      TransactionHolder tmp_holder(config_, txn);
+
+      if (!tmp_holder.KeysInPartition().empty()) {
+        auto txn_id = txn->internal().id();
+
+        VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
+
+        if (lock_manager_.AcquireLocks(tmp_holder)) {
+          CHECK(all_txns_.count(txn_id) > 0) 
+              << "Txn " << txn_id << " is not found for dispatching";
+          DispatchTransaction(txn_id);
+        }
+      }
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unknown transaction type";
+      break;
+  }
+}
+
 bool Scheduler::AcceptTransaction(Transaction* txn) {
-  auto txn_id = txn->internal().id();
-  auto& holder = all_txns_[txn_id];
+  auto txn_replica_id = txn->internal().replica_id();
+  auto& holder = all_txns_[txn_replica_id];
 
   holder.SetTransaction(config_, txn);
   if (holder.KeysInPartition().empty()) {
-    all_txns_.erase(txn_id);
+    all_txns_.erase(txn_replica_id);
     return false;
   }
   return true;

@@ -13,6 +13,7 @@
 #include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/remaster_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
@@ -61,6 +62,7 @@ private:
 
   void MaybeUpdateLocalLog();
   void MaybeProcessNextBatchesFromGlobalLog();
+  void SendToLockManager(Transaction* txn);
 
   bool AcceptTransaction(Transaction* txn);
   void DispatchTransaction(TxnId txn_id);
@@ -77,8 +79,9 @@ private:
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
+  RemasterManager remaster_manager_;
 
-  unordered_map<TxnId, TransactionHolder> all_txns_;
+  TransactionMap all_txns_;
 };
 
 } // namespace slog

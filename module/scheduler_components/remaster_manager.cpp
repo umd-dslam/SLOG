@@ -7,10 +7,9 @@ using std::make_pair;
 namespace slog {
 
 RemasterManager::RemasterManager(
-    ConfigurationPtr config,
     shared_ptr<Storage<Key, Record>> storage,
     shared_ptr<TransactionMap> all_txns)
-  : config_(config), storage_(storage), all_txns_(all_txns) {}
+  : storage_(storage), all_txns_(all_txns) {}
 
 VerifyMasterResult
 RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
