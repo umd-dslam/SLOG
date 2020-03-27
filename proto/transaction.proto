@@ -26,6 +26,7 @@ message TransactionInternal {
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
     internal.MachineId coordinating_server = 4;
+    uint32 replica_id = 5;
 }
 
 message Transaction {

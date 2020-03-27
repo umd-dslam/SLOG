@@ -33,6 +33,10 @@ protected:
     holder.keys_in_partition = keys;
     return holder;
   }
+
+  TxnReplicaId GetTxnReplicaId(TransactionHolder& holder) {
+    return holder.txn->internal().replica_id();
+  }
 };
 
 TEST_F(RemasterManagerTest, CheckCounters) {
@@ -41,9 +45,9 @@ TEST_F(RemasterManagerTest, CheckCounters) {
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 101);
   auto& txn3 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 0}}}), 102);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::VALID);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn3)), VerifyMasterResult::ABORT);
 }
 
 TEST_F(RemasterManagerTest, CheckMultipleCounters) {
@@ -54,9 +58,9 @@ TEST_F(RemasterManagerTest, CheckMultipleCounters) {
   auto& txn2 = MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}}), 101);
   auto& txn3 = MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}}), 102);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::VALID);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn3)), VerifyMasterResult::ABORT);
 }
 
 TEST_F(RemasterManagerTest, CheckIndirectBlocking) {
@@ -66,16 +70,16 @@ TEST_F(RemasterManagerTest, CheckIndirectBlocking) {
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 101);
   auto& txn3 = MakeHolder(MakeTransaction({"B"}, {}, "some code", {{"B", {0, 1}}}), 102);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn3)), VerifyMasterResult::VALID);
 }
 
 TEST_F(RemasterManagerTest, RemasterQueueSingleKey) {
   storage->Write("A", Record("valueA", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
   auto unblocked = remaster_manager->RemasterOccured("A", 2);
   ASSERT_THAT(unblocked, ElementsAre(100));
 }
@@ -85,7 +89,7 @@ TEST_F(RemasterManagerTest, RemasterQueueMultipleKeys) {
   storage->Write("B", Record("valueB", 0, 1));
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 3}}}), 100);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2), ElementsAre());
   ASSERT_THAT(remaster_manager->RemasterOccured("A", 2), ElementsAre());
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 3), ElementsAre(100));
@@ -97,8 +101,8 @@ TEST_F(RemasterManagerTest, RemasterQueueMultipleTxns) {
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}}), 100);
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 2}}}), 101);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::WAITING);
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2), ElementsAre());
   ASSERT_THAT(remaster_manager->RemasterOccured("A", 2), ElementsAre(100, 101));
 }
@@ -109,6 +113,6 @@ TEST_F(RemasterManagerTest, AvoidsDeadlock) {
   auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}}), 101);
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}}), 100);
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::VALID);
 }

@@ -18,10 +18,13 @@ using std::pair;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using std::reference_wrapper;
 
 namespace slog {
 
-using TransactionMap = unordered_map<TxnId, TransactionHolder>;
+using TransactionMap = unordered_map<TxnReplicaId, TransactionHolder>;
+
+// using TransactionMap = unordered_map<TxnId, TransactionHolder>;
 enum class VerifyMasterResult {VALID, WAITING, ABORT};
 
 /**
@@ -50,7 +53,7 @@ public:
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  VerifyMasterResult VerifyMaster(const TransactionHolder& txn_holder);
+  VerifyMasterResult VerifyMaster(const TxnReplicaId txn_replica_id);
 
   /**
    * Updates the queue of transactions waiting for remasters,
@@ -60,7 +63,7 @@ public:
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */
-  list<TxnId> RemasterOccured(Key key, const uint32_t remaster_counter);
+  list<TxnReplicaId> RemasterOccured(const Key key, const uint32_t remaster_counter);
 
 private:
   /**
@@ -68,7 +71,7 @@ private:
    * unblock txns starting from the front of the queue, and stop when they reach a
    * larger counter.
    */
-  void InsertIntoBlockedQueue(const Key key, const uint32_t counter, const Transaction& txn);
+  void InsertIntoBlockedQueue(const Key key, const uint32_t counter, const TxnReplicaId txn_replica_id);
 
   /**
    * A txn can be unblocked if it is at the front of the indirectly_blocked_queue for
@@ -76,17 +79,19 @@ private:
    * and if successful it will continue recursively on the keys of the transaction that
    * was unblocked.
    */
-  void TryToUnblock(const Key unblocked_key, list<TxnId>& unblocked);
+  void TryToUnblock(const Key unblocked_key, list<TxnReplicaId>& unblocked);
 
   ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;
-  shared_ptr<TransactionMap> all_txns_;
   
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
-  unordered_map<Key, list<pair<Transaction&, uint32_t>>> blocked_queue_;
+  unordered_map<Key, list<pair<TxnReplicaId, uint32_t>>> blocked_queue_;
 
   unordered_map<Key, uint32_t> counters_;
+
+  shared_ptr<TransactionMap> all_txns_;
+  
 };
 
 } // namespace slog
