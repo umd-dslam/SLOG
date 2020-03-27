@@ -36,8 +36,6 @@ struct Record {
   Metadata metadata;
 };
 
-enum class LockMode { UNLOCKED, READ, WRITE };
-
 using Clock = steady_clock;
 using TimePoint = Clock::time_point;
 using Duration = Clock::duration;

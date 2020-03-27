@@ -24,18 +24,19 @@ protected:
   shared_ptr<TransactionMap> all_txns;
   unique_ptr<RemasterManager> remaster_manager;
 
-  TransactionHolder& MakeHolder(Transaction txn, TxnId txn_id) {
-    txn.mutable_internal()->set_id(txn_id);
-    CHECK(all_txns->count(txn.internal().id()) == 0) << "Need to set txns to unique id's";
-    auto keys = ExtractKeysInPartition(configs[0], txn);
-    auto& holder = (*all_txns)[txn.internal().id()];
-    holder.txn = make_unique<Transaction>(txn);
-    holder.keys_in_partition = keys;
+  TransactionHolder& MakeHolder(Transaction* txn, TxnId txn_id) {
+
+    auto txn_replica_id = txn_id;
+    txn->mutable_internal()->set_id(txn_id);
+    txn->mutable_internal()->set_replica_id(txn_replica_id);
+    CHECK(all_txns->count(txn->internal().id()) == 0) << "Need to set txns to unique id's";
+    auto& holder = (*all_txns)[txn_replica_id];
+    holder.SetTransaction(configs[0], txn);
     return holder;
   }
 
   TxnReplicaId GetTxnReplicaId(TransactionHolder& holder) {
-    return holder.txn->internal().replica_id();
+    return holder.GetTransaction()->internal().replica_id();
   }
 };
 
@@ -105,14 +106,4 @@ TEST_F(RemasterManagerTest, RemasterQueueMultipleTxns) {
   ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::WAITING);
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2), ElementsAre());
   ASSERT_THAT(remaster_manager->RemasterOccured("A", 2), ElementsAre(100, 101));
-}
-
-TEST_F(RemasterManagerTest, AvoidsDeadlock) {
-  storage->Write("A", Record("valueA", 0, 1));
-  storage->Write("B", Record("valueB", 0, 1));
-  auto& txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 2}}, {"B", {0, 1}}}), 101);
-  auto& txn2 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}}), 100);
-
-  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), VerifyMasterResult::VALID);
 }

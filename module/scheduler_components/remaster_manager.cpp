@@ -15,8 +15,8 @@ RemasterManager::RemasterManager(
 VerifyMasterResult
 RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
   auto& txn_holder = all_txns_->at(txn_replica_id);
-  auto& txn = txn_holder.txn;
-  auto& keys = txn_holder.keys_in_partition;
+  auto txn = txn_holder.GetTransaction();
+  auto& keys = txn_holder.KeysInPartition();
   if (keys.empty()) {
     // None of the keys in this txn is in this partition
     return VerifyMasterResult::VALID;
@@ -34,7 +34,6 @@ RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
   std::unordered_map<Key, int32_t> ahead_counters;
   for (auto& pair : keys) {
     auto key = pair.first;
-    auto txn_metadata = txn_master_metadata.at(key);
 
     // Check with storage to get current counter
     if (counters_.count(key) == 0) {
@@ -49,7 +48,7 @@ RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
       }
     }
     auto stored_counter = counters_.at(key);
-
+    auto txn_metadata = txn_master_metadata.at(key);
     if (txn_metadata.counter() > stored_counter) {
       ahead_counters[key] = txn_metadata.counter();
     } else if (txn_metadata.counter() < stored_counter) {
@@ -62,9 +61,13 @@ RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
     auto no_key_indirectly_blocked = true;
     for (auto& pair : keys) {
       auto key = pair.first;
+      // If the queue is emtpy, can be skipped
       if (blocked_queue_.count(key)) {
-        no_key_indirectly_blocked = false;
-        break;
+        // If we won't be at the front of the queue, the txn will need to wait.
+        if (blocked_queue_.at(key).front().second <= txn_master_metadata.at(key).counter()) {
+          no_key_indirectly_blocked = false;
+          break;
+        }
       }
     }
     if (no_key_indirectly_blocked) {
@@ -82,14 +85,14 @@ RemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
 }
 
 void RemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const TxnReplicaId txn_replica_id) {
-  // auto entry = make_pair(std::ref(txn_holder), counter);
+  auto entry = make_pair(txn_replica_id, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
   auto itr = blocked_queue_[key].begin();
-  while (itr != blocked_queue_[key].end() && (*itr).second >= counter) {
+  while (itr != blocked_queue_[key].end() && (*itr).second <= counter) {
     itr++;
   }
-  blocked_queue_[key].emplace(itr, txn_replica_id, counter);
+  blocked_queue_[key].insert(itr, entry);
 }
 
 list<TxnReplicaId> RemasterManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
@@ -104,11 +107,8 @@ list<TxnReplicaId> RemasterManager::RemasterOccured(Key key, const uint32_t rema
   CHECK(remaster_counter == counters_.at(key) + 1) << "Remaster didn't increase cached counter by 1";
   counters_[key] = remaster_counter;
 
-  auto itr = blocked_queue_[key].begin();
-  while (itr != blocked_queue_[key].end() && (*itr).second <= remaster_counter) {
-    CHECK((*itr).second == remaster_counter) << "Old counters stuck in remaster queue";
+  if (blocked_queue_[key].front().second == remaster_counter) {
     TryToUnblock(key, unblocked);
-    break;
   }
   
   return unblocked;
@@ -124,12 +124,12 @@ void RemasterManager::TryToUnblock(const Key unblocked_key, list<TxnReplicaId>& 
   auto& txn_holder = all_txns_->at(txn_replica_id);
   
   bool can_be_unblocked = true;
-  for (auto& key_pair : txn_holder.keys_in_partition) {
+  for (auto& key_pair : txn_holder.KeysInPartition()) {
     auto key = key_pair.first;
     CHECK(blocked_queue_.count(key) > 0) << "Transaction was not in correct blocked_queues";
     auto& front_txn_replica_id = blocked_queue_.at(key).front().first;
     if (front_txn_replica_id != txn_replica_id || // txn is not at front of this queue
-          counters_.at(key) != blocked_queue_.at(key).front().second) { // txn is blocked on this key
+          counters_.at(key) < blocked_queue_.at(key).front().second) { // txn is blocked on this key
       can_be_unblocked = false;
       break;
     }
@@ -142,7 +142,7 @@ void RemasterManager::TryToUnblock(const Key unblocked_key, list<TxnReplicaId>& 
   unblocked.push_back(txn_replica_id);
 
   // Garbage collect queue and counters
-  for (auto& key_pair : txn_holder.keys_in_partition) {
+  for (auto& key_pair : txn_holder.KeysInPartition()) {
     auto key = key_pair.first;
     blocked_queue_.at(key).pop_front();
     if (blocked_queue_.at(key).size() == 0) {
@@ -152,7 +152,7 @@ void RemasterManager::TryToUnblock(const Key unblocked_key, list<TxnReplicaId>& 
   }
 
   // Recurse on each updated queue
-  for (auto& key_pair : txn_holder.keys_in_partition) {
+  for (auto& key_pair : txn_holder.KeysInPartition()) {
     auto key = key_pair.first;
     TryToUnblock(key, unblocked);
   }
