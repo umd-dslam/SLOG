@@ -5,11 +5,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/batch_log.h"
 #include "common/configuration.h"
 #include "common/transaction_utils.h"
 #include "common/types.h"
 #include "connection/broker.h"
+#include "data_structure/batch_log.h"
 #include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"

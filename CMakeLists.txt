@@ -120,6 +120,7 @@ add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 
 add_subdirectory(common)
 add_subdirectory(connection)
+add_subdirectory(data_structure)
 add_subdirectory(module)
 add_subdirectory(paxos)
 add_subdirectory(workload)

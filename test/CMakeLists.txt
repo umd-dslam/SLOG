@@ -19,7 +19,7 @@ set(ALL_TESTS
   server_test
   sequencer_test)
 
-add_executable(batch_log_test common/batch_log_test.cpp)
+add_executable(batch_log_test data_structure/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
   
 add_executable(batch_interleaver_test

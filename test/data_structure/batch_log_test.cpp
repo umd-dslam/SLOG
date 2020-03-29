@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "common/batch_log.h"
+#include "data_structure/batch_log.h"
 
 using namespace std;
 using namespace slog;

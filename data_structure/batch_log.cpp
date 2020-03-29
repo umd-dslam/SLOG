@@ -1,4 +1,4 @@
-#include "common/batch_log.h"
+#include "data_structure/batch_log.h"
 
 #include <glog/logging.h>
 
