@@ -23,6 +23,6 @@ install:
 script:
   - mkdir -p build
   - cd build
-  - cmake .. -DBUILD_CLIENT=OFF -DCMAKE_BUILD_TYPE=Debug
+  - cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
   - make -j$(nproc)
   - ctest --output-on-failure

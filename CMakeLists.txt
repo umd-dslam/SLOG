@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.12.4)
 project(slog)
 
+include(CTest)
+
 #========================================
 #               Options
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
-option(BUILD_TESTS "Build the tests" ON)
 
 #========================================
 #               Setup
@@ -169,7 +170,7 @@ endif()
 #                Tests
 #========================================
 
-if (BUILD_TESTS)
+if (BUILD_TESTING)
   find_package(GTest)
   if (GTEST_FOUND)
     message(STATUS "GTest found. Tests will be built")
@@ -180,5 +181,5 @@ if (BUILD_TESTS)
     message(STATUS "GTest not found. No test will be built")
   endif()
 else()
-  message(STATUS "BUILD_TESTS is off. No test will be built")
+  message(STATUS "BUILD_TESTING is off. No test will be built")
 endif()
