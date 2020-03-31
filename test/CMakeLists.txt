@@ -8,6 +8,7 @@ set(ALL_TESTS
   broker_test
   channel_test
   commands_test
+  concurrent_hash_map_test
   deterministic_lock_manager_test
   e2e_test
   forwarder_test
@@ -34,6 +35,8 @@ target_link_libraries(channel_test test_utils)
 
 add_executable(commands_test module/scheduler_components/commands_test.cpp)
 target_link_libraries(commands_test test_utils)
+
+add_executable(concurrent_hash_map_test data_structure/concurrent_hash_map_test.cpp)
 
 add_executable(deterministic_lock_manager_test 
   module/scheduler_components/deterministic_lock_manager_test.cpp)
