@@ -41,8 +41,6 @@ const char PARTIALLY_COMPLETED_TXNS[] = "partially_completed_txns";
 /* Scheduler */
 const char ALL_TXNS[] = "all_txns";
 const char NUM_ALL_TXNS[] = "num_all_txns";
-const char NUM_READY_WORKERS[] = "num_ready_workers";
-const char NUM_READY_TXNS[] = "num_ready_txns";
 const char NUM_LOCKED_KEYS[] = "num_locked_keys";
 const char NUM_TXNS_WAITING_FOR_LOCK[] = "num_txns_waiting_for_lock";
 const char NUM_LOCKS_WAITED_PER_TXN[] = "num_locks_waited_per_txn";

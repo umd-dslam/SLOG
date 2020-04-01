@@ -208,9 +208,6 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
     cout << endl;
   }
 
-  cout << "Ready workers: " << stats[NUM_READY_WORKERS].GetUint() << endl;
-  cout << "Ready txns: " << stats[NUM_READY_TXNS].GetUint() << endl;
-
   cout << "Txns waiting for lock: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << endl;
   if (level >= 1) {
     cout << "Locks waited per txn: " << endl;

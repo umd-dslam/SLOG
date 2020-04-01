@@ -37,7 +37,11 @@ Scheduler::Scheduler(
       0 /* revent */});
 
   for (size_t i = 0; i < config->GetNumWorkers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(config, context, storage));
+    workers_.push_back(MakeRunnerFor<Worker>(
+        std::to_string(i), /* identity */
+        config,
+        context,
+        storage));
   }
 }
 
@@ -50,6 +54,12 @@ void Scheduler::SetUp() {
   for (auto& worker : workers_) {
     worker->StartInNewThread();
   }
+  // Wait for confirmations from all workers
+  for (size_t i = 0; i < workers_.size(); i++) {
+    MMessage msg(worker_socket_);
+    worker_identities_.push_back(msg.GetIdentity());
+  }
+  next_worker_ = 0;
 }
 
 void Scheduler::Loop() {
@@ -86,13 +96,6 @@ void Scheduler::Loop() {
       }
       // Handle the results produced by the worker
       HandleResponseFromWorker(res.worker());
-
-      // If the load on worker is low enough, put it to the
-      // free queue and try dispatching another transaction
-      if (res.worker().load() < WORKER_LOAD_THRESHOLD) {
-        ready_workers_.push(msg.GetIdentity());
-        MaybeDispatchNextTransaction();
-      }
     }
   }
 }
@@ -239,8 +242,6 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   auto& alloc = stats.GetAllocator();
 
   // Add stats for current transactions in the system
-  stats.AddMember(StringRef(NUM_READY_WORKERS), ready_workers_.size(), alloc);
-  stats.AddMember(StringRef(NUM_READY_TXNS), ready_txns_.size(), alloc);
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
   if (level >= 1) {
     stats.AddMember(
@@ -307,7 +308,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   // become ready thanks to this release.
   auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
   for (auto unblocked_txn : unblocked_txns) {
-    EnqueueTransactionForDispatching(unblocked_txn);
+    DispatchTransaction(unblocked_txn);
   }
   auto txn = all_txns_[txn_id].ReleaseTransaction();
   all_txns_.erase(txn_id);
@@ -385,7 +386,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
               VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
 
               if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
-                EnqueueTransactionForDispatching(txn_id);
+                DispatchTransaction(txn_id);
               }
             }
             break;
@@ -397,7 +398,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
               VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
 
               if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
-                EnqueueTransactionForDispatching(txn_id); 
+                DispatchTransaction(txn_id); 
               }
             }
             break;
@@ -414,7 +415,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
               if (lock_manager_.AcquireLocks(tmp_holder)) {
                 CHECK(all_txns_.count(txn_id) > 0) 
                     << "Txn " << txn_id << " is not found for dispatching";
-                EnqueueTransactionForDispatching(txn_id);
+                DispatchTransaction(txn_id);
               }
             }
             break;
@@ -444,27 +445,13 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
               Transaction Dispatch
 ***********************************************/
 
-void Scheduler::EnqueueTransactionForDispatching(TxnId txn_id) {
-  VLOG(2) << "Enqueued txn " << txn_id;
-  ready_txns_.push(txn_id);
-  // Since we now have a ready txn in queue, try dispatching a txn in the queue
-  MaybeDispatchNextTransaction();
-}
-
-void Scheduler::MaybeDispatchNextTransaction() {
-  if (ready_workers_.empty() || ready_txns_.empty()) {
-    return;
-  }
-  // Pop next ready txn in queue
-  auto txn_id = ready_txns_.front();
-  ready_txns_.pop();
-  VLOG(2) << "Dispatched txn " << txn_id;
+void Scheduler::DispatchTransaction(TxnId txn_id) {
 
   auto& holder = all_txns_[txn_id];
 
-  // Pop next ready worker in queue
-  holder.SetWorker(ready_workers_.front());
-  ready_workers_.pop();
+  // Select next worker in a round-robin manner
+  holder.SetWorker(worker_identities_[next_worker_]);
+  next_worker_ = (next_worker_ + 1) % worker_identities_.size();
 
   // Prepare a request with the txn to be sent to the worker
   Request req;
@@ -483,6 +470,8 @@ void Scheduler::MaybeDispatchNextTransaction() {
         holder.GetWorker());
     holder.EarlyRemoteReads().pop_back();
   }
+
+  VLOG(2) << "Dispatched txn " << txn_id;
 }
 
 void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {

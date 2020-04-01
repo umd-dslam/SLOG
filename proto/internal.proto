@@ -173,9 +173,6 @@ message WorkerResponse {
     bool has_txn_id = 1;
     uint32 txn_id = 2;
     repeated uint32 participants = 3;
-    // The higher this number is, the more load
-    // the worker is handling
-    uint32 load = 4;
 }
 
 message StatsResponse {

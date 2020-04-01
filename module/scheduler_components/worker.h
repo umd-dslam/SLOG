@@ -36,6 +36,7 @@ struct TransactionState {
 class Worker : public Module {
 public:
   Worker(
+      const string& identity,
       ConfigurationPtr config,
       zmq::context_t& context,
       shared_ptr<Storage<Key, Record>> storage);
@@ -50,8 +51,6 @@ private:
   void ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
   
   void ExecuteAndCommitTransaction(TxnId txn_id);
-
-  void SendReadyResponse();
 
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,
