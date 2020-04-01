@@ -57,7 +57,7 @@ public:
     buckets_.reset(Buckets::CreateBuckets(initial_bucket_count));
   }
 
-  bool Get(ValueType& res, const KeyType& key) {
+  bool Get(ValueType& res, const KeyType& key) const {
     auto h = HashFn{}(key);
     bool found = false;
 
@@ -220,7 +220,7 @@ private:
     std::unique_ptr<Node*[]> bucket_roots;
   };
 
-  bustub::ReaderWriterLatch rw_latch_; 
+  mutable bustub::ReaderWriterLatch rw_latch_; 
   std::unique_ptr<Buckets> buckets_;
   size_t load_factor_max_size_;
   size_t size_;
@@ -252,7 +252,7 @@ public:
     }
   }
 
-  bool Get(ValueType& res, const KeyType& key) {
+  bool Get(ValueType& res, const KeyType& key) const {
     auto idx = PickSegment(key);
     return EnsureSegment(idx)->Get(res, key);
   }
@@ -269,12 +269,12 @@ public:
 
 private:
 
-  uint64_t PickSegment(const KeyType& key) {
+  uint64_t PickSegment(const KeyType& key) const {
     auto h = HashFn{}(key);
     return h & (NumShards - 1);
   }
 
-  Segment* EnsureSegment(uint64_t idx) {
+  Segment* EnsureSegment(uint64_t idx) const {
     auto segment = segments_[idx].load();
     if (segment == nullptr) {
       auto new_segment = new Segment();
@@ -289,7 +289,7 @@ private:
 
   static constexpr uint64_t NumShards = (1 << ShardBits);
   
-  std::atomic<Segment*> segments_[NumShards];
+  mutable std::atomic<Segment*> segments_[NumShards];
 };
 
 } // namespace slog
