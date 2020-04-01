@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_map>
 #include <unordered_set>
 
 #include <zmq.hpp>
@@ -19,13 +20,17 @@ using std::unordered_set;
 namespace slog {
 
 struct TransactionState {
-
+  TransactionState() = default;
   TransactionState(Transaction* txn) : txn(txn) {}
 
   Transaction* txn;
-  unordered_set<uint32_t> awaited_passive_participants;
-  unordered_set<uint32_t> active_participants;
-  unordered_set<uint32_t> participants;
+  bool has_local_reads;
+  bool has_local_writes;
+  // This set is reduced until we receive remote
+  // reads from all passive partitions
+  unordered_set<uint32_t> remote_passive_partitions;
+  unordered_set<uint32_t> remote_active_partitions;
+  unordered_set<uint32_t> partitions;
 };
 
 class Worker : public Module {
@@ -38,9 +43,15 @@ public:
   void Loop() final;
 
 private:
-  bool PrepareTransaction();
-  bool ApplyRemoteReadResult(const internal::RemoteReadResult& read_result);
-  void ExecuteAndCommitTransaction();
+  void ProcessWorkerRequest(const internal::WorkerRequest& req);
+  TransactionState& InitializeTransactionState(Transaction* txn);
+  void PopulateDataFromLocalStorage(Transaction* txn);
+
+  void ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
+  
+  void ExecuteAndCommitTransaction(TxnId txn_id);
+
+  void SendReadyResponse();
 
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,
@@ -51,7 +62,8 @@ private:
   shared_ptr<Storage<Key, Record>> storage_;
   unique_ptr<Commands> commands_;
   zmq::pollitem_t poll_item_;
-  unique_ptr<TransactionState> txn_state_;
+
+  unordered_map<TxnId, TransactionState> txn_states_;
 };
 
 } // namespace slog

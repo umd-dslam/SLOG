@@ -28,6 +28,7 @@ namespace slog {
 class Scheduler : public Module, ChannelHolder {
 public:
   static const string WORKERS_ENDPOINT;
+  static const uint32_t WORKER_LOAD_THRESHOLD;
 
   Scheduler(
       ConfigurationPtr config,
@@ -48,7 +49,7 @@ private:
   void HandleInternalRequest(
     internal::Request&& req,
     const string& from_machine_id);
-  void HandleResponseFromWorker(internal::Response&& res);
+  void HandleResponseFromWorker(const internal::WorkerResponse& response);
 
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
