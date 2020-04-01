@@ -99,6 +99,8 @@ void ExecuteTxn(const char* txn_file) {
                 Stats Command
 ***********************************************/
 
+const size_t MAX_DISPLAYED_ARRAY_SIZE = 50;
+
 struct StatsModule {
   api::StatsModule api_enum;
   function<void(const rapidjson::Document&, uint32_t level)> print_func;
@@ -138,9 +140,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 
   Header("Global Log");
   const auto& slots_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION].GetArray();
-  // std::sort(slots_per_region.begin(), slots_per_region.end());
   const auto& batches_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION].GetArray();
-  // std::sort(batches_per_region.begin(), batches_per_region.end());
 
   // The last "region" is the log for multi-home txns
   int num_regions = slots_per_region.Size() - 1;
@@ -164,7 +164,13 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << endl;
   if (level >= 1) {
     cout << "List of all txns:\n  ";
+    size_t counter = 0;
     for (auto& txn_id : stats[ALL_TXNS].GetArray()) {
+      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
+        cout << " (truncated)";
+        break;
+      }
+
       cout << txn_id.GetUint() << " ";
     }
     cout << endl;
@@ -178,7 +184,13 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
     cout << "Locks waited per txn: " << endl;
     cout << setw(10) << "Txn" 
          << setw(18) << "# locks waited" << endl;
+    size_t counter = 0;
     for (auto& pair : stats[NUM_LOCKS_WAITED_PER_TXN].GetArray()) {
+      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
+        cout << "(truncated)" << endl;
+        break;
+      }
+
       const auto& txn_and_locks = pair.GetArray();
       cout << setw(10) << txn_and_locks[0].GetUint() 
            << setw(18) << txn_and_locks[1].GetInt() << endl;
@@ -188,7 +200,13 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << endl;
   if (level >= 2) {
     cout << "Lock table:" << endl;
+    size_t counter = 0;
     for (auto& entry_ : stats[LOCK_TABLE].GetArray()) {
+      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
+        cout << "(truncated)" << endl;
+        break;
+      }
+
       const auto& entry = entry_.GetArray();
       auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
       
