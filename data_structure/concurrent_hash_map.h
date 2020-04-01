@@ -1,13 +1,13 @@
 /**
  * concurrent_hash_map.h
  * 
- * The key space is sharded into different segments, similar to folly::ConcurrentHashMap.
- * Concurrency management is simpler than how folly::ConcurrentHashMap does it, because we
- * don't use HazardPtr. Instead, each segment is guarded by a read-write latch. 
+ * This implementation borrows from folly::ConcurrentHashMap the idea of sharding key space
+ * into different segments. However, each segment here is only coarsely guarded with a read-write
+ * latch as opposed to a more granular approach in the highly-optimized folly::ConcurrentHashMap.
  * 
  * This map should be used in conjuction with shared_ptr because its destructor is not
- * thread-safe. With shared_ptr, the last thread that release the pointer will be the only
- * one accessing the map.
+ * thread-safe. With shared_ptr, the last thread that releases the pointer will be the only
+ * one accessing the map at destruction time.
  */
 #pragma once
 
