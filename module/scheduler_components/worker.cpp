@@ -30,8 +30,7 @@ Worker::Worker(
 
 void Worker::SetUp() {
   scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
-  // Send an empty response to tell Scheduler that this worker is ready
-  SendToScheduler(Response());
+  SendReadyResponse();
 }
 
 void Worker::Loop() {
@@ -45,36 +44,12 @@ void Worker::Loop() {
     return;
   }
   switch (req.type_case()) {
-    case Request::kProcessTxn: {
-      CHECK(txn_state_ == nullptr)
-          << "Another transaction is being processed by this worker";
-      auto txn = reinterpret_cast<Transaction*>(req.process_txn().txn_ptr());
-      txn_state_.reset(new TransactionState(txn));
-      if (PrepareTransaction()) {
-        // Immediately execute and commit this transaction if this
-        // machine is a passive participant or if it is an active
-        // one but does not have to wait for other partitions
-        VLOG(3) << "Execute txn " << txn->internal().id() << " after preparing";
-        ExecuteAndCommitTransaction();
-      } else {
-        VLOG(3) << "Awaiting remote read result for txn " << txn->internal().id();
-      }
+    case Request::kWorker: {
+      ProcessWorkerRequest(req.worker());
       break;
     }
     case Request::kRemoteReadResult: {
-      if (txn_state_ == nullptr) {
-        LOG(ERROR) << "There is no in-progress transaction to apply remote reads to";
-        break;
-      }
-      auto& remote_read_result = req.remote_read_result();
-      if (ApplyRemoteReadResult(remote_read_result)) {
-        // Execute and commit this transaction when all remote reads
-        // are received
-        VLOG(3) << "Execute txn " << remote_read_result.txn_id() << " after receving remote read result";
-        ExecuteAndCommitTransaction();
-      } else {
-        VLOG(3) << "Awaiting remote read result for txn " << txn_state_->txn->internal().id();
-      }
+      ProcessRemoteReadResult(req.remote_read_result());
       break;
     }
     default:
@@ -82,104 +57,141 @@ void Worker::Loop() {
   }
 }
 
-bool Worker::PrepareTransaction() {
-  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
+void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
+  auto txn = reinterpret_cast<Transaction*>(worker_request.txn_ptr());
+  auto txn_id = txn->internal().id();
 
-  bool is_passive_participant = true;
+  const auto& state = InitializeTransactionState(txn);
 
-  auto local_partition = config_->GetLocalPartition();
-  auto txn = txn_state_->txn;
+  PopulateDataFromLocalStorage(txn);
 
-  Request request;
-  auto remote_read_result = request.mutable_remote_read_result();
-  auto to_be_sent = remote_read_result->mutable_reads();
-  remote_read_result->set_txn_id(txn->internal().id());
-  remote_read_result->set_partition(local_partition);
-
-  vector<Key> remote_read_keys;
-  for (auto& key_value : *txn->mutable_read_set()) {
-    const auto& key = key_value.first;
-    auto partition = config_->GetPartitionOfKey(key);
-    if (partition == local_partition) {
-      Record record;
-      storage_->Read(key, record);
-      key_value.second = record.value;
-      (*to_be_sent)[key] = record.value;
-    } else {
-      remote_read_keys.push_back(key);
-      txn_state_->awaited_passive_participants.insert(partition);
-    }
-    txn_state_->participants.insert(partition);
-  }
-  // Remove all keys that are to be read by a remote partition
-  for (const auto& key : remote_read_keys) {
-    txn->mutable_read_set()->erase(key);
-  }
-
-  vector<Key> remote_write_keys;
-  for (auto& key_value : *txn->mutable_write_set()) {
-    const auto& key = key_value.first;
-    auto partition = config_->GetPartitionOfKey(key);
-    if (partition == local_partition) {
-
-      is_passive_participant = false;
-
-      Record record;
-      storage_->Read(key, record);
-      key_value.second = record.value;
-    } else {
-      remote_write_keys.push_back(key);
-      txn_state_->active_participants.insert(partition);
-    }
-    txn_state_->participants.insert(partition);
-  }
-  // Remove all keys that are to be written by a remote partition
-  for (const auto& key : remote_write_keys) {
-    txn->mutable_write_set()->erase(key);
-  }
-
-  // Send reads to all active participants in local replica if
-  // the current partition is one of the participants
-  if (!to_be_sent->empty() && txn_state_->participants.count(local_partition) > 0) {
+  // Send local reads to all remote active partitions
+  if (state.has_local_reads) {
+    Request request;
+    auto rrr = request.mutable_remote_read_result();
+    rrr->set_txn_id(txn_id);
+    rrr->set_partition(config_->GetLocalPartition());
+    auto reads_to_be_sent = rrr->mutable_reads();
     auto local_replica = config_->GetLocalReplica();
-    for (auto participant : txn_state_->active_participants) {
-      auto machine_id = MakeMachineIdAsString(local_replica, participant);
+    for (auto& key_value : txn->read_set()) {
+      (*reads_to_be_sent)[key_value.first] = key_value.second;
+    }
+    for (auto p : state.remote_active_partitions) {
+      auto machine_id = MakeMachineIdAsString(local_replica, p);
       SendToScheduler(request, std::move(machine_id));
     }
   }
 
-  return is_passive_participant || txn_state_->awaited_passive_participants.empty();
+  // If the txn does not do any write or does not have to wait for remote read, 
+  // move on with executing this transaction. Otherwise, notify the scheduler
+  // that this worker is free
+  if (!state.has_local_writes || state.remote_passive_partitions.empty()) {
+    VLOG(3) << "Execute txn " << txn_id << " without remote reads";
+    ExecuteAndCommitTransaction(txn_id);
+  } else {
+    VLOG(3) << "Defer executing txn " << txn->internal().id() << " until having enough remote reads";
+    SendReadyResponse();
+  }
 }
 
-bool Worker::ApplyRemoteReadResult(
-    const internal::RemoteReadResult& read_result) {
-  auto txn = txn_state_->txn;
+TransactionState& Worker::InitializeTransactionState(Transaction* txn) {
   auto txn_id = txn->internal().id();
-  CHECK_EQ(txn_id, read_result.txn_id())
-      << "Remote read result belongs to a different transaction. "
-      << "Expected: " << txn_id
-      << ". Received: " << read_result.txn_id();
-  
-  auto& awaited = txn_state_->awaited_passive_participants;
-  if (awaited.count(read_result.partition()) == 0) {
-    return awaited.empty();
-  }
-  awaited.erase(read_result.partition());
+  auto res = txn_states_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(txn_id),
+      std::forward_as_tuple(txn));
 
-  // Apply remote reads to local txn
-  for (const auto& key_value : read_result.reads()) {
+  CHECK(res.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
+
+  auto& state = txn_states_[txn_id];
+  auto local_partition = config_->GetLocalPartition();
+  vector<Key> key_vec;
+    
+  // Collect all remote passive partitions
+  state.has_local_reads = false;
+  key_vec.reserve(txn->read_set_size());
+  for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;
-    const auto& value = key_value.second;
-    (*txn->mutable_read_set())[key] = value;
+    auto partition = config_->GetPartitionOfKey(key);
+    state.partitions.insert(partition);
+    if (partition == local_partition) {
+      state.has_local_reads = true;
+    } else {
+      state.remote_passive_partitions.insert(partition);
+      key_vec.push_back(key);
+    }
+  }
+  // Remove all keys that are to be read by a remote partition
+  for (const auto& key : key_vec) {
+    txn->mutable_read_set()->erase(key);
   }
 
-  return awaited.empty();
+  // Collect all remote active partitions
+  state.has_local_writes = false;
+  key_vec.reserve(txn->write_set_size());
+  for (auto& key_value : *txn->mutable_write_set()) {
+    const auto& key = key_value.first;
+    auto partition = config_->GetPartitionOfKey(key);
+    state.partitions.insert(partition);
+    if (partition == local_partition) {
+      state.has_local_writes = true;
+    } else {
+      state.remote_active_partitions.insert(partition);
+      key_vec.push_back(key);
+    }
+  }
+  // Remove all keys that are to be written by a remote partition
+  for (const auto& key : key_vec) {
+    txn->mutable_write_set()->erase(key);
+  }
+
+  return state;
 }
 
-void Worker::ExecuteAndCommitTransaction() {
-  CHECK(txn_state_ != nullptr) << "There is no in-progress transactions";
+void Worker::PopulateDataFromLocalStorage(Transaction* txn) {
+  for (auto& key_value : *txn->mutable_read_set()) {
+    Record record;
+    storage_->Read(key_value.first, record);
+    key_value.second = record.value;
+  }
 
-  auto txn = txn_state_->txn;
+  for (auto& key_value : *txn->mutable_write_set()) {
+    Record record;
+    storage_->Read(key_value.first, record);
+    key_value.second = record.value;
+  }
+}
+
+void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
+  auto txn_id = read_result.txn_id();
+
+  CHECK(txn_states_.count(txn_id) > 0)
+      << "Transaction " << txn_id << " does not exist for remote read result";
+
+  auto txn = txn_states_[txn_id].txn;
+  auto& rpp = txn_states_[txn_id].remote_passive_partitions;
+
+  if (rpp.count(read_result.partition()) > 0) {
+    rpp.erase(read_result.partition());
+    // Apply remote reads to local txn
+    for (const auto& key_value : read_result.reads()) {
+      (*txn->mutable_read_set())[key_value.first] = key_value.second;
+    }
+  }
+
+  // If all remote reads arrived, move on with executing this transaction.
+  // Otherwise, notify the scheduler that this worker is free
+  if (rpp.empty()) {
+    VLOG(3) << "Execute txn " << txn_id << " after receving all remote read result";
+    ExecuteAndCommitTransaction(txn_id);
+  } else {
+    SendReadyResponse();
+  }
+}
+
+void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
+  const auto& state = txn_states_[txn_id];
+  auto txn = state.txn;
 
   // Execute the transaction code
   commands_->Execute(*txn);
@@ -211,13 +223,25 @@ void Worker::ExecuteAndCommitTransaction() {
 
   // Response back to the scheduler
   Response res;
-  res.mutable_process_txn()->set_txn_id(txn->internal().id());
-  for (auto participant : txn_state_->participants) {
-    res.mutable_process_txn()->mutable_participants()->Add(participant);
+  res.mutable_worker()->set_load(txn_states_.size());
+  res.mutable_worker()->set_has_txn_id(true);
+  res.mutable_worker()->set_txn_id(txn_id);
+  for (auto p : state.partitions) {
+    res.mutable_worker()
+        ->mutable_participants()
+        ->Add(p);
   }
   SendToScheduler(res);
 
-  txn_state_.reset();
+  // Done with this txn. Remove it from the state map
+  txn_states_.erase(txn_id);
+}
+
+void Worker::SendReadyResponse() {
+  Response res;
+  res.mutable_worker()->set_load(txn_states_.size());
+  res.mutable_worker()->set_has_txn_id(false);
+  SendToScheduler(res);
 }
 
 void Worker::SendToScheduler(

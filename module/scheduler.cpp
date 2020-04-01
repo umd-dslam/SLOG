@@ -15,6 +15,7 @@ using internal::Request;
 using internal::Response;
 
 const string Scheduler::WORKERS_ENDPOINT("inproc://workers");
+const uint32_t Scheduler::WORKER_LOAD_THRESHOLD = 5;
 
 Scheduler::Scheduler(
     ConfigurationPtr config,
@@ -78,16 +79,20 @@ void Scheduler::Loop() {
       // Send to the Scheduler of the remote machine
       SendSameChannel(forwarded_req, destination);
     } else if (msg.IsProto<Response>()) {
-      // A worker finishes processing a transaction. Mark this 
-      // worker as ready for another transaction.
       Response res;
       msg.GetProto(res);
-      ready_workers_.push(msg.GetIdentity());
+      if (res.type_case() != Response::kWorker) {
+        return;
+      }
       // Handle the results produced by the worker
-      HandleResponseFromWorker(move(res));
-      // Since we now have a free worker, try dispatching a ready
-      // txn if one is in queue.
-      MaybeDispatchNextTransaction();
+      HandleResponseFromWorker(res.worker());
+
+      // If the load on worker is low enough, put it to the
+      // free queue and try dispatching another transaction
+      if (res.worker().load() < WORKER_LOAD_THRESHOLD) {
+        ready_workers_.push(msg.GetIdentity());
+        MaybeDispatchNextTransaction();
+      }
     }
   }
 }
@@ -289,12 +294,13 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
               Worker Responses
 ***********************************************/
 
-void Scheduler::HandleResponseFromWorker(Response&& res) {
-  if (res.type_case() != Response::kProcessTxn) {
+void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
+  if (!res.has_txn_id()) {
     return;
   }
+
   // This txn is done so remove it from the txn list
-  auto txn_id = res.process_txn().txn_id();
+  auto txn_id = res.txn_id();
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -307,13 +313,13 @@ void Scheduler::HandleResponseFromWorker(Response&& res) {
 
   // Send the txn back to the coordinating server if need to
   auto local_partition = config_->GetLocalPartition();
-  auto& participants = res.process_txn().participants();
+  auto& participants = res.participants();
   if (std::find(
       participants.begin(),
       participants.end(),
       local_partition) != participants.end()) {
     auto coordinating_server = MakeMachineIdAsString(
-          txn->internal().coordinating_server());
+        txn->internal().coordinating_server());
     Request req;
     auto completed_sub_txn = req.mutable_completed_subtxn();
     completed_sub_txn->set_allocated_txn(txn);
@@ -461,8 +467,9 @@ void Scheduler::MaybeDispatchNextTransaction() {
 
   // Prepare a request with the txn to be sent to the worker
   Request req;
-  auto process_txn = req.mutable_process_txn();
-  process_txn->set_txn_ptr(reinterpret_cast<uint64_t>(holder.GetTransaction()));
+  auto worker_request = req.mutable_worker();
+  worker_request->set_txn_ptr(
+      reinterpret_cast<uint64_t>(holder.GetTransaction()));
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
