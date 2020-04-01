@@ -220,9 +220,10 @@ void Scheduler::ProcessRemoteReadResult(
     // Save the remote reads that come before the txn
     // is processed by this partition
     //
-    // TODO: If this request is not needed but still arrives AFTER the transaction 
-    // is already commited, it will be stuck in early_remote_reads forever.
-    // Consider garbage collecting them if needed
+    // NOTE: The logic guarantees that it'd never happens but if somehow this
+    // request was not needed but still arrived AFTER the transaction 
+    // was already commited, it would be stuck in early_remote_reads forever.
+    // Consider garbage collecting them if that happens.
     VLOG(2) << "Got early remote read result for txn " << txn_id;
     holder.EarlyRemoteReads().emplace_back(move(req));
   }
