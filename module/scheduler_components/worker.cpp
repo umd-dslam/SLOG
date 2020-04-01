@@ -11,6 +11,7 @@ using internal::Request;
 using internal::Response;
 
 Worker::Worker(
+    const string& identity,
     ConfigurationPtr config,
     zmq::context_t& context,
     shared_ptr<Storage<Key, Record>> storage)
@@ -19,6 +20,7 @@ Worker::Worker(
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
     commands_(new KeyValueCommands()) {
+  scheduler_socket_.setsockopt(ZMQ_IDENTITY, identity);
   scheduler_socket_.setsockopt(ZMQ_LINGER, 0);
   poll_item_ = {
     static_cast<void*>(scheduler_socket_),
@@ -30,7 +32,9 @@ Worker::Worker(
 
 void Worker::SetUp() {
   scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
-  SendReadyResponse();
+  // Send an empty message to the scheduler to indicate
+  // this worker is live
+  SendToScheduler(Response());
 }
 
 void Worker::Loop() {
@@ -90,7 +94,6 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
     ExecuteAndCommitTransaction(txn_id);
   } else {
     VLOG(3) << "Defer executing txn " << txn->internal().id() << " until having enough remote reads";
-    SendReadyResponse();
   }
 }
 
@@ -182,10 +185,8 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
   // If all remote reads arrived, move on with executing this transaction.
   // Otherwise, notify the scheduler that this worker is free
   if (rpp.empty()) {
-    VLOG(3) << "Execute txn " << txn_id << " after receving all remote read result";
+    VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
     ExecuteAndCommitTransaction(txn_id);
-  } else {
-    SendReadyResponse();
   }
 }
 
@@ -223,7 +224,6 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
 
   // Response back to the scheduler
   Response res;
-  res.mutable_worker()->set_load(txn_states_.size());
   res.mutable_worker()->set_has_txn_id(true);
   res.mutable_worker()->set_txn_id(txn_id);
   for (auto p : state.partitions) {
@@ -235,13 +235,6 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
-}
-
-void Worker::SendReadyResponse() {
-  Response res;
-  res.mutable_worker()->set_load(txn_states_.size());
-  res.mutable_worker()->set_has_txn_id(false);
-  SendToScheduler(res);
 }
 
 void Worker::SendToScheduler(

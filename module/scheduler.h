@@ -63,17 +63,16 @@ private:
   void MaybeProcessNextBatchesFromGlobalLog();
 
   bool AcceptTransaction(Transaction* txn);
-  void EnqueueTransactionForDispatching(TxnId txn_id);
-  void MaybeDispatchNextTransaction();
+  void DispatchTransaction(TxnId txn_id);
 
   void SendToWorker(internal::Request&& req, const string& worker);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
   vector<zmq::pollitem_t> poll_items_;
+  vector<string> worker_identities_;
   vector<unique_ptr<ModuleRunner>> workers_;
-  queue<string> ready_workers_;
-  queue<TxnId> ready_txns_;
+  size_t next_worker_;
 
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
