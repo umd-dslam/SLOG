@@ -2,12 +2,9 @@
 
 #include <stack>
 
+#include "common/json_utils.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
-
-#include "third_party/rapidjson/document.h"
-#include "third_party/rapidjson/stringbuffer.h"
-#include "third_party/rapidjson/writer.h"
 
 using std::make_shared;
 using std::move;
@@ -240,45 +237,39 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   stats.AddMember(StringRef(NUM_READY_TXNS), ready_txns_.size(), alloc);
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
   if (level >= 1) {
-    rapidjson::Value all_txn_ids(rapidjson::kArrayType);
-    for (const auto& pair : all_txns_) {
-      all_txn_ids.PushBack(pair.first, alloc);
-    }
-    stats.AddMember(StringRef(ALL_TXNS), move(all_txn_ids), alloc);
+    stats.AddMember(
+        StringRef(ALL_TXNS),
+        ToJsonArray(all_txns_, [](const auto& p) { return p.first; }, alloc),
+        alloc);
   }
 
   // Add stats for local logs
-  stats.AddMember(StringRef(LOCAL_LOG_NUM_BUFFERED_SLOTS), local_interleaver_.NumBufferedSlots(), alloc);
-  rapidjson::Value buffered_batches_per_queue(rapidjson::kArrayType);
-  for (const auto& pair : local_interleaver_.NumBufferedBatchesPerQueue()) {
-    rapidjson::Value queue_and_batches(rapidjson::kArrayType);
-    queue_and_batches
-        .PushBack(pair.first, alloc)
-        .PushBack(pair.second, alloc);
-    buffered_batches_per_queue.PushBack(move(queue_and_batches), alloc);
-  }
-  stats.AddMember(StringRef(LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE), buffered_batches_per_queue, alloc);
+  stats.AddMember(
+      StringRef(LOCAL_LOG_NUM_BUFFERED_SLOTS),
+      local_interleaver_.NumBufferedSlots(),
+      alloc);
+  stats.AddMember(
+      StringRef(LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE),
+      ToJsonArrayOfKeyValue(local_interleaver_.NumBufferedBatchesPerQueue(), alloc),
+      alloc);
+  
 
   // Add stats for global logs
-  rapidjson::Value buffered_slots_per_region(rapidjson::kArrayType);
-  for (const auto& pair : all_logs_) {
-    rapidjson::Value region_and_slots(rapidjson::kArrayType);
-    region_and_slots
-        .PushBack(pair.first, alloc)
-        .PushBack(pair.second.NumBufferedSlots(), alloc);
-    buffered_slots_per_region.PushBack(move(region_and_slots), alloc);
-  }
-  stats.AddMember(StringRef(GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION), buffered_slots_per_region, alloc);
+  stats.AddMember(
+      StringRef(GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION),
+      ToJsonArrayOfKeyValue(
+          all_logs_,
+          [](const BatchLog& batch_log) { return batch_log.NumBufferedSlots(); },
+          alloc),
+      alloc);
 
-  rapidjson::Value buffered_batches_per_region(rapidjson::kArrayType);
-  for (const auto& pair : all_logs_) {
-    rapidjson::Value region_and_batches(rapidjson::kArrayType);
-    region_and_batches
-        .PushBack(pair.first, alloc)
-        .PushBack(pair.second.NumBufferedBatches(), alloc);
-    buffered_batches_per_region.PushBack(move(region_and_batches), alloc);
-  }
-  stats.AddMember(StringRef(GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION), buffered_batches_per_region, alloc);
+  stats.AddMember(
+      StringRef(GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION),
+      ToJsonArrayOfKeyValue(
+          all_logs_,
+          [](const BatchLog& batch_log) { return batch_log.NumBufferedBatches(); },
+          alloc),
+      alloc);
 
   // Add stats from the lock manager
   lock_manager_.GetStats(stats, level);

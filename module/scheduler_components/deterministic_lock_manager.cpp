@@ -203,15 +203,10 @@ void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t lev
 
   if (level >= 1) {
     // Collect number of locks waited per txn
-    rapidjson::Value num_locks(rapidjson::kArrayType);
-    for (const auto& pair : num_locks_waited_) {
-      rapidjson::Value entry(rapidjson::kArrayType);
-      entry
-          .PushBack(pair.first, alloc)   /* txn */
-          .PushBack(pair.second, alloc); /* num locks */
-      num_locks.PushBack(move(entry), alloc);
-    }
-    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), move(num_locks), alloc);
+    stats.AddMember(
+        StringRef(NUM_LOCKS_WAITED_PER_TXN),
+        ToJsonArrayOfKeyValue(num_locks_waited_, alloc),
+        alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);
@@ -224,26 +219,18 @@ void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t lev
       if (lock_state.mode == LockMode::UNLOCKED) {
         continue;
       }
-
-      rapidjson::Value holders(rapidjson::kArrayType);
-      for (auto holder : lock_state.GetHolders()) {
-        holders.PushBack(holder, alloc);
-      }
-
-      rapidjson::Value waiters(rapidjson::kArrayType);
-      for (auto waiter : lock_state.GetWaiters()) {
-        rapidjson::Value txn_and_mode(rapidjson::kArrayType);
-        txn_and_mode.PushBack(waiter.first, alloc)
-                    .PushBack(static_cast<uint32_t>(waiter.second), alloc);
-        waiters.PushBack(txn_and_mode, alloc);
-      }
-
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
       entry.PushBack(key_json, alloc)
            .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
-           .PushBack(move(holders), alloc)
-           .PushBack(move(waiters), alloc);
+           .PushBack(
+                ToJsonArray(lock_state.GetHolders(), alloc), alloc)
+           .PushBack(
+                ToJsonArrayOfKeyValue(
+                    lock_state.GetWaiters(),
+                    [](const auto& v) { return static_cast<uint32_t>(v); },
+                    alloc),
+                alloc);
       lock_table.PushBack(move(entry), alloc);
     }
     stats.AddMember(StringRef(LOCK_TABLE), move(lock_table), alloc);
