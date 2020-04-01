@@ -31,6 +31,14 @@ const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;
  *      Statistic Keys
  ****************************/
 
+/* Server */
+const char TXN_ID_COUNTER[] = "txn_id_counter";
+const char NUM_PENDING_RESPONSES[] = "num_pending_responses";
+const char NUM_PARTIALLY_COMPLETED_TXNS[] = "num_partially_completed_txns";
+const char PENDING_RESPONSES[] = "pending_responses";
+const char PARTIALLY_COMPLETED_TXNS[] = "partially_completed_txns";
+
+/* Scheduler */
 const char ALL_TXNS[] = "all_txns";
 const char NUM_ALL_TXNS[] = "num_all_txns";
 const char NUM_READY_WORKERS[] = "num_ready_workers";

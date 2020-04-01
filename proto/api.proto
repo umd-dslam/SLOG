@@ -21,7 +21,8 @@ message TransactionRequest {
 }
 
 enum StatsModule {
-    SCHEDULER = 0;
+    SERVER = 0;
+    SCHEDULER = 1;
 }
 
 message StatsRequest {

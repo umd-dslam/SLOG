@@ -70,7 +70,6 @@ private:
       internal::LookupMasterRequest* lookup_master,
       string&& from_machine_id,
       string&& from_channel);
-
   /**
    * After a transaction is processed by different partitions, each
    * involving partition will send a sub-transaction with the processing
@@ -79,6 +78,7 @@ private:
    * the client.
    */
   void ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn);
+  void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void SendAPIResponse(TxnId txn_id, api::Response&& res);
 

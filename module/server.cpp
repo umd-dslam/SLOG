@@ -1,6 +1,7 @@
 #include "module/server.h"
 
 #include "common/constants.h"
+#include "common/json_utils.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
@@ -125,6 +126,9 @@ void Server::HandleAPIRequest(MMessage&& msg) {
 
       // Send to appropriate module based on provided information
       switch (request.stats().module()) {
+        case api::StatsModule::SERVER:
+          ProcessStatsRequest(stats_request.stats());
+          break;
         case api::StatsModule::SCHEDULER:
           SendSameMachine(stats_request, SCHEDULER_CHANNEL);
           break;
@@ -236,6 +240,48 @@ void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed
     completed_txns_.erase(txn_id);
   }
 }
+
+void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  // Add stats for current transactions in the system
+  stats.AddMember(StringRef(TXN_ID_COUNTER), txn_id_counter_, alloc);
+  stats.AddMember(StringRef(NUM_PENDING_RESPONSES), pending_responses_.size(), alloc);
+  stats.AddMember(StringRef(NUM_PARTIALLY_COMPLETED_TXNS), completed_txns_.size(), alloc);
+  if (level >= 1) {
+    stats.AddMember(
+        StringRef(PENDING_RESPONSES),
+        ToJsonArrayOfKeyValue(
+            pending_responses_,
+            [](const auto& resp) { return resp.stream_id; },
+            alloc),
+        alloc);
+
+    stats.AddMember(
+        StringRef(PARTIALLY_COMPLETED_TXNS),
+        ToJsonArray(
+            completed_txns_,
+            [](const auto& p) { return p.first; },
+            alloc),
+        alloc);
+  }
+
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  internal::Response res;
+  res.mutable_stats()->set_id(stats_request.id());
+  res.mutable_stats()->set_stats_json(buf.GetString());
+  HandleInternalResponse(std::move(res));
+}
+
 
 /***********************************************
               Internal Responses

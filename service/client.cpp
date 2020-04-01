@@ -112,6 +112,38 @@ void Header(const std::string& header) {
   cout << endl << endl;
 }
 
+void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
+  cout << "Txn id counter: " << stats[TXN_ID_COUNTER].GetUint() << endl;
+  cout << "Pending responses: " << stats[NUM_PENDING_RESPONSES].GetUint() << endl;
+  if (level >= 1) {
+    cout << "List of pending responses (txn_id, stream_id): " << endl;
+    size_t counter = 0;
+    for (auto& entry : stats[PENDING_RESPONSES].GetArray()) {
+      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
+        cout << " (truncated)";
+        break;
+      }
+
+      cout << "(" << entry.GetArray()[0].GetUint()
+           << ", " << entry.GetArray()[1].GetUint() << ") " << endl;
+    }
+  }
+  cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << endl;
+  if (level >= 1) {
+    cout << "List of partially completed txns: ";
+    size_t counter = 0;
+    for (auto& txn_id : stats[PARTIALLY_COMPLETED_TXNS].GetArray()) {
+      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
+        cout << " (truncated)";
+        break;
+      }
+
+      cout << txn_id.GetUint() << " ";
+    }
+    cout << endl;
+  }
+}
+
 string LockModeStr(LockMode mode) {
   switch (mode) {
     case LockMode::UNLOCKED: return "UNLOCKED";
@@ -231,6 +263,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 }
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
+  {"server", {api::StatsModule::SERVER, PrintServerStats}},
   {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}
 };
 
