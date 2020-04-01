@@ -49,7 +49,7 @@ class SegmentT {
 
 public:
   /**
-   * initial_num_buckets must be a power of 2
+   * initial_bucket_count must be a power of 2
    */
   SegmentT(size_t initial_bucket_count = 8)
     : load_factor_max_size_(kLoadFactor * initial_bucket_count),
