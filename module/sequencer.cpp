@@ -11,6 +11,7 @@ using internal::Response;
 
 Sequencer::Sequencer(ConfigurationPtr config, Broker& broker)
   : BasicModule(
+        "Sequencer",
         broker.AddChannel(SEQUENCER_CHANNEL),
         config->GetBatchDuration() /* wake_up_every_ms */),
     config_(config),

@@ -12,7 +12,9 @@ SimpleMultiPaxos::SimpleMultiPaxos(
     Broker& broker,
     const vector<string>& members,
     const string& me)
-  : BasicModule(broker.AddChannel(CHANNEL_PREFIX + group_name)),
+  : BasicModule(
+        "Paxos_" + group_name,
+        broker.AddChannel(CHANNEL_PREFIX + group_name)),
     leader_(*this, members, me),
     acceptor_(*this) {}
 

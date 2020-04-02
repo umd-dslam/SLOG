@@ -11,6 +11,7 @@ using internal::Request;
 
 MultiHomeOrderer::MultiHomeOrderer(ConfigurationPtr config, Broker& broker) 
   : BasicModule(
+        "MultiHomeOrderer",
         broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL),
         config->GetBatchDuration()),
     config_(config),

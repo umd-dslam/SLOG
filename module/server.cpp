@@ -70,6 +70,8 @@ void Server::Loop() {
       HandleAPIRequest(move(msg));
     }
   }
+
+  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Server is alive";
 }
 
 bool Server::HasMessageFromChannel() const {

@@ -15,6 +15,7 @@ namespace slog {
 class BasicModule : public Module, public ChannelHolder {
 public:
   BasicModule(
+      const std::string& name,
       unique_ptr<Channel>&& listener,
       long wake_up_every_ms = -1L);
 
@@ -34,6 +35,7 @@ private:
 
   bool NeedWakeUp() const;
 
+  std::string name_;
   zmq::pollitem_t poll_item_;
   long wake_up_every_ms_;
   long poll_timeout_ms_;

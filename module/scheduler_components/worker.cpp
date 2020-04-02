@@ -15,7 +15,8 @@ Worker::Worker(
     ConfigurationPtr config,
     zmq::context_t& context,
     shared_ptr<Storage<Key, Record>> storage)
-  : config_(config),
+  : identity_(identity),
+    config_(config),
     scheduler_socket_(context, ZMQ_DEALER),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
@@ -38,27 +39,26 @@ void Worker::SetUp() {
 }
 
 void Worker::Loop() {
-  if (!zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS)) {
-    return;
-  }
-
-  MMessage msg(scheduler_socket_);
-  Request req;
-  if (!msg.GetProto(req)) {
-    return;
-  }
-  switch (req.type_case()) {
-    case Request::kWorker: {
-      ProcessWorkerRequest(req.worker());
-      break;
+  if (zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS)) {
+    MMessage msg(scheduler_socket_);
+    Request req;
+    if (!msg.GetProto(req)) {
+      return;
     }
-    case Request::kRemoteReadResult: {
-      ProcessRemoteReadResult(req.remote_read_result());
-      break;
+    switch (req.type_case()) {
+      case Request::kWorker: {
+        ProcessWorkerRequest(req.worker());
+        break;
+      }
+      case Request::kRemoteReadResult: {
+        ProcessRemoteReadResult(req.remote_read_result());
+        break;
+      }
+      default:
+        break;
     }
-    default:
-      break;
   }
+  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Worker " << identity_ << " is alive.";
 }
 
 void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
