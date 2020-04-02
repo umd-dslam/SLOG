@@ -197,9 +197,18 @@ void Broker::Run() {
     for (size_t i = 0; i < items.size() - 1; i++) {
       // A channel just sent a message
       if (items[i].revents & ZMQ_POLLIN) {
-        MMessage message;
-        channels_[channel_names[i]]->Receive(message);
-        HandleOutgoingMessage(move(message));
+        // Receive as many messages as it can based on the has_more
+        // signal. This is done to balance out the message processing
+        // speed. Some channel might produce messages faster than others.
+        // When that happens, a fast channel has the option to chain
+        // multiple messages and the broker will take them all out in one
+        // go, reducing the queue size faster.
+        bool has_more;
+        do {
+          MMessage message;
+          has_more = channels_[channel_names[i]]->Receive(message);
+          HandleOutgoingMessage(move(message));
+        } while (has_more);
       }
     }
 
