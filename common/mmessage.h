@@ -37,7 +37,7 @@ namespace slog {
  */
 class MMessage {
 public:
-  MMessage() = default;
+  MMessage();
   MMessage(zmq::socket_t& socket);
 
   size_t Size() const;

@@ -60,3 +60,38 @@ TEST_F(ChannelTest, SendToChannel) {
 
   th.join();
 }
+
+TEST_F(ChannelTest, MultiSendToChannel) {
+  thread th([this](){
+    unique_ptr<Channel> listener(channel->GetListener());
+    MMessage message;
+    message.SetIdentity("zZz");
+    message.Set(MM_PROTO, MakeEchoResponse("foo"));
+    listener->Send(message, true);
+
+    message.SetIdentity("zZz");
+    message.Set(MM_PROTO, MakeEchoResponse("bar"));
+    listener->Send(message, true);
+
+    message.SetIdentity("zZz");
+    message.Set(MM_PROTO, MakeEchoResponse("far"));
+    listener->Send(message, false);
+  });
+
+  MMessage message;
+  Response res;
+
+  ASSERT_TRUE(channel->Receive(message));
+  ASSERT_TRUE(message.GetProto(res));
+  ASSERT_EQ("foo", res.echo().data());
+
+  ASSERT_TRUE(channel->Receive(message));
+  ASSERT_TRUE(message.GetProto(res));
+  ASSERT_EQ("bar", res.echo().data());
+
+  ASSERT_FALSE(channel->Receive(message));
+  ASSERT_TRUE(message.GetProto(res));
+  ASSERT_EQ("far", res.echo().data());
+
+  th.join();
+}
