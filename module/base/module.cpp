@@ -43,38 +43,41 @@ ChannelHolder::ChannelHolder(unique_ptr<Channel>&& channel)
 void ChannelHolder::Send(
     const google::protobuf::Message& request_or_response,
     const string& to_machine_id,
-    const string& to_channel) {
+    const string& to_channel,
+    bool has_more) {
   MMessage message;
   message.SetIdentity(to_machine_id);
   message.Set(MM_PROTO, request_or_response);
   message.Set(MM_FROM_CHANNEL, channel_->GetName());
   message.Set(MM_TO_CHANNEL, to_channel);
-  Send(std::move(message));
+  Send(std::move(message), has_more);
 }
 
 void ChannelHolder::SendSameMachine(
     const google::protobuf::Message& request_or_response,
-    const string& to_channel) {
+    const string& to_channel,
+    bool has_more) {
   MMessage message;
   message.Set(MM_PROTO, request_or_response);
   message.Set(MM_FROM_CHANNEL, channel_->GetName());
   message.Set(MM_TO_CHANNEL, to_channel);
-  Send(std::move(message));
+  Send(std::move(message), has_more);
 }
 
 void ChannelHolder::SendSameChannel(
     const google::protobuf::Message& request_or_response,
-    const string& to_machine_id) {
+    const string& to_machine_id,
+    bool has_more) {
   MMessage message;
   message.SetIdentity(to_machine_id);
   message.Set(MM_PROTO, request_or_response);
   message.Set(MM_FROM_CHANNEL, channel_->GetName());
   message.Set(MM_TO_CHANNEL, channel_->GetName());
-  Send(std::move(message));
+  Send(std::move(message), has_more);
 }
 
-void ChannelHolder::Send(MMessage&& message) {
-  channel_->Send(message);
+void ChannelHolder::Send(MMessage&& message, bool has_more) {
+  channel_->Send(message, has_more);
 }
 
 void ChannelHolder::ReceiveFromChannel(MMessage& message) {

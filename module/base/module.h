@@ -84,35 +84,46 @@ public:
    * @param request_or_response Request or response to be sent
    * @param to_machine_id Id of the machine that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
+   * @param has_more Setting this to true signals the receiver (broker) to
+   *                 receive the next message in succession.
    */
   void Send(
       const google::protobuf::Message& request_or_response,
       const string& to_machine_id,
-      const string& to_channel);
+      const string& to_channel,
+      bool has_more = false);
 
   /**
    * Send a request or response to a given channel on this same machine
    * @param request_or_response Request or response to be sent
    * @param to_channel Channel to send to
+   * @param has_more Setting this to true signals the receiver (broker) to
+   *                 receive the next message in succession.
    */
   void SendSameMachine(
       const google::protobuf::Message& request_or_response,
-      const string& to_channel);
+      const string& to_channel,
+      bool has_more = false);
 
   /**
    * Send a request or response to the same channel on another machine
    * @param request_or_response Request or response to be sent
    * @param to_machine_id Machine to send to
+   * @param has_more Setting this to true signals the receiver (broker) to
+   *                 receive the next message in succession.
    */
   void SendSameChannel(
       const google::protobuf::Message& request_or_response,
-      const string& to_machine_id);
+      const string& to_machine_id,
+      bool has_more = false);
 
   /**
    * Send a message to the destination specified in the message
    * @param message The message to be sent
+   * @param has_more Setting this to true signals the receiver (broker) to
+   *                 receive the next message in succession.
    */
-  void Send(MMessage&& message);
+  void Send(MMessage&& message, bool has_more = false);
 
   zmq::pollitem_t GetChannelPollItem() const;
 
