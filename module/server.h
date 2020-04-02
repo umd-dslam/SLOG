@@ -90,7 +90,6 @@ private:
 
   shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
 
-  uint32_t server_id_;
   TxnId txn_id_counter_;
   unordered_map<TxnId, PendingResponse> pending_responses_;
   unordered_map<TxnId, CompletedTransaction> completed_txns_;

@@ -98,6 +98,8 @@ void Scheduler::Loop() {
       HandleResponseFromWorker(res.worker());
     }
   }
+
+  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Scheduler is alive";
 }
 
 bool Scheduler::HasMessageFromChannel() const {

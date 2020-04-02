@@ -56,6 +56,7 @@ private:
       const google::protobuf::Message& req_or_res,
       string&& forward_to_machine = "");
 
+  std::string identity_;
   ConfigurationPtr config_;
   zmq::socket_t scheduler_socket_;
   shared_ptr<Storage<Key, Record>> storage_;

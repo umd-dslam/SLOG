@@ -203,6 +203,7 @@ void Broker::Run() {
       }
     }
 
+   VLOG_EVERY_N(4, 5000/poll_timeout_ms_) << "Broker is alive";
   } // while-loop
 }
 

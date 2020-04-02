@@ -18,9 +18,11 @@ using internal::Request;
 using internal::Response;
 
 BasicModule::BasicModule(
+    const std::string& name,
     unique_ptr<Channel>&& listener,
     long wake_up_every_ms)
   : ChannelHolder(move(listener)),
+    name_(name),
     poll_item_(GetChannelPollItem()),
     wake_up_every_ms_(wake_up_every_ms),
     wake_up_deadline_(Clock::now()) {
@@ -66,10 +68,14 @@ void BasicModule::Loop() {
     }
     poll_timeout_ms_ = 1 + DurationInMs(wake_up_deadline_ - now);
 
-    VLOG(4) << "Now: " << DurationInMs(now.time_since_epoch())
+    VLOG_EVERY_N(5, 5000 / wake_up_every_ms_)
+            << "Now: " << DurationInMs(now.time_since_epoch())
             << " Deadline: " << DurationInMs(wake_up_deadline_.time_since_epoch())
             << " Timeout: " << poll_timeout_ms_ << " ms";
 
+    VLOG_EVERY_N(4, 5000 / wake_up_every_ms_) << name_ << " is alive";
+  } else {
+    VLOG_EVERY_N(4, 5000 / MODULE_POLL_TIMEOUT_MS) << name_ << " is alive";
   }
 }
 
