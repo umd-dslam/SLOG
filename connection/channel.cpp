@@ -40,12 +40,18 @@ zmq::pollitem_t Channel::GetPollItem() {
   };
 }
 
-void Channel::Send(const MMessage& msg) {
+void Channel::Send(const MMessage& msg, bool has_more) {
   msg.SendTo(socket_);
+  zmq::message_t has_more_msg(1);
+  *has_more_msg.data<bool>() = has_more;
+  socket_.send(has_more_msg, zmq::send_flags::none);
 }
 
-void Channel::Receive(MMessage& msg) {
+bool Channel::Receive(MMessage& msg) {
   msg.ReceiveFrom(socket_);
+  zmq::message_t has_more_msg;
+  socket_.recv(has_more_msg);
+  return *has_more_msg.data<bool>();
 }
 
 std::unique_ptr<Channel> Channel::GetListener() {

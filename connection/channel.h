@@ -6,8 +6,6 @@
 
 namespace slog {
 
-class ChannelListener;
-
 /**
  * A Channel is the interface between a module (e.g. Sequencer) and the
  * network layer. The Broker uses channels to pass message from the outside
@@ -33,12 +31,12 @@ public:
   /**
    * Passes a message to this channel
    */
-  void Send(const MMessage& msg);
+  void Send(const MMessage& msg, bool has_more = false);
 
   /**
    * Receives a message from this channel
    */
-  void Receive(MMessage& msg);
+  bool Receive(MMessage& msg);
 
   /**
    * Returns a unique pointer to the listener corresponding to

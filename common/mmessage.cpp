@@ -33,7 +33,12 @@ bool ReceiveSingleMessage(
 
 } // namespace
 
+MMessage::MMessage() {
+  body_.reserve(5);
+}
+
 MMessage::MMessage(zmq::socket_t& socket) {
+  body_.reserve(5);
   ReceiveFrom(socket);
 }
 
@@ -107,7 +112,7 @@ void MMessage::SendTo(zmq::socket_t& socket) const {
   if (!identity_.empty()) {
     SendSingleMessage(socket, identity_, true);
   }
-  SendSingleMessage(socket, "", true);
+  SendSingleMessage(socket, "", body_.size() > 0);
   size_t remaining = body_.size();
   for (const auto& part : body_) {
     SendSingleMessage(socket, part, remaining - 1 > 0);
