@@ -36,7 +36,7 @@ public:
       double multi_home_pct,
       double multi_partition_pct);
 
-  Transaction* NextTransaction() final;
+  std::pair<Transaction*, TransactionProfile> NextTransaction() final;
 
 private:
   ConfigurationPtr config_;

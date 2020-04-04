@@ -131,36 +131,36 @@ BasicWorkload::BasicWorkload(
   }
 }
 
-Transaction* BasicWorkload::NextTransaction() {
+std::pair<Transaction*, TransactionProfile>
+BasicWorkload::NextTransaction() {
   CHECK_LE(NUM_WRITES, NUM_RECORDS) 
       << "Number of writes cannot exceed number of records in a txn!";
 
+  TransactionProfile pro;
+
   // Decide if this is a multi-partition txn or not
   discrete_distribution<> spmp({100 - multi_partition_pct_, multi_partition_pct_});
-  bool is_multi_partition = spmp(re_);
+  pro.is_multi_partition = spmp(re_);
 
   // Select a number of partitions to choose from for each record
   auto candidate_partitions = Choose(
       config_->GetNumPartitions(),
-      is_multi_partition ? MP_NUM_PARTITIONS : 1,
+      pro.is_multi_partition ? MP_NUM_PARTITIONS : 1,
       re_);
 
   // Decide if this is a multi-home txn or not
   discrete_distribution<> shmh({100 - multi_home_pct_, multi_home_pct_});
-  bool is_multi_home = shmh(re_);
+  pro.is_multi_home = shmh(re_);
 
   // Select a number of homes to choose from for each record
   auto candidate_homes = Choose(
       config_->GetNumReplicas(),
-      is_multi_home ? MH_NUM_HOMES : 1,
+      pro.is_multi_home ? MH_NUM_HOMES : 1,
       re_);
 
   unordered_set<Key> read_set;
   unordered_set<Key> write_set;
   std::ostringstream code;
-
-  // For logging
-  vector<pair<uint32_t, uint32_t>> picked_sources;
 
   // Fill txn with write operators
   for (size_t i = 0; i < NUM_WRITES; i++) {
@@ -171,7 +171,8 @@ Transaction* BasicWorkload::NextTransaction() {
     code << "SET " << key << " " << RandomString(VALUE_SIZE, re_) << " ";
     write_set.insert(key);
 
-    picked_sources.emplace_back(partition, home);
+    pro.key_to_home[key] = home;
+    pro.key_to_partition[key] = partition;
   }
 
   // Fill txn with read operators
@@ -183,22 +184,13 @@ Transaction* BasicWorkload::NextTransaction() {
     code << "GET " << key << " ";
     read_set.insert(key);
 
-    picked_sources.emplace_back(partition, home);
+    pro.key_to_home[key] = home;
+    pro.key_to_partition[key] = partition;
   }
 
-  std::ostringstream log;
-  log << "partition: ";
-  for (auto& src : picked_sources) {
-    log << std::setw(2) << src.first << " ";
-  }
-  log << "\n" << std::setw(11) << "home: ";
-  for (auto& src : picked_sources) {
-    log << std::setw(2) << src.second << " ";
-  }
+  auto txn = MakeTransaction(read_set, write_set, code.str());
 
-  VLOG(1) << "Source of keys:\n" << log.str();
-
-  return MakeTransaction(read_set, write_set, code.str());
+  return {txn, pro};
 }
 
 } // namespace slog

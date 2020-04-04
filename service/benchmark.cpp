@@ -27,7 +27,8 @@ DEFINE_uint32(
 DEFINE_double(mh, 0, "Percentage of multi-home transactions");
 DEFINE_double(mp, 0, "Percentage of multi-partition transactions");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
-DEFINE_bool(print_txn, false, "Print the each generated transactions");
+DEFINE_bool(print_txn, false, "Print each generated transaction");
+DEFINE_bool(print_profile, false, "Print the profile of each transaction");
 
 using namespace slog;
 
@@ -71,7 +72,7 @@ unique_ptr<WorkloadGenerator> workload;
  * Data structure for keeping track of the transactions
  */
 struct TransactionInfo {
-  TransactionType type;
+  TransactionProfile type;
   TimePoint sending_time;
 };
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
@@ -173,7 +174,7 @@ void SendNextTransaction();
 void ReceiveResult(int from_socket);
 
 void RunBenchmark() {
-  LOG(INFO) << "Transaction profile:\n"
+  LOG(INFO) << "\n"
             << "NUM_RECORDS = " << NUM_RECORDS << "\n"
             << "NUM_WRITES = " << NUM_WRITES << "\n"
             << "VALUE_SIZE = " << VALUE_SIZE << "\n"
@@ -214,9 +215,25 @@ bool StopConditionMet() {
 }
 
 void SendNextTransaction() {
-  auto txn = workload->NextTransaction();
+  auto txn_and_profile = workload->NextTransaction();
+  auto txn = txn_and_profile.first;
+  auto profile = txn_and_profile.second;
+
   if (FLAGS_print_txn) {
-    LOG(INFO) << txn;
+    LOG(INFO) << *txn;
+  }
+
+  if (FLAGS_print_profile) {
+    std::ostringstream log;
+    log << "partition: ";
+    for (const auto& p : profile.key_to_partition) {
+      log << std::setw(2) << p.second << " ";
+    }
+    log << "\n" << std::setw(11) << "home: ";
+    for (const auto& p : profile.key_to_home) {
+      log << std::setw(2) << p.second << " ";
+    }
+    LOG(INFO) << "Source of keys:\n" << log.str();
   }
 
   stats.txn_counter++;
@@ -229,10 +246,13 @@ void SendNextTransaction() {
   req.set_stream_id(stats.txn_counter);
   MMessage msg;
   msg.Push(req);
+
+  auto& txn_info = outstanding_txns[stats.txn_counter];
+  txn_info.sending_time = Clock::now();
+  txn_info.type = profile;
+
   // TODO: Add an option to randomly send to any server in the same region
   msg.SendTo(*server_sockets[0]);
-  // TODO: Fill in transaction info here
-  outstanding_txns[stats.txn_counter] = {};
 }
 
 void ReceiveResult(int from_socket) {
