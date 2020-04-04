@@ -184,24 +184,22 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
   txn.set_abort_reason(other.abort_reason());
 }
 
-using std::endl;
-
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
-  os << "Transaction ID: " << txn.internal().id() << endl;
+  os << "Transaction ID: " << txn.internal().id() << "\n";
   os << "Status: " 
-      << ENUM_NAME(txn.status(), TransactionStatus) << endl;
-  os << "Read set:" << endl;
+      << ENUM_NAME(txn.status(), TransactionStatus) << "\n";
+  os << "Read set:" << "\n";
   os << std::setfill(' ');
   for (const auto& pair : txn.read_set()) {
-    os << std::setw(10) << pair.first << " ==> " << pair.second << endl;
+    os << std::setw(10) << pair.first << " ==> " << pair.second << "\n";
   }
-  os << "Write set:" << endl;
+  os << "Write set:\n";
   for (const auto& pair : txn.write_set()) {
-    os << std::setw(10) << pair.first << " ==> " << pair.second << endl;
+    os << std::setw(10) << pair.first << " ==> " << pair.second << "\n";
   }
   os << "Type: "
-      << ENUM_NAME(txn.internal().type(), TransactionType) << endl;
-  os << "Code: " << txn.code() << endl;
+      << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
+  os << "Code: " << txn.code() << std::endl;
   return os;
 }
 

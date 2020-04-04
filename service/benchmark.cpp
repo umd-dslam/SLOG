@@ -115,9 +115,8 @@ private:
 
   void Print() {
     cout.precision(1);
-    cout << endl;
-    cout << "Transactions sent: " << txn_counter << endl;
-    cout << "Responses received: " << resp_counter << endl;
+    cout << "\nTransactions sent: " << txn_counter << "\n";
+    cout << "Responses received: " << resp_counter << "\n";
     cout << "Throughput: " << fixed << Throughput() << " txns/s" << endl;
   }
 
@@ -174,12 +173,12 @@ void SendNextTransaction();
 void ReceiveResult(int from_socket);
 
 void RunBenchmark() {
-  LOG(INFO) << "Transaction profile:" << endl
-            << "NUM_RECORDS = " << NUM_RECORDS << endl
-            << "NUM_WRITES = " << NUM_WRITES << endl
-            << "VALUE_SIZE = " << VALUE_SIZE << endl
-            << "MP_NUM_PARTITIONS = " << MP_NUM_PARTITIONS << endl
-            << "MH_NUM_HOMES = " << MH_NUM_HOMES << endl;
+  LOG(INFO) << "Transaction profile:\n"
+            << "NUM_RECORDS = " << NUM_RECORDS << "\n"
+            << "NUM_WRITES = " << NUM_WRITES << "\n"
+            << "VALUE_SIZE = " << VALUE_SIZE << "\n"
+            << "MP_NUM_PARTITIONS = " << MP_NUM_PARTITIONS << "\n"
+            << "MH_NUM_HOMES = " << MH_NUM_HOMES << "\n";
 
   stats.start_time = Clock::now();
   while (!StopConditionMet() || !outstanding_txns.empty()) {

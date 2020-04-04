@@ -191,7 +191,7 @@ Transaction* BasicWorkload::NextTransaction() {
   for (auto& src : picked_sources) {
     log << std::setw(2) << src.first << " ";
   }
-  log << std::endl << std::setw(11) << "home: ";
+  log << "\n" << std::setw(11) << "home: ";
   for (auto& src : picked_sources) {
     log << std::setw(2) << src.second << " ";
   }

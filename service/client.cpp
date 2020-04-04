@@ -107,16 +107,14 @@ struct StatsModule {
 };
 
 void Header(const std::string& header) {
-  cout << endl << endl;
-  cout << "====================== " << header << " ======================";
-  cout << endl << endl;
+  cout << "\n\n====================== " << header << " ======================\n\n";
 }
 
 void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
-  cout << "Txn id counter: " << stats[TXN_ID_COUNTER].GetUint() << endl;
-  cout << "Pending responses: " << stats[NUM_PENDING_RESPONSES].GetUint() << endl;
+  cout << "Txn id counter: " << stats[TXN_ID_COUNTER].GetUint() << "\n";
+  cout << "Pending responses: " << stats[NUM_PENDING_RESPONSES].GetUint() << "\n";
   if (level >= 1) {
-    cout << "List of pending responses (txn_id, stream_id): " << endl;
+    cout << "List of pending responses (txn_id, stream_id):\n";
     size_t counter = 0;
     for (auto& entry : stats[PENDING_RESPONSES].GetArray()) {
       if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
@@ -125,10 +123,10 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
       }
 
       cout << "(" << entry.GetArray()[0].GetUint()
-           << ", " << entry.GetArray()[1].GetUint() << ") " << endl;
+           << ", " << entry.GetArray()[1].GetUint() << ")\n";
     }
   }
-  cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << endl;
+  cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of partially completed txns: ";
     size_t counter = 0;
@@ -140,8 +138,9 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
 
       cout << txn_id.GetUint() << " ";
     }
-    cout << endl;
+    cout << "\n";
   }
+  cout << endl;
 }
 
 string LockModeStr(LockMode mode) {
@@ -160,14 +159,14 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   // cout << buffer.GetString() << endl;
 
   Header("Local Log");
-  cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << endl;
-  cout << "Buffered batches per queue: " << endl;
+  cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
+  cout << "Buffered batches per queue:\n";
   const auto& batches_per_queue = stats[LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE].GetArray();
   // std::sort(batches_per_queue.begin(), batches_per_queue.end());
   
   for (size_t i = 0; i < batches_per_queue.Size(); i++) {
     const auto& pair = batches_per_queue[i].GetArray();
-    cout << "\tQueue " << pair[0].GetUint() << ": " << pair[1].GetUint() << endl;
+    cout << "\tQueue " << pair[0].GetUint() << ": " << pair[1].GetUint() << "\n";
   }
 
   Header("Global Log");
@@ -178,24 +177,24 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   int num_regions = slots_per_region.Size() - 1;
   cout << setw(12) << "Regions" 
        << setw(20) << "# buffered slots"
-       << setw(22) << "# buffered batches" << endl;
+       << setw(22) << "# buffered batches\n";
   for (int i = 0; i < num_regions; i++) {
     const auto& slots = slots_per_region[i].GetArray();
     const auto& batches = batches_per_region[i].GetArray();
     cout << setw(12) << slots[0].GetUint()
          << setw(20) << slots[1].GetUint()
-         << setw(22) << batches[1].GetUint() << endl;
+         << setw(22) << batches[1].GetUint() << "\n";
   }
   if (num_regions >= 0) {
     cout << setw(12) << "multi-home"
         << setw(20) << slots_per_region[num_regions].GetArray()[1].GetUint()
-        << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << endl;
+        << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << "\n";
   }
 
   Header("Transactions");
-  cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << endl;
+  cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {
-    cout << "List of all txns:\n  ";
+    cout << "List of all txns:\n";
     size_t counter = 0;
     for (auto& txn_id : stats[ALL_TXNS].GetArray()) {
       if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
@@ -205,34 +204,34 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 
       cout << txn_id.GetUint() << " ";
     }
-    cout << endl;
+    cout << "\n";
   }
 
-  cout << "Txns waiting for lock: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << endl;
+  cout << "Txns waiting for lock: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
   if (level >= 1) {
-    cout << "Locks waited per txn: " << endl;
+    cout << "Locks waited per txn:\n";
     cout << setw(10) << "Txn" 
-         << setw(18) << "# locks waited" << endl;
+         << setw(18) << "# locks waited\n";
     size_t counter = 0;
     for (auto& pair : stats[NUM_LOCKS_WAITED_PER_TXN].GetArray()) {
       if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << "(truncated)" << endl;
+        cout << "(truncated)\n";
         break;
       }
 
       const auto& txn_and_locks = pair.GetArray();
       cout << setw(10) << txn_and_locks[0].GetUint() 
-           << setw(18) << txn_and_locks[1].GetInt() << endl;
+           << setw(18) << txn_and_locks[1].GetInt() << "\n";
     }
   }
 
-  cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << endl;
+  cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << "\n";
   if (level >= 2) {
-    cout << "Lock table:" << endl;
+    cout << "Lock table:\n";
     size_t counter = 0;
     for (auto& entry_ : stats[LOCK_TABLE].GetArray()) {
       if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << "(truncated)" << endl;
+        cout << "(truncated)\n";
         break;
       }
 
@@ -240,13 +239,13 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
       
       cout << "Key: " << entry[0].GetString()
-           << ". Mode: " << LockModeStr(lock_mode) << endl;
+           << ". Mode: " << LockModeStr(lock_mode) << "\n";
 
       cout << "\tHolders: ";
       for (auto& holder : entry[2].GetArray()) {
         cout << holder.GetUint() << " ";
       }
-      cout << endl;
+      cout << "\n";
 
       cout << "\tWaiters: ";
       for (auto& waiter : entry[3].GetArray()) {
@@ -254,9 +253,10 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         cout << "(" << txn_and_mode[0].GetUint()
              << ", "<< LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
       }
-      cout << endl;
+      cout << "\n";
     }
   }
+  cout << endl;
 }
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
