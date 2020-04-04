@@ -71,10 +71,16 @@ void Sequencer::HandlePeriodicWakeUp() {
   local_paxos_->Propose(config_->GetLocalPartition());
 
   // Replicate batch to all machines
-  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
-    for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
+  auto num_partitions = config_->GetNumPartitions();
+  auto num_replicas = config_->GetNumReplicas();
+  for (uint32_t part = 0; part < num_partitions; part++) {
+    for (uint32_t rep = 0; rep < num_replicas; rep++) {
       auto machine_id = MakeMachineIdAsString(rep, part);
-      Send(req, machine_id, SCHEDULER_CHANNEL);
+      Send(
+          req,
+          machine_id,
+          SCHEDULER_CHANNEL,
+          part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
     }
   }
 
@@ -119,9 +125,14 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
   }
 
   // Replicate the batch of multi-home txns to all machines in the same region
-  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+  auto num_partitions = config_->GetNumPartitions();
+  for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = MakeMachineIdAsString(local_rep, part);
-    Send(req, machine_id, SCHEDULER_CHANNEL);
+    Send(
+        req,
+        machine_id,
+        SCHEDULER_CHANNEL,
+        part + 1 < num_partitions /* has_more */);
   }
 }
 

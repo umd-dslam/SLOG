@@ -351,8 +351,12 @@ void Scheduler::MaybeUpdateLocalLog() {
     auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
     forward_batch_order->set_batch_id(batch_id);
     forward_batch_order->set_slot(slot_id);
-    for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-      SendSameChannel(request, MakeMachineIdAsString(rep, local_partition));
+    auto num_replicas = config_->GetNumReplicas();
+    for (uint32_t rep = 0; rep < num_replicas; rep++) {
+      SendSameChannel(
+          request,
+          MakeMachineIdAsString(rep, local_partition),
+          rep + 1 < num_replicas /* has_more */);
     }
   }
 }
