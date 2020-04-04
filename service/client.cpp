@@ -153,16 +153,10 @@ string LockModeStr(LockMode mode) {
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
-  // rapidjson::StringBuffer buffer;
-  // rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  // stats.Accept(writer);
-  // cout << buffer.GetString() << endl;
-
   Header("Local Log");
   cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
   cout << "Buffered batches per queue:\n";
   const auto& batches_per_queue = stats[LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE].GetArray();
-  // std::sort(batches_per_queue.begin(), batches_per_queue.end());
   
   for (size_t i = 0; i < batches_per_queue.Size(); i++) {
     const auto& pair = batches_per_queue[i].GetArray();
