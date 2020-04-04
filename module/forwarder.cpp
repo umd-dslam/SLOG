@@ -64,11 +64,13 @@ void Forwarder::HandleInternalRequest(
   // Send a look up master request to each partition in the same region
   auto lookup_master_request = MakeLookupMasterRequest(*txn);
   auto rep = config_->GetLocalReplica();
-  for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+  auto num_partitions = config_->GetNumPartitions();
+  for (uint32_t part = 0; part < num_partitions; part++) {
     Send(
         lookup_master_request,
         MakeMachineIdAsString(rep, part),
-        SERVER_CHANNEL);
+        SERVER_CHANNEL,
+        part + 1 < num_partitions /* has_more */);
   }
 }
 

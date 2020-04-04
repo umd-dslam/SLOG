@@ -66,9 +66,14 @@ void MultiHomeOrderer::HandlePeriodicWakeUp() {
 
   // Replicate new batch to other regions
   auto part = config_->GetLeaderPartitionForMultiHomeOrdering();
-  for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
+  auto num_replicas = config_->GetNumReplicas();
+  for (uint32_t rep = 0; rep < num_replicas; rep++) {
     auto machine_id = MakeMachineIdAsString(rep, part);
-    Send(req, machine_id, MULTI_HOME_ORDERER_CHANNEL);
+    Send(
+        req,
+        machine_id,
+        MULTI_HOME_ORDERER_CHANNEL,
+        rep + 1 < num_replicas /* has_more */);
   }
 
   NewBatch();
