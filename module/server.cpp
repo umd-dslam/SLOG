@@ -20,6 +20,8 @@ Server::Server(
     lookup_master_index_(lookup_master_index),
     txn_id_counter_(0) {
   client_socket_.setsockopt(ZMQ_LINGER, 0);
+  client_socket_.setsockopt(ZMQ_RCVHWM, SERVER_RCVHWM);
+  client_socket_.setsockopt(ZMQ_SNDHWM, SERVER_SNDHWM);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({ 
       static_cast<void*>(client_socket_),

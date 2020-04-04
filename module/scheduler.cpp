@@ -29,6 +29,8 @@ Scheduler::Scheduler(
     config_(config),
     worker_socket_(context, ZMQ_ROUTER) {
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
+  worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
+  worker_socket_.setsockopt(ZMQ_SNDHWM, 0);
   poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
       static_cast<void*>(worker_socket_),

@@ -7,6 +7,9 @@ namespace slog {
 const long BROKER_POLL_TIMEOUT_MS = 100;
 const long MODULE_POLL_TIMEOUT_MS = 100;
 
+const int SERVER_RCVHWM = 10000;
+const int SERVER_SNDHWM = 10000;
+
 const std::string SERVER_CHANNEL("server");
 const std::string FORWARDER_CHANNEL("forwarder");
 const std::string SEQUENCER_CHANNEL("sequencer");

@@ -30,9 +30,14 @@ Broker::Broker(
   // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
   // Otherwise, it would hang indefinitely until the messages are sent.
   router_.setsockopt(ZMQ_LINGER, 0);
+  // Remove all limits on the message queues
+  router_.setsockopt(ZMQ_RCVHWM, 0);
+  router_.setsockopt(ZMQ_SNDHWM, 0);
   for (const auto& addr : config->GetAllAddresses()) {
     auto socket = std::make_unique<zmq::socket_t>(*context, ZMQ_DEALER);
     socket->setsockopt(ZMQ_LINGER, 0);
+    socket->setsockopt(ZMQ_RCVHWM, 0);
+    socket->setsockopt(ZMQ_SNDHWM, 0);
     address_to_socket_[addr] = move(socket);
   }
 }

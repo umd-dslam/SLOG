@@ -20,6 +20,9 @@ Channel::Channel(
     listener_created_(false) {
   string endpoint = "inproc://" + name;
   socket_.setsockopt(ZMQ_LINGER, 0);
+  // Remove limit on the zmq message queues
+  socket_.setsockopt(ZMQ_RCVHWM, 0);
+  socket_.setsockopt(ZMQ_SNDHWM, 0);
   if (is_listener) {
     socket_.bind(endpoint);
   } else {

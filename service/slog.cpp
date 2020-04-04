@@ -80,6 +80,12 @@ void LoadData(
 int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
   
+  auto zmq_version = zmq::version();
+  LOG(INFO) << "ZMQ version "
+            << std::get<0>(zmq_version) << "."
+            << std::get<1>(zmq_version) << "."
+            << std::get<2>(zmq_version);
+
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 
       FLAGS_address,
