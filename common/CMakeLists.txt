@@ -18,3 +18,5 @@ target_link_libraries(test_utils
   connection
   module
   proto)
+
+add_library(csv_writer csv_writer.cpp)

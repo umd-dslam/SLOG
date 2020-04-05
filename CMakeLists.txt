@@ -139,7 +139,7 @@ message(STATUS "External libs: ${EXTERNAL_LIBS}")
 #            Executables
 #========================================
 
-# Create an executable for the services
+# Create an executable for each service
 add_executable(slog service/slog.cpp)
 target_link_libraries(slog 
   batch_log
@@ -154,6 +154,7 @@ target_link_libraries(slog
 add_executable(benchmark service/benchmark.cpp)
 target_link_libraries(benchmark 
   common
+  csv_writer
   ticker
   workload
   ${EXTERNAL_LIBS})

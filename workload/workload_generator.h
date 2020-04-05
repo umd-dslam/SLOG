@@ -14,6 +14,7 @@ const uint32_t NUM_WRITES = 2;
 const uint32_t VALUE_SIZE = 100; // bytes
 
 struct TransactionProfile {
+  TxnId client_txn_id;
   bool is_multi_home;
   bool is_multi_partition;
 

@@ -3,6 +3,7 @@
 #include <iomanip>
 
 #include "common/configuration.h"
+#include "common/csv_writer.h"
 #include "common/proto_utils.h"
 #include "common/service_utils.h"
 #include "common/types.h"
@@ -37,6 +38,7 @@ using std::endl;
 using std::fixed;
 using std::make_unique;
 using std::move;
+using std::string;
 using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
@@ -47,6 +49,15 @@ uint64_t TimeElapsedSince(TimePoint tp) {
 }
 
 const uint32_t STATS_PRINT_EVERY_MS = 1000;
+const string RESULT_FILE = "results.csv";
+const vector<string> RESULT_COLUMNS = {
+    "client_txn_id",
+    "txn_id",
+    "is_mh",
+    "is_mp",
+    "sent_at",
+    "received_at",
+    "rtt"};
 
 /**
  * Connection stuff
@@ -72,10 +83,11 @@ unique_ptr<WorkloadGenerator> workload;
  * Data structure for keeping track of the transactions
  */
 struct TransactionInfo {
-  TransactionProfile type;
-  TimePoint sending_time;
+  TransactionProfile profile;
+  TimePoint sent_at;
 };
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
+std::unique_ptr<CSVWriter> result_writer;
 
 /**
  * Statistics
@@ -156,6 +168,8 @@ void InitializeBenchmark() {
 
     LOG(INFO) << "Connecting to " << endpoint;
     auto socket = make_unique<zmq::socket_t>(context, ZMQ_DEALER);
+    socket->setsockopt(ZMQ_SNDHWM, 0);
+    socket->setsockopt(ZMQ_RCVHWM, 0);
     socket->connect(endpoint);
     poll_items.push_back({
         static_cast<void*>(*socket),
@@ -167,6 +181,7 @@ void InitializeBenchmark() {
   }
 
   workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_mh, FLAGS_mp);
+  result_writer = make_unique<CSVWriter>(RESULT_FILE, RESULT_COLUMNS);
 }
 
 bool StopConditionMet();
@@ -247,16 +262,18 @@ void SendNextTransaction() {
   MMessage msg;
   msg.Push(req);
 
-  auto& txn_info = outstanding_txns[stats.txn_counter];
-  txn_info.sending_time = Clock::now();
-  txn_info.type = profile;
-
   // TODO: Add an option to randomly send to any server in the same region
   msg.SendTo(*server_sockets[0]);
+
+  auto& txn_info = outstanding_txns[stats.txn_counter];
+  txn_info.sent_at = Clock::now();
+  txn_info.profile = profile;
 }
 
 void ReceiveResult(int from_socket) {
   MMessage msg(*server_sockets[from_socket]);
+  const auto& recv_at = Clock::now();
+
   api::Response res;
 
   if (!msg.GetProto(res)) {
@@ -272,11 +289,22 @@ void ReceiveResult(int from_socket) {
   } 
 
   stats.resp_counter++;
-  
-  outstanding_txns.erase(res.stream_id());
 
-  // TODO: collect stats of individual txn
-  // const auto& txn = res.txn().txn();
+  // Write txn info to csv file
+  const auto& txn = res.txn().txn();
+  const auto& txn_info = outstanding_txns[res.stream_id()];
+  const auto& sent_at = txn_info.sent_at;
+
+  (*result_writer) << txn_info.profile.client_txn_id
+                   << txn.internal().id()
+                   << txn_info.profile.is_multi_home
+                   << txn_info.profile.is_multi_partition
+                   << duration_cast<milliseconds>(sent_at.time_since_epoch()).count()
+                   << duration_cast<milliseconds>(recv_at.time_since_epoch()).count()
+                   << duration_cast<milliseconds>(recv_at - sent_at).count()
+                   << csvendl;
+
+  outstanding_txns.erase(res.stream_id());
 }
 
 int main(int argc, char* argv[]) {

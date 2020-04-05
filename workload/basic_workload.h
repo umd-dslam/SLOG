@@ -49,6 +49,8 @@ private:
   vector<vector<KeyList>> partition_to_key_lists_;
 
   std::mt19937 re_;
+
+  TxnId client_txn_id_counter_;
 };
 
 } // namespace slog

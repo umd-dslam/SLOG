@@ -101,7 +101,8 @@ BasicWorkload::BasicWorkload(
   : config_(config),
     multi_home_pct_(multi_home_pct),
     multi_partition_pct_(multi_partition_pct),
-    partition_to_key_lists_(config->GetNumPartitions()) {
+    partition_to_key_lists_(config->GetNumPartitions()),
+    client_txn_id_counter_(0) {
 
   for (auto& key_lists : partition_to_key_lists_) {
     for (uint32_t rep = 0; rep < config->GetNumReplicas(); rep++) {
@@ -137,6 +138,8 @@ BasicWorkload::NextTransaction() {
       << "Number of writes cannot exceed number of records in a txn!";
 
   TransactionProfile pro;
+
+  pro.client_txn_id = client_txn_id_counter_;
 
   // Decide if this is a multi-partition txn or not
   discrete_distribution<> spmp({100 - multi_partition_pct_, multi_partition_pct_});
@@ -189,6 +192,9 @@ BasicWorkload::NextTransaction() {
   }
 
   auto txn = MakeTransaction(read_set, write_set, code.str());
+  txn->mutable_internal()->set_id(client_txn_id_counter_);
+
+  client_txn_id_counter_++;
 
   return {txn, pro};
 }
