@@ -16,6 +16,11 @@ namespace slog {
 
 using TransactionMap = unordered_map<TxnReplicaId, TransactionHolder>;
 
+/**
+ * Basic, inefficient implimentation of remastering. Transactions are kept in the exact
+ * order as their local logs: if a transaction from region 1 is blocked in the queue, all
+ * following transactions from region 1 will be blocked behind it
+ */
 class SimpleRemasterManager :
     public RemasterManager {
 public:
@@ -27,13 +32,21 @@ public:
   virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter);
 
 private:
+  /**
+   * Compare transaction metadata to stored metadata
+   */
   VerifyMasterResult CheckCounters(TransactionHolder& txn_holder);
+
+  /**
+   * Test if the head of this queue can be unblocked
+   */
   void TryToUnblock(const uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
   shared_ptr<Storage<Key, Record>> storage_;
-  unordered_map<uint32_t, list<TxnReplicaId>> blocked_queue_;
   shared_ptr<TransactionMap> all_txns_;
 
+  // One queue is kept per local log
+  unordered_map<uint32_t, list<TxnReplicaId>> blocked_queue_;
 };
 
 } // namespace slog

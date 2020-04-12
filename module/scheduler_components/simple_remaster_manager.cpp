@@ -86,6 +86,7 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t re
     for (auto& key_pair : txn_keys) {
       auto txn_key = key_pair.first;
       if (txn_key == remaster_key) {
+        // TODO: check here if counters match, saves an iteration through all keys
         TryToUnblock(queue_pair.first, result);
         break;
       }
