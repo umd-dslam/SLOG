@@ -30,8 +30,8 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
-  if (blocked_queue_.count(local_log_machine_id)) {
-    blocked_queue_.at(local_log_machine_id).push_back(txn_replica_id);
+  if (blocked_queue_.count(local_log_machine_id) && !blocked_queue_[local_log_machine_id].empty()) {
+    blocked_queue_[local_log_machine_id].push_back(txn_replica_id);
     return VerifyMasterResult::WAITING;
   }
 
@@ -39,21 +39,16 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
   auto result = CheckCounters(txn_holder);
   if (result == VerifyMasterResult::WAITING) {
     blocked_queue_[local_log_machine_id].push_back(txn_replica_id);
-    return VerifyMasterResult::WAITING;
-  } else {
-    return result;
   }
+  return result;
 }
 
 VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_holder) {
   auto& keys = txn_holder.KeysInPartition();
   auto& txn_master_metadata = txn_holder.GetTransaction()->internal().master_metadata();
   for (auto& key_pair : keys) {
-    auto key = key_pair.first;
+    auto& key = key_pair.first;
 
-    // Get txn's counter
-    CHECK(txn_master_metadata.count(key))
-            << "Master metadata for key \"" << key << "\" is missing";
     auto txn_counter = txn_master_metadata.at(key).counter();
 
     // Get current counter from storage
@@ -81,14 +76,16 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t re
   // Try to unblock each txn at the head of a queue, if it contains the remastered key.
   // Note that multiple queues could contain the same key with different counters
   for (auto& queue_pair : blocked_queue_) {
-    auto txn_replica_id = queue_pair.second.front();
-    auto& txn_keys = all_txns_->at(txn_replica_id).KeysInPartition();
-    for (auto& key_pair : txn_keys) {
-      auto txn_key = key_pair.first;
-      if (txn_key == remaster_key) {
-        // TODO: check here if counters match, saves an iteration through all keys
-        TryToUnblock(queue_pair.first, result);
-        break;
+    if (!queue_pair.second.empty()) {
+      auto txn_replica_id = queue_pair.second.front();
+      auto& txn_keys = all_txns_->at(txn_replica_id).KeysInPartition();
+      for (auto& key_pair : txn_keys) {
+        auto& txn_key = key_pair.first;
+        if (txn_key == remaster_key) {
+          // TODO: check here if counters match, saves an iteration through all keys
+          TryToUnblock(queue_pair.first, result);
+          break;
+        }
       }
     }
   }
@@ -98,11 +95,11 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t re
 void SimpleRemasterManager::TryToUnblock(
     const uint32_t local_log_machine_id,
     RemasterOccurredResult& result) {
-  if (blocked_queue_.count(local_log_machine_id) == 0) {
+  if (blocked_queue_.count(local_log_machine_id) == 0 || blocked_queue_[local_log_machine_id].empty()) {
     return;
   }
 
-  auto txn_replica_id = blocked_queue_.at(local_log_machine_id).front();
+  auto txn_replica_id = blocked_queue_[local_log_machine_id].front();
   auto& txn_holder = all_txns_->at(txn_replica_id);
   auto& keys = txn_holder.KeysInPartition();
 
@@ -116,14 +113,10 @@ void SimpleRemasterManager::TryToUnblock(
   }
 
   // Head of queue has changed
-  blocked_queue_.at(local_log_machine_id).pop_front();
-  if (blocked_queue_.at(local_log_machine_id).empty()) {
-    // garbage collect
-    blocked_queue_.erase(local_log_machine_id);
-  } else {
-    // recurse on new front of queue
-    TryToUnblock(local_log_machine_id, result);
-  }
+  blocked_queue_[local_log_machine_id].pop_front();
+
+  // Note: queue may be left empty, since there are not many replicas
+  TryToUnblock(local_log_machine_id, result);
 }
 
 } // namespace slog
