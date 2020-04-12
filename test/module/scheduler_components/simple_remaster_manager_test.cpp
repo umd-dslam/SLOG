@@ -27,7 +27,7 @@ protected:
 
     auto txn_replica_id = txn_id;
     txn->mutable_internal()->set_id(txn_id);
-    txn->mutable_internal()->set_replica_id(txn_replica_id);
+    txn->mutable_internal()->set_txn_replica_id(txn_replica_id);
     CHECK(all_txns->count(txn->internal().id()) == 0) << "Need to set txns to unique id's";
     auto& holder = (*all_txns)[txn_replica_id];
     holder.SetTransaction(configs[0], txn);
@@ -35,7 +35,7 @@ protected:
   }
 
   TxnReplicaId GetTxnReplicaId(TransactionHolder& holder) {
-    return holder.GetTransaction()->internal().replica_id();
+    return holder.GetTransaction()->internal().txn_replica_id();
   }
 };
 
