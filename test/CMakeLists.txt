@@ -18,7 +18,8 @@ set(ALL_TESTS
   proto_utils_test
   scheduler_test
   server_test
-  sequencer_test)
+  sequencer_test
+  simple_remaster_manager_test)
 
 add_executable(batch_log_test data_structure/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
@@ -68,6 +69,10 @@ target_link_libraries(server_test test_utils)
 
 add_executable(sequencer_test module/sequencer_test.cpp)
 target_link_libraries(sequencer_test test_utils)
+
+add_executable(simple_remaster_manager_test 
+   module/scheduler_components/simple_remaster_manager_test.cpp)
+ target_link_libraries(simple_remaster_manager_test test_utils)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

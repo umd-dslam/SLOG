@@ -22,10 +22,14 @@ message MasterMetadata {
 }
 
 message TransactionInternal {
+    // unique transaction id, multi-home and lock only
+    // txns share this id
     uint32 id = 1;
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
     internal.MachineId coordinating_server = 4;
+    // unique id for lock only txns
+    uint32 txn_replica_id = 5;
 }
 
 message Transaction {
