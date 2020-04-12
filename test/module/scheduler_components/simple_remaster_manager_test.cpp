@@ -41,7 +41,8 @@ protected:
 
 TEST_F(SimpleRemasterManagerTest, ValidateMetadata) {
   storage->Write("A", Record("value", 0, 1));
-  auto& txn1 = MakeHolder(MakeTransaction({"A", "B"}, {}, "some code", {{"B", {1, 1}}}), 100);
+  storage->Write("B", Record("value", 0, 1));
+  auto& txn1 = MakeHolder(MakeTransaction({"A", "B"}, {}, "some code", {{"B", {0, 1}}}), 100);
   auto& txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {1, 1}}}), 101);
   ASSERT_DEATH(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), "metadata for key .* is missing");
   ASSERT_DEATH(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), "Masters don't match");
