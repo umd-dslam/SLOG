@@ -52,7 +52,7 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_h
     auto txn_counter = txn_master_metadata.at(key).counter();
 
     // Get current counter from storage
-    auto storage_counter = 0; // default to 0 for a new key
+    uint32_t storage_counter = 0; // default to 0 for a new key
     Record record;
     bool found = storage_->Read(key, record);
     if (found) {        
@@ -71,7 +71,7 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_h
 }
 
 RemasterOccurredResult
-SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t remaster_counter) {
+SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
   // Try to unblock each txn at the head of a queue, if it contains the remastered key.
   // Note that multiple queues could contain the same key with different counters
@@ -101,7 +101,6 @@ void SimpleRemasterManager::TryToUnblock(
 
   auto txn_replica_id = blocked_queue_[local_log_machine_id].front();
   auto& txn_holder = all_txns_->at(txn_replica_id);
-  auto& keys = txn_holder.KeysInPartition();
 
   auto counter_result = CheckCounters(txn_holder);
   if (counter_result == VerifyMasterResult::WAITING) {

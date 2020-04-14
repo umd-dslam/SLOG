@@ -8,7 +8,7 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/transaction_utils.h"
+#include "common/transaction_holder.h"
 #include "common/types.h"
 
 using std::list;

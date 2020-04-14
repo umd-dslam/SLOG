@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "common/configuration.h"
-#include "common/transaction_utils.h"
+#include "common/transaction_holder.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "data_structure/batch_log.h"

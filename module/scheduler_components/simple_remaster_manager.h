@@ -4,7 +4,7 @@
 
 #include "module/scheduler_components/remaster_manager.h"
 
-#include "common/transaction_utils.h"
+#include "common/transaction_holder.h"
 
 #include "storage/storage.h"
 
