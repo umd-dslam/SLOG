@@ -49,8 +49,11 @@ uint64_t TimeElapsedSince(TimePoint tp) {
 }
 
 const uint32_t STATS_PRINT_EVERY_MS = 1000;
-const string RESULT_FILE = "results.csv";
-const vector<string> RESULT_COLUMNS = {
+const string TXNS_FILE = "transactions.csv";
+
+// Time points are in microseconds since epoch
+// Time spans are in microseconds
+const vector<string> TXN_COLUMNS = {
     "client_txn_id",
     "txn_id",
     "is_mh",
@@ -58,6 +61,12 @@ const vector<string> RESULT_COLUMNS = {
     "sent_at",
     "received_at",
     "rtt"};
+const string EVENTS_FILE = "events.csv";
+const vector<string> EVENT_COLUMNS = {
+    "txn_id",
+    "event",
+    "time",
+    "machine"};
 
 /**
  * Connection stuff
@@ -87,7 +96,8 @@ struct TransactionInfo {
   TimePoint sent_at;
 };
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
-std::unique_ptr<CSVWriter> result_writer;
+std::unique_ptr<CSVWriter> txn_writer;
+std::unique_ptr<CSVWriter> event_writer;
 
 /**
  * Statistics
@@ -181,7 +191,8 @@ void InitializeBenchmark() {
   }
 
   workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_mh, FLAGS_mp);
-  result_writer = make_unique<CSVWriter>(RESULT_FILE, RESULT_COLUMNS);
+  txn_writer = make_unique<CSVWriter>(TXNS_FILE, TXN_COLUMNS);
+  event_writer = make_unique<CSVWriter>(EVENTS_FILE, EVENT_COLUMNS);
 }
 
 bool StopConditionMet();
@@ -292,17 +303,26 @@ void ReceiveResult(int from_socket) {
 
   // Write txn info to csv file
   const auto& txn = res.txn().txn();
+  const auto& txn_internal = txn.internal();
   const auto& txn_info = outstanding_txns[res.stream_id()];
   const auto& sent_at = txn_info.sent_at;
 
-  (*result_writer) << txn_info.profile.client_txn_id
-                   << txn.internal().id()
+  (*txn_writer) << txn_info.profile.client_txn_id
+                   << txn_internal.id()
                    << txn_info.profile.is_multi_home
                    << txn_info.profile.is_multi_partition
-                   << duration_cast<milliseconds>(sent_at.time_since_epoch()).count()
-                   << duration_cast<milliseconds>(recv_at.time_since_epoch()).count()
-                   << duration_cast<milliseconds>(recv_at - sent_at).count()
+                   << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
+                   << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
+                   << duration_cast<microseconds>(recv_at - sent_at).count()
                    << csvendl;
+
+  for (int i = 0; i < txn_internal.events_size(); i++) {
+    (*event_writer) << txn_internal.id()
+                    << ENUM_NAME(txn_internal.events(i), TransactionEvent)
+                    << txn_internal.event_times(i)
+                    << txn_internal.event_machines(i)
+                    << csvendl;
+  }
 
   outstanding_txns.erase(res.stream_id());
 }
