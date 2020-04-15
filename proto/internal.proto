@@ -12,6 +12,11 @@ message Batch {
     // Can either be SINGLE_HOME or MULTI_HOME. 
     // LOCK_ONLY txns are also considered SINGLE_HOME.
     TransactionType transaction_type = 3;
+    // For recording the event time for all
+    // transactions in this batch simultaneously
+    repeated TransactionEvent events = 4;
+    repeated uint64 event_times = 5;    // when the events took place
+    repeated uint32 event_machines = 6; // where the events took place
 }
 
 message BatchOrder {

@@ -32,6 +32,12 @@ void Sequencer::HandleInternalRequest(
     case Request::kForwardTxn: {
       // Received a single-home txn
       auto txn = req.mutable_forward_txn()->release_txn();
+
+      RecordTxnEvent(
+          config_,
+          txn->mutable_internal(),
+          TransactionEvent::ENTER_SEQUENCER);
+
       PutSingleHomeTransactionIntoBatch(txn);
       break;
     }
@@ -71,6 +77,11 @@ void Sequencer::HandlePeriodicWakeUp() {
   local_paxos_->Propose(config_->GetLocalPartition());
 
   // Replicate batch to all machines
+  RecordTxnEvent(
+      config_,
+      forward_batch->mutable_batch_data(),
+      TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+
   auto num_partitions = config_->GetNumPartitions();
   auto num_replicas = config_->GetNumReplicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
@@ -88,16 +99,21 @@ void Sequencer::HandlePeriodicWakeUp() {
 }
 
 void Sequencer::ProcessMultiHomeBatch(Request&& req) {
-  const auto& batch = req.forward_batch().batch_data();
-  if (batch.transaction_type() != TransactionType::MULTI_HOME) {
+  auto batch = req.mutable_forward_batch()->mutable_batch_data();
+  if (batch->transaction_type() != TransactionType::MULTI_HOME) {
     LOG(ERROR) << "Batch has to contain multi-home txns";
     return;
   }
 
+  RecordTxnEvent(
+      config_,
+      batch,
+      TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
+
   auto local_rep = config_->GetLocalReplica();
   // For each multi-home txn, create a lock-only txn and put into
   // the single-home batch to be sent to the local log
-  for (auto& txn : batch.transactions()) {
+  for (auto& txn : batch->transactions()) {
     auto lock_only_txn = new Transaction();
 
     lock_only_txn->mutable_internal()
@@ -125,6 +141,11 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
   }
 
   // Replicate the batch of multi-home txns to all machines in the same region
+  RecordTxnEvent(
+      config_,
+      batch,
+      TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+
   auto num_partitions = config_->GetNumPartitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = MakeMachineIdAsString(local_rep, part);

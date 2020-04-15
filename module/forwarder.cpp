@@ -52,6 +52,11 @@ void Forwarder::HandleInternalRequest(
   }
 
   auto txn = req.mutable_forward_txn()->release_txn();
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::ENTER_FORWARDER);
+
   auto txn_type = SetTransactionType(*txn);
   // Forward the transaction if we already knoww the type of the txn
   if (txn_type != TransactionType::UNKNOWN) {
@@ -117,9 +122,10 @@ void Forwarder::HandleInternalResponse(
 }
 
 void Forwarder::Forward(Transaction* txn) {
-  auto txn_id = txn->internal().id();
-  auto txn_type = txn->internal().type();
-  auto& master_metadata = txn->internal().master_metadata();
+  auto txn_internal = txn->mutable_internal();
+  auto txn_id = txn_internal->id();
+  auto txn_type = txn_internal->type();
+  auto& master_metadata = txn_internal->master_metadata();
 
   // Prepare a request to be forwarded to a sequencer
   Request forward_txn;
@@ -131,6 +137,10 @@ void Forwarder::Forward(Transaction* txn) {
     auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->GetLocalReplica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
+      RecordTxnEvent(
+          config_,
+          txn_internal,
+          TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       SendSameMachine(forward_txn, SEQUENCER_CHANNEL);
     } else {
       auto partition = RandomPartition(re_);
@@ -139,6 +149,10 @@ void Forwarder::Forward(Transaction* txn) {
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: "
               << home_replica << ", part: " << partition << ")";
 
+      RecordTxnEvent(
+          config_,
+          txn_internal,
+          TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(
           forward_txn,
           random_machine_in_home_replica,
@@ -151,6 +165,10 @@ void Forwarder::Forward(Transaction* txn) {
 
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
+    RecordTxnEvent(
+        config_,
+        txn_internal,
+        TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
     Send(
         forward_txn,
         destination,

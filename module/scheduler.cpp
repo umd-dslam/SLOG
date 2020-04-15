@@ -153,7 +153,11 @@ void Scheduler::ProcessForwardBatch(
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
- 
+      RecordTxnEvent(
+          config_,
+          batch.get(),
+          TransactionEvent::ENTER_SCHEDULER_IN_BATCH);
+
       switch (batch->transaction_type()) {
         case TransactionType::SINGLE_HOME: {
           VLOG(1) << "Received data for SINGLE-HOME batch " << batch->id()
@@ -317,6 +321,11 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   auto txn = all_txns_[txn_id].ReleaseTransaction();
   all_txns_.erase(txn_id);
 
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::RELEASE_LOCKS);
+
   // Send the txn back to the coordinating server if need to
   auto local_partition = config_->GetLocalPartition();
   auto& participants = res.participants();
@@ -333,6 +342,12 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     for (auto p : participants) {
       completed_sub_txn->add_involved_partitions(p);
     }
+
+    RecordTxnEvent(
+        config_,
+        txn->mutable_internal(),
+        TransactionEvent::EXIT_SCHEDULER);
+
     Send(req, coordinating_server, SERVER_CHANNEL);
   }
 }
@@ -384,6 +399,13 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
         auto txn = buffer.top();
         buffer.pop();
 
+        auto txn_internal = txn->mutable_internal();
+
+        // Transfer recorded events from batch to each txn in the batch
+        txn_internal->mutable_events()->MergeFrom(batch->events());
+        txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
+        txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
+
         auto txn_type = txn->internal().type();
 
         switch (txn_type) {
@@ -406,6 +428,10 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
               VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
 
               if (lock_manager_.AcceptTransaction(all_txns_[txn_id])) {
+                RecordTxnEvent(
+                    config_,
+                    txn_internal,
+                    TransactionEvent::ACCEPTED);
                 DispatchTransaction(txn_id); 
               }
             }
@@ -456,6 +482,7 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
 void Scheduler::DispatchTransaction(TxnId txn_id) {
 
   auto& holder = all_txns_[txn_id];
+  auto txn = holder.GetTransaction();
 
   // Select next worker in a round-robin manner
   holder.SetWorker(worker_identities_[next_worker_]);
@@ -465,7 +492,12 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   Request req;
   auto worker_request = req.mutable_worker();
   worker_request->set_txn_ptr(
-      reinterpret_cast<uint64_t>(holder.GetTransaction()));
+      reinterpret_cast<uint64_t>(txn));
+
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::DISPATCHED);
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction

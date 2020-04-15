@@ -63,7 +63,13 @@ void Worker::Loop() {
 
 void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
   auto txn = reinterpret_cast<Transaction*>(worker_request.txn_ptr());
-  auto txn_id = txn->internal().id();
+  auto txn_internal = txn->mutable_internal();
+  RecordTxnEvent(
+      config_,
+      txn_internal,
+      TransactionEvent::ENTER_WORKER);
+
+  auto txn_id = txn_internal->id();
 
   const auto& state = InitializeTransactionState(txn);
 
@@ -231,6 +237,12 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
         ->mutable_participants()
         ->Add(p);
   }
+
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::EXIT_WORKER);
+
   SendToScheduler(res);
 
   // Done with this txn. Remove it from the state map

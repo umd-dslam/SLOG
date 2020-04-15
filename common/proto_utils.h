@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <unordered_map>
 
+#include "common/configuration.h"
 #include "common/mmessage.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
@@ -63,5 +64,17 @@ void MergeTransaction(Transaction& txn, const Transaction& other);
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);
 bool operator==(const Transaction& txn1, const Transaction txn2);
+
+template<typename TxnOrBatch>
+inline void RecordTxnEvent(ConfigurationPtr config, TxnOrBatch txn, TransactionEvent event) {
+  txn->mutable_events()->Add(event);
+  txn->mutable_event_times()->Add(
+      duration_cast<microseconds>(
+          Clock::now()
+              .time_since_epoch()).count()
+  );
+  txn->mutable_event_machines()->Add(
+      config->GetLocalMachineIdAsNumber());
+}
 
 } // namespace slog

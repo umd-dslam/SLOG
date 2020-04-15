@@ -32,6 +32,10 @@ void MultiHomeOrderer::HandleInternalRequest(
     case Request::kForwardTxn: {
       // Received a new multi-home txn
       auto txn = req.mutable_forward_txn()->release_txn();
+      RecordTxnEvent(
+          config_,
+          txn->mutable_internal(),
+          TransactionEvent::ENTER_MULTI_HOME_ORDERER);
       batch_->mutable_transactions()->AddAllocated(txn);
       break;
     }
@@ -84,6 +88,10 @@ void MultiHomeOrderer::ProcessForwardBatch(
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
+      RecordTxnEvent(
+          config_,
+          batch.get(),
+          TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
@@ -109,6 +117,12 @@ void MultiHomeOrderer::ProcessForwardBatch(
     Request req;
     auto forward_batch = req.mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());
+
+    RecordTxnEvent(
+        config_,
+        forward_batch->mutable_batch_data(),
+        TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
+
     // Send the newly ordered multi-home batch to the sequencer
     SendSameMachine(req, SEQUENCER_CHANNEL);
   }

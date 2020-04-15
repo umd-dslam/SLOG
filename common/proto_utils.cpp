@@ -157,7 +157,7 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
     throw std::runtime_error(oss.str());
   }
   
-  auto MergeSet = [](auto this_set, const auto& other_set) {
+  auto MergeMap = [](auto this_set, const auto& other_set) {
     for (const auto& key_value : other_set) {
       const auto& key = key_value.first;
       const auto& value = key_value.second;
@@ -173,15 +173,24 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
       }
     }
   };
-  MergeSet(txn.mutable_read_set(), other.read_set());
-  MergeSet(txn.mutable_write_set(), other.write_set());
-
+  MergeMap(txn.mutable_read_set(), other.read_set());
+  MergeMap(txn.mutable_write_set(), other.write_set());
   txn.mutable_delete_set()->MergeFrom(other.delete_set());
   
   if (txn.status() != TransactionStatus::ABORTED) {
     txn.set_status(other.status());
   }
   txn.set_abort_reason(other.abort_reason());
+
+  txn.mutable_internal()
+      ->mutable_events()
+      ->MergeFrom(other.internal().events());
+  txn.mutable_internal()
+      ->mutable_event_times()
+      ->MergeFrom(other.internal().event_times());
+  txn.mutable_internal()
+      ->mutable_event_machines()
+      ->MergeFrom(other.internal().event_machines());
 }
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {

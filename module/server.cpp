@@ -110,6 +110,7 @@ void Server::HandleAPIRequest(MMessage&& msg) {
     case api::Request::kTxn: {
       auto txn = request.mutable_txn()->release_txn();
       auto txn_internal = txn->mutable_internal();
+      RecordTxnEvent(config_, txn_internal, TransactionEvent::ENTER_SERVER);
       txn_internal->set_id(txn_id);
       txn_internal
           ->mutable_coordinating_server()
@@ -118,6 +119,8 @@ void Server::HandleAPIRequest(MMessage&& msg) {
 
       internal::Request forward_request;
       forward_request.mutable_forward_txn()->set_allocated_txn(txn);
+
+      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
       SendSameMachine(forward_request, FORWARDER_CHANNEL);
       break;
     }
@@ -208,6 +211,11 @@ void Server::ProcessLookUpMasterRequest(
 }
 
 void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {
+  RecordTxnEvent(
+      config_,
+      completed_subtxn->mutable_txn()->mutable_internal(),
+      TransactionEvent::RETURN_TO_SERVER);
+
   auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
     return;
@@ -239,8 +247,13 @@ void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed
     api::Response response;
     auto txn_response = response.mutable_txn();
     txn_response->set_allocated_txn(finished_txn.txn);
-    SendAPIResponse(txn_id, move(response));
 
+    RecordTxnEvent(
+        config_,
+        finished_txn.txn->mutable_internal(),
+        TransactionEvent::EXIT_SERVER_TO_CLIENT);
+
+    SendAPIResponse(txn_id, move(response));
     completed_txns_.erase(txn_id);
   }
 }
