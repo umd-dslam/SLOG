@@ -308,13 +308,13 @@ void ReceiveResult(int from_socket) {
   const auto& sent_at = txn_info.sent_at;
 
   (*txn_writer) << txn_info.profile.client_txn_id
-                   << txn_internal.id()
-                   << txn_info.profile.is_multi_home
-                   << txn_info.profile.is_multi_partition
-                   << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
-                   << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
-                   << duration_cast<microseconds>(recv_at - sent_at).count()
-                   << csvendl;
+                << txn_internal.id()
+                << txn_info.profile.is_multi_home
+                << txn_info.profile.is_multi_partition
+                << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
+                << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
+                << duration_cast<microseconds>(recv_at - sent_at).count()
+                << csvendl;
 
   for (int i = 0; i < txn_internal.events_size(); i++) {
     (*event_writer) << txn_internal.id()

@@ -27,23 +27,6 @@ CSVWriter::CSVWriter(
   file_ << "\n";
 }
 
-CSVWriter& CSVWriter::operator<<(const std::string& str) {
-  IncrementLineItemsAndCheck();
-  AppendDelim();
-  file_ << str;
-  return *this;
-}
-
-CSVWriter& CSVWriter::operator<<(const CSVWriterLineEnder& ender) {
-  if (line_items_ != num_columns_) {
-    throw std::runtime_error("Number of items must match number of columns");
-  }
-  (void)ender; // Silent unused warning
-  file_ << "\n";
-  line_items_ = 0;
-  return *this;
-}
-
 void CSVWriter::AppendDelim() {
   if (line_items_ > 1) {
     file_ << delim_;
