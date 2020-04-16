@@ -1,6 +1,5 @@
 #pragma once
 
-#include <random>
 #include <vector>
 
 #include "workload/workload_generator.h"

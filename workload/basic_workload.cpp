@@ -23,52 +23,6 @@ using std::unordered_set;
 
 namespace slog {
 
-namespace {
-
-/**
- * Chooses without replacement k elements from [0, n)
- */
-vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& re) {
-  if (n == 0) {
-    return {};
-  }
-  if (k == 1) {
-    // For k = 1, it is faster to pick a random key than shuffling
-    // the whole vector and pick the first key.
-    uniform_int_distribution<uint32_t> dis(0, n - 1);
-    return {dis(re)};
-  }
-  vector<uint32_t> a(n);
-  std::iota(a.begin(), a.end(), 0);
-  shuffle(a.begin(), a.end(), re);
-  return {a.begin(), a.begin() + std::min(n, k)};
-}
-
-/**
- * Randomly picks an element from a vector uniformly
- */
-template<typename T>
-T PickOne(const vector<T>& v, std::mt19937& re) {
-  auto i = Choose(v.size(), 1, re)[0];
-  return v[i];
-}
-
-const std::string CHARACTERS("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-
-/**
- * Generates a random string of length n
- */
-string RandomString(size_t n, std::mt19937& re) {
-  string s;
-  for (size_t i = 0; i < n; i++) {
-    auto k = Choose(CHARACTERS.size(), 1, re)[0];
-    s += CHARACTERS[k];
-  }
-  return s;
-}
-
-} // namespace
-
 KeyList::KeyList(size_t num_hot_keys) : num_hot_keys_(num_hot_keys) {}
 
 void KeyList::AddKey(Key key) {

@@ -31,7 +31,9 @@ rapidjson::Value ToJsonArrayOfKeyValue(
   return json_array;
 }
 
-template<typename Container, typename BaseAllocator>
+template<
+    typename Container,
+    typename BaseAllocator>
 rapidjson::Value ToJsonArrayOfKeyValue(
     const Container& container,
     rapidjson::MemoryPoolAllocator<BaseAllocator>& alloc) {

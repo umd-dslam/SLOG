@@ -16,8 +16,8 @@ public:
       char delimiter=',');
 
   template<
-    typename T,
-    typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+      typename T,
+      typename = std::enable_if_t<std::is_arithmetic<T>::value>>
   CSVWriter& operator<<(T val) {
     IncrementLineItemsAndCheck();
     AppendDelim();
