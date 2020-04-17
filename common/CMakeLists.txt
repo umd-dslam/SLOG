@@ -20,3 +20,4 @@ target_link_libraries(test_utils
   proto)
 
 add_library(csv_writer csv_writer.cpp)
+add_library(string_utils string_utils.cpp)

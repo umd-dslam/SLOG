@@ -1,7 +1,6 @@
 project(test)
 
-# Don't forget to add all of the tests here so that they
-# are linked properly
+# Don't forget to add all tests here so that they are linked properly
 set(ALL_TESTS
   batch_log_test
   batch_interleaver_test
@@ -19,7 +18,8 @@ set(ALL_TESTS
   scheduler_test
   server_test
   sequencer_test
-  simple_remaster_manager_test)
+  simple_remaster_manager_test
+  string_utils_test)
 
 add_executable(batch_log_test data_structure/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
@@ -71,8 +71,11 @@ add_executable(sequencer_test module/sequencer_test.cpp)
 target_link_libraries(sequencer_test test_utils)
 
 add_executable(simple_remaster_manager_test 
-   module/scheduler_components/simple_remaster_manager_test.cpp)
- target_link_libraries(simple_remaster_manager_test test_utils)
+  module/scheduler_components/simple_remaster_manager_test.cpp)
+target_link_libraries(simple_remaster_manager_test test_utils)
+
+add_executable(string_utils_test common/string_utils_test.cpp)
+target_link_libraries(string_utils_test string_utils)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)

@@ -1,6 +1,9 @@
 #include "module/scheduler_components/commands.h"
-#include "common/proto_utils.h"
+
 #include <glog/logging.h>
+
+#include "common/proto_utils.h"
+#include "common/string_utils.h"
 
 using std::string;
 using std::vector;
@@ -8,35 +11,7 @@ using std::vector;
 namespace slog {
 
 namespace {
-
 const string SPACE(" \t\n\v\f\r");
-
-size_t NextToken(string& token, const string& str, size_t pos) {
-  while (pos < str.length() && isspace(str[pos])) {
-    pos++;
-  }
-  if (pos >= str.length()) {
-    return string::npos;
-  }
-  auto length = str.find_first_of(SPACE, pos) - pos;
-  token = str.substr(pos, length);
-  return pos + token.length();
-}
-
-size_t NextNTokens(
-    vector<string>& tokens, const string& str, size_t pos, size_t n = 1) {
-  tokens.clear();
-  for (size_t i = 0; i < n; i++) {
-    string token;
-    pos = NextToken(token, str, pos);
-    if (pos == string::npos) {
-      return string::npos;
-    }
-    tokens.push_back(std::move(token));
-  }
-  return pos;
-}
-
 } // namespace
 
 const std::unordered_map<string, size_t>
@@ -89,7 +64,7 @@ std::ostringstream& KeyValueCommands::Abort() {
 }
 
 bool KeyValueCommands::NextCommand(const string& code) {
-  pos_ = NextToken(cmd_, code, pos_);
+  pos_ = NextToken(cmd_, code, SPACE, pos_);
   if (pos_ == string::npos) {
     return false;
   }
@@ -100,7 +75,7 @@ bool KeyValueCommands::NextCommand(const string& code) {
   }
 
   auto required_num_args = COMMAND_NUM_ARGS.at(cmd_);
-  pos_ = NextNTokens(args_, code, pos_, required_num_args);
+  pos_ = NextNTokens(args_, code, SPACE, required_num_args, pos_);
   if (pos_ == string::npos) {
     Abort() << "Invalid number of arguments for command " << cmd_;
     return false;

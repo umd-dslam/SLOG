@@ -10,10 +10,10 @@ TEST(CommandsTest, SimpleKeyValueProcedures) {
   auto txn = MakeTransaction(
       {"key1"},
       {"key2", "key3", "key4"},
-      "GET key1\n"
-      "SET key2 value2\n"
-      "DEL key4\n"
-      "COPY key1 key3\n");
+      "GET    key1   \n"
+      "SET   key2   value2  \n"
+      "DEL    key4   \n"
+      "COPY    key1 key3\n");
   (*(txn->mutable_read_set()))["key1"] = "value1";
 
   KeyValueCommands proc;
