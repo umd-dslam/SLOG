@@ -31,16 +31,13 @@ class BasicWorkload : public WorkloadGenerator {
 public:
   BasicWorkload(
       ConfigurationPtr config,
-      std::string data_dir,
-      double multi_home_pct,
-      double multi_partition_pct);
+      const std::string& data_dir,
+      const std::string& params_str);
 
   std::pair<Transaction*, TransactionProfile> NextTransaction() final;
 
 private:
   ConfigurationPtr config_;
-  double multi_home_pct_;
-  double multi_partition_pct_;
 
   // This is an index of keys by their partition and home.
   // Each partition holds a vector of homes, each of which

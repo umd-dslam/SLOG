@@ -1,18 +1,89 @@
 #pragma once
 
-#include <unordered_map>
+#include <sstream>
 #include <random>
+#include <unordered_map>
 
 #include "common/types.h"
+#include "common/string_utils.h"
 #include "proto/transaction.pb.h"
 
 namespace slog {
 
-const uint32_t MP_NUM_PARTITIONS = 2;
-const uint32_t MH_NUM_HOMES = 2;
-const uint32_t NUM_RECORDS = 10;
-const uint32_t NUM_WRITES = 2;
-const uint32_t VALUE_SIZE = 100; // bytes
+using RawParamMap = std::unordered_map<std::string, std::string>; 
+
+class WorkloadParams {
+public:
+  WorkloadParams(const RawParamMap& default_params) {
+    raw_params_ = default_params;
+  }
+
+  void Update(const std::string& params_str) {
+    auto new_params_ = Parse(params_str);
+    for (const auto& pair : new_params_) {
+      if (raw_params_.count(pair.first) == 0) {
+        std::ostringstream ss;
+        ss << "Invalid param for current workload: " << pair.first
+           << "\nDefault params: " << ToString();
+        throw std::runtime_error(ss.str());
+      }
+      raw_params_[pair.first] = pair.second;
+    }
+  }
+
+  double GetDouble(const std::string& key) const {
+    CheckKeyExists(key);
+    return std::stod(raw_params_.at(key));
+  }
+
+  uint32_t GetUInt32(const std::string& key) const {
+    CheckKeyExists(key);
+    return std::stoul(raw_params_.at(key));
+  }
+
+  uint64_t GetUInt64(const std::string& key) const {
+    CheckKeyExists(key);
+    return std::stoull(raw_params_.at(key));
+  }
+
+  std::string GetString(const std::string& key) const {
+    CheckKeyExists(key);
+    return raw_params_.at(key);
+  }
+
+  std::string ToString() const {
+    std::ostringstream ss;
+    for (const auto& param : raw_params_) {
+      ss << param.first << " = " << param.second << "; ";
+    }
+    return ss.str();
+  }
+
+private:
+
+  RawParamMap Parse(const std::string& params_str) {
+    RawParamMap map;
+    std::string token;
+    size_t pos = 0;
+    while ((pos = NextToken(token, params_str, ";,", pos)) != std::string::npos) {
+      auto eq_pos = token.find_first_of("=");
+      if (eq_pos == std::string::npos) {
+        throw std::runtime_error("Invalid param entry: " + token);
+      }
+      auto key = Trim(token.substr(0, eq_pos));
+      map[key] = Trim(token.substr(eq_pos + 1));
+    }
+    return map;
+  }
+
+  void CheckKeyExists(const std::string& key) const {
+    if (raw_params_.count(key) == 0) {
+      throw std::runtime_error("Key does not exist");
+    }
+  }
+
+  RawParamMap raw_params_;
+};
 
 struct TransactionProfile {
   TxnId client_txn_id;
@@ -28,10 +99,23 @@ struct TransactionProfile {
  */
 class WorkloadGenerator {
 public:
+  WorkloadGenerator(
+      const RawParamMap& default_params,
+      const std::string& params_str) : params_(default_params) {
+    params_.Update(params_str);
+  }
+
   /**
    * Gets the next transaction in the workload
    */
   virtual std::pair<Transaction*, TransactionProfile> NextTransaction() = 0;
+
+  std::string GetParamsStr() {
+    return params_.ToString();
+  }
+
+protected:
+  WorkloadParams params_;
 };
 
 /**
@@ -58,6 +142,9 @@ inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& re) {
  */
 template<typename T>
 T PickOne(const std::vector<T>& v, std::mt19937& re) {
+  if (v.empty()) {
+    throw std::runtime_error("Cannot pick from an empty container");
+  }
   auto i = Choose(v.size(), 1, re)[0];
   return v[i];
 }

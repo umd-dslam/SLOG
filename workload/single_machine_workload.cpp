@@ -23,17 +23,33 @@ using std::unordered_set;
 
 namespace slog {
 
+namespace {
+
+constexpr char REPLICA[] = "rep";
+constexpr char PARTITION[] = "part";
+constexpr char NUM_RECORDS[] = "num_records";
+constexpr char NUM_WRITES[] = "num_writes";
+constexpr char VALUE_SIZE[] = "value_size";
+
+const RawParamMap DEFAULT_PARAMS = {
+  { REPLICA, "0" },
+  { PARTITION, "0" },
+  { NUM_RECORDS, "10" },
+  { NUM_WRITES, "2" },
+  { VALUE_SIZE, "100" } // bytes
+};
+
+} // namespace
+
 SingleMachineWorkload::SingleMachineWorkload(
     ConfigurationPtr config,
-    std::string data_dir,
-    uint32_t replica,
-    uint32_t partition)
-  : config_(config),
-    replica_(replica),
-    partition_(partition),
+    const string& data_dir,
+    const string& params_str)
+  : WorkloadGenerator(DEFAULT_PARAMS, params_str),
+    config_(config),
     client_txn_id_counter_(0) {
 
-  auto data_file = data_dir + "/" + std::to_string(partition) + ".dat";
+  auto data_file = data_dir + "/" + params_.GetString(PARTITION) + ".dat";
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
     LOG(FATAL) << "Error while loading \"" << data_file << "\": " << strerror(errno);
@@ -41,6 +57,8 @@ SingleMachineWorkload::SingleMachineWorkload(
 
   OfflineDataReader reader(fd);
   LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums from " << data_file;
+
+  auto replica = params_.GetUInt32(REPLICA);
   while (reader.HasNextDatum()) {
     auto datum = reader.GetNextDatum();
     CHECK_LT(datum.master(), config->GetNumReplicas())
@@ -51,15 +69,20 @@ SingleMachineWorkload::SingleMachineWorkload(
     }
   }
   close(fd);
+
+  if (keys_.empty()) {
+    throw std::runtime_error("The list of key is empty");
+  }
 }
 
 std::pair<Transaction*, TransactionProfile>
 SingleMachineWorkload::NextTransaction() {
-  CHECK_LE(NUM_WRITES, NUM_RECORDS) 
+  auto num_writes = params_.GetUInt32(NUM_WRITES);
+  auto num_records = params_.GetUInt32(NUM_RECORDS);
+  CHECK_LE(num_writes, num_records) 
       << "Number of writes cannot exceed number of records in a txn!";
 
   TransactionProfile pro;
-
   pro.client_txn_id = client_txn_id_counter_;
   pro.is_multi_partition = false;
   pro.is_multi_home = false;
@@ -67,25 +90,28 @@ SingleMachineWorkload::NextTransaction() {
   unordered_set<Key> read_set;
   unordered_set<Key> write_set;
   std::ostringstream code;
+  auto replica = params_.GetUInt32(REPLICA);
+  auto partition = params_.GetUInt32(PARTITION);
 
   // Fill txn with write operators
-  for (size_t i = 0; i < NUM_WRITES; i++) {
+  auto value_size = params_.GetUInt32(VALUE_SIZE);
+  for (size_t i = 0; i < num_writes; i++) {
     auto key = PickOne(keys_, re_);
-    code << "SET " << key << " " << RandomString(VALUE_SIZE, re_) << " ";
+    code << "SET " << key << " " << RandomString(value_size, re_) << " ";
     write_set.insert(key);
 
-    pro.key_to_home[key] = replica_;
-    pro.key_to_partition[key] = partition_;
+    pro.key_to_home[key] = replica;
+    pro.key_to_partition[key] = partition;
   }
 
   // Fill txn with read operators
-  for (size_t i = 0; i < NUM_RECORDS - NUM_WRITES; i++) {
+  for (size_t i = 0; i < num_records - num_writes; i++) {
     auto key = PickOne(keys_, re_);
     code << "GET " << key << " ";
     read_set.insert(key);
 
-    pro.key_to_home[key] = replica_;
-    pro.key_to_partition[key] = partition_;
+    pro.key_to_home[key] = replica;
+    pro.key_to_partition[key] = partition;
   }
 
   auto txn = MakeTransaction(read_set, write_set, code.str());

@@ -15,16 +15,13 @@ class SingleMachineWorkload : public WorkloadGenerator {
 public:
   SingleMachineWorkload(
       ConfigurationPtr config,
-      std::string data_dir,
-      uint32_t replica,
-      uint32_t partition);
+      const std::string& data_dir,
+      const std::string& params_str);
 
   std::pair<Transaction*, TransactionProfile> NextTransaction() final;
 
 private:
   ConfigurationPtr config_;
-  uint32_t replica_;
-  uint32_t partition_;
 
   vector<Key> keys_;
 

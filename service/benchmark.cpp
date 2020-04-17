@@ -10,6 +10,7 @@
 #include "module/ticker.h"
 #include "proto/api.pb.h"
 #include "workload/basic_workload.h"
+#include "workload/single_machine_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_uint32(replica, 0, "The region where the current machine is located");
@@ -25,8 +26,8 @@ DEFINE_uint32(
     0,
     "Total number of txns being sent. "
     "This is mutually exclusive with \"duration\"");
-DEFINE_double(mh, 0, "Percentage of multi-home transactions");
-DEFINE_double(mp, 0, "Percentage of multi-partition transactions");
+DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, 1machine)");
+DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_bool(print_txn, false, "Print each generated transaction");
 DEFINE_bool(print_profile, false, "Print the profile of each transaction");
@@ -190,7 +191,14 @@ void InitializeBenchmark() {
     server_sockets.push_back(move(socket));
   }
 
-  workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_mh, FLAGS_mp);
+  if (FLAGS_wl == "basic") {
+    workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
+  } else if (FLAGS_wl == "1machine") {
+    workload = make_unique<SingleMachineWorkload>(config, FLAGS_data_dir, FLAGS_params);
+  } else {
+    LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
+  }
+
   txn_writer = make_unique<CSVWriter>(TXNS_FILE, TXN_COLUMNS);
   event_writer = make_unique<CSVWriter>(EVENTS_FILE, EVENT_COLUMNS);
 }
@@ -200,12 +208,7 @@ void SendNextTransaction();
 void ReceiveResult(int from_socket);
 
 void RunBenchmark() {
-  LOG(INFO) << "\n"
-            << "NUM_RECORDS = " << NUM_RECORDS << "\n"
-            << "NUM_WRITES = " << NUM_WRITES << "\n"
-            << "VALUE_SIZE = " << VALUE_SIZE << "\n"
-            << "MP_NUM_PARTITIONS = " << MP_NUM_PARTITIONS << "\n"
-            << "MH_NUM_HOMES = " << MH_NUM_HOMES << "\n";
+  LOG(INFO) << workload->GetParamsStr();
 
   stats.start_time = Clock::now();
   while (!StopConditionMet() || !outstanding_txns.empty()) {
