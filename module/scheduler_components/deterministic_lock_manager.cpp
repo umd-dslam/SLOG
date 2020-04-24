@@ -118,12 +118,16 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
 }
 
 bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
-  if (txn_holder.KeysInPartition().empty()) {
+  return AcquireLocks(txn_holder, txn_holder.KeysInPartition());
+}
+
+bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder, const KeyList& keys) {
+  if (keys.empty()) {
     return false;
   }
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   int num_locks_acquired = 0;
-  for (auto pair : txn_holder.KeysInPartition()) {
+  for (auto pair : keys) {
     auto key = pair.first;
     auto mode = pair.second;
     if (!lock_table_[key].Contains(txn_id)) {

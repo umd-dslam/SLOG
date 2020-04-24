@@ -128,12 +128,14 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
       auto master = metadata.at(key_value.first).master();
       if (master == local_rep) {
         lock_only_txn->mutable_read_set()->insert(key_value);
+        (*lock_only_txn->mutable_internal()->mutable_master_metadata())[key_value.first] = txn.internal().master_metadata().at(key_value.first);
       }
     }
     for (auto& key_value : txn.write_set()) {
       auto master = metadata.at(key_value.first).master();
       if (master == local_rep) {
         lock_only_txn->mutable_write_set()->insert(key_value);
+        (*lock_only_txn->mutable_internal()->mutable_master_metadata())[key_value.first] = txn.internal().master_metadata().at(key_value.first);
       }
     }
     // TODO: Ignore lock only txns with no key

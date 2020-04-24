@@ -53,21 +53,22 @@ Transaction* TransactionHolder::ReleaseTransaction() {
   return tmp;
 }
 
-bool TransactionHolder::AddLockOnlyTransaction(const ConfigurationPtr config, Transaction* lo_txn, TxnReplicaId& lo_txn_replica_id) {
-  CHECK(txn_->internal().type() == TransactionType::MULTI_HOME) <<
-      "Transaction " << txn_->internal().id() << " is not MULTI_HOME, LOCK_ONLY should not be added";
+bool TransactionHolder::AddLockOnlyTransaction(const ConfigurationPtr config, Transaction* lo_txn) {
+  // Note: Lockonly may arrive first, txn_ could be null
+  
+  // CHECK(txn_->internal().type() == TransactionType::MULTI_HOME) <<
+  //     "Transaction " << txn_->internal().id() << " is not MULTI_HOME, LOCK_ONLY should not be added";
   CHECK(lo_txn->internal().type() == TransactionType::LOCK_ONLY) <<
       "Transaction " << lo_txn->internal().id() << " is not LOCK_ONLY";
   auto txn_replica_id = GetTransactionReplicaId(lo_txn);
   auto replica_id = txn_replica_id.second;
   CHECK(keys_per_replica_.count(replica_id) == 0) <<
-      "Transaction " << txn_->internal().id() << " already had a lock only transaction added for replica " << replica_id;
+      "Transaction already had a lock only transaction added for replica " << replica_id;
   ExtractKeysInPartition(keys_per_replica_[replica_id], config, *lo_txn);
   if (keys_per_replica_[replica_id].empty()) {
     keys_per_replica_.erase(replica_id);
     return false;
   } else {
-    lo_txn_replica_id = txn_replica_id;
     return true;
   }
 }
@@ -86,6 +87,13 @@ const KeyList& TransactionHolder::KeysInPartition() const {
 
 const unordered_map<ReplicaId, KeyList>& TransactionHolder::KeysPerReplica() const {
   return keys_per_replica_;
+}
+
+const KeyList& TransactionHolder::KeysInReplica(ReplicaId replica_id) const {
+  if (keys_per_replica_.count(replica_id)) {
+    return keys_per_replica_.at(replica_id);
+  }
+  return keys_in_partition_;
 }
 
 vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {

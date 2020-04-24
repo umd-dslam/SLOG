@@ -28,3 +28,10 @@ TEST(ProtoUtilsTest, MachineIdStringToMachineId) {
   ASSERT_THROW(MakeMachineId("01234"), std::invalid_argument);
   ASSERT_THROW(MakeMachineId("ab12:cd34"), std::invalid_argument);
 }
+
+TEST(ProtoUtilsTest, ReplicaId) {
+  auto txn = MakeTransaction({"A"}, {}, "some code", {{"A", {1, 1}}});
+  txn->mutable_internal()->set_id(100);
+  TxnReplicaId txn_replica_id = make_pair(100, 1);
+  ASSERT_EQ(GetTransactionReplicaId(txn), txn_replica_id);
+}

@@ -82,6 +82,7 @@ public:
    *            the transaction is queued up.
    */
   bool AcquireLocks(const TransactionHolder& txn);
+  bool AcquireLocks(const TransactionHolder& txn, const KeyList& keys);
 
   /**
    * Convenient method to perform txn registration and 

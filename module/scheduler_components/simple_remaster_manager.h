@@ -42,8 +42,6 @@ private:
    */
   void TryToUnblock(const uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
-  const KeyList& GetKeys(const TxnReplicaId txn_replica_id);
-
   shared_ptr<Storage<Key, Record>> storage_;
   shared_ptr<TransactionMap> all_txns_;
 

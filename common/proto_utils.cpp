@@ -1,4 +1,5 @@
 #include "common/proto_utils.h"
+
 #include <glog/logging.h>
 
 #include <iostream>
@@ -199,8 +200,9 @@ TxnReplicaId GetTransactionReplicaId(const Transaction* txn) {
   // CHECK(txn->internal().type() == TransactionType::SINGLE_HOME ||
   //     txn->internal().type() == TransactionType::LOCK_ONLY)
   //     << "Only SINGLE_HOME and LOCK_ONLY transactions have a valid replica id";
-  auto replica_id =  txn->internal().master_metadata().begin()->second.master();
   auto txn_id = txn->internal().id();
+  // CHECK(!txn->internal().master_metadata().empty()) << "Empty txn " << txn_id << "Does not have replica id";
+  auto replica_id = txn->internal().master_metadata().begin()->second.master();
   return make_pair(txn_id, replica_id);
 }
 

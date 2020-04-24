@@ -12,12 +12,12 @@ SimpleRemasterManager::SimpleRemasterManager(
 
 VerifyMasterResult
 SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
-  auto& keys = GetKeys(txn_replica_id);
+  auto& txn_holder = all_txns_->at(txn_replica_id.first);
+  auto& keys = txn_holder.KeysInReplica(txn_replica_id.second);
   // if (keys.empty()) {
   //   return VerifyMasterResult::VALID;
   // }
 
-  auto& txn_holder = all_txns_->at(txn_replica_id.first);
   auto txn = txn_holder.GetTransaction();
   auto& txn_master_metadata = txn->internal().master_metadata();
   if (txn_master_metadata.empty()) { // This should only be the case for testing
@@ -45,8 +45,8 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
 }
 
 VerifyMasterResult SimpleRemasterManager::CheckCounters(const TxnReplicaId txn_replica_id) {
-  auto& keys = GetKeys(txn_replica_id);
   auto& txn_holder = (*all_txns_)[txn_replica_id.first];
+  auto& keys = txn_holder.KeysInReplica(txn_replica_id.second);
   auto& txn_master_metadata = txn_holder.GetTransaction()->internal().master_metadata();
   for (auto& key_pair : keys) {
     auto& key = key_pair.first;
@@ -72,18 +72,6 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(const TxnReplicaId txn_r
   return VerifyMasterResult::VALID;
 }
 
-const KeyList& SimpleRemasterManager::GetKeys(const TxnReplicaId txn_replica_id) {
-  auto& txn_holder = (*all_txns_)[txn_replica_id.first];
-  auto txn = txn_holder.GetTransaction();
-  if (txn->internal().type() == TransactionType::SINGLE_HOME) {
-    return txn_holder.KeysInPartition();
-  } else if (txn->internal().type() == TransactionType::LOCK_ONLY) {
-    return txn_holder.KeysPerReplica().at(txn_replica_id.second);
-  } else {
-    LOG(FATAL) << "No other type of transaction should be sent to the remaster manager";
-  }
-}
-
 RemasterOccurredResult
 SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
@@ -92,7 +80,8 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /*
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
       auto txn_replica_id = queue_pair.second.front();
-      auto& txn_keys = GetKeys(txn_replica_id);
+      auto txn_holder = (*all_txns_)[txn_replica_id.first];
+      auto& txn_keys = txn_holder.KeysInReplica(txn_replica_id.second);
       for (auto& key_pair : txn_keys) {
         auto& txn_key = key_pair.first;
         if (txn_key == remaster_key) {

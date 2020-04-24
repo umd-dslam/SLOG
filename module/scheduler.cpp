@@ -414,7 +414,6 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
               auto txn_id = txn->internal().id();
 
               VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
-
               if (lock_manager_.AcceptTransactionAndAcquireLocks(all_txns_[txn_id])) {
                 DispatchTransaction(txn_id);
               }
@@ -438,35 +437,24 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             break;
           }
           case TransactionType::LOCK_ONLY: {
-            // We discard lock_only txn right away so only need a tmp holder
-            // TransactionHolder tmp_holder(config_, txn);
-
-            // if (!tmp_holder.KeysInPartition().empty()) {
-            //   auto txn_id = txn->internal().id();
-
-            //   VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
-
-            //   if (lock_manager_.AcquireLocks(tmp_holder)) {
-            //     CHECK(all_txns_.count(txn_id) > 0) 
-            //         << "Txn " << txn_id << " is not found for dispatching";
-            //     DispatchTransaction(txn_id);
-            //   }
-            // }
-
             auto txn_id = txn->internal().id();
-            auto txn_holder = all_txns_[txn_id];
-            TxnReplicaId txn_replica_id;
-            if (txn_holder.AddLockOnlyTransaction(config_, txn, txn_replica_id)) {
+            VLOG(2) << "Working on LOCK-ONLY transaction " << txn_id;
+            auto& txn_holder = all_txns_[txn_id];
+            CHECK(!(txn->read_set().empty() && txn->write_set().empty())) << "Empty keys txn " << txn_id;
+            CHECK(!txn->internal().master_metadata().empty()) << "Empty txn " << txn_id;
+            if (txn_holder.AddLockOnlyTransaction(config_, txn)) {
+              VLOG(2) << "Really trying on LOCK-ONLY transaction " << txn_id;
+              auto txn_replica_id = GetTransactionReplicaId(txn);
               VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_replica_id.first << ", " << txn_replica_id.second;
-              if (lock_manager_.AcquireLocks(txn_holder)) {
-                CHECK(all_txns_.count(txn_id) > 0)
-                    << "Txn " << txn_id << " is not found for dispatching";
+              if (lock_manager_.AcquireLocks(txn_holder, txn_holder.KeysInReplica(txn_replica_id.second))) {
+                // CHECK(all_txns_.count(txn_id) > 0)
+                //     << "Txn " << txn_id << " is not found for dispatching";
                 DispatchTransaction(txn_id);
               }
             }
-
-
+            VLOG(2) << "Gave up on LOCK-ONLY transaction " << txn_id;
             break;
+
           }
           default:
             LOG(ERROR) << "Unknown transaction type";

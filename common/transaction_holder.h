@@ -27,13 +27,14 @@ public:
    * @return        An identifier for the LOCK_ONLY transaction if it has keys in
    *                this partition. Otherwise null_opt.
    */
-  bool AddLockOnlyTransaction(ConfigurationPtr config, Transaction* lo_txn, TxnReplicaId& txn_replica_id);
+  bool AddLockOnlyTransaction(ConfigurationPtr config, Transaction* lo_txn);
 
   void SetWorker(const std::string& worker);
   const std::string& GetWorker() const;
 
   const KeyList& KeysInPartition() const;
   const unordered_map<ReplicaId, KeyList>& KeysPerReplica() const;
+  const KeyList& KeysInReplica(ReplicaId replica_id) const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
 
