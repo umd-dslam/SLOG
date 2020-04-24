@@ -27,7 +27,6 @@ protected:
 
     auto txn_replica_id = txn_id;
     txn->mutable_internal()->set_id(txn_id);
-    txn->mutable_internal()->set_txn_replica_id(txn_replica_id);
     CHECK(all_txns->count(txn->internal().id()) == 0) << "Need to set txns to unique id's";
     auto& holder = (*all_txns)[txn_replica_id];
     holder.SetTransaction(configs[0], txn);
@@ -35,17 +34,14 @@ protected:
   }
 
   TxnReplicaId GetTxnReplicaId(TransactionHolder& holder) {
-    return holder.GetTransaction()->internal().txn_replica_id();
+    return GetTransactionReplicaId(holder.GetTransaction());
   }
 };
 
 TEST_F(SimpleRemasterManagerTest, ValidateMetadata) {
   storage->Write("A", Record("value", 0, 1));
-  storage->Write("B", Record("value", 0, 1));
-  auto& txn1 = MakeHolder(MakeTransaction({"A", "B"}, {}, "some code", {{"B", {0, 1}}}), 100);
-  auto& txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {1, 1}}}), 101);
-  ASSERT_ANY_THROW(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)));
-  ASSERT_DEATH(remaster_manager->VerifyMaster(GetTxnReplicaId(txn2)), "Masters don't match");
+  auto& txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {1, 1}}}), 101);
+  ASSERT_DEATH(remaster_manager->VerifyMaster(GetTxnReplicaId(txn1)), "Masters don't match");
 }
 
 TEST_F(SimpleRemasterManagerTest, CheckCounters) {
@@ -93,6 +89,6 @@ TEST_F(SimpleRemasterManagerTest, RemasterReleases) {
 
   storage->Write("A", Record("value", 0, 2));
   auto result = remaster_manager->RemasterOccured("A", 2);
-  ASSERT_THAT(result.unblocked, ElementsAre(100));
-  ASSERT_THAT(result.should_abort, ElementsAre(101));
+  ASSERT_THAT(result.unblocked, ElementsAre(make_pair(100, 0)));
+  ASSERT_THAT(result.should_abort, ElementsAre(make_pair(101, 0)));
 }

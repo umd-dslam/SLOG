@@ -1,4 +1,5 @@
 #include "module/scheduler_components/simple_remaster_manager.h"
+#include "common/proto_utils.h"
 
 #include <glog/logging.h>
 
@@ -11,12 +12,12 @@ SimpleRemasterManager::SimpleRemasterManager(
 
 VerifyMasterResult
 SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
-  auto& txn_holder = all_txns_->at(txn_replica_id);
-  auto& keys = txn_holder.KeysInPartition();
-  if (keys.empty()) {
-    return VerifyMasterResult::VALID;
-  }
+  auto& keys = GetKeys(txn_replica_id);
+  // if (keys.empty()) {
+  //   return VerifyMasterResult::VALID;
+  // }
 
+  auto& txn_holder = all_txns_->at(txn_replica_id.first);
   auto txn = txn_holder.GetTransaction();
   auto& txn_master_metadata = txn->internal().master_metadata();
   if (txn_master_metadata.empty()) { // This should only be the case for testing
@@ -26,7 +27,7 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
 
   // Determine which local log this txn is from. Since only single home or
   // lock only txns, all keys will have same master
-  auto local_log_machine_id = txn_master_metadata.begin()->second.master();
+  auto local_log_machine_id = txn_replica_id.second;
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
@@ -36,15 +37,16 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
   }
 
   // Test counters
-  auto result = CheckCounters(txn_holder);
+  auto result = CheckCounters(txn_replica_id);
   if (result == VerifyMasterResult::WAITING) {
     blocked_queue_[local_log_machine_id].push_back(txn_replica_id);
   }
   return result;
 }
 
-VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_holder) {
-  auto& keys = txn_holder.KeysInPartition();
+VerifyMasterResult SimpleRemasterManager::CheckCounters(const TxnReplicaId txn_replica_id) {
+  auto& keys = GetKeys(txn_replica_id);
+  auto& txn_holder = (*all_txns_)[txn_replica_id.first];
   auto& txn_master_metadata = txn_holder.GetTransaction()->internal().master_metadata();
   for (auto& key_pair : keys) {
     auto& key = key_pair.first;
@@ -70,6 +72,18 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_h
   return VerifyMasterResult::VALID;
 }
 
+const KeyList& SimpleRemasterManager::GetKeys(const TxnReplicaId txn_replica_id) {
+  auto& txn_holder = (*all_txns_)[txn_replica_id.first];
+  auto txn = txn_holder.GetTransaction();
+  if (txn->internal().type() == TransactionType::SINGLE_HOME) {
+    return txn_holder.KeysInPartition();
+  } else if (txn->internal().type() == TransactionType::LOCK_ONLY) {
+    return txn_holder.KeysPerReplica().at(txn_replica_id.second);
+  } else {
+    LOG(FATAL) << "No other type of transaction should be sent to the remaster manager";
+  }
+}
+
 RemasterOccurredResult
 SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
@@ -78,7 +92,7 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /*
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
       auto txn_replica_id = queue_pair.second.front();
-      auto& txn_keys = all_txns_->at(txn_replica_id).KeysInPartition();
+      auto& txn_keys = GetKeys(txn_replica_id);
       for (auto& key_pair : txn_keys) {
         auto& txn_key = key_pair.first;
         if (txn_key == remaster_key) {
@@ -100,9 +114,9 @@ void SimpleRemasterManager::TryToUnblock(
   }
 
   auto txn_replica_id = blocked_queue_[local_log_machine_id].front();
-  auto& txn_holder = all_txns_->at(txn_replica_id);
+  auto& txn_holder = all_txns_->at(txn_replica_id.first);
 
-  auto counter_result = CheckCounters(txn_holder);
+  auto counter_result = CheckCounters(txn_replica_id);
   if (counter_result == VerifyMasterResult::WAITING) {
     return;
   } else if (counter_result == VerifyMasterResult::VALID) {

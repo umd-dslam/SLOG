@@ -8,6 +8,8 @@
 
 namespace slog {
 
+using KeyList = std::vector<std::pair<Key, LockMode>>;
+
 class TransactionHolder {
 public:
   TransactionHolder();
@@ -18,10 +20,20 @@ public:
   Transaction* GetTransaction() const;
   Transaction* ReleaseTransaction();
 
+  /**
+   * Adds the subset of keys from a LOCK_ONLY transaction. Should only be called
+   * on holders of MULTI_HOME transactions.
+   * @param  lo_txn The LOCK_ONLY transaction to add
+   * @return        An identifier for the LOCK_ONLY transaction if it has keys in
+   *                this partition. Otherwise null_opt.
+   */
+  bool AddLockOnlyTransaction(ConfigurationPtr config, Transaction* lo_txn, TxnReplicaId& txn_replica_id);
+
   void SetWorker(const std::string& worker);
   const std::string& GetWorker() const;
 
-  const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
+  const KeyList& KeysInPartition() const;
+  const unordered_map<ReplicaId, KeyList>& KeysPerReplica() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
 
@@ -29,7 +41,8 @@ private:
   Transaction* txn_;
   string worker_;
   std::vector<internal::Request> early_remote_reads_;
-  std::vector<std::pair<Key, LockMode>> keys_in_partition_;
+  KeyList keys_in_partition_;
+  std::unordered_map<ReplicaId, KeyList> keys_per_replica_;
 };
 
 } // namespace slog

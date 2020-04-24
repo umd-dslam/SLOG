@@ -62,6 +62,15 @@ TransactionType SetTransactionType(Transaction& txn);
  */
 void MergeTransaction(Transaction& txn, const Transaction& other);
 
+/**
+ * Get the id of the replica where this transaction was placed in a local log.
+ * Cannot be called on MULTI_HOME transactions.
+ * 
+ * @param txn The questioned transaction
+ * @return    The replica id where this transaction was placed in a local log
+ */
+TxnReplicaId GetTransactionReplicaId(const Transaction* txn);
+
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);
 bool operator==(const Transaction& txn1, const Transaction txn2);
 

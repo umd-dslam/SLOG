@@ -439,19 +439,33 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
           }
           case TransactionType::LOCK_ONLY: {
             // We discard lock_only txn right away so only need a tmp holder
-            TransactionHolder tmp_holder(config_, txn);
+            // TransactionHolder tmp_holder(config_, txn);
 
-            if (!tmp_holder.KeysInPartition().empty()) {
-              auto txn_id = txn->internal().id();
+            // if (!tmp_holder.KeysInPartition().empty()) {
+            //   auto txn_id = txn->internal().id();
 
-              VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
+            //   VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
 
-              if (lock_manager_.AcquireLocks(tmp_holder)) {
-                CHECK(all_txns_.count(txn_id) > 0) 
+            //   if (lock_manager_.AcquireLocks(tmp_holder)) {
+            //     CHECK(all_txns_.count(txn_id) > 0) 
+            //         << "Txn " << txn_id << " is not found for dispatching";
+            //     DispatchTransaction(txn_id);
+            //   }
+            // }
+
+            auto txn_id = txn->internal().id();
+            auto txn_holder = all_txns_[txn_id];
+            TxnReplicaId txn_replica_id;
+            if (txn_holder.AddLockOnlyTransaction(config_, txn, txn_replica_id)) {
+              VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_replica_id.first << ", " << txn_replica_id.second;
+              if (lock_manager_.AcquireLocks(txn_holder)) {
+                CHECK(all_txns_.count(txn_id) > 0)
                     << "Txn " << txn_id << " is not found for dispatching";
                 DispatchTransaction(txn_id);
               }
             }
+
+
             break;
           }
           default:

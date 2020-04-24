@@ -1,9 +1,11 @@
 #include "common/proto_utils.h"
+#include <glog/logging.h>
 
 #include <iostream>
 #include <sstream>
 
 using std::string;
+using std::make_pair;
 
 namespace slog {
 
@@ -191,6 +193,15 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
   txn.mutable_internal()
       ->mutable_event_machines()
       ->MergeFrom(other.internal().event_machines());
+}
+
+TxnReplicaId GetTransactionReplicaId(const Transaction* txn) {
+  // CHECK(txn->internal().type() == TransactionType::SINGLE_HOME ||
+  //     txn->internal().type() == TransactionType::LOCK_ONLY)
+  //     << "Only SINGLE_HOME and LOCK_ONLY transactions have a valid replica id";
+  auto replica_id =  txn->internal().master_metadata().begin()->second.master();
+  auto txn_id = txn->internal().id();
+  return make_pair(txn_id, replica_id);
 }
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {

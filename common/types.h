@@ -12,13 +12,14 @@ namespace slog {
 using Key = std::string;
 using Value = std::string;
 using TxnId = uint32_t;
-using TxnReplicaId = uint32_t;
 using BatchId = uint32_t;
 using SlotId = uint32_t;
+using ReplicaId = uint32_t;
+using TxnReplicaId = std::pair<TxnId, ReplicaId>;
 
 struct Metadata {
   Metadata() = default;
-  Metadata(uint32_t m, uint32_t c = 0) : master(m), counter(c) {}
+  Metadata(ReplicaId m, uint32_t c = 0) : master(m), counter(c) {}
   void operator=(const MasterMetadata& metadata) {
     master = metadata.master();
     counter = metadata.counter();
@@ -29,7 +30,7 @@ struct Metadata {
 };
 
 struct Record {
-  Record(Value v, uint32_t m, uint32_t c = 0) : value(v), metadata(m, c) {}
+  Record(Value v, ReplicaId m, uint32_t c = 0) : value(v), metadata(m, c) {}
   Record() = default;
 
   Value value;

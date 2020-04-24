@@ -14,7 +14,7 @@ using std::unordered_map;
 
 namespace slog {
 
-using TransactionMap = unordered_map<TxnReplicaId, TransactionHolder>;
+using TransactionMap = unordered_map<TxnId, TransactionHolder>;
 
 /**
  * Basic, inefficient implimentation of remastering. Transactions are kept in the exact
@@ -35,12 +35,14 @@ private:
   /**
    * Compare transaction metadata to stored metadata
    */
-  VerifyMasterResult CheckCounters(TransactionHolder& txn_holder);
+  VerifyMasterResult CheckCounters(const TxnReplicaId txn_replica_id);
 
   /**
    * Test if the head of this queue can be unblocked
    */
   void TryToUnblock(const uint32_t local_log_machine_id, RemasterOccurredResult& result);
+
+  const KeyList& GetKeys(const TxnReplicaId txn_replica_id);
 
   shared_ptr<Storage<Key, Record>> storage_;
   shared_ptr<TransactionMap> all_txns_;
