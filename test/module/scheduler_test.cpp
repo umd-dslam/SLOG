@@ -293,6 +293,27 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
   ASSERT_EQ(output_txn.write_set().at("Z"), "newZ");
 }
 
+TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"D"},  /* write_set */
+      "GET A     \n"
+      "SET D newD\n", /* code */
+      {{"A", {0,0}}, {"D", {0,0}}},
+      MakeMachineId("0:1") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+
+  SendSingleHomeBatch(100, {txn}, {0});
+
+  auto output_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_txn.read_set_size(), 1);
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+  ASSERT_EQ(output_txn.write_set_size(), 1);
+  ASSERT_EQ(output_txn.write_set().at("D"), "newD");
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   google::InstallFailureSignalHandler();

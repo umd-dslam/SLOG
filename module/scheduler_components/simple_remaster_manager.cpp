@@ -55,14 +55,15 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(const TransactionHolder*
     bool found = storage_->Read(key, record);
     if (found) {        
       storage_counter = record.metadata.counter;
-      CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
-              << "Masters don't match for same key \"" << key << "\"";
     }
 
     if (txn_counter < storage_counter) {
       return VerifyMasterResult::ABORT;
     } else if (txn_counter > storage_counter) {
       return VerifyMasterResult::WAITING;
+    } else {
+      CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
+        << "Masters don't match for same key \"" << key << "\"";
     }
   }
   return VerifyMasterResult::VALID;
