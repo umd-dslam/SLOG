@@ -66,7 +66,7 @@ private:
 
   bool AcceptTransaction(Transaction* txn);
   void SendToRemasterManager(TransactionHolder* txn_holder);
-  void SendToLockManager(TransactionHolder* txn_holder);
+  void SendToLockManager(const TransactionHolder* txn_holder);
   void DispatchTransaction(TxnId txn_id);
 
   void SendToWorker(internal::Request&& req, const string& worker);

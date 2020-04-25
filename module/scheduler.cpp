@@ -324,6 +324,20 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   auto txn = all_txns_[txn_id].ReleaseTransaction();
   all_txns_.erase(txn_id);
 
+  // If a remaster transaction, trigger any unblocked txns
+  if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+    auto key = txn->write_set().begin()->first;
+    auto counter = txn->internal().master_metadata().at(key).master() + 1;
+    auto remaster_result = remaster_manager_.RemasterOccured(key, counter);
+
+    for (auto txn_holder : remaster_result.unblocked) {
+      SendToLockManager(txn_holder);
+    }
+    for (auto txn_holder : remaster_result.should_abort) {
+      // TODO
+    }
+  }
+
   RecordTxnEvent(
       config_,
       txn->mutable_internal(),
@@ -511,7 +525,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   }
 }
 
-void Scheduler::SendToLockManager(TransactionHolder* txn_holder) {
+void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->GetTransaction()->internal().id();
   auto txn_type = txn_holder->GetTransaction()->internal().type();
   switch(txn_type) {
@@ -537,6 +551,7 @@ void Scheduler::SendToLockManager(TransactionHolder* txn_holder) {
             << "Txn " << txn_id << " is not found for dispatching";
         DispatchTransaction(txn_id);
       }
+      lock_only_txns_.erase(txn_holder->GetTransactionIdReplicaIdPair());
       break;
     }
     default:

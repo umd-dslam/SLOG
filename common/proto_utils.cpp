@@ -74,7 +74,8 @@ Transaction* MakeTransaction(
     const unordered_set<Key>& write_set,
     const string& code,
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
-    const internal::MachineId coordinating_server) {
+    const internal::MachineId coordinating_server,
+    const uint32_t new_master) {
   Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
     txn->mutable_read_set()->insert({key, ""});
@@ -82,7 +83,12 @@ Transaction* MakeTransaction(
   for (const auto& key : write_set) {
     txn->mutable_write_set()->insert({key, ""});
   }
-  txn->set_code(code);
+
+  if (new_master != -1) {
+    txn->set_new_master(new_master);
+  } else {
+    txn->set_code(code);
+  }
   txn->set_status(TransactionStatus::NOT_STARTED);
 
   for (const auto& pair : master_metadata) {

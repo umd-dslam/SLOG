@@ -314,6 +314,42 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
   ASSERT_EQ(output_txn.write_set().at("D"), "newD");
 }
 
+TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {},  /* write_set */
+      "GET A     \n", /* code */
+      {{"A", {1,1}}},
+      MakeMachineId("0:0") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_id(10);
+
+  auto remaster_txn = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {{"A", {0,0}}}, /* master metadata */
+      MakeMachineId("0:1") /* coordinating server */,
+      1 /* new master */);
+  remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  remaster_txn->mutable_internal()->set_id(11);
+
+  SendSingleHomeBatch(100, {txn, remaster_txn}, {0});
+
+  auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_remaster_txn;
+  ASSERT_EQ(output_remaster_txn.internal().id(), 11);
+  ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_remaster_txn.new_master(), 1);
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.internal().id(), 10);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_txn.read_set_size(), 1);
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   google::InstallFailureSignalHandler();

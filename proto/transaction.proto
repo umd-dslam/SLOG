@@ -62,11 +62,27 @@ message TransactionInternal {
 message Transaction {
     TransactionInternal internal = 1;
 
-    string code = 2;
-    map<string, string> read_set = 3;
-    map<string, string> write_set = 4;
+    oneof procedure {
+        /*
+        Commands:
+        GET key1
+        SET key2 value2
+        DEL key4
+        COPY key1 key3
+        */
+        string code = 2;
 
-    TransactionStatus status = 5;
-    string abort_reason = 6;
-    repeated string delete_set = 7;
+         /*
+        Remaster transactions will move the keys in the write_set to the new master.
+        MasterMetadata must still be correct for the keys.
+        */
+        uint32 new_master = 3;
+    }
+
+    map<string, string> read_set = 4;
+    map<string, string> write_set = 5;
+
+    TransactionStatus status = 6;
+    string abort_reason = 7;
+    repeated string delete_set = 8;
 }
