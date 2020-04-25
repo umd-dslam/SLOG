@@ -27,7 +27,7 @@ public:
   /**
    * Checks the counters of the transaction's master metadata.
    * 
-   * @param txn Transaction to be checked
+   * @param txn_holder Transaction to be checked
    * @return The result of the check.
    * - If Valid, the transaction can be sent for locks.
    * - If Waiting, the transaction will be queued until a remaster
@@ -42,6 +42,7 @@ public:
    * and returns any newly unblocked transactions.
    * 
    * @param key The key that has been remastered
+   * @param remaster_counter The key's new counter
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */

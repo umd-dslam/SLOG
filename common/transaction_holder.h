@@ -27,10 +27,17 @@ public:
 
   std::vector<internal::Request>& EarlyRemoteReads();
 
-  const uint32_t GetReplicaId() const;
-  const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair() const;
+  /**
+   * Get the id of the replica where this transaction was added to the local log.
+   * Should only be used for single-home and lock-only transactions.
+   */
+  uint32_t GetReplicaId() const;
+  static  uint32_t GetReplicaId(Transaction* txn);
 
-  static const uint32_t GetReplicaId(Transaction* txn);
+  /**
+   * Get a unique identifier for lock-only transactions
+   */
+  const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair() const;
   static const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair(Transaction*);
 
 private:

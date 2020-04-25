@@ -41,7 +41,7 @@ Transaction* MakeTransaction(
     const string& code = "",
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
     const internal::MachineId coordinating_server = MakeMachineId("0:0"),
-    const uint32_t new_master = -1);
+    const int32_t new_master = -1);
 
 /**
  * Inspects the internal metadata of a transaction then determines whether

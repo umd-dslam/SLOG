@@ -65,11 +65,17 @@ private:
   void MaybeProcessNextBatchesFromGlobalLog();
 
   bool AcceptTransaction(Transaction* txn);
-  void SendToRemasterManager(TransactionHolder* txn_holder);
+
+  // Send single-home and lock-only transactions for counter checking
+  void SendToRemasterManager(const TransactionHolder* txn_holder);
+  // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
   void DispatchTransaction(TxnId txn_id);
 
   void SendToWorker(internal::Request&& req, const string& worker);
+
+  // Abort and resubmit transaction, including all lock-onlies
+  void AbortTransaction(const TransactionHolder* txn_holder);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
@@ -84,6 +90,8 @@ private:
   SimpleRemasterManager remaster_manager_;
 
   unordered_map<TxnId, TransactionHolder> all_txns_;
+  
+  // Lock-only transactions are kept here during remaster checking
   map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 };
 

@@ -334,7 +334,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
       SendToLockManager(txn_holder);
     }
     for (auto txn_holder : remaster_result.should_abort) {
-      // TODO
+      AbortTransaction(txn_holder);
     }
   }
 
@@ -423,8 +423,6 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
         txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
         txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
 
-        
-
         if (AcceptTransaction(txn)) {
           auto txn_id = txn->internal().id();
           auto txn_type = txn->internal().type();
@@ -463,13 +461,12 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
     case TransactionType::MULTI_HOME: {
       auto txn_id = txn->internal().id();
       auto& holder = all_txns_[txn_id];
-
+      
       holder.SetTransaction(config_, txn);
       if (holder.KeysInPartition().empty()) {
         all_txns_.erase(txn_id);
         return false;
       }
-      return true;
       break;
     }
     case TransactionType::LOCK_ONLY: {
@@ -481,17 +478,16 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
         lock_only_txns_.erase(txn_replica_id);
         return false;
       }
-      return true;
       break;
     }
     default:
       LOG(ERROR) << "Unknown transaction type";
       break;
   }
+  return true;
 }
 
-void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
-  auto txn_id = txn_holder->GetTransaction()->internal().id();
+void Scheduler::SendToRemasterManager(const TransactionHolder* txn_holder) {
   auto txn_type = txn_holder->GetTransaction()->internal().type();
   switch(txn_type) {
     case TransactionType::SINGLE_HOME:
@@ -503,7 +499,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
           break;
         }
         case VerifyMasterResult::ABORT: {
-          // TODO
+          AbortTransaction(txn_holder);
           break;
         }
         case VerifyMasterResult::WAITING: {
@@ -558,6 +554,10 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
       LOG(ERROR) << "Unknown transaction type";
       break;
   }
+}
+
+void Scheduler::AbortTransaction(const TransactionHolder* txn_holder) {
+  // TODO
 }
 
 /***********************************************

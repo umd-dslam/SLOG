@@ -37,6 +37,7 @@ private:
    */
   void TryToUnblock(const uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
+  // Needs access to storage to check counters
   shared_ptr<Storage<Key, Record>> storage_;
 
   // One queue is kept per local log

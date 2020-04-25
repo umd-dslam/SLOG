@@ -71,15 +71,17 @@ vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
   return early_remote_reads_;
 }
 
-const uint32_t TransactionHolder::GetReplicaId() const {
+uint32_t TransactionHolder::GetReplicaId() const {
   return GetReplicaId(txn_);
 }
 
-const uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
+uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
   if (txn->internal().master_metadata().empty()) { // This should only be the case for testing
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return 0;
   }
+  // Get the master of an element from the metadata. For single-home and lock-onlies, all masters
+  // will be the same in the metadata
   return txn->internal().master_metadata().begin()->second.master();
 }
 
