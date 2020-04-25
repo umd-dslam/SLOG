@@ -8,6 +8,8 @@
 
 namespace slog {
 
+using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
+
 class TransactionHolder {
 public:
   TransactionHolder();
@@ -24,6 +26,12 @@ public:
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
+
+  const uint32_t GetReplicaId() const;
+  const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair() const;
+
+  static const uint32_t GetReplicaId(Transaction* txn);
+  static const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair(Transaction*);
 
 private:
   Transaction* txn_;

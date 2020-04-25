@@ -24,7 +24,7 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 
   // Determine which local log this txn is from. Since only single home or
   // lock only txns, all keys will have same master
-  auto local_log_machine_id = txn_master_metadata.begin()->second.master();
+  auto local_log_machine_id = txn_holder->GetReplicaId();
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier

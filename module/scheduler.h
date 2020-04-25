@@ -13,12 +13,14 @@
 #include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/simple_remaster_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
 using std::shared_ptr;
 using std::queue;
 using std::unique_ptr;
+using std::map;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
@@ -63,6 +65,8 @@ private:
   void MaybeProcessNextBatchesFromGlobalLog();
 
   bool AcceptTransaction(Transaction* txn);
+  void SendToRemasterManager(TransactionHolder* txn_holder);
+  void SendToLockManager(TransactionHolder* txn_holder);
   void DispatchTransaction(TxnId txn_id);
 
   void SendToWorker(internal::Request&& req, const string& worker);
@@ -77,8 +81,10 @@ private:
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
+  SimpleRemasterManager remaster_manager_;
 
   unordered_map<TxnId, TransactionHolder> all_txns_;
+  map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 };
 
 } // namespace slog
