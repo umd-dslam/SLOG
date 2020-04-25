@@ -200,6 +200,8 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn;
 
+  // TODO: verify counters now that locks are held
+
   if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
     // Execute the transaction code
     commands_->Execute(*txn);
@@ -235,6 +237,7 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
       Record record;
       bool found = storage_->Read(key, record);
       if (!found) {
+        // TODO: handle case where key is deleted
         LOG(FATAL) << "Remastering key that does not exist: " << key;
       }
       record.metadata = Metadata(txn->new_master(), txn_key_metadata.counter() + 1);

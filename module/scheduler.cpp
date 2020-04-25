@@ -423,32 +423,37 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
         txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
         txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
 
-        if (AcceptTransaction(txn)) {
-          auto txn_id = txn->internal().id();
-          auto txn_type = txn->internal().type();
-          switch (txn_type) {
-            case TransactionType::SINGLE_HOME: {
-              VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
-              auto txn_holder = &all_txns_[txn_id];
-              SendToRemasterManager(txn_holder);
-              break;
-            }
-            case TransactionType::LOCK_ONLY: {
-              VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_id;
-              auto txn_holder = &lock_only_txns_[TransactionHolder::GetTransactionIdReplicaIdPair(txn)];
-              SendToRemasterManager(txn_holder);
-              break;
-            }
-            case TransactionType::MULTI_HOME: {
-              VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
-              auto txn_holder = &all_txns_[txn_id];
-              SendToLockManager(txn_holder);
-              break;
-            }
-            default:
-              LOG(ERROR) << "Unknown transaction type";
-              break;
+        if (!AcceptTransaction(txn)) {
+          continue;
+        }
+
+        auto txn_id = txn_internal->id();
+        auto txn_type = txn_internal->type();
+        switch (txn_type) {
+          case TransactionType::SINGLE_HOME: {
+            VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
+            auto txn_holder = &all_txns_[txn_id];
+            SendToRemasterManager(txn_holder);
+            break;
           }
+          case TransactionType::LOCK_ONLY: {
+            auto txn_replica_id = TransactionHolder::GetTransactionIdReplicaIdPair(txn);
+            VLOG(2) << "Accepted LOCK-ONLY transaction "
+                << txn_replica_id.first <<", " << txn_replica_id.second;
+            // TODO: this pointer may cause problems with std::map
+            auto txn_holder = &lock_only_txns_[txn_replica_id];
+            SendToRemasterManager(txn_holder);
+            break;
+          }
+          case TransactionType::MULTI_HOME: {
+            VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
+            auto txn_holder = &all_txns_[txn_id];
+            SendToLockManager(txn_holder);
+            break;
+          }
+          default:
+            LOG(ERROR) << "Unknown transaction type";
+            break;
         }
       }
     }

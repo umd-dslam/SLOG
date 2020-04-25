@@ -32,7 +32,7 @@ public:
    * Should only be used for single-home and lock-only transactions.
    */
   uint32_t GetReplicaId() const;
-  static  uint32_t GetReplicaId(Transaction* txn);
+  static uint32_t GetReplicaId(Transaction* txn);
 
   /**
    * Get a unique identifier for lock-only transactions
