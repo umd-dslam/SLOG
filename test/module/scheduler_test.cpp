@@ -8,12 +8,14 @@
 using namespace std;
 using namespace slog;
 
-internal::Request MakeSingleHomeBatch(
-    BatchId batch_id, const vector<Transaction*>& txns) {
+internal::Request MakeBatch(
+    BatchId batch_id,
+    const vector<Transaction*>& txns,
+    TransactionType batch_type) {
   internal::Request req;
   auto batch = req.mutable_forward_batch()->mutable_batch_data();
   batch->set_id(batch_id);
-  batch->set_transaction_type(TransactionType::SINGLE_HOME);
+  batch->set_transaction_type(batch_type);
   for (auto txn : txns) {
     batch->mutable_transactions()->AddAllocated(txn);
   }
@@ -29,12 +31,12 @@ internal::Request MakeLocalQueueOrder(uint32_t slot, uint32_t queue_id) {
 
 class SchedulerTest : public ::testing::Test {
 protected:
-  static const size_t NUM_MACHINES = 3;
+  static const size_t NUM_MACHINES = 6;
 
   void SetUp() {
     ConfigVec configs = MakeTestConfigurations(
         "scheduler",
-        1 /* num_replicas */,
+        2 /* num_replicas */,
         3 /* num_partitions */);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
@@ -43,33 +45,77 @@ protected:
       input_[i] = test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL);
       output_[i] = test_slogs_[i]->AddChannel(SERVER_CHANNEL);
     }
+    // Relica 0
     test_slogs_[0]->Data("A", {"valueA", 0, 0});
     test_slogs_[0]->Data("D", {"valueD", 0, 0});
+    test_slogs_[0]->Data("Y", {"valueY", 1, 0});
+
     test_slogs_[1]->Data("C", {"valueC", 0, 0});
     test_slogs_[1]->Data("F", {"valueF", 0, 0});
+    test_slogs_[1]->Data("X", {"valueX", 1, 0});
+
     test_slogs_[2]->Data("B", {"valueB", 0, 0});
     test_slogs_[2]->Data("E", {"valueE", 0, 0});
+    test_slogs_[2]->Data("Z", {"valueZ", 1, 0});
+
+    // Replica 1
+    test_slogs_[3]->Data("A", {"valueA", 0, 0});
+    test_slogs_[3]->Data("D", {"valueD", 0, 0});
+    test_slogs_[3]->Data("Y", {"valueY", 1, 0});
+
+    test_slogs_[4]->Data("C", {"valueC", 0, 0});
+    test_slogs_[4]->Data("F", {"valueF", 0, 0});
+    test_slogs_[4]->Data("X", {"valueX", 1, 0});
+
+    test_slogs_[5]->Data("B", {"valueB", 0, 0});
+    test_slogs_[5]->Data("E", {"valueE", 0, 0});
+    test_slogs_[5]->Data("Z", {"valueZ", 1, 0});
 
     for (const auto& test_slog : test_slogs_) {
       test_slog->StartInNewThreads();
     }
   }
 
-  void SendBatchToEachPartition(
-        BatchId batch_id,
-        const vector<Transaction*>& txns,
-        const vector<size_t>& partitions) {
-    auto batch = MakeSingleHomeBatch(batch_id, txns);
+  void SendSingleHomeBatch(
+      BatchId batch_id,
+      const vector<Transaction*>& txns,
+      const vector<size_t>& partitions,
+      // Use this when sending multiple batches
+      size_t batch_order_offset = 0) {
+    auto batch = MakeBatch(batch_id, txns, SINGLE_HOME);
     for (auto partition : partitions) {
-      MMessage msg;
-      msg.Set(MM_PROTO, batch);
-      msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
-      input_[partition]->Send(msg);
+      // Simulate a message containing a batch
+      MMessage batch_msg;
+      batch_msg.Set(MM_PROTO, batch);
+      // Destination
+      batch_msg.SetIdentity(MakeMachineIdAsString(0, partition));
+      batch_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
+      // This message is sent from machine 0:0, so it will be queued up in queue 0
+      input_[0]->Send(batch_msg);
 
-      msg.Clear();
-      msg.Set(MM_PROTO, MakeLocalQueueOrder(0, partition));
-      msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
-      input_[partition]->Send(msg);
+      // Simulate a local paxos order message
+      MMessage order_msg;
+      order_msg.Set(MM_PROTO, MakeLocalQueueOrder(batch_order_offset, 0 /* queue_id */));
+      order_msg.SetIdentity(MakeMachineIdAsString(0, partition));
+      order_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
+      input_[0]->Send(order_msg);
+    }
+  }
+
+  void SendMultiHomeBatch(
+      BatchId batch_id,
+      const vector<Transaction*>& txns,
+      const vector<size_t>& partitions) {
+    auto batch = MakeBatch(batch_id, txns, MULTI_HOME);
+    for (auto partition : partitions) {
+      // Simulate a message containing a batch. It doesn't matter where
+      // this message comes from.
+      MMessage batch_msg;
+      batch_msg.Set(MM_PROTO, batch);
+      batch_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
+      input_[partition]->Send(batch_msg);
+      // Unlike single-home batch, multi-home batches are pre-ordered
+      // and this order follows batch_id
     }
   }
 
@@ -115,7 +161,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatchToEachPartition(100, {txn}, {0});
+  SendSingleHomeBatch(100, {txn}, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -133,7 +179,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
       "COPY A C" /* code */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
+  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -152,7 +198,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
       "COPY B C\n" /* code */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
+  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -174,7 +220,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
       "SET C newC\n" /* code */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
+  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -195,7 +241,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
       "GET F\n" /* code */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendBatchToEachPartition(100, {txn}, {0, 1, 2});
+  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -205,6 +251,46 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
   ASSERT_EQ(output_txn.read_set().at("E"), "valueE");
   ASSERT_EQ(output_txn.read_set().at("F"), "valueF");
   ASSERT_EQ(output_txn.write_set_size(), 0);
+}
+
+TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
+  auto txn = MakeTransaction(
+      {"A", "X", "C"}, /* read_set */
+      {"B", "Y", "Z"}, /* write_set */
+      "GET A\n"
+      "GET X\n"
+      "GET C\n"
+      "SET B newB\n"
+      "SET Y newY\n"
+      "SET Z newZ\n" /* code */);
+  txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
+
+  auto lo_txn_0 = MakeTransaction(
+      {"A", "C"}, /* read_set */
+      {"B"} /* write_set */,
+      "" /* code */);
+  lo_txn_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  auto lo_txn_1 = MakeTransaction(
+      {"X"}, /* read_set */
+      {"Y", "Z"}, /* write_set */
+      ""/* code */);
+  lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  SendMultiHomeBatch(0, {txn}, {0, 1, 2});
+  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0, 1, 2});
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 3);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_txn.read_set_size(), 3);
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+  ASSERT_EQ(output_txn.read_set().at("X"), "valueX");
+  ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
+  ASSERT_EQ(output_txn.write_set_size(), 3);
+  ASSERT_EQ(output_txn.write_set().at("B"), "newB");
+  ASSERT_EQ(output_txn.write_set().at("Y"), "newY");
+  ASSERT_EQ(output_txn.write_set().at("Z"), "newZ");
 }
 
 int main(int argc, char* argv[]) {
