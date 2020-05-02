@@ -200,32 +200,52 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn;
 
-  // Execute the transaction code
-  commands_->Execute(*txn);
+  // TODO: verify counters now that locks are held
 
-  // Apply all writes to local storage if the transaction is not aborted
-  if (txn->status() == TransactionStatus::COMMITTED) {
-    auto& master_metadata = txn->internal().master_metadata();
-    for (const auto& key_value : txn->write_set()) {
-      const auto& key = key_value.first;
-      if (config_->KeyIsInLocalPartition(key)) {
-        const auto& value = key_value.second;
-        Record record;
-        bool found = storage_->Read(key_value.first, record);
-        if (!found) {
-          CHECK(master_metadata.contains(key))
-              << "Master metadata for key \"" << key << "\" is missing";
-          record.metadata = master_metadata.at(key);
+  if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
+    // Execute the transaction code
+    commands_->Execute(*txn);
+
+    // Apply all writes to local storage if the transaction is not aborted
+    if (txn->status() == TransactionStatus::COMMITTED) {
+      auto& master_metadata = txn->internal().master_metadata();
+      for (const auto& key_value : txn->write_set()) {
+        const auto& key = key_value.first;
+        if (config_->KeyIsInLocalPartition(key)) {
+          const auto& value = key_value.second;
+          Record record;
+          bool found = storage_->Read(key_value.first, record);
+          if (!found) {
+            CHECK(master_metadata.contains(key))
+                << "Master metadata for key \"" << key << "\" is missing";
+            record.metadata = master_metadata.at(key);
+          }
+          record.value = value;
+          storage_->Write(key, record);
         }
-        record.value = value;
-        storage_->Write(key, record);
+      }
+      for (const auto& key : txn->delete_set()) {
+        if (config_->KeyIsInLocalPartition(key)) {
+          storage_->Delete(key);
+        }
       }
     }
-    for (const auto& key : txn->delete_set()) {
-      if (config_->KeyIsInLocalPartition(key)) {
-        storage_->Delete(key);
+  } else if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+    const auto& key = txn->write_set().begin()->first;
+    if (config_->KeyIsInLocalPartition(key)) {
+      auto txn_key_metadata = txn->internal().master_metadata().at(key);
+      Record record;
+      bool found = storage_->Read(key, record);
+      if (!found) {
+        // TODO: handle case where key is deleted
+        LOG(FATAL) << "Remastering key that does not exist: " << key;
       }
+      record.metadata = Metadata(txn->new_master(), txn_key_metadata.counter() + 1);
+      storage_->Write(key, record);
     }
+    txn->set_status(TransactionStatus::COMMITTED);
+  } else {
+    LOG(ERROR) << "Procedure is not set";
   }
 
   // Response back to the scheduler

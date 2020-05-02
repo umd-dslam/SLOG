@@ -52,22 +52,36 @@ message TransactionInternal {
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
     internal.MachineId coordinating_server = 4;
-    // unique id for lock only txns
-    uint32 txn_replica_id = 5;
+
     // for recording time of different events of txn
-    repeated TransactionEvent events = 6;
-    repeated uint64 event_times = 7;    // when the events took place
-    repeated uint32 event_machines = 8; // where the events took place
+    repeated TransactionEvent events = 5;
+    repeated uint64 event_times = 6;    // when the events took place
+    repeated uint32 event_machines = 7; // where the events took place
 }
 
 message Transaction {
     TransactionInternal internal = 1;
 
-    string code = 2;
-    map<string, string> read_set = 3;
-    map<string, string> write_set = 4;
+    oneof procedure {
+        /*
+        Commands:
+        GET key1
+        SET key2 value2
+        DEL key4
+        COPY key1 key3
+        */
+        string code = 2;
+         /*
+        Remaster transactions will move the keys in the write_set to the new master.
+        MasterMetadata must still be correct for the keys.
+        */
+        uint32 new_master = 3;
+    }
 
-    TransactionStatus status = 5;
-    string abort_reason = 6;
-    repeated string delete_set = 7;
+    map<string, string> read_set = 4;
+    map<string, string> write_set = 5;
+
+    TransactionStatus status = 6;
+    string abort_reason = 7;
+    repeated string delete_set = 8;
 }

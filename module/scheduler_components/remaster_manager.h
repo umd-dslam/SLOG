@@ -3,6 +3,7 @@
 #include <list>
 
 #include "common/types.h"
+#include "common/transaction_holder.h"
 
 using std::list;
 
@@ -10,8 +11,8 @@ namespace slog {
 
 enum class VerifyMasterResult {VALID, WAITING, ABORT};
 struct RemasterOccurredResult {
-  list<TxnReplicaId> unblocked;
-  list<TxnReplicaId> should_abort;
+  list<const TransactionHolder*> unblocked;
+  list<const TransactionHolder*> should_abort;
 };
 
 /**
@@ -26,7 +27,7 @@ public:
   /**
    * Checks the counters of the transaction's master metadata.
    * 
-   * @param txn Transaction to be checked
+   * @param txn_holder Transaction to be checked
    * @return The result of the check.
    * - If Valid, the transaction can be sent for locks.
    * - If Waiting, the transaction will be queued until a remaster
@@ -34,13 +35,14 @@ public:
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  virtual VerifyMasterResult VerifyMaster(const TxnReplicaId txn_replica_id) = 0;
+  virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder) = 0;
 
   /**
    * Updates the queue of transactions waiting for remasters,
    * and returns any newly unblocked transactions.
    * 
    * @param key The key that has been remastered
+   * @param remaster_counter The key's new counter
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */

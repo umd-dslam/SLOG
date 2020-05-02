@@ -12,7 +12,6 @@ namespace slog {
 using Key = std::string;
 using Value = std::string;
 using TxnId = uint32_t;
-using TxnReplicaId = uint32_t;
 using BatchId = uint32_t;
 using SlotId = uint32_t;
 

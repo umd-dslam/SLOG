@@ -40,7 +40,8 @@ Transaction* MakeTransaction(
     const unordered_set<Key>& write_set,
     const string& code = "",
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-    const internal::MachineId coordinating_server = MakeMachineId("0:0"));
+    const internal::MachineId coordinating_server = MakeMachineId("0:0"),
+    const int32_t new_master = -1); // TODO: make this a union wtih code
 
 /**
  * Inspects the internal metadata of a transaction then determines whether

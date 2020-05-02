@@ -1,6 +1,9 @@
 #include "common/transaction_holder.h"
 
+#include <glog/logging.h>
+
 using std::pair;
+using std::make_pair;
 using std::vector;
 using std::string;
 
@@ -68,5 +71,28 @@ vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
   return early_remote_reads_;
 }
 
+uint32_t TransactionHolder::GetReplicaId() const {
+  return GetReplicaId(txn_);
+}
+
+uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
+  if (txn->internal().master_metadata().empty()) { // This should only be the case for testing
+    LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
+    return 0;
+  }
+  // Get the master of an element from the metadata. For single-home and lock-onlies, all masters
+  // will be the same in the metadata
+  return txn->internal().master_metadata().begin()->second.master();
+}
+
+const TxnIdReplicaIdPair TransactionHolder::GetTransactionIdReplicaIdPair() const {
+  return GetTransactionIdReplicaIdPair(txn_);
+}
+
+const TxnIdReplicaIdPair TransactionHolder::GetTransactionIdReplicaIdPair(Transaction* txn) {
+  auto txn_id = txn->internal().id();
+  auto local_log_id = GetReplicaId(txn);
+  return make_pair(txn_id, local_log_id);
+}
 
 } // namespace slog

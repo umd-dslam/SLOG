@@ -4,8 +4,6 @@
 
 #include "module/scheduler_components/remaster_manager.h"
 
-#include "common/transaction_holder.h"
-
 #include "storage/storage.h"
 
 using std::shared_ptr;
@@ -13,8 +11,6 @@ using std::unordered_map;
 
 
 namespace slog {
-
-using TransactionMap = unordered_map<TxnReplicaId, TransactionHolder>;
 
 /**
  * Basic, inefficient implimentation of remastering. Transactions are kept in the exact
@@ -25,28 +21,27 @@ class SimpleRemasterManager :
     public RemasterManager {
 public:
   SimpleRemasterManager(
-    shared_ptr<Storage<Key, Record>> storage,
-    shared_ptr<TransactionMap> all_txns);
+    shared_ptr<Storage<Key, Record>> storage);
 
-  virtual VerifyMasterResult VerifyMaster(const TxnReplicaId txn_replica_id);
+  virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter);
 
 private:
   /**
    * Compare transaction metadata to stored metadata
    */
-  VerifyMasterResult CheckCounters(TransactionHolder& txn_holder);
+  VerifyMasterResult CheckCounters(const TransactionHolder* txn_holder);
 
   /**
    * Test if the head of this queue can be unblocked
    */
   void TryToUnblock(const uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
+  // Needs access to storage to check counters
   shared_ptr<Storage<Key, Record>> storage_;
-  shared_ptr<TransactionMap> all_txns_;
 
   // One queue is kept per local log
-  unordered_map<uint32_t, list<TxnReplicaId>> blocked_queue_;
+  unordered_map<uint32_t, list<const TransactionHolder*>> blocked_queue_;
 };
 
 } // namespace slog

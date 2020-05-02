@@ -5,19 +5,17 @@
 namespace slog {
 
 SimpleRemasterManager::SimpleRemasterManager(
-    shared_ptr<Storage<Key, Record>> storage,
-    shared_ptr<TransactionMap> all_txns)
-  : storage_(storage), all_txns_(all_txns) {}
+    shared_ptr<Storage<Key, Record>> storage)
+  : storage_(storage) {}
 
 VerifyMasterResult
-SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
-  auto& txn_holder = all_txns_->at(txn_replica_id);
-  auto& keys = txn_holder.KeysInPartition();
+SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
+  auto& keys = txn_holder->KeysInPartition();
   if (keys.empty()) {
     return VerifyMasterResult::VALID;
   }
 
-  auto txn = txn_holder.GetTransaction();
+  auto txn = txn_holder->GetTransaction();
   auto& txn_master_metadata = txn->internal().master_metadata();
   if (txn_master_metadata.empty()) { // This should only be the case for testing
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
@@ -26,26 +24,26 @@ SimpleRemasterManager::VerifyMaster(const TxnReplicaId txn_replica_id) {
 
   // Determine which local log this txn is from. Since only single home or
   // lock only txns, all keys will have same master
-  auto local_log_machine_id = txn_master_metadata.begin()->second.master();
+  auto local_log_machine_id = txn_holder->GetReplicaId();
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
   if (blocked_queue_.count(local_log_machine_id) && !blocked_queue_[local_log_machine_id].empty()) {
-    blocked_queue_[local_log_machine_id].push_back(txn_replica_id);
+    blocked_queue_[local_log_machine_id].push_back(txn_holder);
     return VerifyMasterResult::WAITING;
   }
 
   // Test counters
   auto result = CheckCounters(txn_holder);
   if (result == VerifyMasterResult::WAITING) {
-    blocked_queue_[local_log_machine_id].push_back(txn_replica_id);
+    blocked_queue_[local_log_machine_id].push_back(txn_holder);
   }
   return result;
 }
 
-VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_holder) {
-  auto& keys = txn_holder.KeysInPartition();
-  auto& txn_master_metadata = txn_holder.GetTransaction()->internal().master_metadata();
+VerifyMasterResult SimpleRemasterManager::CheckCounters(const TransactionHolder* txn_holder) {
+  auto& keys = txn_holder->KeysInPartition();
+  auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
   for (auto& key_pair : keys) {
     auto& key = key_pair.first;
 
@@ -57,14 +55,15 @@ VerifyMasterResult SimpleRemasterManager::CheckCounters(TransactionHolder& txn_h
     bool found = storage_->Read(key, record);
     if (found) {        
       storage_counter = record.metadata.counter;
-      CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
-              << "Masters don't match for same key \"" << key << "\"";
     }
 
     if (txn_counter < storage_counter) {
       return VerifyMasterResult::ABORT;
     } else if (txn_counter > storage_counter) {
       return VerifyMasterResult::WAITING;
+    } else {
+      CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
+        << "Masters don't match for same key \"" << key << "\"";
     }
   }
   return VerifyMasterResult::VALID;
@@ -77,8 +76,8 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /*
   // Note that multiple queues could contain the same key with different counters
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
-      auto txn_replica_id = queue_pair.second.front();
-      auto& txn_keys = all_txns_->at(txn_replica_id).KeysInPartition();
+      auto txn_holder = queue_pair.second.front();
+      auto& txn_keys = txn_holder->KeysInPartition();
       for (auto& key_pair : txn_keys) {
         auto& txn_key = key_pair.first;
         if (txn_key == remaster_key) {
@@ -99,16 +98,15 @@ void SimpleRemasterManager::TryToUnblock(
     return;
   }
 
-  auto txn_replica_id = blocked_queue_[local_log_machine_id].front();
-  auto& txn_holder = all_txns_->at(txn_replica_id);
+  auto& txn_holder = blocked_queue_[local_log_machine_id].front();
 
   auto counter_result = CheckCounters(txn_holder);
   if (counter_result == VerifyMasterResult::WAITING) {
     return;
   } else if (counter_result == VerifyMasterResult::VALID) {
-    result.unblocked.push_back(txn_replica_id);
+    result.unblocked.push_back(txn_holder);
   } else if (counter_result == VerifyMasterResult::ABORT) {
-    result.should_abort.push_back(txn_replica_id);
+    result.should_abort.push_back(txn_holder);
   }
 
   // Head of queue has changed

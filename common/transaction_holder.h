@@ -8,6 +8,8 @@
 
 namespace slog {
 
+using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
+
 class TransactionHolder {
 public:
   TransactionHolder();
@@ -24,6 +26,19 @@ public:
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
+
+  /**
+   * Get the id of the replica where this transaction was added to the local log.
+   * Should only be used for single-home and lock-only transactions.
+   */
+  uint32_t GetReplicaId() const;
+  static uint32_t GetReplicaId(Transaction* txn);
+
+  /**
+   * Get a unique identifier for lock-only transactions
+   */
+  const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair() const;
+  static const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair(Transaction*);
 
 private:
   Transaction* txn_;
