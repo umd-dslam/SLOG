@@ -12,6 +12,7 @@
 #include "module/scheduler.h"
 #include "module/server.h"
 #include "module/sequencer.h"
+#include "module/ticker.h"
 #include "proto/internal.pb.h"
 #include "proto/offline_data.pb.h"
 #include "storage/mem_only_storage.h"
@@ -115,6 +116,8 @@ int main(int argc, char* argv[]) {
   auto server = MakeRunnerFor<slog::Server>(config, *context, broker, storage);
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
+  modules.push_back(
+      MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->GetBatchDuration())));
   modules.push_back(
       MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(

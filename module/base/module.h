@@ -6,10 +6,6 @@
 
 #include "connection/channel.h"
 
-using std::shared_ptr;
-using std::unique_ptr;
-using std::string;
-
 namespace slog {
 
 /**
@@ -47,7 +43,7 @@ public:
  */
 class ModuleRunner {
 public:
-  ModuleRunner(const shared_ptr<Module>& module);
+  ModuleRunner(const std::shared_ptr<Module>& module);
   ~ModuleRunner();
 
   void Start();
@@ -56,7 +52,7 @@ public:
 private:
   void Run();
 
-  shared_ptr<Module> module_;
+  std::shared_ptr<Module> module_;
   std::thread thread_;
   std::atomic<bool> running_;
 };
@@ -65,7 +61,7 @@ private:
  * Helper function for creating a ModuleRunner.
  */
 template<typename T, typename... Args>
-inline unique_ptr<ModuleRunner>
+inline std::unique_ptr<ModuleRunner>
 MakeRunnerFor(Args&&... args)
 {
   return std::make_unique<ModuleRunner>(
@@ -77,7 +73,7 @@ MakeRunnerFor(Args&&... args)
  */
 class ChannelHolder {
 public:
-  ChannelHolder(unique_ptr<Channel>&& channel_);
+  ChannelHolder(std::unique_ptr<Channel>&& channel_);
 
   /**
    * Send a request or response to a given channel of a given machine
@@ -89,8 +85,8 @@ public:
    */
   void Send(
       const google::protobuf::Message& request_or_response,
-      const string& to_machine_id,
-      const string& to_channel,
+      const std::string& to_machine_id,
+      const std::string& to_channel,
       bool has_more = false);
 
   /**
@@ -125,12 +121,14 @@ public:
    */
   void Send(MMessage&& message, bool has_more = false);
 
-  zmq::pollitem_t GetChannelPollItem() const;
-
   void ReceiveFromChannel(MMessage& message);
 
+  zmq::pollitem_t GetChannelPollItem() const;
+
+  const std::shared_ptr<zmq::context_t>& GetContext() const;
+
 private:
-  unique_ptr<Channel> channel_;
+  std::unique_ptr<Channel> channel_;
 };
 
 } // namespace slog

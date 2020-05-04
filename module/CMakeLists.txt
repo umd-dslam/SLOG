@@ -27,7 +27,8 @@ target_link_libraries(module
   batch_log
   base_module
   paxos
-  scheduler_components)
+  scheduler_components
+  ticker)
 
 add_library(ticker ticker.cpp)
 target_link_libraries(ticker base_module common)

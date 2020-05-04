@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "common/constants.h"
 #include "common/types.h"
 #include "module/base/module.h"
@@ -16,30 +18,30 @@ class BasicModule : public Module, public ChannelHolder {
 public:
   BasicModule(
       const std::string& name,
-      unique_ptr<Channel>&& listener,
-      long wake_up_every_ms = -1L);
+      std::unique_ptr<Channel>&& listener);
 
 protected:
+  virtual std::vector<zmq::socket_t> InitializeCustomSockets();
+
   virtual void HandleInternalRequest(
       internal::Request&& req,
-      string&& from_machine_id) = 0;
+      std::string&& from_machine_id) = 0;
 
   virtual void HandleInternalResponse(
       internal::Response&& /* res */,
-      string&& /* from_machine_id */) {};
+      std::string&& /* from_machine_id */) {};
 
-  virtual void HandlePeriodicWakeUp() {};
+  virtual void HandleCustomSocketMessage(
+      const MMessage& /* msg */,
+      size_t /* socket_index */) {};
 
 private:
+  void SetUp() final;
   void Loop() final;
 
-  bool NeedWakeUp() const;
-
   std::string name_;
-  zmq::pollitem_t poll_item_;
-  long wake_up_every_ms_;
-  long poll_timeout_ms_;
-  TimePoint wake_up_deadline_;
+  std::vector<zmq::pollitem_t> poll_items_;
+  std::vector<zmq::socket_t> custom_sockets_;
 };
 
 } // namespace slog

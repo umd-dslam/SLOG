@@ -65,4 +65,8 @@ std::unique_ptr<Channel> Channel::GetListener() {
   return std::unique_ptr<Channel>(new Channel(context_, name_, true /* is_listener */));
 }
 
+const std::shared_ptr<zmq::context_t>& Channel::GetContext() const {
+  return context_;
+}
+
 } // namespace slog;

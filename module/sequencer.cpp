@@ -1,6 +1,7 @@
 #include "module/sequencer.h"
 
 #include "common/proto_utils.h"
+#include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"
 
 namespace slog {
@@ -12,12 +13,20 @@ using internal::Response;
 Sequencer::Sequencer(ConfigurationPtr config, Broker& broker)
   : BasicModule(
         "Sequencer",
-        broker.AddChannel(SEQUENCER_CHANNEL),
-        config->GetBatchDuration() /* wake_up_every_ms */),
+        broker.AddChannel(SEQUENCER_CHANNEL)),
     config_(config),
     local_paxos_(new SimpleMultiPaxosClient(*this, LOCAL_PAXOS)),
     batch_id_counter_(0) {
   NewBatch();
+}
+
+vector<zmq::socket_t> Sequencer::InitializeCustomSockets() {
+  vector<zmq::socket_t> ticker_socket;
+  ticker_socket.emplace_back(*GetContext(), ZMQ_SUB);
+  ticker_socket.front().connect(Ticker::ENDPOINT);
+  // Subscribe to any message
+  ticker_socket.front().setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  return ticker_socket;
 }
 
 void Sequencer::NewBatch() {
@@ -55,7 +64,9 @@ void Sequencer::HandleInternalRequest(
   }
 }
 
-void Sequencer::HandlePeriodicWakeUp() {
+void Sequencer::HandleCustomSocketMessage(
+    const MMessage& /* msg */,
+    size_t /* socket_index */) {
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
