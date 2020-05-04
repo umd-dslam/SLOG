@@ -2,6 +2,7 @@
 
 #include "common/constants.h"
 #include "common/proto_utils.h"
+#include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"
 
 namespace slog {
@@ -12,12 +13,20 @@ using internal::Request;
 MultiHomeOrderer::MultiHomeOrderer(ConfigurationPtr config, Broker& broker) 
   : BasicModule(
         "MultiHomeOrderer",
-        broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL),
-        config->GetBatchDuration()),
+        broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL)),
     config_(config),
     global_paxos_(new SimpleMultiPaxosClient(*this, GLOBAL_PAXOS)),
     batch_id_counter_(0) {
   NewBatch();
+}
+
+std::vector<zmq::socket_t> MultiHomeOrderer::InitializeCustomSockets() {
+  vector<zmq::socket_t> ticker_socket;
+  ticker_socket.emplace_back(*GetContext(), ZMQ_SUB);
+  ticker_socket.front().connect(Ticker::ENDPOINT);
+  // Subscribe to any message
+  ticker_socket.front().setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  return ticker_socket;
 }
 
 void MultiHomeOrderer::NewBatch() {
@@ -50,7 +59,9 @@ void MultiHomeOrderer::HandleInternalRequest(
   }
 }
 
-void MultiHomeOrderer::HandlePeriodicWakeUp() {
+void MultiHomeOrderer::HandleCustomSocketMessage(
+    const MMessage& /* msg */,
+    size_t /* socket_index */) {
   if (batch_->transactions().empty()) {
     return;
   }

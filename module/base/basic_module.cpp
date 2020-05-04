@@ -3,38 +3,45 @@
 #include "common/constants.h"
 
 using std::move;
+using std::unique_ptr;
+using std::vector;
 
 namespace slog {
-
-namespace {
-
-long DurationInMs(Duration duration) {
-  return duration_cast<milliseconds>(duration).count();
-}
-
-} // namespace
 
 using internal::Request;
 using internal::Response;
 
 BasicModule::BasicModule(
     const std::string& name,
-    unique_ptr<Channel>&& listener,
-    long wake_up_every_ms)
+    unique_ptr<Channel>&& listener)
   : ChannelHolder(move(listener)),
-    name_(name),
-    poll_item_(GetChannelPollItem()),
-    wake_up_every_ms_(wake_up_every_ms),
-    wake_up_deadline_(Clock::now()) {
-  if (NeedWakeUp()) {
-    poll_timeout_ms_ = wake_up_every_ms;
-  } else {
-    poll_timeout_ms_ = MODULE_POLL_TIMEOUT_MS;
+    name_(name) {
+  poll_items_.push_back(GetChannelPollItem());
+}
+
+vector<zmq::socket_t> BasicModule::InitializeCustomSockets() {
+  return {};
+}
+
+void BasicModule::SetUp() {
+  custom_sockets_ = InitializeCustomSockets();
+  for (auto& socket : custom_sockets_) {
+    poll_items_.push_back({ 
+      static_cast<void*>(socket),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */
+    });
   }
 }
 
 void BasicModule::Loop() {
-  if (zmq::poll(&poll_item_, 1, poll_timeout_ms_)) {
+  if (!zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS)) {
+    return;
+  }
+
+  // Message from channel
+  if (poll_items_[0].revents & ZMQ_POLLIN) {
     MMessage message;
     ReceiveFromChannel(message);
     auto from_machine_id = message.GetIdentity();
@@ -55,32 +62,15 @@ void BasicModule::Loop() {
           move(res),
           move(from_machine_id));
     }
-  } else {
-    if (NeedWakeUp()) {
-      HandlePeriodicWakeUp();
-    }
   }
 
-  if (NeedWakeUp()) {
-    auto now = Clock::now();
-    while (now >= wake_up_deadline_) {
-      wake_up_deadline_ += milliseconds(wake_up_every_ms_);
+  // Message from one of the custom sockets
+  for (size_t i = 1; i < poll_items_.size(); i++) {
+    if (poll_items_[i].revents & ZMQ_POLLIN) {
+      MMessage msg(custom_sockets_[i - 1]);
+      HandleCustomSocketMessage(msg, i - 1 /* socket_index */);
     }
-    poll_timeout_ms_ = 1 + DurationInMs(wake_up_deadline_ - now);
-
-    VLOG_EVERY_N(5, 5000 / wake_up_every_ms_)
-            << "Now: " << DurationInMs(now.time_since_epoch())
-            << " Deadline: " << DurationInMs(wake_up_deadline_.time_since_epoch())
-            << " Timeout: " << poll_timeout_ms_ << " ms";
-
-    VLOG_EVERY_N(4, 5000 / wake_up_every_ms_) << name_ << " is alive";
-  } else {
-    VLOG_EVERY_N(4, 5000 / MODULE_POLL_TIMEOUT_MS) << name_ << " is alive";
   }
-}
-
-bool BasicModule::NeedWakeUp() const {
-  return wake_up_every_ms_ > 0;
 }
 
 } // namespace slog

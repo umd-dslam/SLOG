@@ -11,6 +11,7 @@ class Ticker : public Module {
 public:
   const static string ENDPOINT;
 
+  Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms);
   Ticker(zmq::context_t& context, uint32_t ticks_per_sec);
 
   void SetUp() final;
@@ -18,7 +19,6 @@ public:
 
 private:
   zmq::socket_t socket_;
-  uint32_t ticks_per_sec_;
   Duration sleep_us_;
 };
 

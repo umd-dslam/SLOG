@@ -3,6 +3,9 @@
 #include "common/constants.h"
 #include "common/mmessage.h"
 
+using std::shared_ptr;
+using std::unique_ptr;
+
 namespace slog {
 
 ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) 
@@ -88,5 +91,8 @@ zmq::pollitem_t ChannelHolder::GetChannelPollItem() const {
   return channel_->GetPollItem();
 }
 
+const shared_ptr<zmq::context_t>& ChannelHolder::GetContext() const {
+  return channel_->GetContext();
+}
 
 } // namespace slog

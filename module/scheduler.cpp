@@ -27,8 +27,8 @@ Scheduler::Scheduler(
     // range, num_replicas can be used as the marker for MULTI-HOME txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
-    remaster_manager_(storage),
-    worker_socket_(context, ZMQ_ROUTER) {
+    worker_socket_(context, ZMQ_ROUTER),
+    remaster_manager_(storage) {
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
   worker_socket_.setsockopt(ZMQ_SNDHWM, 0);

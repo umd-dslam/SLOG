@@ -5,12 +5,13 @@
 #include <glog/logging.h>
 
 #include "common/proto_utils.h"
+#include "module/consensus.h"
 #include "module/forwarder.h"
+#include "module/multi_home_orderer.h"
 #include "module/server.h"
 #include "module/sequencer.h"
 #include "module/scheduler.h"
-#include "module/consensus.h"
-#include "module/multi_home_orderer.h"
+#include "module/ticker.h"
 #include "proto/api.pb.h"
 
 using std::to_string;
@@ -81,7 +82,9 @@ TestSlog::TestSlog(ConfigurationPtr config)
     storage_(new MemOnlyStorage<Key, Record, Metadata>()),
     broker_(config, context_, 5),
     client_context_(1),
-    client_socket_(client_context_, ZMQ_DEALER) {}
+    client_socket_(client_context_, ZMQ_DEALER) {
+  ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->GetBatchDuration()));
+}
 
 void TestSlog::Data(Key&& key, Record&& record) {
   CHECK(config_->KeyIsInLocalPartition(key)) 
@@ -125,6 +128,7 @@ unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
 
 void TestSlog::StartInNewThreads() {
   broker_.StartInNewThread();
+  ticker_->StartInNewThread();
   if (server_) {
     server_->StartInNewThread();
     string endpoint = 

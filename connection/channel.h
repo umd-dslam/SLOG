@@ -44,6 +44,11 @@ public:
    */
   std::unique_ptr<Channel> GetListener();
 
+  /**
+   * Returns the zmq context
+   */
+  const std::shared_ptr<zmq::context_t>& GetContext() const;
+
 private:
   Channel(
       std::shared_ptr<zmq::context_t> context,
