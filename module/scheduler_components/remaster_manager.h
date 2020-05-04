@@ -5,7 +5,12 @@
 #include "common/types.h"
 #include "common/transaction_holder.h"
 
+#include "storage/storage.h"
+
+#include <glog/logging.h>
+
 using std::list;
+using std::shared_ptr;
 
 namespace slog {
 
@@ -47,6 +52,45 @@ public:
    * order they were submitted
    */
   virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter) = 0;
+
+  /**
+   * Compare transaction metadata to stored metadata, without adding the
+   * transaciton to any queues
+   */
+  static VerifyMasterResult CheckCounters(
+      const TransactionHolder* txn_holder,
+      shared_ptr<Storage<Key, Record>> storage) {
+    auto& keys = txn_holder->KeysInPartition();
+    auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
+    
+    if (txn_master_metadata.empty()) { // This should only be the case for testing
+      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->GetTransaction()->internal().id();
+      return VerifyMasterResult::VALID;
+    }
+    for (auto& key_pair : keys) {
+      auto& key = key_pair.first;
+
+      auto txn_counter = txn_master_metadata.at(key).counter();
+
+      // Get current counter from storage
+      uint32_t storage_counter = 0; // default to 0 for a new key
+      Record record;
+      bool found = storage->Read(key, record);
+      if (found) {        
+        storage_counter = record.metadata.counter;
+      }
+
+      if (txn_counter < storage_counter) {
+        return VerifyMasterResult::ABORT;
+      } else if (txn_counter > storage_counter) {
+        return VerifyMasterResult::WAITING;
+      } else {
+        CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
+          << "Masters don't match for same key \"" << key << "\"";
+      }
+    }
+    return VerifyMasterResult::VALID;
+  }
 };
 
 } // namespace slog

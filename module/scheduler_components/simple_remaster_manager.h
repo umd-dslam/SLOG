@@ -4,9 +4,6 @@
 
 #include "module/scheduler_components/remaster_manager.h"
 
-#include "storage/storage.h"
-
-using std::shared_ptr;
 using std::unordered_map;
 
 
@@ -27,11 +24,6 @@ public:
   virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter);
 
 private:
-  /**
-   * Compare transaction metadata to stored metadata
-   */
-  VerifyMasterResult CheckCounters(const TransactionHolder* txn_holder);
-
   /**
    * Test if the head of this queue can be unblocked
    */

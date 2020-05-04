@@ -1,4 +1,5 @@
 #include "module/scheduler_components/worker.h"
+#include "module/scheduler_components/remaster_manager.h"
 
 #include <thread>
 
@@ -62,7 +63,8 @@ void Worker::Loop() {
 }
 
 void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
-  auto txn = reinterpret_cast<Transaction*>(worker_request.txn_ptr());
+  auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
+  auto txn = txn_holder->GetTransaction();
   auto txn_internal = txn->mutable_internal();
   RecordTxnEvent(
       config_,
@@ -71,7 +73,7 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
 
   auto txn_id = txn_internal->id();
 
-  const auto& state = InitializeTransactionState(txn);
+  const auto& state = InitializeTransactionState(txn_holder);
 
   PopulateDataFromLocalStorage(txn);
 
@@ -103,12 +105,13 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   }
 }
 
-TransactionState& Worker::InitializeTransactionState(Transaction* txn) {
+TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_holder) {
+  auto txn = txn_holder->GetTransaction();
   auto txn_id = txn->internal().id();
   auto res = txn_states_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(txn_id),
-      std::forward_as_tuple(txn));
+      std::forward_as_tuple(txn_holder));
 
   CHECK(res.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
@@ -199,9 +202,51 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
 void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn;
+  auto holder = state.txn_holder;
+  switch(RemasterManager::CheckCounters(holder, storage_)) {
+    case VerifyMasterResult::VALID: {
+      // TODO: the transaction shouldn't execute until the other partitions
+      // have confirmed that the counters are valid
+      ExecuteTransactionHelper(txn_id);
+      break;
+    }
+    case VerifyMasterResult::ABORT: {
+      txn->set_status(TransactionStatus::ABORTED);
+      break;
+    }
+    case VerifyMasterResult::WAITING: {
+      LOG(ERROR) << "Transaction " << txn_id << " was sent to worker with a high counter";
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unrecognized check counter result";
+      break;
+  }
 
-  // TODO: verify counters now that locks are held
+  // Response back to the scheduler
+  Response res;
+  res.mutable_worker()->set_has_txn_id(true);
+  res.mutable_worker()->set_txn_id(txn_id);
+  for (auto p : state.partitions) {
+    res.mutable_worker()
+        ->mutable_participants()
+        ->Add(p);
+  }
 
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::EXIT_WORKER);
+
+  SendToScheduler(res);
+
+  // Done with this txn. Remove it from the state map
+  txn_states_.erase(txn_id);
+}
+
+void Worker::ExecuteTransactionHelper(TxnId txn_id) {
+  const auto& state = txn_states_[txn_id];
+  auto txn = state.txn;
   if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
     // Execute the transaction code
     commands_->Execute(*txn);
@@ -247,26 +292,6 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   } else {
     LOG(ERROR) << "Procedure is not set";
   }
-
-  // Response back to the scheduler
-  Response res;
-  res.mutable_worker()->set_has_txn_id(true);
-  res.mutable_worker()->set_txn_id(txn_id);
-  for (auto p : state.partitions) {
-    res.mutable_worker()
-        ->mutable_participants()
-        ->Add(p);
-  }
-
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::EXIT_WORKER);
-
-  SendToScheduler(res);
-
-  // Done with this txn. Remove it from the state map
-  txn_states_.erase(txn_id);
 }
 
 void Worker::SendToScheduler(

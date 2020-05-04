@@ -34,39 +34,11 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
   }
 
   // Test counters
-  auto result = CheckCounters(txn_holder);
+  auto result = CheckCounters(txn_holder, storage_);
   if (result == VerifyMasterResult::WAITING) {
     blocked_queue_[local_log_machine_id].push_back(txn_holder);
   }
   return result;
-}
-
-VerifyMasterResult SimpleRemasterManager::CheckCounters(const TransactionHolder* txn_holder) {
-  auto& keys = txn_holder->KeysInPartition();
-  auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
-  for (auto& key_pair : keys) {
-    auto& key = key_pair.first;
-
-    auto txn_counter = txn_master_metadata.at(key).counter();
-
-    // Get current counter from storage
-    uint32_t storage_counter = 0; // default to 0 for a new key
-    Record record;
-    bool found = storage_->Read(key, record);
-    if (found) {        
-      storage_counter = record.metadata.counter;
-    }
-
-    if (txn_counter < storage_counter) {
-      return VerifyMasterResult::ABORT;
-    } else if (txn_counter > storage_counter) {
-      return VerifyMasterResult::WAITING;
-    } else {
-      CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
-        << "Masters don't match for same key \"" << key << "\"";
-    }
-  }
-  return VerifyMasterResult::VALID;
 }
 
 RemasterOccurredResult
@@ -100,7 +72,7 @@ void SimpleRemasterManager::TryToUnblock(
 
   auto& txn_holder = blocked_queue_[local_log_machine_id].front();
 
-  auto counter_result = CheckCounters(txn_holder);
+  auto counter_result = CheckCounters(txn_holder, storage_);
   if (counter_result == VerifyMasterResult::WAITING) {
     return;
   } else if (counter_result == VerifyMasterResult::VALID) {
