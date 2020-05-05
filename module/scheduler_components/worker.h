@@ -22,11 +22,8 @@ namespace slog {
 
 struct TransactionState {
   TransactionState() = default;
-  TransactionState(TransactionHolder* txn_holder) :
-      txn(txn_holder->GetTransaction()),
-      txn_holder(txn_holder) {}
+  TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
 
-  Transaction* txn;
   TransactionHolder* txn_holder;
   bool has_local_reads;
   bool has_local_writes;

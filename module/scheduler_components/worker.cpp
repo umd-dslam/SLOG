@@ -180,7 +180,7 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
   CHECK(txn_states_.count(txn_id) > 0)
       << "Transaction " << txn_id << " does not exist for remote read result";
 
-  auto txn = txn_states_[txn_id].txn;
+  auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
   auto& rpp = txn_states_[txn_id].remote_passive_partitions;
 
   if (rpp.count(read_result.partition()) > 0) {
@@ -201,7 +201,7 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
 
 void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
-  auto txn = state.txn;
+  auto txn = state.txn_holder->GetTransaction();
   auto holder = state.txn_holder;
   switch(RemasterManager::CheckCounters(holder, storage_)) {
     case VerifyMasterResult::VALID: {
@@ -246,7 +246,7 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
 
 void Worker::ExecuteTransactionHelper(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
-  auto txn = state.txn;
+  auto txn = state.txn_holder->GetTransaction();
   if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
     // Execute the transaction code
     commands_->Execute(*txn);
