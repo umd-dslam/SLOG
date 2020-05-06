@@ -22,10 +22,7 @@ Sequencer::Sequencer(ConfigurationPtr config, Broker& broker)
 
 vector<zmq::socket_t> Sequencer::InitializeCustomSockets() {
   vector<zmq::socket_t> ticker_socket;
-  ticker_socket.emplace_back(*GetContext(), ZMQ_SUB);
-  ticker_socket.front().connect(Ticker::ENDPOINT);
-  // Subscribe to any message
-  ticker_socket.front().setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  ticker_socket.push_back(Ticker::Subscribe(*GetContext()));
   return ticker_socket;
 }
 
