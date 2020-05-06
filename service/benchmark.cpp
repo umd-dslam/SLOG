@@ -154,9 +154,8 @@ void InitializeBenchmark() {
   // Create a ticker and subscribe to it
   ticker = MakeRunnerFor<Ticker>(context, FLAGS_rate);
   ticker->StartInNewThread();
-  ticker_socket = make_unique<zmq::socket_t>(context, ZMQ_SUB);
-  ticker_socket->connect(Ticker::ENDPOINT);
-  ticker_socket->setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  ticker_socket = make_unique<zmq::socket_t>(
+      Ticker::Subscribe(context));
   // This has to be pushed to poll_items before the server sockets
   poll_items.push_back({
       static_cast<void*>(*ticker_socket),
@@ -270,6 +269,7 @@ void SendNextTransaction() {
   if (FLAGS_dry_run) {
     return;
   }
+
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);
   req.set_stream_id(stats.txn_counter);
