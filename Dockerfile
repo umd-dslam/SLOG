@@ -23,12 +23,12 @@ FROM ubuntu:bionic AS builder
         && cd ..
 
 FROM ubuntu:bionic AS runner
-    # If set (to anything), only create an image with only slog
+    # If set (to anything), only create an image with only slog (exclude the toolings)
     ARG SLOG_ONLY
 
     WORKDIR /opt/slog
     COPY --from=builder /src/build/slog .
-    COPY --from=builder /src/slog.conf .
+    COPY --from=builder /src/examples/*.conf .
     COPY --from=builder /src/tools/ tools/
 
     RUN if [ -z "$SLOG_ONLY" ]; then \

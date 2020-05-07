@@ -1,0 +1,5 @@
+{
+  "read_set": [],
+  "write_set": ["D", "E", "F"],
+  "code": "SET D valD SET E valE SET F valF"
+}
