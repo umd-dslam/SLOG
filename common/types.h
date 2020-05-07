@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "common/constants.h"
 #include "proto/transaction.pb.h"
 
 using namespace std::chrono;
@@ -23,8 +24,8 @@ struct Metadata {
     counter = metadata.counter();
   }
 
-  uint32_t master;
-  uint32_t counter;
+  uint32_t master = DEFAULT_MASTER_REGION_OF_NEW_KEY;
+  uint32_t counter = 0;
 };
 
 struct Record {

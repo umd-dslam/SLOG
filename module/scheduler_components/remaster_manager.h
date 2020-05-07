@@ -86,7 +86,9 @@ public:
         return VerifyMasterResult::WAITING;
       } else {
         CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
-          << "Masters don't match for same key \"" << key << "\"";
+            << "Masters don't match for same key \"" << key
+            << "\". In txn: " << txn_master_metadata.at(key).master()
+            << ". In storage: " << record.metadata.master;
       }
     }
     return VerifyMasterResult::VALID;

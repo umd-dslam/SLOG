@@ -28,7 +28,7 @@ FROM ubuntu:bionic AS runner
 
     WORKDIR /opt/slog
     COPY --from=builder /src/build/slog .
-    COPY --from=builder /src/examples/*.conf .
+    COPY --from=builder /src/examples/*.conf ./
     COPY --from=builder /src/tools/ tools/
 
     RUN if [ -z "$SLOG_ONLY" ]; then \
