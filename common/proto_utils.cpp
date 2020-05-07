@@ -217,7 +217,11 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   }
   os << "Type: "
       << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
-  os << "Code: " << txn.procedure_case() << std::endl;
+  if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
+    os << "Code: " << txn.code() << std::endl;
+  } else {
+    os << "New master: " << txn.new_master() << std::endl;
+  }
   return os;
 }
 
