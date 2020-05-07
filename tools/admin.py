@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Admin tool
 
-This tool is used to automate controlling a cluster of SLOG servers with tasks
+This tool is used to control a cluster of SLOG servers with tasks
 such as starting a cluster, stopping a cluster, getting status, and more.
 """
 import docker
