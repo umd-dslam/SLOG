@@ -7,6 +7,7 @@
 
 #include "common/configuration.h"
 #include "common/types.h"
+#include "common/transaction_holder.h"
 #include "module/base/module.h"
 #include "module/scheduler_components/commands.h"
 #include "proto/transaction.pb.h"
@@ -21,9 +22,9 @@ namespace slog {
 
 struct TransactionState {
   TransactionState() = default;
-  TransactionState(Transaction* txn) : txn(txn) {}
+  TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
 
-  Transaction* txn;
+  TransactionHolder* txn_holder;
   bool has_local_reads;
   bool has_local_writes;
   // This set is reduced until we receive remote
@@ -45,12 +46,13 @@ public:
 
 private:
   void ProcessWorkerRequest(const internal::WorkerRequest& req);
-  TransactionState& InitializeTransactionState(Transaction* txn);
+  TransactionState& InitializeTransactionState(TransactionHolder* txn);
   void PopulateDataFromLocalStorage(Transaction* txn);
 
   void ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
   
   void ExecuteAndCommitTransaction(TxnId txn_id);
+  void ExecuteTransactionHelper(TxnId txn_id);
 
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,

@@ -113,7 +113,7 @@ message LocalQueueOrder {
 }
 
 message WorkerRequest {
-    uint64 txn_ptr = 1;
+    uint64 txn_holder_ptr = 1;
 }
 
 message RemoteReadResult {
