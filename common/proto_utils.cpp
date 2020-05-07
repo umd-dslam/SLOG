@@ -211,9 +211,13 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   for (const auto& pair : txn.write_set()) {
     os << std::setw(10) << pair.first << " ==> " << pair.second << "\n";
   }
+  os << "Master metadata:\n";
+  for (const auto& pair : txn.internal().master_metadata()) {
+    os << std::setw(10) << pair.first << ": " << pair.second << ")\n";
+  }
   os << "Type: "
       << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
-  os << "Code: " << txn.code() << std::endl;
+  os << "Code: " << txn.procedure_case() << std::endl;
   return os;
 }
 
@@ -221,11 +225,15 @@ bool operator==(const Transaction& txn1, const Transaction txn2) {
   return txn1.status() == txn2.status()
       && txn1.read_set() == txn2.read_set()
       && txn1.write_set() == txn2.write_set()
-      && txn1.code() == txn2.code()
+      && txn1.procedure_case() == txn2.procedure_case()
       && txn1.abort_reason() == txn2.abort_reason()
       && txn1.internal().id() == txn2.internal().id()
       && txn1.internal().master_metadata() == txn2.internal().master_metadata()
       && txn1.internal().type() == txn2.internal().type();
+}
+
+std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
+  os << std::setw(10) << "(" << metadata.master() << ", " << metadata.counter() << ")";
 }
 
 } // namespace slog

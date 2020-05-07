@@ -66,6 +66,8 @@ void MergeTransaction(Transaction& txn, const Transaction& other);
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);
 bool operator==(const Transaction& txn1, const Transaction txn2);
 
+std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata);
+
 template<typename TxnOrBatch>
 inline void RecordTxnEvent(ConfigurationPtr config, TxnOrBatch txn, TransactionEvent event) {
   txn->mutable_events()->Add(event);
