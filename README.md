@@ -55,7 +55,7 @@ Send another transaction to read the written data.
 ```
 $ build/client txn examples/read_sh.1.json
 ```
-Below is the result of the read transaction. Notice that the key-value pairs are from the readset.
+Below is the result of the read transaction. Note that this time, the key-value pairs are from the readset.
 ```
 Transaction ID: 2000
 Status: COMMITTED
@@ -117,7 +117,7 @@ build/client txn examples/write_mh.json --host 192.168.2.11
 The following confirmation is returned.
 
 ```
-Transaction ID: 2000
+Transaction ID: 1000
 Status: COMMITTED
 Read set:
 Write set:
