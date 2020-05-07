@@ -54,7 +54,7 @@ Vagrant.configure("2") do |config|
     # vb.gui = true
   
     # Customize the amount of memory on the VM:
-    vb.memory = "2048"
+    vb.memory = "4096"
 
     # box was timing out on startup. from https://bugs.launchpad.net/cloud-images/+bug/1829625
     vb.customize ["modifyvm", :id, "--uart1", "0x3F8", "4"]
