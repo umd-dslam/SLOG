@@ -65,11 +65,20 @@ void ExecuteTxn(const char* txn_file) {
       metadata[mem.name.GetString()] = {mem.value.GetUint(), 0};
     }
   }
+
+  int32_t new_master = -1;
+  if (d.HasMember("new_master")) {
+    new_master = d["new_master"].GetInt();
+  }
+
   auto txn = MakeTransaction(
-      read_set,
-      write_set,
-      d["code"].GetString(),
-      metadata);
+    read_set,
+    write_set,
+    d["code"].GetString(),
+    metadata,
+    MakeMachineId("0:0"),
+    new_master
+    );
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);
