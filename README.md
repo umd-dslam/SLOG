@@ -11,7 +11,7 @@ This repository contains an experimental implementation of the system, which is 
 
 # Getting Started 
 
-The following guide has been tested on Ubuntu 20.04 with GCC 9.3.0 and CMake 3.12.4
+The following guide has been tested on Ubuntu 20.04 with GCC 9.3.0 and CMake 3.12.4. Additional docs are in the Wiki.
 
 ## Build SLOG
 
