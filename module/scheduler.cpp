@@ -309,7 +309,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
 void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   auto txn_id = res.txn_id();
-  auto txn_holder = all_txns_[txn_id];
+  auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
 
   // Release locks held by this txn. Enqueue the txns that
@@ -339,8 +339,6 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   }
 
   // Send the txn back to the coordinating server
-  auto coordinating_server = MakeMachineIdAsString(
-      txn->internal().coordinating_server());
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
@@ -354,6 +352,8 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
       txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
 
+  auto coordinating_server = MakeMachineIdAsString(
+      txn->internal().coordinating_server());
   Send(req, coordinating_server, SERVER_CHANNEL);
 
   // This txn holder is done so remove it. The request
