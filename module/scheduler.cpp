@@ -338,10 +338,13 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     }
   }
 
+  // Release txn so it can be passed to request
+  auto released_txn = txn_holder.ReleaseTransaction();
+
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->set_allocated_txn(txn);
+  completed_sub_txn->set_allocated_txn(released_txn);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
   for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
@@ -349,16 +352,14 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
 
   RecordTxnEvent(
       config_,
-      txn->mutable_internal(),
+      released_txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
 
   auto coordinating_server = MakeMachineIdAsString(
-      txn->internal().coordinating_server());
+      released_txn->internal().coordinating_server());
   Send(req, coordinating_server, SERVER_CHANNEL);
 
-  // This txn holder is done so remove it. The request
-  // will delete the txn
-  txn_holder.ReleaseTransaction();
+  // Done with this txn, delete the holder
   all_txns_.erase(txn_id);
 }
 
