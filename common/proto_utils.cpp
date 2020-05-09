@@ -238,6 +238,7 @@ bool operator==(const Transaction& txn1, const Transaction txn2) {
 
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
   os << std::setw(10) << "(" << metadata.master() << ", " << metadata.counter() << ")";
+  return os;
 }
 
 } // namespace slog

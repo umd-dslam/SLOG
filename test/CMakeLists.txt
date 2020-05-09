@@ -19,7 +19,8 @@ set(ALL_TESTS
   server_test
   sequencer_test
   simple_remaster_manager_test
-  string_utils_test)
+  string_utils_test
+  transaction_holder_test)
 
 add_executable(batch_log_test data_structure/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
@@ -76,6 +77,9 @@ target_link_libraries(simple_remaster_manager_test test_utils)
 
 add_executable(string_utils_test common/string_utils_test.cpp)
 target_link_libraries(string_utils_test string_utils)
+
+add_executable(transaction_holder_test common/transaction_holder_test.cpp)
+target_link_libraries(transaction_holder_test common test_utils)
 
 foreach(TEST ${ALL_TESTS})
   target_link_libraries(${TEST} ${EXTERNAL_LIBS} GTest::GTest GTest::Main)
