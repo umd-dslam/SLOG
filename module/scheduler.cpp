@@ -343,7 +343,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   auto completed_sub_txn = req.mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
-  for (auto p : txn_holder.PartitionParticipants()) {
+  for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
   }
 

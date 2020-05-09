@@ -56,7 +56,7 @@ TEST_F(TransactionHolderTest, KeysInPartition) {
   ASSERT_TRUE(holder2.KeysInPartition().empty());
 }
 
-TEST_F(TransactionHolderTest, PartitionParticipants) {
+TEST_F(TransactionHolderTest, InvolvedPartitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction(
       {"A"}, /* read_set */
@@ -66,7 +66,7 @@ TEST_F(TransactionHolderTest, PartitionParticipants) {
     txn->mutable_internal()->set_id(100);
 
     auto holder = TransactionHolder(configs[i], txn);
-    auto partitions = holder.PartitionParticipants();
+    auto partitions = holder.InvolvedPartitions();
     ASSERT_EQ(partitions.size(), 2);
     ASSERT_TRUE(partitions.count(0));
     ASSERT_TRUE(partitions.count(2));

@@ -14,11 +14,11 @@ namespace {
 
 void ExtractKeyPartitions(
     vector<std::pair<Key, LockMode>>& keys,
-    unordered_set<uint32_t>& partition_participants,
+    unordered_set<uint32_t>& partitions,
     ConfigurationPtr config,
     const Transaction& txn) {
   for (const auto& kv : txn.read_set()) {
-    partition_participants.insert(config->GetPartitionOfKey(kv.first));
+    partitions.insert(config->GetPartitionOfKey(kv.first));
     // If this key is also in write_set, give it write lock instead
     if (config->KeyIsInLocalPartition(kv.first) 
         && !txn.write_set().contains(kv.first)) {
@@ -26,7 +26,7 @@ void ExtractKeyPartitions(
     }
   }
   for (const auto& kv : txn.write_set()) {
-    partition_participants.insert(config->GetPartitionOfKey(kv.first));
+    partitions.insert(config->GetPartitionOfKey(kv.first));
     if (config->KeyIsInLocalPartition(kv.first)) {
       keys.emplace_back(kv.first, LockMode::WRITE);
     }
@@ -45,8 +45,8 @@ TransactionHolder::~TransactionHolder() {
 }
 
 void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
-  // TODO: partition_participants_ is only needed by MH and SH, could avoid computing for LO
-  ExtractKeyPartitions(keys_in_partition_, partition_participants_, config, *txn);
+  // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
+  ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
   txn_ = txn;
 }
 
@@ -72,8 +72,8 @@ const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {
   return keys_in_partition_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::PartitionParticipants() const {
-  return partition_participants_;
+const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() const {
+  return involved_partitions_;
 }
 
 vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
