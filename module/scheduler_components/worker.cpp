@@ -125,7 +125,6 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
   for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;
     auto partition = config_->GetPartitionOfKey(key);
-    state.partitions.insert(partition);
     if (partition == local_partition) {
       state.has_local_reads = true;
     } else {
@@ -144,7 +143,6 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
   for (auto& key_value : *txn->mutable_write_set()) {
     const auto& key = key_value.first;
     auto partition = config_->GetPartitionOfKey(key);
-    state.partitions.insert(partition);
     if (partition == local_partition) {
       state.has_local_writes = true;
     } else {
@@ -225,13 +223,7 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
 
   // Response back to the scheduler
   Response res;
-  res.mutable_worker()->set_has_txn_id(true);
   res.mutable_worker()->set_txn_id(txn_id);
-  for (auto p : state.partitions) {
-    res.mutable_worker()
-        ->mutable_participants()
-        ->Add(p);
-  }
 
   RecordTxnEvent(
       config_,

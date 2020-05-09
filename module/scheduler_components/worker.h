@@ -31,7 +31,6 @@ struct TransactionState {
   // reads from all passive partitions
   unordered_set<uint32_t> remote_passive_partitions;
   unordered_set<uint32_t> remote_active_partitions;
-  unordered_set<uint32_t> partitions;
 };
 
 class Worker : public Module {

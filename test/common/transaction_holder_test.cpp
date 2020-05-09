@@ -57,7 +57,7 @@ TEST_F(TransactionHolderTest, KeysInPartition) {
 }
 
 TEST_F(TransactionHolderTest, PartitionParticipants) {
-  for (auto i = 0; i < NUM_MACHINES; i++) {
+  for (uint32_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction(
       {"A"}, /* read_set */
       {"B", "D"},  /* write_set */

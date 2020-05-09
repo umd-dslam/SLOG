@@ -18,7 +18,7 @@ void ExtractKeyPartitions(
     ConfigurationPtr config,
     const Transaction& txn) {
   for (const auto& kv : txn.read_set()) {
-    partition_participants.emplace(config->GetPartitionOfKey(kv.first));
+    partition_participants.insert(config->GetPartitionOfKey(kv.first));
     // If this key is also in write_set, give it write lock instead
     if (config->KeyIsInLocalPartition(kv.first) 
         && !txn.write_set().contains(kv.first)) {
@@ -26,7 +26,7 @@ void ExtractKeyPartitions(
     }
   }
   for (const auto& kv : txn.write_set()) {
-    partition_participants.emplace(config->GetPartitionOfKey(kv.first));
+    partition_participants.insert(config->GetPartitionOfKey(kv.first));
     if (config->KeyIsInLocalPartition(kv.first)) {
       keys.emplace_back(kv.first, LockMode::WRITE);
     }
