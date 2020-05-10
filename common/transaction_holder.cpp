@@ -5,17 +5,20 @@
 using std::pair;
 using std::make_pair;
 using std::vector;
+using std::unordered_set;
 using std::string;
 
 namespace slog {
 
 namespace {
 
-void ExtractKeysInPartition(
+void ExtractKeyPartitions(
     vector<std::pair<Key, LockMode>>& keys,
+    unordered_set<uint32_t>& partitions,
     ConfigurationPtr config,
     const Transaction& txn) {
   for (const auto& kv : txn.read_set()) {
+    partitions.insert(config->GetPartitionOfKey(kv.first));
     // If this key is also in write_set, give it write lock instead
     if (config->KeyIsInLocalPartition(kv.first) 
         && !txn.write_set().contains(kv.first)) {
@@ -23,6 +26,7 @@ void ExtractKeysInPartition(
     }
   }
   for (const auto& kv : txn.write_set()) {
+    partitions.insert(config->GetPartitionOfKey(kv.first));
     if (config->KeyIsInLocalPartition(kv.first)) {
       keys.emplace_back(kv.first, LockMode::WRITE);
     }
@@ -41,7 +45,8 @@ TransactionHolder::~TransactionHolder() {
 }
 
 void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
-  ExtractKeysInPartition(keys_in_partition_, config, *txn);
+  // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
+  ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
   txn_ = txn;
 }
 
@@ -67,6 +72,10 @@ const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {
   return keys_in_partition_;
 }
 
+const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() const {
+  return involved_partitions_;
+}
+
 vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
   return early_remote_reads_;
 }
@@ -76,7 +85,10 @@ uint32_t TransactionHolder::GetReplicaId() const {
 }
 
 uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
-  if (txn->internal().master_metadata().empty()) { // This should only be the case for testing
+  // Note that this uses all metadata, not just keys in partition. This shouldn't be empty,
+  // except for in testing.
+  // TODO: make this fatal, add metadata to tests
+  if (txn->internal().master_metadata().empty()) {
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return 0;
   }

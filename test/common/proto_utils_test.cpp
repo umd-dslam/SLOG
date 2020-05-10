@@ -8,8 +8,6 @@ using namespace slog;
 using internal::Request;
 using internal::Response;
 
-const string TEST_STRING = "test";
-
 TEST(ProtoUtilsTest, MachineIdStringToMachineId) {
   internal::MachineId mid;
 

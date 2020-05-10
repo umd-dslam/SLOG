@@ -308,12 +308,9 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 ***********************************************/
 
 void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
-  if (!res.has_txn_id()) {
-    return;
-  }
-
-  // This txn is done so remove it from the txn list
   auto txn_id = res.txn_id();
+  auto& txn_holder = all_txns_[txn_id];
+  auto txn = txn_holder.GetTransaction();
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -321,8 +318,11 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   for (auto unblocked_txn : unblocked_txns) {
     DispatchTransaction(unblocked_txn);
   }
-  auto txn = all_txns_[txn_id].ReleaseTransaction();
-  all_txns_.erase(txn_id);
+
+  RecordTxnEvent(
+    config_,
+    txn->mutable_internal(),
+    TransactionEvent::RELEASE_LOCKS);
 
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
@@ -330,43 +330,37 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     auto counter = txn->internal().master_metadata().at(key).master() + 1;
     auto remaster_result = remaster_manager_.RemasterOccured(key, counter);
 
-    for (auto txn_holder : remaster_result.unblocked) {
-      SendToLockManager(txn_holder);
+    for (auto unblocked_txn_holder : remaster_result.unblocked) {
+      SendToLockManager(unblocked_txn_holder);
     }
-    for (auto txn_holder : remaster_result.should_abort) {
-      AbortTransaction(txn_holder);
+    for (auto unblocked_txn_holder : remaster_result.should_abort) {
+      AbortTransaction(unblocked_txn_holder);
     }
+  }
+
+  // Release txn so it can be passed to request
+  auto released_txn = txn_holder.ReleaseTransaction();
+
+  // Send the txn back to the coordinating server
+  Request req;
+  auto completed_sub_txn = req.mutable_completed_subtxn();
+  completed_sub_txn->set_allocated_txn(released_txn);
+  completed_sub_txn->set_partition(config_->GetLocalPartition());
+  for (auto p : txn_holder.InvolvedPartitions()) {
+    completed_sub_txn->add_involved_partitions(p);
   }
 
   RecordTxnEvent(
       config_,
-      txn->mutable_internal(),
-      TransactionEvent::RELEASE_LOCKS);
+      released_txn->mutable_internal(),
+      TransactionEvent::EXIT_SCHEDULER);
 
-  // Send the txn back to the coordinating server if need to
-  auto local_partition = config_->GetLocalPartition();
-  auto& participants = res.participants();
-  if (std::find(
-      participants.begin(),
-      participants.end(),
-      local_partition) != participants.end()) {
-    auto coordinating_server = MakeMachineIdAsString(
-        txn->internal().coordinating_server());
-    Request req;
-    auto completed_sub_txn = req.mutable_completed_subtxn();
-    completed_sub_txn->set_allocated_txn(txn);
-    completed_sub_txn->set_partition(config_->GetLocalPartition());
-    for (auto p : participants) {
-      completed_sub_txn->add_involved_partitions(p);
-    }
+  auto coordinating_server = MakeMachineIdAsString(
+      released_txn->internal().coordinating_server());
+  Send(req, coordinating_server, SERVER_CHANNEL);
 
-    RecordTxnEvent(
-        config_,
-        txn->mutable_internal(),
-        TransactionEvent::EXIT_SCHEDULER);
-
-    Send(req, coordinating_server, SERVER_CHANNEL);
-  }
+  // Done with this txn, delete the holder
+  all_txns_.erase(txn_id);
 }
 
 /***********************************************

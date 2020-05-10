@@ -24,6 +24,7 @@ public:
   const std::string& GetWorker() const;
 
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
+  const std::unordered_set<uint32_t>& InvolvedPartitions() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
 
@@ -45,6 +46,7 @@ private:
   string worker_;
   std::vector<internal::Request> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
+  std::unordered_set<uint32_t> involved_partitions_;
 };
 
 } // namespace slog

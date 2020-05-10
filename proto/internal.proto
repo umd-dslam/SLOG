@@ -175,9 +175,7 @@ message PaxosCommitResponse {
 }
 
 message WorkerResponse {
-    bool has_txn_id = 1;
     uint32 txn_id = 2;
-    repeated uint32 participants = 3;
 }
 
 message StatsResponse {
