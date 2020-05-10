@@ -123,33 +123,29 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
 }
 
 TEST_F(E2ETest, RemasterTxn) {
-  for (size_t i = 0; i < NUM_MACHINES; i++) {
-    // auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
+  auto remaster_txn = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {}, /* master metadata */
+      MakeMachineId("0:0") /* coordinating server */,
+      1 /* new master */);
 
-    auto remaster_txn = MakeTransaction(
-        {}, /* read_set */
-        {"A"},  /* write_set */
-        "", /* code */
-        {}, /* master metadata */
-        MakeMachineId("0:0") /* coordinating server */,
-        1 /* new master */);
+  test_slogs[1]->SendTxn(remaster_txn);
+  auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, remaster_txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
 
-    test_slogs[i]->SendTxn(remaster_txn);
-    auto remaster_txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, remaster_txn_resp.status());
-    ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
+  auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
 
-    auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
-
-    // Note: this relies on metadata being updated synchronously, or the txn may abort.
-    // May break in future implementations
-    test_slogs[i]->SendTxn(txn);
-    auto txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type()); // used to be MH
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valX", txn_resp.read_set().at("X"));
-  }
+  // Note: this relies on metadata being updated synchronously, or the txn may abort.
+  // May break in future implementations
+  test_slogs[1]->SendTxn(txn);
+  auto txn_resp = test_slogs[1]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type()); // used to be MH
+  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+  ASSERT_EQ("valX", txn_resp.read_set().at("X"));
 }
 
 int main(int argc, char* argv[]) {

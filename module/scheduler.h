@@ -52,6 +52,7 @@ private:
     internal::Request&& req,
     const string& from_machine_id);
   void HandleResponseFromWorker(const internal::WorkerResponse& response);
+  void SendToCoordinatingServer(TransactionHolder* txn_holder);
 
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
@@ -67,7 +68,7 @@ private:
   bool AcceptTransaction(Transaction* txn);
 
   // Send single-home and lock-only transactions for counter checking
-  void SendToRemasterManager(const TransactionHolder* txn_holder);
+  void SendToRemasterManager(TransactionHolder* txn_holder);
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
   void DispatchTransaction(TxnId txn_id);
@@ -75,7 +76,7 @@ private:
   void SendToWorker(internal::Request&& req, const string& worker);
 
   // Abort and resubmit transaction, including all lock-onlies
-  void AbortTransaction(const TransactionHolder* txn_holder);
+  void AbortTransaction(TransactionHolder* txn_holder);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;

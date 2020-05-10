@@ -9,7 +9,7 @@ SimpleRemasterManager::SimpleRemasterManager(
   : storage_(storage) {}
 
 VerifyMasterResult
-SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
+SimpleRemasterManager::VerifyMaster(TransactionHolder* txn_holder) {
   auto& keys = txn_holder->KeysInPartition();
   if (keys.empty()) {
     return VerifyMasterResult::VALID;

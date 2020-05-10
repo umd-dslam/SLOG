@@ -85,9 +85,11 @@ uint32_t TransactionHolder::GetReplicaId() const {
 }
 
 uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
-  // Note that this uses all metadata, not just keys in partition. This shouldn't be empty,
-  // except for in testing.
-  // TODO: make this fatal, add metadata to tests
+  // This should only be empty for testing.
+  // TODO: add metadata to test cases, make this an error
+  //
+  // Note that this uses all metadata, not just keys in partition. It's therefore safe
+  // to call this on transactions that don't involve the current partition
   if (txn->internal().master_metadata().empty()) {
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return 0;

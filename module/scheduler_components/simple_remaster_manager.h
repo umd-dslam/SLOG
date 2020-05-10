@@ -20,7 +20,7 @@ public:
   SimpleRemasterManager(
     shared_ptr<Storage<Key, Record>> storage);
 
-  virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
+  virtual VerifyMasterResult VerifyMaster(TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter);
 
 private:
@@ -33,7 +33,7 @@ private:
   shared_ptr<Storage<Key, Record>> storage_;
 
   // One queue is kept per local log
-  unordered_map<uint32_t, list<const TransactionHolder*>> blocked_queue_;
+  unordered_map<uint32_t, list<TransactionHolder*>> blocked_queue_;
 };
 
 } // namespace slog

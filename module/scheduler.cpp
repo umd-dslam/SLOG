@@ -309,8 +309,8 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
 void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   auto txn_id = res.txn_id();
-  auto& txn_holder = all_txns_[txn_id];
-  auto txn = txn_holder.GetTransaction();
+  auto txn_holder = &all_txns_[txn_id];
+  auto txn = txn_holder->GetTransaction();
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -338,15 +338,28 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     }
   }
 
+  switch (txn->status()) {
+    case TransactionStatus::COMMITTED:
+      SendToCoordinatingServer(txn_holder);
+      break;
+    case TransactionStatus::ABORTED:
+      AbortTransaction(txn_holder);
+      break;
+    default:
+      LOG(ERROR) << "Invalid txn status from worker: " << txn->status();
+  }
+}
+
+void Scheduler::SendToCoordinatingServer(TransactionHolder* txn_holder) {
   // Release txn so it can be passed to request
-  auto released_txn = txn_holder.ReleaseTransaction();
+  auto released_txn = txn_holder->ReleaseTransaction();
 
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(released_txn);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
-  for (auto p : txn_holder.InvolvedPartitions()) {
+  for (auto p : txn_holder->InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
   }
 
@@ -360,7 +373,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   Send(req, coordinating_server, SERVER_CHANNEL);
 
   // Done with this txn, delete the holder
-  all_txns_.erase(txn_id);
+  all_txns_.erase(released_txn->internal().id());
 }
 
 /***********************************************
@@ -427,6 +440,16 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
           case TransactionType::SINGLE_HOME: {
             VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
             auto txn_holder = &all_txns_[txn_id];
+
+            // Check that remaster txns aren't remastering to the same master
+            if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+              auto past_master = txn->internal().master_metadata().begin()->second.master();
+              if (txn->new_master() == past_master) {
+                AbortTransaction(txn_holder);
+                break;
+              }
+            }
+
             SendToRemasterManager(txn_holder);
             break;
           }
@@ -486,11 +509,11 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
   return true;
 }
 
-void Scheduler::SendToRemasterManager(const TransactionHolder* txn_holder) {
+void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   auto txn_type = txn_holder->GetTransaction()->internal().type();
   switch(txn_type) {
     case TransactionType::SINGLE_HOME:
-      // Same as LOCK_ONLY
+      // Same as lock-only
     case TransactionType::LOCK_ONLY: {
       switch (remaster_manager_.VerifyMaster(txn_holder)) {
         case VerifyMasterResult::VALID: {
@@ -555,8 +578,26 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   }
 }
 
-void Scheduler::AbortTransaction(const TransactionHolder* txn_holder) {
-  // TODO
+void Scheduler::AbortTransaction(TransactionHolder* txn_holder) {
+  CHECK(txn_holder->InvolvedPartitions().size() == 1) << "MP not impelemented";
+
+  auto txn = txn_holder->GetTransaction();
+  switch (txn->internal().type()) {
+    case TransactionType::SINGLE_HOME: {
+      txn->set_status(TransactionStatus::ABORTED);
+      SendToCoordinatingServer(txn_holder);
+      break;
+    }
+    case TransactionType::MULTI_HOME: {
+      break;
+    }
+    case TransactionType::LOCK_ONLY: {
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unknown transaction type";
+      break;
+  }
 }
 
 /***********************************************
