@@ -45,8 +45,18 @@ TransactionHolder::~TransactionHolder() {
 }
 
 void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
+  keys_in_partition_.clear();
+  involved_partitions_.clear();
+  involved_replicas_.clear();
+
   // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
   ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
+
+  // TODO: only needed for MH
+  for (auto& pair : txn_->internal().master_metadata()) {
+    involved_replicas_.insert(pair.second.master());
+  }
+
   txn_ = txn;
 }
 
@@ -74,6 +84,10 @@ const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {
 
 const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() const {
   return involved_partitions_;
+}
+
+const std::unordered_set<uint32_t>& TransactionHolder::InvolvedReplicas() const {
+  return involved_replicas_;
 }
 
 vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {

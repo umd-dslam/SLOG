@@ -76,6 +76,7 @@ private:
   void SendToWorker(internal::Request&& req, const string& worker);
 
   void AbortTransaction(TransactionHolder* txn_holder, bool was_dispatched);
+  void AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
@@ -92,7 +93,15 @@ private:
   unordered_map<TxnId, TransactionHolder> all_txns_;
   
   // Lock-only transactions are kept here during remaster checking
-  unordered_map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
+  map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
+
+  /**
+   * Stores how many lock-only transactions need aborting during
+   * mutli-home abort
+   * 
+   * Note: can be negative, if lock-onlys abort before the multi-home
+   */
+  unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
 };
 
 } // namespace slog
