@@ -9,7 +9,7 @@ target_link_libraries(base_module
   proto)
 
 add_library(scheduler_components
-  scheduler_components/abort_manager.cpp
+
   scheduler_components/batch_interleaver.cpp
   scheduler_components/commands.cpp
   scheduler_components/deterministic_lock_manager.cpp

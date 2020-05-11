@@ -12,7 +12,6 @@
 #include "data_structure/batch_log.h"
 #include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
-#include "module/scheduler_components/abort_manager.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
 #include "module/scheduler_components/simple_remaster_manager.h"
 #include "module/scheduler_components/worker.h"
@@ -76,7 +75,7 @@ private:
 
   void SendToWorker(internal::Request&& req, const string& worker);
 
-  void AbortAndReturnTransaction(TransactionHolder* txn_holder, bool was_dispatched);
+  void AbortTransaction(TransactionHolder* txn_holder, bool was_dispatched);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
@@ -87,7 +86,6 @@ private:
 
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
-  AbortManager abort_manager_;
   DeterministicLockManager lock_manager_;
   SimpleRemasterManager remaster_manager_;
 
