@@ -5,11 +5,11 @@
 namespace slog {
 
 SimpleRemasterManager::SimpleRemasterManager(
-    shared_ptr<Storage<Key, Record>> storage)
+    shared_ptr<const Storage<Key, Record>> storage)
   : storage_(storage) {}
 
 VerifyMasterResult
-SimpleRemasterManager::VerifyMaster(TransactionHolder* txn_holder) {
+SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
   auto& keys = txn_holder->KeysInPartition();
   if (keys.empty()) {
     return VerifyMasterResult::VALID;

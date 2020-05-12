@@ -19,9 +19,9 @@ class SimpleRemasterManager :
     public RemasterManager {
 public:
   SimpleRemasterManager(
-    const shared_ptr<Storage<Key, Record>> storage);
+    shared_ptr<const Storage<Key, Record>> storage);
 
-  virtual VerifyMasterResult VerifyMaster(TransactionHolder* txn_holder);
+  virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id);
   /**
@@ -36,10 +36,10 @@ private:
   void TryToUnblock(uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
   // Needs access to storage to check counters
-  shared_ptr<Storage<Key, Record>> storage_;
+  shared_ptr<const Storage<Key, Record>> storage_;
 
   // One queue is kept per local log
-  unordered_map<uint32_t, list<TransactionHolder*>> blocked_queue_;
+  unordered_map<uint32_t, list<const TransactionHolder*>> blocked_queue_;
 };
 
 } // namespace slog

@@ -333,26 +333,27 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
 
   switch (txn->status()) {
     case TransactionStatus::COMMITTED:
-      SendToCoordinatingServer(txn_holder);
+      SendToCoordinatingServer(txn_id);
       break;
     case TransactionStatus::ABORTED:
-      AbortTransaction(txn_holder, true);
+      AbortTransaction(txn_id);
       break;
     default:
       LOG(ERROR) << "Invalid txn status from worker: " << txn->status();
   }
 }
 
-void Scheduler::SendToCoordinatingServer(TransactionHolder* txn_holder) {
+void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
   // Release txn so it can be passed to request
-  auto released_txn = txn_holder->ReleaseTransaction();
+  auto& txn_holder = all_txns_[txn_id];
+  auto released_txn = txn_holder.ReleaseTransaction();
 
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(released_txn);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
-  for (auto p : txn_holder->InvolvedPartitions()) {
+  for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
   }
 
@@ -366,7 +367,7 @@ void Scheduler::SendToCoordinatingServer(TransactionHolder* txn_holder) {
   Send(req, coordinating_server, SERVER_CHANNEL);
 
   // Done with this txn, delete the holder
-  all_txns_.erase(released_txn->internal().id());
+  all_txns_.erase(txn_id);
 }
 
 /***********************************************
@@ -438,7 +439,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
               auto past_master = txn->internal().master_metadata().begin()->second.master();
               if (txn->new_master() == past_master) {
-                AbortTransaction(txn_holder, false);
+                AbortTransaction(txn_id);
                 break;
               }
             }
@@ -464,7 +465,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             auto txn_holder = &all_txns_[txn_id];
 
             if (mh_abort_waiting_on_.count(txn_id)) {
-              AbortTransaction(txn_holder, false);
+              AbortTransaction(txn_id);
             } else {
               SendToLockManager(txn_holder);
             }
@@ -512,7 +513,8 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
 }
 
 void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
-  auto txn_type = txn_holder->GetTransaction()->internal().type();
+  auto txn = txn_holder->GetTransaction();
+  auto txn_type = txn->internal().type();
   switch(txn_type) {
     case TransactionType::SINGLE_HOME:
       switch (remaster_manager_.VerifyMaster(txn_holder)) {
@@ -521,7 +523,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
           break;
         }
         case VerifyMasterResult::ABORT: {
-          AbortTransaction(txn_holder, false);
+          AbortTransaction(txn->internal().id());
           break;
         }
         case VerifyMasterResult::WAITING: {
@@ -570,7 +572,7 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
     auto unblocked_txn_type = unblocked_txn_holder->GetTransaction()->internal().type();
     switch (unblocked_txn_type) {
       case TransactionType::SINGLE_HOME:
-        AbortTransaction(unblocked_txn_holder, false);
+        AbortTransaction(unblocked_txn_holder->GetTransaction()->internal().id());
         break;
       case TransactionType::LOCK_ONLY:
         AbortLockOnlyTransaction(unblocked_txn_holder->GetTransactionIdReplicaIdPair());
@@ -617,25 +619,24 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   }
 }
 
-void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatched) {
-  CHECK(txn_holder->InvolvedPartitions().size() == 1) << "MP not impelemented";
+void Scheduler::AbortTransaction(TxnId txn_id) {
+  auto& txn_holder = all_txns_[txn_id];
+  CHECK(txn_holder.InvolvedPartitions().size() == 1) << "MP not impelemented";
 
-  auto txn = txn_holder->GetTransaction();
-  auto txn_id = txn->internal().id();
-  LOG(INFO) << "Aborting txn " << txn_id;
+  auto txn = txn_holder.GetTransaction();
+  VLOG(2) << "Aborting txn " << txn_id;
   switch (txn->internal().type()) {
     case TransactionType::SINGLE_HOME: {
       txn->set_status(TransactionStatus::ABORTED);
-      SendToCoordinatingServer(txn_holder);
+      SendToCoordinatingServer(txn_id);
       break;
     }
     case TransactionType::MULTI_HOME: {
       txn->set_status(TransactionStatus::ABORTED);
-      if (was_dispatched) {
-        // LOs have already been deleted
-        SendToCoordinatingServer(txn_holder);
-      } else {
-        auto involved_replicas = txn_holder->InvolvedReplicas();
+
+      // If transaction has not been dispatched, then LOs must be collected
+      if (txn_holder.GetWorker() == "") {
+        auto& involved_replicas = txn_holder.InvolvedReplicas();
         mh_abort_waiting_on_[txn_id] += involved_replicas.size();
 
         // release LOs in remaster manager
@@ -643,7 +644,7 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
             remaster_manager_.ReleaseTransaction(txn_id, involved_replicas));
 
         // release LOs in lock manager
-        for (auto unblocked_txn : lock_manager_.ReleaseLocks(*txn_holder)) {
+        for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
           DispatchTransaction(unblocked_txn);
         }
 
@@ -656,15 +657,15 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
             mh_abort_waiting_on_[txn_id] -= 1;
           }
         }
-        
-        // Can return abort even before all lock onlys are recieved
-        SendToCoordinatingServer(txn_holder);
 
         // Remove if all LOs have been recieved
         if (mh_abort_waiting_on_[txn_id] == 0) {
           mh_abort_waiting_on_.erase(txn_id);
         }
       }
+
+      // Can return abort even before all lock onlys are recieved
+      SendToCoordinatingServer(txn_id);
       break;
     }
     case TransactionType::LOCK_ONLY: {
@@ -684,7 +685,7 @@ void Scheduler::AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id) {
   if (lock_only_txns_.count(txn_replica_id) == 0) {
     return;
   }
-  LOG(INFO) << "Aborting txn " << txn_replica_id.first << ", " << txn_replica_id.second;
+  VLOG(2) << "Aborting lock-only txn " << txn_replica_id.first << ", " << txn_replica_id.second;
   lock_only_txns_.erase(txn_replica_id);
   auto txn_id = txn_replica_id.first;
 
@@ -703,7 +704,7 @@ void Scheduler::AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id) {
 
   // Start the full abort
   if (first_to_abort && all_txns_.count(txn_id)) {
-    AbortTransaction(&all_txns_[txn_id], false);
+    AbortTransaction(txn_id);
   }
 }
 

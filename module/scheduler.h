@@ -52,7 +52,7 @@ private:
     internal::Request&& req,
     const string& from_machine_id);
   void HandleResponseFromWorker(const internal::WorkerResponse& response);
-  void SendToCoordinatingServer(TransactionHolder* txn_holder);
+  void SendToCoordinatingServer(TxnId txn_id);
 
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
@@ -85,7 +85,7 @@ private:
    * they will be released from the remaster manager and lock manager, as well as deleted
    * on arrival.
    */
-  void AbortTransaction(TransactionHolder* txn_holder, bool was_dispatched);
+  void AbortTransaction(TxnId txn_id);
   void AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id);
 
   ConfigurationPtr config_;
