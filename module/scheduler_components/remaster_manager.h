@@ -51,7 +51,15 @@ public:
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */
-  virtual RemasterOccurredResult RemasterOccured(const Key key, const uint32_t remaster_counter) = 0;
+  virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter) = 0;
+
+  /**
+   * Release a transaction from remaster queues
+   * 
+   * @param txn_id Transaction to be checked
+   * @return Transactions that are now unblocked
+   */
+  virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id) = 0;
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
@@ -59,7 +67,7 @@ public:
    */
   static VerifyMasterResult CheckCounters(
       const TransactionHolder* txn_holder,
-      shared_ptr<Storage<Key, Record>> storage) {
+      const shared_ptr<Storage<Key, Record>> storage) {
     auto& keys = txn_holder->KeysInPartition();
     auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
     

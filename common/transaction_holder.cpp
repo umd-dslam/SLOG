@@ -53,7 +53,7 @@ void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transactio
   ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
 
   // TODO: only needed for MH
-  for (auto& pair : txn_->internal().master_metadata()) {
+  for (auto& pair : txn->internal().master_metadata()) {
     involved_replicas_.insert(pair.second.master());
   }
 

@@ -328,26 +328,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
     auto key = txn->write_set().begin()->first;
     auto counter = txn->internal().master_metadata().at(key).master() + 1;
-    auto remaster_result = remaster_manager_.RemasterOccured(key, counter);
-
-    for (auto unblocked_txn_holder : remaster_result.unblocked) {
-      SendToLockManager(unblocked_txn_holder);
-    }
-    for (auto unblocked_txn_holder : remaster_result.should_abort) {
-      auto unblocked_txn_type = unblocked_txn_holder->GetTransaction()->internal().type();
-      switch (unblocked_txn_type) {
-        case TransactionType::SINGLE_HOME:
-          AbortTransaction(unblocked_txn_holder, false);
-          break;
-        case TransactionType::LOCK_ONLY:
-          AbortLockOnlyTransaction(unblocked_txn_holder->GetTransactionIdReplicaIdPair());
-          break;
-        default:
-          // Mutli-home should not be sent to the remaster manager
-          LOG(ERROR) << "Invalid transaction type: " << unblocked_txn_type;
-          break;
-      }
-    }
+    ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
 
   switch (txn->status()) {
@@ -485,7 +466,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             if (mh_abort_waiting_on_.count(txn_id)) {
               AbortTransaction(txn_holder, false);
             } else {
-              SendToRemasterManager(txn_holder);
+              SendToLockManager(txn_holder);
             }
             break;
           }
@@ -567,17 +548,38 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
           break;
         }
         default:
-          LOG(ERROR) << "Unknown VerifyMaster type";
+          LOG(FATAL) << "Unknown VerifyMaster type";
           break;
       }
       break;
     }
     case TransactionType::MULTI_HOME:
-      LOG(ERROR) << "MULTI-HOME txns aren't sent to the remaster manager";
+      LOG(FATAL) << "MULTI-HOME txns aren't sent to the remaster manager";
       break;
     default:
-      LOG(ERROR) << "Unknown transaction type";
+      LOG(FATAL) << "Unknown transaction type";
       break;
+  }
+}
+
+void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
+  for (auto unblocked_txn_holder : result.unblocked) {
+    SendToLockManager(unblocked_txn_holder);
+  }
+  for (auto unblocked_txn_holder : result.should_abort) {
+    auto unblocked_txn_type = unblocked_txn_holder->GetTransaction()->internal().type();
+    switch (unblocked_txn_type) {
+      case TransactionType::SINGLE_HOME:
+        AbortTransaction(unblocked_txn_holder, false);
+        break;
+      case TransactionType::LOCK_ONLY:
+        AbortLockOnlyTransaction(unblocked_txn_holder->GetTransactionIdReplicaIdPair());
+        break;
+      default:
+        // Mutli-home should not be sent to the remaster manager
+        LOG(ERROR) << "Invalid transaction type: " << unblocked_txn_type;
+        break;
+    }
   }
 }
 
@@ -638,7 +640,9 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
         auto involved_replicas = txn_holder->InvolvedReplicas();
         mh_abort_waiting_on_[txn_id] += involved_replicas.size();
 
-        // TODO release LOs in remaster manager
+        // release LOs in remaster manager
+        ProcessRemasterResult(
+            remaster_manager_.ReleaseTransaction(txn_id, involved_replicas));
 
         // release LOs in lock manager
         for (auto unblocked_txn : lock_manager_.ReleaseLocks(*txn_holder)) {
@@ -667,6 +671,7 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
     }
     case TransactionType::LOCK_ONLY: {
       LOG(ERROR) << "LockOnly should not be sent to this method";
+      break;
     }
     default:
       LOG(ERROR) << "Unknown transaction type";

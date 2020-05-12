@@ -69,6 +69,7 @@ private:
 
   // Send single-home and lock-only transactions for counter checking
   void SendToRemasterManager(TransactionHolder* txn_holder);
+  void ProcessRemasterResult(RemasterOccurredResult result);
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
   void DispatchTransaction(TxnId txn_id);

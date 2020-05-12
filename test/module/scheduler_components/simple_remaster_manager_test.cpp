@@ -19,9 +19,10 @@ protected:
 
   ConfigVec configs;
   shared_ptr<Storage<Key, Record>> storage;
-  unique_ptr<RemasterManager> remaster_manager;
+  unique_ptr<SimpleRemasterManager> remaster_manager;
 
-  TransactionHolder MakeHolder(Transaction* txn) {
+  TransactionHolder MakeHolder(Transaction* txn, uint32_t txn_id = 0) {
+    txn->mutable_internal()->set_id(txn_id);
     return TransactionHolder(configs[0], txn);
   }
 };
@@ -83,4 +84,39 @@ TEST_F(SimpleRemasterManagerTest, RemasterReleases) {
   auto result = remaster_manager->RemasterOccured("A", 2);
   ASSERT_THAT(result.unblocked, ElementsAre(&txn1));
   ASSERT_THAT(result.should_abort, ElementsAre(&txn2));
+}
+
+TEST_F(SimpleRemasterManagerTest, ReleaseTransaction) {
+  storage->Write("A", Record("value", 0, 1));
+  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
+  auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 101);
+
+  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
+
+  auto result = remaster_manager->ReleaseTransaction(100);
+  ASSERT_THAT(result.unblocked, ElementsAre(&txn2));
+  ASSERT_THAT(result.should_abort, ElementsAre());
+}
+
+TEST_F(SimpleRemasterManagerTest, ReleaseTransactionInPartition) {
+  storage->Write("A", Record("value", 0, 1));
+  storage->Write("B", Record("value", 1, 1));
+  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
+  auto txn2 = MakeHolder(MakeTransaction({"B"}, {}, "some code", {{"B", {1, 2}}}), 101);
+  auto txn3 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 102);
+
+  EXPECT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::WAITING);
+
+  unordered_set<uint32_t> partition_1({1});
+  auto result = remaster_manager->ReleaseTransaction(100, partition_1);
+  ASSERT_THAT(result.unblocked, ElementsAre());
+  ASSERT_THAT(result.should_abort, ElementsAre());
+
+  unordered_set<uint32_t> partition_0({0});
+  result = remaster_manager->ReleaseTransaction(100, partition_0);
+  ASSERT_THAT(result.unblocked, ElementsAre(&txn3));
+  ASSERT_THAT(result.should_abort, ElementsAre());
 }

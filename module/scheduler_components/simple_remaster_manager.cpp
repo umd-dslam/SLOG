@@ -42,7 +42,7 @@ SimpleRemasterManager::VerifyMaster(TransactionHolder* txn_holder) {
 }
 
 RemasterOccurredResult
-SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /* remaster_counter */) {
+SimpleRemasterManager::RemasterOccured(Key remaster_key, uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
   // Try to unblock each txn at the head of a queue, if it contains the remastered key.
   // Note that multiple queues could contain the same key with different counters
@@ -63,10 +63,40 @@ SimpleRemasterManager::RemasterOccured(const Key remaster_key, const uint32_t /*
   return result;
 }
 
-void SimpleRemasterManager::TryToUnblock(
-    const uint32_t local_log_machine_id,
-    RemasterOccurredResult& result) {
-  if (blocked_queue_.count(local_log_machine_id) == 0 || blocked_queue_[local_log_machine_id].empty()) {
+RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(TxnId txn_id) {
+  unordered_set<uint32_t> partitions;
+  for (auto& queue_pair : blocked_queue_) {
+    if (!queue_pair.second.empty()) {
+      partitions.insert(queue_pair.first);
+    }
+  }
+  return ReleaseTransaction(txn_id, partitions);
+}
+
+RemasterOccurredResult
+SimpleRemasterManager::ReleaseTransaction(TxnId txn_id, const unordered_set<uint32_t>& partitions) {
+  for (auto& p : partitions) {
+    if (blocked_queue_.count(p) == 0 || blocked_queue_[p].empty()) {
+      continue;
+    }
+    auto& queue = blocked_queue_[p];
+    for (auto itr = queue.begin(); itr != queue.end(); itr++) {
+      if ((*itr)->GetTransaction()->internal().id() == txn_id) {
+        queue.erase(itr);
+        break;
+      }
+    }
+  }
+  // TODO: only necessary if a removed txn was front of the queue
+  RemasterOccurredResult result;
+  for (auto& p : partitions) {
+    TryToUnblock(p, result);
+  }
+  return result;
+}
+
+void SimpleRemasterManager::TryToUnblock(uint32_t local_log_machine_id, RemasterOccurredResult& result) {
+  if (blocked_queue_[local_log_machine_id].empty()) {
     return;
   }
 
