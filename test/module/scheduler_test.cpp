@@ -46,30 +46,30 @@ protected:
       output_[i] = test_slogs_[i]->AddChannel(SERVER_CHANNEL);
     }
     // Relica 0
-    test_slogs_[0]->Data("A", {"valueA", 0, 0});
-    test_slogs_[0]->Data("D", {"valueD", 0, 0});
-    test_slogs_[0]->Data("Y", {"valueY", 1, 0});
+    test_slogs_[0]->Data("A", {"valueA", 0, 1});
+    test_slogs_[0]->Data("D", {"valueD", 0, 1});
+    test_slogs_[0]->Data("Y", {"valueY", 1, 1});
 
-    test_slogs_[1]->Data("C", {"valueC", 0, 0});
-    test_slogs_[1]->Data("F", {"valueF", 0, 0});
-    test_slogs_[1]->Data("X", {"valueX", 1, 0});
+    test_slogs_[1]->Data("C", {"valueC", 0, 1});
+    test_slogs_[1]->Data("F", {"valueF", 0, 1});
+    test_slogs_[1]->Data("X", {"valueX", 1, 1});
 
-    test_slogs_[2]->Data("B", {"valueB", 0, 0});
-    test_slogs_[2]->Data("E", {"valueE", 0, 0});
-    test_slogs_[2]->Data("Z", {"valueZ", 1, 0});
+    test_slogs_[2]->Data("B", {"valueB", 0, 1});
+    test_slogs_[2]->Data("E", {"valueE", 0, 1});
+    test_slogs_[2]->Data("Z", {"valueZ", 1, 1});
 
     // Replica 1
-    test_slogs_[3]->Data("A", {"valueA", 0, 0});
-    test_slogs_[3]->Data("D", {"valueD", 0, 0});
-    test_slogs_[3]->Data("Y", {"valueY", 1, 0});
+    test_slogs_[3]->Data("A", {"valueA", 0, 1});
+    test_slogs_[3]->Data("D", {"valueD", 0, 1});
+    test_slogs_[3]->Data("Y", {"valueY", 1, 1});
 
-    test_slogs_[4]->Data("C", {"valueC", 0, 0});
-    test_slogs_[4]->Data("F", {"valueF", 0, 0});
-    test_slogs_[4]->Data("X", {"valueX", 1, 0});
+    test_slogs_[4]->Data("C", {"valueC", 0, 1});
+    test_slogs_[4]->Data("F", {"valueF", 0, 1});
+    test_slogs_[4]->Data("X", {"valueX", 1, 1});
 
-    test_slogs_[5]->Data("B", {"valueB", 0, 0});
-    test_slogs_[5]->Data("E", {"valueE", 0, 0});
-    test_slogs_[5]->Data("Z", {"valueZ", 1, 0});
+    test_slogs_[5]->Data("B", {"valueB", 0, 1});
+    test_slogs_[5]->Data("E", {"valueE", 0, 1});
+    test_slogs_[5]->Data("Z", {"valueZ", 1, 1});
 
     for (const auto& test_slog : test_slogs_) {
       test_slog->StartInNewThreads();
@@ -299,7 +299,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
       {"D"},  /* write_set */
       "GET A     \n"
       "SET D newD\n", /* code */
-      {{"A", {0,0}}, {"D", {0,0}}},
+      {{"A", {0,1}}, {"D", {0,1}}},
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
@@ -319,7 +319,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {"A"}, /* read_set */
       {},  /* write_set */
       "GET A     \n", /* code */
-      {{"A", {1,1}}},
+      {{"A", {1,2}}},
       MakeMachineId("0:0") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   txn->mutable_internal()->set_id(10);
@@ -328,7 +328,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {}, /* read_set */
       {"A"},  /* write_set */
       "", /* code */
-      {{"A", {0,0}}}, /* master metadata */
+      {{"A", {0,1}}}, /* master metadata */
       MakeMachineId("0:1") /* coordinating server */,
       1 /* new master */);
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
@@ -350,8 +350,54 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
 }
 
+TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {},  /* write_set */
+      "GET A     \n", /* code */
+      {{"A", {1,0}}}, /* metadata */
+      MakeMachineId("0:1") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+
+  SendSingleHomeBatch(100, {txn}, {0});
+
+  auto output_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   google::InstallFailureSignalHandler();
   return RUN_ALL_TESTS();
+}
+
+TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
+  auto txn = MakeTransaction(
+      {"A", "D"}, /* read_set */
+      {"Y"}, /* write_set */
+      "", /* code */
+      {{"A", {0,1}}, {"Y", {1,1}}, {"D", {1,0}}});
+  txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
+
+  auto lo_txn_0 = MakeTransaction(
+      {"A"}, /* read_set */
+      {} /* write_set */,
+      "", /* code */
+      {{"A", {0,1}}});
+  lo_txn_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  auto lo_txn_1 = MakeTransaction(
+      {"D"}, /* read_set */
+      {"Y"}, /* write_set */
+      "", /* code */
+      {{"Y", {1,1}}, {"D", {1,0}}}); // low counter
+  lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  SendMultiHomeBatch(0, {txn}, {0});
+  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0});
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
 }
