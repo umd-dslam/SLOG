@@ -102,7 +102,11 @@ private:
 
   unordered_map<TxnId, TransactionHolder> all_txns_;
   
-  // Lock-only transactions are kept here during remaster checking
+  /**
+   * Lock-only transactions are kept here during remaster checking and locking.
+   * This map is also used to track which LOs have arrived during an abort, which means
+   * that LOs should not be removed until the txn is dispatched.
+   */
   map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 
   /**
