@@ -515,7 +515,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   auto txn_type = txn_holder->GetTransaction()->internal().type();
   switch(txn_type) {
     case TransactionType::SINGLE_HOME:
-            switch (remaster_manager_.VerifyMaster(txn_holder)) {
+      switch (remaster_manager_.VerifyMaster(txn_holder)) {
         case VerifyMasterResult::VALID: {
           SendToLockManager(txn_holder);
           break;

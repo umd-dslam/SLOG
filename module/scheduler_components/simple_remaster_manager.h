@@ -25,7 +25,7 @@ public:
   virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id);
   /**
-   * Release that are in the queues for certain replicas
+   * Release a txn in the queues for specified replicas
    */
   virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id, const unordered_set<uint32_t>& replicas);
 
