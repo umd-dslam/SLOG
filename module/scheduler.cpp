@@ -622,6 +622,7 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
 
   auto txn = txn_holder->GetTransaction();
   auto txn_id = txn->internal().id();
+  LOG(INFO) << "Aborting txn " << txn_id;
   switch (txn->internal().type()) {
     case TransactionType::SINGLE_HOME: {
       txn->set_status(TransactionStatus::ABORTED);
@@ -683,7 +684,7 @@ void Scheduler::AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id) {
   if (lock_only_txns_.count(txn_replica_id) == 0) {
     return;
   }
-
+  LOG(INFO) << "Aborting txn " << txn_replica_id.first << ", " << txn_replica_id.second;
   lock_only_txns_.erase(txn_replica_id);
   auto txn_id = txn_replica_id.first;
 
