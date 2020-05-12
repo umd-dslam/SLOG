@@ -65,17 +65,26 @@ private:
   void MaybeUpdateLocalLog();
   void MaybeProcessNextBatchesFromGlobalLog();
 
+  // Place a transaction in a holder if it has keys in this partition
   bool AcceptTransaction(Transaction* txn);
-
   // Send single-home and lock-only transactions for counter checking
   void SendToRemasterManager(TransactionHolder* txn_holder);
+  // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
-  void DispatchTransaction(TxnId txn_id);
 
+  // Prepare transaction to be sent to worker
+  void DispatchTransaction(TxnId txn_id);
   void SendToWorker(internal::Request&& req, const string& worker);
 
+  /**
+   * Abort and return the transaction to the server.
+   * Multi-Home transactions must also abort all associated Lock-Onlys. If the
+   * transaction has been dispatched, then they have already been deleted. Otherwise
+   * they will be released from the remaster manager and lock manager, as well as deleted
+   * on arrival.
+   */
   void AbortTransaction(TransactionHolder* txn_holder, bool was_dispatched);
   void AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id);
 

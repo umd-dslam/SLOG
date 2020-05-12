@@ -54,7 +54,8 @@ public:
   virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter) = 0;
 
   /**
-   * Release a transaction from remaster queues
+   * Release a transaction from remaster queues. It's guaranteed that the released transaction
+   * will not be in the returned result.
    * 
    * @param txn_id Transaction to be checked
    * @return Transactions that are now unblocked

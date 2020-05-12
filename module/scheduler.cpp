@@ -631,12 +631,9 @@ void Scheduler::AbortTransaction(TransactionHolder* txn_holder, bool was_dispatc
     case TransactionType::MULTI_HOME: {
       txn->set_status(TransactionStatus::ABORTED);
       if (was_dispatched) {
+        // LOs have already been deleted
         SendToCoordinatingServer(txn_holder);
       } else {
-        /*
-        Need to abort all LO transactions. They could be in the remaster manager,
-        lock manager, yet to arrive, or they could already be aborted.
-        */
         auto involved_replicas = txn_holder->InvolvedReplicas();
         mh_abort_waiting_on_[txn_id] += involved_replicas.size();
 

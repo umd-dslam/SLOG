@@ -64,18 +64,19 @@ SimpleRemasterManager::RemasterOccured(Key remaster_key, uint32_t /* remaster_co
 }
 
 RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(TxnId txn_id) {
-  unordered_set<uint32_t> partitions;
+  // Collect all local logs
+  unordered_set<uint32_t> replicas;
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
-      partitions.insert(queue_pair.first);
+      replicas.insert(queue_pair.first);
     }
   }
-  return ReleaseTransaction(txn_id, partitions);
+  return ReleaseTransaction(txn_id, replicas);
 }
 
 RemasterOccurredResult
-SimpleRemasterManager::ReleaseTransaction(TxnId txn_id, const unordered_set<uint32_t>& partitions) {
-  for (auto& p : partitions) {
+SimpleRemasterManager::ReleaseTransaction(TxnId txn_id, const unordered_set<uint32_t>& replicas) {
+  for (auto& p : replicas) {
     if (blocked_queue_.count(p) == 0 || blocked_queue_[p].empty()) {
       continue;
     }
@@ -87,9 +88,12 @@ SimpleRemasterManager::ReleaseTransaction(TxnId txn_id, const unordered_set<uint
       }
     }
   }
-  // TODO: only necessary if a removed txn was front of the queue
+  
+  // Note: this must happen after the transaction is released, otherwise it could be returned in
+  // the unblocked list
   RemasterOccurredResult result;
-  for (auto& p : partitions) {
+  for (auto& p : replicas) {
+    // TODO: only necessary if a removed txn was front of the queue
     TryToUnblock(p, result);
   }
   return result;
