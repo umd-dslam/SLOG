@@ -1,4 +1,4 @@
-#include "workload/basic_workload.h"
+#include "workload/remastering_workload.h"
 
 #include <algorithm>
 #include <iomanip>
@@ -24,24 +24,14 @@ using std::unordered_set;
 namespace slog {
 namespace {
 
-// Percentage of multi-home transactions
 constexpr char MH_PCT[] = "mh";
-// Number of regions selected as homes in a multi-home transaction
 constexpr char MH_NUM_HOMES[] = "mh_homes";
-// Percentage of multi-partition transactions
 constexpr char MP_PCT[] = "mp";
-// Number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_NUM_PARTS[] = "mp_parts";
-// Number of records in a transaction
 constexpr char NUM_RECORDS[] = "num_records";
-// Number of write records in a transaction
 constexpr char NUM_WRITES[] = "num_writes";
-// Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
-// Region that is home to a single-home transaction.
-// Use a negative number to select a random region for
-// each transaction
-constexpr char SH_REGION[] = "sh_region";
+constexpr char REMASTER_GAP[] = "remaster_gap";
 
 const RawParamMap DEFAULT_PARAMS = {
   { MH_PCT, "0" },
@@ -50,14 +40,14 @@ const RawParamMap DEFAULT_PARAMS = {
   { MP_NUM_PARTS, "2" },
   { NUM_RECORDS, "10" },
   { NUM_WRITES, "2" },
-  { VALUE_SIZE, "100" },
-  { SH_REGION, "-1" }
+  { VALUE_SIZE, "100" }, // bytes
+  { REMASTER_GAP, "50" }
 };
 
 } // namespace
 
-BasicWorkload::BasicWorkload(
-    const ConfigurationPtr& config,
+RemasteringWorkload::RemasteringWorkload(
+    ConfigurationPtr config,
     const string& data_dir,
     const string& params_str)
   : WorkloadGenerator(DEFAULT_PARAMS, params_str),
@@ -94,15 +84,30 @@ BasicWorkload::BasicWorkload(
 }
 
 std::pair<Transaction*, TransactionProfile>
-BasicWorkload::NextTransaction() {
+RemasteringWorkload::NextTransaction() {
+  TransactionProfile pro;
+
+  pro.client_txn_id = client_txn_id_counter_;
+
+  Transaction* txn;
+  if (client_txn_id_counter_ % params_.GetUInt32(REMASTER_GAP) == 0) {
+    txn = MakeRemasterTransaction(pro);
+  } else {
+    txn = MakeNormalTransaction(pro);
+  }
+
+  txn->mutable_internal()->set_id(client_txn_id_counter_);
+
+  client_txn_id_counter_++;
+
+  return {txn, pro};
+}
+
+Transaction* RemasteringWorkload::MakeNormalTransaction(TransactionProfile& pro) {
   auto num_writes = params_.GetUInt32(NUM_WRITES);
   auto num_records = params_.GetUInt32(NUM_RECORDS);
   CHECK_LE(num_writes, num_records)
       << "Number of writes cannot exceed number of records in a txn!";
-
-  TransactionProfile pro;
-
-  pro.client_txn_id = client_txn_id_counter_;
 
   // Decide if this is a multi-partition txn or not
   auto multi_partition_pct = params_.GetDouble(MP_PCT);
@@ -121,22 +126,10 @@ BasicWorkload::NextTransaction() {
   pro.is_multi_home = shmh(re_);
 
   // Select a number of homes to choose from for each record
-  vector<uint32_t> candidate_homes;
-  if (pro.is_multi_home) {
-    candidate_homes = Choose(
-        config_->GetNumReplicas(),
-        params_.GetUInt32(MH_NUM_HOMES),
-        re_);
-  } else {
-    auto sh_region = params_.GetInt(SH_REGION);
-    if (sh_region < 0) {
-      candidate_homes = Choose(config_->GetNumReplicas(), 1, re_);
-    } else {
-      CHECK_LT(static_cast<uint32_t>(sh_region), config_->GetNumReplicas())
-          << "Selected single-home region does not exist";
-      candidate_homes.push_back(sh_region);
-    }
-  }
+  auto candidate_homes = Choose(
+      config_->GetNumReplicas(),
+      pro.is_multi_home ? params_.GetUInt32(MH_NUM_HOMES) : 1,
+      re_);
 
   unordered_set<Key> read_set;
   unordered_set<Key> write_set;
@@ -169,12 +162,35 @@ BasicWorkload::NextTransaction() {
     pro.key_to_partition[key] = partition;
   }
 
-  auto txn = MakeTransaction(read_set, write_set, code.str());
-  txn->mutable_internal()->set_id(client_txn_id_counter_);
+  return MakeTransaction(read_set, write_set, code.str());
+}
 
-  client_txn_id_counter_++;
+Transaction* RemasteringWorkload::MakeRemasterTransaction(TransactionProfile& pro) {
+  pro.is_multi_home = false;
+  pro.is_multi_partition = false;
 
-  return {txn, pro};
+  unordered_set<Key> read_set;
+  unordered_set<Key> write_set;
+  unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
+
+  auto home = Choose(config_->GetNumReplicas(), 1, re_)[0];
+  auto partition = Choose(config_->GetNumPartitions(), 1, re_)[0];
+
+  auto new_master = (home + 1) % config_->GetNumReplicas();
+
+  auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
+  write_set.insert(key);
+
+  pro.key_to_home[key] = home;
+  pro.key_to_partition[key] = partition;
+
+  return MakeTransaction(
+    read_set,
+    write_set,
+    "",
+    metadata,
+    MakeMachineId("0:0"),
+    new_master);
 }
 
 } // namespace slog
