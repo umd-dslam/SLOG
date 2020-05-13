@@ -131,17 +131,20 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         ->set_type(TransactionType::LOCK_ONLY);
     
     const auto& metadata = txn.internal().master_metadata();
+    auto lock_only_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
     
     for (auto& key_value : txn.read_set()) {
       auto master = metadata.at(key_value.first).master();
       if (master == local_rep) {
         lock_only_txn->mutable_read_set()->insert(key_value);
+        lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
     for (auto& key_value : txn.write_set()) {
       auto master = metadata.at(key_value.first).master();
       if (master == local_rep) {
         lock_only_txn->mutable_write_set()->insert(key_value);
+        lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
     // TODO: Ignore lock only txns with no key

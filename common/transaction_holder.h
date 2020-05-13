@@ -25,6 +25,7 @@ public:
 
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
   const std::unordered_set<uint32_t>& InvolvedPartitions() const;
+  const std::unordered_set<uint32_t>& InvolvedReplicas() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
 
@@ -47,6 +48,7 @@ private:
   std::vector<internal::Request> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   std::unordered_set<uint32_t> involved_partitions_;
+  std::unordered_set<uint32_t> involved_replicas_;
 };
 
 } // namespace slog

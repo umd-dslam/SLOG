@@ -45,8 +45,18 @@ TransactionHolder::~TransactionHolder() {
 }
 
 void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
+  keys_in_partition_.clear();
+  involved_partitions_.clear();
+  involved_replicas_.clear();
+
   // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
   ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
+
+  // TODO: only needed for MH
+  for (auto& pair : txn->internal().master_metadata()) {
+    involved_replicas_.insert(pair.second.master());
+  }
+
   txn_ = txn;
 }
 
@@ -76,6 +86,10 @@ const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() cons
   return involved_partitions_;
 }
 
+const std::unordered_set<uint32_t>& TransactionHolder::InvolvedReplicas() const {
+  return involved_replicas_;
+}
+
 vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
   return early_remote_reads_;
 }
@@ -85,9 +99,11 @@ uint32_t TransactionHolder::GetReplicaId() const {
 }
 
 uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
-  // Note that this uses all metadata, not just keys in partition. This shouldn't be empty,
-  // except for in testing.
-  // TODO: make this fatal, add metadata to tests
+  // This should only be empty for testing.
+  // TODO: add metadata to test cases, make this an error
+  //
+  // Note that this uses all metadata, not just keys in partition. It's therefore safe
+  // to call this on transactions that don't involve the current partition
   if (txn->internal().master_metadata().empty()) {
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return 0;
