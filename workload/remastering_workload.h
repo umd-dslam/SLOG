@@ -11,9 +11,9 @@ using std::vector;
 
 namespace slog {
 
-class BasicWorkload : public WorkloadGenerator {
+class RemasteringWorkload : public WorkloadGenerator {
 public:
-  BasicWorkload(
+  RemasteringWorkload(
       ConfigurationPtr config,
       const std::string& data_dir,
       const std::string& params_str);
@@ -21,6 +21,10 @@ public:
   std::pair<Transaction*, TransactionProfile> NextTransaction() final;
 
 private:
+  Transaction* MakeNormalTransaction(TransactionProfile& pro);
+  Transaction* MakeRemasterTransaction(TransactionProfile& pro);
+
+
   ConfigurationPtr config_;
 
   // This is an index of keys by their partition and home.
