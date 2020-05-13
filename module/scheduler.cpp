@@ -515,51 +515,28 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
 void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   auto txn = txn_holder->GetTransaction();
   auto txn_type = txn->internal().type();
-  switch(txn_type) {
-    case TransactionType::SINGLE_HOME:
-      switch (remaster_manager_.VerifyMaster(txn_holder)) {
-        case VerifyMasterResult::VALID: {
-          SendToLockManager(txn_holder);
-          break;
-        }
-        case VerifyMasterResult::ABORT: {
-          AbortTransaction(txn->internal().id());
-          break;
-        }
-        case VerifyMasterResult::WAITING: {
-          // Do nothing
-          break;
-        }
-        default:
-          LOG(ERROR) << "Unknown VerifyMaster type";
-          break;
-      }
+  CHECK(txn_type == TransactionType::SINGLE_HOME || txn_type == TransactionType::LOCK_ONLY)
+      << "MH aren't sent to the remaster manager";
+
+  switch (remaster_manager_.VerifyMaster(txn_holder)) {
+    case VerifyMasterResult::VALID: {
+      SendToLockManager(txn_holder);
       break;
-    case TransactionType::LOCK_ONLY: {
-      switch (remaster_manager_.VerifyMaster(txn_holder)) {
-        case VerifyMasterResult::VALID: {
-          SendToLockManager(txn_holder);
-          break;
-        }
-        case VerifyMasterResult::ABORT: {
-          AbortLockOnlyTransaction(txn_holder->GetTransactionIdReplicaIdPair());
-          break;
-        }
-        case VerifyMasterResult::WAITING: {
-          // Do nothing
-          break;
-        }
-        default:
-          LOG(FATAL) << "Unknown VerifyMaster type";
-          break;
+    }
+    case VerifyMasterResult::ABORT: {
+      if (txn_type == TransactionType::LOCK_ONLY) {
+        AbortLockOnlyTransaction(txn_holder->GetTransactionIdReplicaIdPair());
+      } else {
+        AbortTransaction(txn->internal().id());
       }
       break;
     }
-    case TransactionType::MULTI_HOME:
-      LOG(FATAL) << "MULTI-HOME txns aren't sent to the remaster manager";
+    case VerifyMasterResult::WAITING: {
+      // Do nothing
       break;
+    }
     default:
-      LOG(FATAL) << "Unknown transaction type";
+      LOG(ERROR) << "Unknown VerifyMaster type";
       break;
   }
 }
@@ -658,13 +635,13 @@ void Scheduler::AbortTransaction(TxnId txn_id) {
           }
         }
 
-        // Remove if all LOs have been recieved
+        // Remove if all LOs have been received
         if (mh_abort_waiting_on_[txn_id] == 0) {
           mh_abort_waiting_on_.erase(txn_id);
         }
       }
 
-      // Can return abort even before all lock onlys are recieved
+      // Can return abort even before all lock onlys are received
       SendToCoordinatingServer(txn_id);
       break;
     }
