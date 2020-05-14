@@ -480,6 +480,10 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
   }
 }
 
+/***********************************************
+              Transaction Processing
+***********************************************/
+
 bool Scheduler::AcceptTransaction(Transaction* txn) {
   switch(txn->internal().type()) {
     case TransactionType::SINGLE_HOME:
@@ -596,14 +600,23 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   }
 }
 
+/***********************************************
+              Abort Processing
+***********************************************/
+
+
 void Scheduler::AbortTransaction(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
-  CHECK(txn_holder.InvolvedPartitions().size() == 1) << "MP not impelemented";
+
+  if (txn_holder.InvolvedPartitions().size() > 1) {
+    SendAbortToPartitions(txn_id);
+  }
 
   auto txn = txn_holder.GetTransaction();
   VLOG(2) << "Aborting txn " << txn_id;
   switch (txn->internal().type()) {
     case TransactionType::SINGLE_HOME: {
+      // TODO: make sure read requests arriving after are deleted
       txn->set_status(TransactionStatus::ABORTED);
       SendToCoordinatingServer(txn_id);
       break;
@@ -682,6 +695,22 @@ void Scheduler::AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id) {
   // Start the full abort
   if (first_to_abort && all_txns_.count(txn_id)) {
     AbortTransaction(txn_id);
+  }
+}
+
+void Scheduler::SendAbortToPartitions(TxnId txn_id) {
+  auto& txn_holder = all_txns_[txn_id];
+  Request request;
+  auto rrr = request.mutable_remote_read_result();
+  rrr->set_txn_id(txn_id);
+  rrr->set_partition(config_->GetLocalPartition());
+  rrr->set_will_abort(true);
+  auto local_replica = config_->GetLocalReplica();
+  for (auto p : txn_holder.ActivePartitions()) {
+    if (p != config_->GetLocalPartition()) {
+      auto machine_id = MakeMachineIdAsString(local_replica, p);
+      SendSameChannel(request, machine_id);
+    }
   }
 }
 

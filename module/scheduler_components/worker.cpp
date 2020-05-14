@@ -75,29 +75,53 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
 
   const auto& state = InitializeTransactionState(txn_holder);
 
+  auto will_abort = false;
+  switch(RemasterManager::CheckCounters(txn_holder, storage_)) {
+    case VerifyMasterResult::VALID: {
+      break;
+    }
+    case VerifyMasterResult::ABORT: {
+      txn->set_status(TransactionStatus::ABORTED);
+      will_abort = true;
+      break;
+    }
+    case VerifyMasterResult::WAITING: {
+      LOG(ERROR) << "Transaction " << txn_id << " was sent to worker with a high counter";
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unrecognized check counter result";
+      break;
+  }
+
   PopulateDataFromLocalStorage(txn);
 
-  // Send local reads to all remote active partitions
-  if (state.has_local_reads) {
-    Request request;
-    auto rrr = request.mutable_remote_read_result();
-    rrr->set_txn_id(txn_id);
-    rrr->set_partition(config_->GetLocalPartition());
+  // Send abort result and local reads to all remote active partitions
+  Request request;
+  auto local_partition = config_->GetLocalPartition();
+  auto rrr = request.mutable_remote_read_result();
+  rrr->set_txn_id(txn_id);
+  rrr->set_partition(local_partition);
+  if (will_abort) {
+    rrr->set_will_abort(true);
+  } else {
+    rrr->set_will_abort(false);
     auto reads_to_be_sent = rrr->mutable_reads();
-    auto local_replica = config_->GetLocalReplica();
     for (auto& key_value : txn->read_set()) {
       (*reads_to_be_sent)[key_value.first] = key_value.second;
     }
-    for (auto p : state.remote_active_partitions) {
+  }
+  auto local_replica = config_->GetLocalReplica();
+  for (auto p : txn_holder->ActivePartitions()) {
+    if (p != local_partition) {
       auto machine_id = MakeMachineIdAsString(local_replica, p);
       SendToScheduler(request, std::move(machine_id));
     }
   }
 
   // If the txn does not do any write or does not have to wait for remote read, 
-  // move on with executing this transaction. Otherwise, notify the scheduler
-  // that this worker is free
-  if (!state.has_local_writes || state.remote_passive_partitions.empty()) {
+  // move on with executing this transaction.
+  if (txn_holder->ActivePartitions().count(local_partition) == 0 || state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
     ExecuteAndCommitTransaction(txn_id);
   } else {
@@ -118,6 +142,8 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
   auto& state = txn_states_[txn_id];
   auto local_partition = config_->GetLocalPartition();
   vector<Key> key_vec;
+
+  state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
     
   // Collect all remote passive partitions
   state.has_local_reads = false;
@@ -181,17 +207,19 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
   auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
   auto& rpp = txn_states_[txn_id].remote_passive_partitions;
 
-  if (rpp.count(read_result.partition()) > 0) {
-    rpp.erase(read_result.partition());
-    // Apply remote reads to local txn
-    for (const auto& key_value : read_result.reads()) {
-      (*txn->mutable_read_set())[key_value.first] = key_value.second;
-    }
+  rpp.erase(read_result.partition());
+
+  txn_states_[txn_id].remote_reads_waiting_on -= 1;
+  if (read_result.will_abort()) {
+    txn->set_status(TransactionStatus::ABORTED);
+  }
+  // Apply remote reads to local txn
+  for (const auto& key_value : read_result.reads()) {
+    (*txn->mutable_read_set())[key_value.first] = key_value.second;
   }
 
   // If all remote reads arrived, move on with executing this transaction.
-  // Otherwise, notify the scheduler that this worker is free
-  if (rpp.empty()) {
+  if (txn_states_[txn_id].remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
     ExecuteAndCommitTransaction(txn_id);
   }
@@ -201,24 +229,9 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
   auto holder = state.txn_holder;
-  switch(RemasterManager::CheckCounters(holder, storage_)) {
-    case VerifyMasterResult::VALID: {
-      // TODO: the transaction shouldn't execute until the other partitions
-      // have confirmed that the counters are valid
-      ExecuteTransactionHelper(txn_id);
-      break;
-    }
-    case VerifyMasterResult::ABORT: {
-      txn->set_status(TransactionStatus::ABORTED);
-      break;
-    }
-    case VerifyMasterResult::WAITING: {
-      LOG(ERROR) << "Transaction " << txn_id << " was sent to worker with a high counter";
-      break;
-    }
-    default:
-      LOG(ERROR) << "Unrecognized check counter result";
-      break;
+
+  if (txn->status() != TransactionStatus::ABORTED) {
+    ExecuteTransactionHelper(txn_id);
   }
 
   // Response back to the scheduler

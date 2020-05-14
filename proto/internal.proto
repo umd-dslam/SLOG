@@ -120,6 +120,7 @@ message RemoteReadResult {
     uint32 txn_id = 1;
     uint32 partition = 2;
     map<string, string> reads = 3;
+    bool will_abort = 4;
 }
 
 message CompletedSubtransaction {

@@ -78,6 +78,7 @@ private:
   void DispatchTransaction(TxnId txn_id);
   void SendToWorker(internal::Request&& req, const string& worker);
 
+  void SendAbortToPartitions(TxnId txn_id);
   /**
    * Abort and return the transaction to the server.
    * Multi-Home transactions must also abort all associated Lock-Onlys. If the

@@ -401,3 +401,38 @@ TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
 }
+
+TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"C"},  /* write_set */
+      "GET A     \n"
+      "SET C newC    \n", /* code */
+      {{"A", {1,0}}, {"C", {0,1}}}, /* metadata */
+      MakeMachineId("0:1") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+
+  SendSingleHomeBatch(100, {txn}, {0, 1});
+
+  auto output_txn = ReceiveMultipleAndMerge(1, 2);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
+
+TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"C", "B"},  /* write_set */
+      "GET A     \n"
+      "SET C newC    \n"
+      "SET B newB    \n", /* code */
+      {{"A", {0,1}}, {"C", {1,0}}, {"B", {1,0}}}, /* metadata */
+      MakeMachineId("0:1") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+
+  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+
+  auto output_txn = ReceiveMultipleAndMerge(1, 3);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
