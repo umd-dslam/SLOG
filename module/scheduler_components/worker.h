@@ -23,14 +23,7 @@ namespace slog {
 struct TransactionState {
   TransactionState() = default;
   TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
-
   TransactionHolder* txn_holder;
-  bool has_local_reads;
-  bool has_local_writes;
-  // This set is reduced until we receive remote
-  // reads from all passive partitions
-  unordered_set<uint32_t> remote_passive_partitions;
-  unordered_set<uint32_t> remote_active_partitions;
   uint32_t remote_reads_waiting_on;
 };
 
@@ -52,7 +45,7 @@ private:
   void ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
   
   void ExecuteAndCommitTransaction(TxnId txn_id);
-  void ExecuteTransactionHelper(TxnId txn_id);
+  void ApplyWrites(TxnId txn_id);
 
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,

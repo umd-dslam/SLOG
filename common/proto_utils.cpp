@@ -164,7 +164,7 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
   
   if (other.status() == TransactionStatus::ABORTED) {
     txn.set_status(TransactionStatus::ABORTED);
-    txn.set_abort_reason(txn.abort_reason());
+    txn.set_abort_reason(other.abort_reason());
   } else if (txn.status() != TransactionStatus::ABORTED) {
     auto MergeMap = [](auto this_set, const auto& other_set) {
       for (const auto& key_value : other_set) {

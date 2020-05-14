@@ -102,9 +102,8 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   auto rrr = request.mutable_remote_read_result();
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
-  if (will_abort) {
-    rrr->set_will_abort(true);
-  } else {
+  rrr->set_will_abort(will_abort);
+  if (!will_abort) {
     rrr->set_will_abort(false);
     auto reads_to_be_sent = rrr->mutable_reads();
     for (auto& key_value : txn->read_set()) {
@@ -140,43 +139,31 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
   CHECK(res.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
   auto& state = txn_states_[txn_id];
+  state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+
   auto local_partition = config_->GetLocalPartition();
   vector<Key> key_vec;
-
-  state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
     
-  // Collect all remote passive partitions
-  state.has_local_reads = false;
+  // Remove keys in remote partitions
   key_vec.reserve(txn->read_set_size());
   for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;
     auto partition = config_->GetPartitionOfKey(key);
-    if (partition == local_partition) {
-      state.has_local_reads = true;
-    } else {
-      state.remote_passive_partitions.insert(partition);
+    if (partition != local_partition) {
       key_vec.push_back(key);
     }
   }
-  // Remove all keys that are to be read by a remote partition
   for (const auto& key : key_vec) {
     txn->mutable_read_set()->erase(key);
   }
-
-  // Collect all remote active partitions
-  state.has_local_writes = false;
   key_vec.reserve(txn->write_set_size());
   for (auto& key_value : *txn->mutable_write_set()) {
     const auto& key = key_value.first;
     auto partition = config_->GetPartitionOfKey(key);
-    if (partition == local_partition) {
-      state.has_local_writes = true;
-    } else {
-      state.remote_active_partitions.insert(partition);
+    if (partition != local_partition) {
       key_vec.push_back(key);
     }
   }
-  // Remove all keys that are to be written by a remote partition
   for (const auto& key : key_vec) {
     txn->mutable_write_set()->erase(key);
   }
@@ -205,9 +192,6 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
       << "Transaction " << txn_id << " does not exist for remote read result";
 
   auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
-  auto& rpp = txn_states_[txn_id].remote_passive_partitions;
-
-  rpp.erase(read_result.partition());
 
   txn_states_[txn_id].remote_reads_waiting_on -= 1;
   if (read_result.will_abort()) {
@@ -228,10 +212,9 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
 void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
-  auto holder = state.txn_holder;
 
   if (txn->status() != TransactionStatus::ABORTED) {
-    ExecuteTransactionHelper(txn_id);
+    ApplyWrites(txn_id);
   }
 
   // Response back to the scheduler
@@ -249,7 +232,7 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   txn_states_.erase(txn_id);
 }
 
-void Worker::ExecuteTransactionHelper(TxnId txn_id) {
+void Worker::ApplyWrites(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
   if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
