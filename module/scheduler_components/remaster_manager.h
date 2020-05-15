@@ -64,7 +64,7 @@ public:
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
-   * transaciton to any queues
+   * transaction to any queues
    */
   static VerifyMasterResult CheckCounters(
       const TransactionHolder* txn_holder,

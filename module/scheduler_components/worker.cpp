@@ -94,7 +94,9 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
       break;
   }
 
-  PopulateDataFromLocalStorage(txn);
+  if (!will_abort) {
+    PopulateDataFromLocalStorage(txn);
+  }
 
   // Send abort result and local reads to all remote active partitions
   Request request;
@@ -104,7 +106,6 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   rrr->set_partition(local_partition);
   rrr->set_will_abort(will_abort);
   if (!will_abort) {
-    rrr->set_will_abort(false);
     auto reads_to_be_sent = rrr->mutable_reads();
     for (auto& key_value : txn->read_set()) {
       (*reads_to_be_sent)[key_value.first] = key_value.second;
@@ -120,7 +121,7 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
 
   // If the txn does not do any write or does not have to wait for remote read, 
   // move on with executing this transaction.
-  if (txn_holder->ActivePartitions().count(local_partition) == 0 || state.remote_reads_waiting_on == 0) {
+  if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
     ExecuteAndCommitTransaction(txn_id);
   } else {
@@ -138,13 +139,18 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
 
   CHECK(res.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
-  auto& state = txn_states_[txn_id];
-  state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
-
   auto local_partition = config_->GetLocalPartition();
-  vector<Key> key_vec;
+  auto& state = txn_states_[txn_id];
+  if (txn_holder->ActivePartitions().count(local_partition) > 0) {
+    // Active partition needs remote reads from all partitions
+    state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+  } else {
+    // Passive needs none
+    state.remote_reads_waiting_on = 0;
+  }
     
   // Remove keys in remote partitions
+  vector<Key> key_vec;
   key_vec.reserve(txn->read_set_size());
   for (auto& key_value : *txn->mutable_read_set()) {
     const auto& key = key_value.first;

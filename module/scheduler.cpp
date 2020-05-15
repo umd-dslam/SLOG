@@ -345,14 +345,13 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
 }
 
 void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
-  // Release txn so it can be passed to request
   auto& txn_holder = all_txns_[txn_id];
-  Transaction txn_copy = *txn_holder.GetTransaction();
+  auto txn = txn_holder.ReleaseTransaction();
 
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->set_allocated_txn(&txn_copy);
+  completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
   for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
@@ -360,12 +359,14 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
 
   RecordTxnEvent(
       config_,
-      txn_copy.mutable_internal(),
+      txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
 
   auto coordinating_server = MakeMachineIdAsString(
-      txn_copy.internal().coordinating_server());
+      txn->internal().coordinating_server());
   Send(req, coordinating_server, SERVER_CHANNEL);
+  
+  txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
 
 /***********************************************
@@ -615,6 +616,7 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
   auto txn_type = txn->internal().type();
+  VLOG(3) << "Main txn of abort arrived: " << txn_id;
 
   txn->set_status(TransactionStatus::ABORTED);
   SendToCoordinatingServer(txn_id);
@@ -631,11 +633,10 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
 }
 
 void Scheduler::AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id) {
-  auto& txn_holder = lock_only_txns_[txn_replica_id];
   auto txn_id = txn_replica_id.first;
   CHECK(aborting_txns_.count(txn_id) > 0)
       << "Abort not triggered: " << txn_id << ", " << txn_replica_id.second;
-
+  VLOG(3) << "Aborting lo txn arrived: " << txn_id << ", " << txn_replica_id.second;
   lock_only_txns_.erase(txn_replica_id);
   mh_abort_waiting_on_[txn_id] -= 1;
 
@@ -688,6 +689,8 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
 
+  VLOG(3) << "Attempting to finish abort: " << txn_id;
+
   // Will occur if multiple lock-only's arrive before multi-home
   if (txn == nullptr) {
     return;
@@ -716,6 +719,8 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 
   aborting_txns_.erase(txn_id);
   all_txns_.erase(txn_id);
+
+  VLOG(3) << "Finished abort: " << txn_id;
 }
 
 /***********************************************
