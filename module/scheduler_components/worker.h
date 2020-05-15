@@ -44,8 +44,8 @@ private:
 
   void ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
   
-  void ExecuteAndCommitTransaction(TxnId txn_id);
-  void ApplyWrites(TxnId txn_id);
+  void ExecuteAndMaybeCommitTransaction(TxnId txn_id);
+  void ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id);
 
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,

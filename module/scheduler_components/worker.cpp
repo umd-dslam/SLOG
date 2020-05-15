@@ -121,9 +121,11 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
 
   // If the txn does not do any write or does not have to wait for remote read, 
   // move on with executing this transaction.
+  // TODO: optimize by returning an aborting transaction to the scheduler immediately.
+  // later remote reads will need to be garbage collected.
   if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
-    ExecuteAndCommitTransaction(txn_id);
+    ExecuteAndMaybeCommitTransaction(txn_id);
   } else {
     VLOG(3) << "Defer executing txn " << txn->internal().id() << " until having enough remote reads";
   }
@@ -150,28 +152,25 @@ TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_hold
   }
     
   // Remove keys in remote partitions
-  vector<Key> key_vec;
-  key_vec.reserve(txn->read_set_size());
-  for (auto& key_value : *txn->mutable_read_set()) {
-    const auto& key = key_value.first;
+  auto itr = txn->mutable_read_set()->begin();
+  while (itr != txn->mutable_read_set()->end()) {
+    const auto& key = itr->first;
     auto partition = config_->GetPartitionOfKey(key);
     if (partition != local_partition) {
-      key_vec.push_back(key);
+      itr = txn->mutable_read_set()->erase(itr);
+    } else {
+      itr++;
     }
   }
-  for (const auto& key : key_vec) {
-    txn->mutable_read_set()->erase(key);
-  }
-  key_vec.reserve(txn->write_set_size());
-  for (auto& key_value : *txn->mutable_write_set()) {
-    const auto& key = key_value.first;
+  itr = txn->mutable_write_set()->begin();
+  while (itr != txn->mutable_write_set()->end()) {
+    const auto& key = itr->first;
     auto partition = config_->GetPartitionOfKey(key);
     if (partition != local_partition) {
-      key_vec.push_back(key);
+      itr = txn->mutable_write_set()->erase(itr);
+    } else {
+      itr++;
     }
-  }
-  for (const auto& key : key_vec) {
-    txn->mutable_write_set()->erase(key);
   }
 
   return state;
@@ -211,16 +210,16 @@ void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_resu
   // If all remote reads arrived, move on with executing this transaction.
   if (txn_states_[txn_id].remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
-    ExecuteAndCommitTransaction(txn_id);
+    ExecuteAndMaybeCommitTransaction(txn_id);
   }
 }
 
-void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
+void Worker::ExecuteAndMaybeCommitTransaction(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
 
   if (txn->status() != TransactionStatus::ABORTED) {
-    ApplyWrites(txn_id);
+    ExecuteAndMaybeCommitTransactionHelper(txn_id);
   }
 
   // Response back to the scheduler
@@ -238,7 +237,7 @@ void Worker::ExecuteAndCommitTransaction(TxnId txn_id) {
   txn_states_.erase(txn_id);
 }
 
-void Worker::ApplyWrites(TxnId txn_id) {
+void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
   const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
   if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
