@@ -78,16 +78,12 @@ private:
   void DispatchTransaction(TxnId txn_id);
   void SendToWorker(internal::Request&& req, const string& worker);
 
+  void TriggerPreDispatchAbort(TxnId txn_id);
+  void AddTransactionToAbort(TxnId txn_id);
+  void AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id);
+  void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
   void SendAbortToPartitions(TxnId txn_id);
-  /**
-   * Abort and return the transaction to the server.
-   * Multi-Home transactions must also abort all associated Lock-Onlys. If the
-   * transaction has been dispatched, then they have already been deleted. Otherwise
-   * they will be released from the remaster manager and lock manager, as well as deleted
-   * on arrival.
-   */
-  void AbortTransaction(TxnId txn_id);
-  void AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id);
+  void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
@@ -110,6 +106,7 @@ private:
    */
   map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 
+  unordered_set<TxnId> aborting_txns_;
   /**
    * Stores how many lock-only transactions need aborting during
    * mutli-home abort
