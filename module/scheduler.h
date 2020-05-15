@@ -79,17 +79,22 @@ private:
   void SendToWorker(internal::Request&& req, const string& worker);
 
   /**
+   * Aborts
+   * 
    * Once a transaction is sent to a worker, the worker will manage an abort.
    * If a remaster abort occurs at this partition or if a remote read abort
    * is received before the transaction is dispatched, then the abort is handled
    * here.
    * 
-   * Aborts are triggered once on every partition. They send remote read aborts
-   * to active partitions, then delay until all lock-onlys are collected
-   * (if multi-home) and all remote reads are collected (if multi-partition and
-   * an active partition)
+   * Aborts are triggered once on every partition. Once the main transaction
+   * arrives, it's returned to the coordinating server and remote read aborts
+   * are sent to every active remote partition.
+   * 
+   * Before the transaction data is erased, we wait to collect all
+   * - lock-onlys (if multi-home)
+   * - remote reads (if multi-partition and an active partition)
    */
-  
+
   // Start the abort. Only be called once per transaction
   void TriggerPreDispatchAbort(TxnId txn_id);
   // Add a single or multi-home transaction to an abort that started before it
@@ -126,6 +131,9 @@ private:
    */
   map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 
+  /**
+   * Transactions that are in the process of aborting
+   */
   unordered_set<TxnId> aborting_txns_;
   /**
    * Stores how many lock-only transactions need aborting during

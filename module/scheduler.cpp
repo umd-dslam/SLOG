@@ -341,17 +341,18 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   }
 
   SendToCoordinatingServer(txn_id);
+  all_txns_.erase(txn_id);
 }
 
 void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
   // Release txn so it can be passed to request
   auto& txn_holder = all_txns_[txn_id];
-  auto released_txn = txn_holder.ReleaseTransaction();
+  Transaction txn_copy = *txn_holder.GetTransaction();
 
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->set_allocated_txn(released_txn);
+  completed_sub_txn->set_allocated_txn(&txn_copy);
   completed_sub_txn->set_partition(config_->GetLocalPartition());
   for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
@@ -359,15 +360,12 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
 
   RecordTxnEvent(
       config_,
-      released_txn->mutable_internal(),
+      txn_copy.mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
 
   auto coordinating_server = MakeMachineIdAsString(
-      released_txn->internal().coordinating_server());
+      txn_copy.internal().coordinating_server());
   Send(req, coordinating_server, SERVER_CHANNEL);
-
-  // Done with this txn, delete the holder
-  all_txns_.erase(txn_id);
 }
 
 /***********************************************
@@ -613,9 +611,13 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 }
 
 void Scheduler::AddTransactionToAbort(TxnId txn_id) {
+  CHECK(aborting_txns_.count(txn_id) > 0) << "Abort not triggered: " << txn_id;
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
   auto txn_type = txn->internal().type();
+
+  txn->set_status(TransactionStatus::ABORTED);
+  SendToCoordinatingServer(txn_id);
 
   if (txn_holder.InvolvedPartitions().size() > 1) {
     SendAbortToPartitions(txn_id);
@@ -631,9 +633,13 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
 void Scheduler::AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id) {
   auto& txn_holder = lock_only_txns_[txn_replica_id];
   auto txn_id = txn_replica_id.first;
+  CHECK(aborting_txns_.count(txn_id) > 0)
+      << "Abort not triggered: " << txn_id << ", " << txn_replica_id.second;
 
   lock_only_txns_.erase(txn_replica_id);
   mh_abort_waiting_on_[txn_id] -= 1;
+
+  // Check if this was the last lock-only
   MaybeFinishAbort(txn_id);
 }
 
@@ -682,10 +688,12 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
 
+  // Will occur if multiple lock-only's arrive before multi-home
   if (txn == nullptr) {
     return;
   }
 
+  // Active partitions must receive remote reads from all other partitions
   auto num_remote_partitions = txn_holder.InvolvedPartitions().size() - 1;
   auto local_partition = config_->GetLocalPartition();
   auto local_partition_active =
@@ -696,6 +704,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
     }
   }
 
+  // Multi-homes must collect all lock-onlys
   auto txn_type = txn->internal().type();
   if (txn_type == TransactionType::MULTI_HOME) {
     if (mh_abort_waiting_on_[txn_id] != 0) {
@@ -705,9 +714,8 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
     }
   }
 
-  txn->set_status(TransactionStatus::ABORTED);
   aborting_txns_.erase(txn_id);
-  SendToCoordinatingServer(txn_id);
+  all_txns_.erase(txn_id);
 }
 
 /***********************************************
