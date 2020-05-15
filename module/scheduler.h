@@ -79,14 +79,36 @@ private:
   void SendToWorker(internal::Request&& req, const string& worker);
 
   /**
-   * Abort and return the transaction to the server.
-   * Multi-Home transactions must also abort all associated Lock-Onlys. If the
-   * transaction has been dispatched, then they have already been deleted. Otherwise
-   * they will be released from the remaster manager and lock manager, as well as deleted
-   * on arrival.
+   * Aborts
+   * 
+   * Once a transaction is sent to a worker, the worker will manage an abort.
+   * If a remaster abort occurs at this partition or if a remote read abort
+   * is received before the transaction is dispatched, then the abort is handled
+   * here.
+   * 
+   * Aborts are triggered once on every partition. Once the main transaction
+   * arrives, it's returned to the coordinating server and remote read aborts
+   * are sent to every active remote partition.
+   * 
+   * Before the transaction data is erased, we wait to collect all
+   * - lock-onlys (if multi-home)
+   * - remote reads (if multi-partition and an active partition)
    */
-  void AbortTransaction(TxnId txn_id);
-  void AbortLockOnlyTransaction(TxnIdReplicaIdPair txn_replica_id);
+
+  // Start the abort. Only be called once per transaction
+  void TriggerPreDispatchAbort(TxnId txn_id);
+  // Add a single or multi-home transaction to an abort that started before it
+  // arrived
+  void AddTransactionToAbort(TxnId txn_id);
+  // Add a lock-only transaction to an abort that started before it arrived
+  void AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id);
+  // Abort lock-only transactions from the remaster manager and lock manager
+  void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
+  // Multicast the remote read abort to active partitions
+  void SendAbortToPartitions(TxnId txn_id);
+  // Return the transaction to the server if lock-only transactions and 
+  // remote reads are received
+  void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
@@ -109,6 +131,10 @@ private:
    */
   map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 
+  /**
+   * Transactions that are in the process of aborting
+   */
+  unordered_set<TxnId> aborting_txns_;
   /**
    * Stores how many lock-only transactions need aborting during
    * mutli-home abort

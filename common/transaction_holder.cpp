@@ -10,31 +10,6 @@ using std::string;
 
 namespace slog {
 
-namespace {
-
-void ExtractKeyPartitions(
-    vector<std::pair<Key, LockMode>>& keys,
-    unordered_set<uint32_t>& partitions,
-    ConfigurationPtr config,
-    const Transaction& txn) {
-  for (const auto& kv : txn.read_set()) {
-    partitions.insert(config->GetPartitionOfKey(kv.first));
-    // If this key is also in write_set, give it write lock instead
-    if (config->KeyIsInLocalPartition(kv.first) 
-        && !txn.write_set().contains(kv.first)) {
-      keys.emplace_back(kv.first, LockMode::READ);
-    }
-  }
-  for (const auto& kv : txn.write_set()) {
-    partitions.insert(config->GetPartitionOfKey(kv.first));
-    if (config->KeyIsInLocalPartition(kv.first)) {
-      keys.emplace_back(kv.first, LockMode::WRITE);
-    }
-  }
-}
-
-} // namespace
-
 TransactionHolder::TransactionHolder() : txn_(nullptr), worker_("") {}
 TransactionHolder::TransactionHolder(ConfigurationPtr config, Transaction* txn) : worker_("") {
   SetTransaction(config, txn);
@@ -47,16 +22,35 @@ TransactionHolder::~TransactionHolder() {
 void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
   keys_in_partition_.clear();
   involved_partitions_.clear();
+  active_partitions_.clear();
   involved_replicas_.clear();
 
   // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
-  ExtractKeyPartitions(keys_in_partition_, involved_partitions_, config, *txn);
+  for (const auto& kv : txn->read_set()) {
+    involved_partitions_.insert(config->GetPartitionOfKey(kv.first));
+    // If this key is also in write_set, give it write lock instead
+    if (config->KeyIsInLocalPartition(kv.first) 
+        && !txn->write_set().contains(kv.first)) {
+      keys_in_partition_.emplace_back(kv.first, LockMode::READ);
+    }
+  }
+  for (const auto& kv : txn->write_set()) {
+    involved_partitions_.insert(config->GetPartitionOfKey(kv.first));
+    active_partitions_.insert(config->GetPartitionOfKey(kv.first));
+    if (config->KeyIsInLocalPartition(kv.first)) {
+      keys_in_partition_.emplace_back(kv.first, LockMode::WRITE);
+    }
+  }
 
   // TODO: only needed for MH
   for (auto& pair : txn->internal().master_metadata()) {
     involved_replicas_.insert(pair.second.master());
   }
 
+  txn_ = txn;
+}
+
+void TransactionHolder::SetTransactionNoProcessing(Transaction* txn) {
   txn_ = txn;
 }
 
@@ -84,6 +78,10 @@ const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {
 
 const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() const {
   return involved_partitions_;
+}
+
+const std::unordered_set<uint32_t>& TransactionHolder::ActivePartitions() const {
+  return active_partitions_;
 }
 
 const std::unordered_set<uint32_t>& TransactionHolder::InvolvedReplicas() const {

@@ -17,6 +17,7 @@ public:
   ~TransactionHolder();
 
   void SetTransaction(ConfigurationPtr config, Transaction* txn);
+  void SetTransactionNoProcessing(Transaction* txn);
   Transaction* GetTransaction() const;
   Transaction* ReleaseTransaction();
 
@@ -25,6 +26,7 @@ public:
 
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
   const std::unordered_set<uint32_t>& InvolvedPartitions() const;
+  const std::unordered_set<uint32_t>& ActivePartitions() const;
   const std::unordered_set<uint32_t>& InvolvedReplicas() const;
 
   std::vector<internal::Request>& EarlyRemoteReads();
@@ -48,6 +50,7 @@ private:
   std::vector<internal::Request> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   std::unordered_set<uint32_t> involved_partitions_;
+  std::unordered_set<uint32_t> active_partitions_;
   std::unordered_set<uint32_t> involved_replicas_;
 };
 

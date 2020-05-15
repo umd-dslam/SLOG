@@ -162,30 +162,30 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
     throw std::runtime_error(oss.str());
   }
   
-  auto MergeMap = [](auto this_set, const auto& other_set) {
-    for (const auto& key_value : other_set) {
-      const auto& key = key_value.first;
-      const auto& value = key_value.second;
-      if (this_set->contains(key)) {
-        if (this_set->at(key) != value) {
-          std::ostringstream oss;
-          oss << "Found conflicting value at key \"" << key << "\" while merging transactions. Val: "
-              << this_set->at(key) << ". Other val: " << value;
-          throw std::runtime_error(oss.str());
+  if (other.status() == TransactionStatus::ABORTED) {
+    txn.set_status(TransactionStatus::ABORTED);
+    txn.set_abort_reason(other.abort_reason());
+  } else if (txn.status() != TransactionStatus::ABORTED) {
+    auto MergeMap = [](auto this_set, const auto& other_set) {
+      for (const auto& key_value : other_set) {
+        const auto& key = key_value.first;
+        const auto& value = key_value.second;
+        if (this_set->contains(key)) {
+          if (this_set->at(key) != value) {
+            std::ostringstream oss;
+            oss << "Found conflicting value at key \"" << key << "\" while merging transactions. Val: "
+                << this_set->at(key) << ". Other val: " << value;
+            throw std::runtime_error(oss.str());
+          }
+        } else {
+          this_set->insert(key_value);
         }
-      } else {
-        this_set->insert(key_value);
       }
-    }
-  };
-  MergeMap(txn.mutable_read_set(), other.read_set());
-  MergeMap(txn.mutable_write_set(), other.write_set());
-  txn.mutable_delete_set()->MergeFrom(other.delete_set());
-  
-  if (txn.status() != TransactionStatus::ABORTED) {
-    txn.set_status(other.status());
+    };
+    MergeMap(txn.mutable_read_set(), other.read_set());
+    MergeMap(txn.mutable_write_set(), other.write_set());
+    txn.mutable_delete_set()->MergeFrom(other.delete_set());
   }
-  txn.set_abort_reason(other.abort_reason());
 
   txn.mutable_internal()
       ->mutable_events()
