@@ -405,10 +405,10 @@ TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
 TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
   auto txn = MakeTransaction(
       {"A"}, /* read_set */
-      {"C"},  /* write_set */
+      {"X"},  /* write_set */
       "GET A     \n"
-      "SET C newC    \n", /* code */
-      {{"A", {1,0}}, {"C", {0,1}}}, /* metadata */
+      "SET X newC    \n", /* code */
+      {{"A", {1,0}}, {"X", {1,1}}}, /* metadata */
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
@@ -421,18 +421,48 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
 
 TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
   auto txn = MakeTransaction(
-      {"A"}, /* read_set */
+      {"Y"}, /* read_set */
       {"C", "B"},  /* write_set */
-      "GET A     \n"
+      "GET Y     \n"
       "SET C newC    \n"
       "SET B newB    \n", /* code */
-      {{"A", {0,1}}, {"C", {1,0}}, {"B", {1,0}}}, /* metadata */
+      {{"Y", {1,1}}, {"C", {1,0}}, {"B", {1,0}}}, /* metadata */
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 3);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
+
+TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
+  auto txn = MakeTransaction(
+      {"A", "D"}, /* read_set */
+      {"Y", "X"}, /* write_set */
+      "", /* code */
+      {{"A", {0,1}}, {"Y", {1,1}}, {"D", {1,0}}, {"X", {0,0}}});
+  txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
+
+  auto lo_txn_0 = MakeTransaction(
+      {"A"}, /* read_set */
+      {"X"} /* write_set */,
+      "", /* code */
+      {{"A", {0,1}}, {"X", {0,0}}});
+  lo_txn_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  auto lo_txn_1 = MakeTransaction(
+      {"D"}, /* read_set */
+      {"Y"}, /* write_set */
+      "", /* code */
+      {{"Y", {1,1}}, {"D", {1,0}}}); // low counter
+  lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  SendMultiHomeBatch(0, {txn}, {0, 1});
+  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0, 1});
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
 }
