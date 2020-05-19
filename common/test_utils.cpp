@@ -93,8 +93,7 @@ void TestSlog::Data(Key&& key, Record&& record) {
 }
 
 void TestSlog::AddServerAndClient() {
-  server_ = MakeRunnerFor<Server>(
-      config_, *context_, broker_, storage_);
+  server_ = MakeRunnerFor<Server>(config_, broker_, storage_);
 }
 
 void TestSlog::AddForwarder() {
