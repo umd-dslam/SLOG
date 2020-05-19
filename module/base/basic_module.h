@@ -35,6 +35,8 @@ protected:
       const MMessage& /* msg */,
       size_t /* socket_index */) {};
 
+  zmq::socket_t& GetCustomSocket(size_t i);
+
 private:
   void SetUp() final;
   void Loop() final;

@@ -23,6 +23,10 @@ vector<zmq::socket_t> BasicModule::InitializeCustomSockets() {
   return {};
 }
 
+zmq::socket_t& BasicModule::GetCustomSocket(size_t i) {
+  return custom_sockets_[i];
+}
+
 void BasicModule::SetUp() {
   custom_sockets_ = InitializeCustomSockets();
   for (auto& socket : custom_sockets_) {
