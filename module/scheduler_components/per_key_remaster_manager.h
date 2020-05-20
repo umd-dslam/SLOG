@@ -51,9 +51,6 @@ private:
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
   unordered_map<Key, list<pair<const TransactionHolder*, uint32_t>>> blocked_queue_;
-
-  // Cached counter value for each key that's currently in the queue
-  unordered_map<Key, uint32_t> counters_;
 };
 
 } // namespace slog

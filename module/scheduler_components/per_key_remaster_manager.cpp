@@ -25,48 +25,30 @@ PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
     return VerifyMasterResult::VALID;
   }
 
-  // keeps track of counters that will need to be waited on
-  std::unordered_map<Key, int32_t> ahead_counters;
-  for (auto& pair : keys) {
-    auto key = pair.first;
-
-    // Check with storage to get current counter
-    if (counters_.count(key) == 0) {
-      Record record;
-      bool found = storage_->Read(key, record);
-      if (found) {
-        CHECK(txn_master_metadata.contains(key))
-              << "Master metadata for key \"" << key << "\" is missing";
-        counters_[key] = record.metadata.counter;
-      } else {
-        counters_[key] = 0;
-      }
-    }
-    auto stored_counter = counters_.at(key);
-    auto txn_metadata = txn_master_metadata.at(key);
-    if (txn_metadata.counter() > stored_counter) {
-      ahead_counters[key] = txn_metadata.counter();
-    } else if (txn_metadata.counter() < stored_counter) {
+  switch(CheckCounters(txn_holder, storage_)) {
+    case VerifyMasterResult::ABORT: {
       return VerifyMasterResult::ABORT;
     }
-  }
-
-  // Check if no keys are blocked at all
-  if (ahead_counters.empty()){
-    auto no_key_indirectly_blocked = true;
-    for (auto& pair : keys) {
-      auto key = pair.first;
-      // If the queue is emtpy, can be skipped
-      if (blocked_queue_.count(key)) {
-        // If we won't be at the front of the queue, the txn will need to wait.
-        if (blocked_queue_.at(key).front().second <= txn_master_metadata.at(key).counter()) {
-          no_key_indirectly_blocked = false;
-          break;
+    case VerifyMasterResult::VALID: {
+      auto indirectly_blocked = false;
+      for (auto& key_pair :keys) {
+        auto key = key_pair.first;
+        // If the queue is emtpy, can be skipped
+        if (blocked_queue_.count(key)) {
+          // If we won't be at the front of the queue, the txn will need to wait.
+          if (blocked_queue_.at(key).front().second <= txn_master_metadata.at(key).counter()) {
+            indirectly_blocked = true;
+            break;
+          }
         }
       }
+      if (!indirectly_blocked) {
+        return VerifyMasterResult::VALID;
+        break;
+      }
     }
-    if (no_key_indirectly_blocked) {
-      return VerifyMasterResult::VALID;
+    case VerifyMasterResult::WAITING: {
+      break;
     }
   }
 
@@ -129,12 +111,7 @@ RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(Key key, const uin
     return result;
   }
 
-  // CHECK_EQ(remaster_counter, counters_.at(key) + 1) << "Remaster didn't increase cached counter by 1";
-  counters_[key] = remaster_counter;
-
-  if (blocked_queue_[key].front().second == remaster_counter) {
-    TryToUnblock(key, result);
-  }
+  TryToUnblock(key, result);
   
   return result;
 }
@@ -146,47 +123,45 @@ void PerKeyRemasterManager::TryToUnblock(Key unblocked_key, RemasterOccurredResu
 
   auto& txn_pair = blocked_queue_.at(unblocked_key).front();
   auto& txn_holder = txn_pair.first;
-  
-  bool can_be_unblocked = true;
-  bool should_abort = false;
-  for (auto& key_pair : txn_holder->KeysInPartition()) {
-    auto key = key_pair.first;
-    CHECK(blocked_queue_.count(key) > 0) << "Transaction was not in correct blocked_queues";
-    auto& front_txn_replica_id = blocked_queue_.at(key).front().first;
-    if (front_txn_replica_id != txn_holder || // txn is not at front of this queue
-          counters_.at(key) < blocked_queue_.at(key).front().second) { // txn is blocked on this key
-      can_be_unblocked = false;
-      if (counters_.at(key) > blocked_queue_.at(key).front().second) { 
-        should_abort = true;
+
+  switch (CheckCounters(txn_holder, storage_)) {
+    case VerifyMasterResult::ABORT: {
+      result.should_abort.push_back(txn_holder);
+      auto release_result = ReleaseTransaction(txn_holder);
+      result.unblocked.merge(release_result.unblocked);
+      result.should_abort.merge(release_result.should_abort);
+      return;
+    }
+    case VerifyMasterResult::WAITING: {
+      return;
+    }
+    case VerifyMasterResult::VALID: {
+      for (auto& key_pair : txn_holder->KeysInPartition()) {
+        auto key = key_pair.first;
+        CHECK(blocked_queue_.count(key) > 0) << "Transaction was not in correct blocked_queues";
+        auto& front_txn_replica_id = blocked_queue_.at(key).front().first;
+        if (front_txn_replica_id != txn_holder) {
+          return;
+        }
+      }
+      result.unblocked.push_back(txn_holder);
+
+      // Garbage collect queue and counters
+      for (auto& key_pair : txn_holder->KeysInPartition()) {
+        auto key = key_pair.first;
+        blocked_queue_.at(key).pop_front();
+        if (blocked_queue_.at(key).size() == 0) {
+          blocked_queue_.erase(key);
+        }
+      }
+
+      // Recurse on each updated queue
+      for (auto& key_pair : txn_holder->KeysInPartition()) {
+        auto key = key_pair.first;
+        TryToUnblock(key, result);
       }
       break;
     }
-  }
-
-  if (!can_be_unblocked) {
-    return;
-  }
-
-  if (should_abort) {
-    result.should_abort.push_back(txn_holder);
-  } else {
-    result.unblocked.push_back(txn_holder);
-  }
-
-  // Garbage collect queue and counters
-  for (auto& key_pair : txn_holder->KeysInPartition()) {
-    auto key = key_pair.first;
-    blocked_queue_.at(key).pop_front();
-    if (blocked_queue_.at(key).size() == 0) {
-      blocked_queue_.erase(key);
-      counters_.erase(key);
-    }
-  }
-
-  // Recurse on each updated queue
-  for (auto& key_pair : txn_holder->KeysInPartition()) {
-    auto key = key_pair.first;
-    TryToUnblock(key, result);
   }
 }
 

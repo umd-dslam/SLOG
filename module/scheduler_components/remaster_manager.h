@@ -76,6 +76,8 @@ public:
       LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->GetTransaction()->internal().id();
       return VerifyMasterResult::VALID;
     }
+
+    auto waiting = false;
     for (auto& key_pair : keys) {
       auto& key = key_pair.first;
 
@@ -92,7 +94,7 @@ public:
       if (txn_counter < storage_counter) {
         return VerifyMasterResult::ABORT;
       } else if (txn_counter > storage_counter) {
-        return VerifyMasterResult::WAITING;
+        waiting = true;
       } else {
         CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
             << "Masters don't match for same key \"" << key
@@ -100,7 +102,11 @@ public:
             << ". In storage: " << record.metadata.master;
       }
     }
-    return VerifyMasterResult::VALID;
+    if (waiting) {
+      return VerifyMasterResult::WAITING;
+    } else {
+      return VerifyMasterResult::VALID;
+    }
   }
 };
 

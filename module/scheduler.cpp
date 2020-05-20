@@ -532,9 +532,11 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
     }
     case VerifyMasterResult::ABORT: {
       TriggerPreDispatchAbort(txn->internal().id());
+      break;
     }
     case VerifyMasterResult::WAITING: {
       // Do nothing
+      VLOG(4) << "Txn " << txn->internal().id() << " is waiting on a remaster";
       break;
     }
     default:
