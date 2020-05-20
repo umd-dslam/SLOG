@@ -13,7 +13,7 @@
 #include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
-#include "module/scheduler_components/simple_remaster_manager.h"
+#include "module/scheduler_components/per_key_remaster_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
@@ -120,7 +120,7 @@ private:
   unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
-  SimpleRemasterManager remaster_manager_;
+  PerKeyRemasterManager remaster_manager_;
 
   unordered_map<TxnId, TransactionHolder> all_txns_;
   
