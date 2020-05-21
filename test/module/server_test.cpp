@@ -16,7 +16,6 @@ using namespace std;
 using namespace slog;
 
 TEST(ServerTest, LookupMaster) {
-  const string REQUESTER_CHANNEL("requester");
   auto configs = MakeTestConfigurations("lookup", 1, 1, 23 /* seed */);
   TestSlog test_slog(configs[0]);
   test_slog.AddServerAndClient();
@@ -24,7 +23,7 @@ TEST(ServerTest, LookupMaster) {
   test_slog.Data("B", {"fbczx", 1, 1});
   test_slog.Data("C", {"bzxcv", 2, 2});
   unique_ptr<Channel> requester(
-      test_slog.AddChannel(REQUESTER_CHANNEL));
+      test_slog.AddChannel(FORWARDER_CHANNEL));
   test_slog.StartInNewThreads();
 
   // Send a lookup request to the server
@@ -36,7 +35,7 @@ TEST(ServerTest, LookupMaster) {
   lookup->add_keys("D");
   MMessage msg;
   msg.Set(MM_PROTO, req);
-  msg.Set(MM_FROM_CHANNEL, REQUESTER_CHANNEL);
+  msg.Set(MM_FROM_CHANNEL, FORWARDER_CHANNEL);
   msg.Set(MM_TO_CHANNEL, SERVER_CHANNEL);
   requester->Send(msg);
 

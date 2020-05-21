@@ -1,13 +1,5 @@
 {
   "read_set": ["A", "B", "C", "D", "E", "F"],
   "write_set": [],
-  "code": "GET A GET B GET C GET D GET E GET F",
-  "metadata": {
-    "A": 0,
-    "B": 0,
-    "C": 0,
-    "D": 1,
-    "E": 1,
-    "F": 1
-  }
+  "code": "GET A GET B GET C GET D GET E GET F"
 }

@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 
   // Create the server module. This is not added to the "modules" 
   // list below because it starts differently.
-  auto server = MakeRunnerFor<slog::Server>(config, *context, broker, storage);
+  auto server = MakeRunnerFor<slog::Server>(config, broker, storage);
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(

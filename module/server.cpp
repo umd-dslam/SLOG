@@ -11,84 +11,38 @@ namespace slog {
 
 Server::Server(
     ConfigurationPtr config,
-    zmq::context_t& context,
     Broker& broker,
     shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)
-  : ChannelHolder(broker.AddChannel(SERVER_CHANNEL)), 
+  : BasicModule("Server", broker.AddChannel(SERVER_CHANNEL)), 
     config_(config),
-    client_socket_(context, ZMQ_ROUTER),
     lookup_master_index_(lookup_master_index),
-    txn_id_counter_(0) {
-  client_socket_.setsockopt(ZMQ_LINGER, 0);
-  client_socket_.setsockopt(ZMQ_RCVHWM, SERVER_RCVHWM);
-  client_socket_.setsockopt(ZMQ_SNDHWM, SERVER_SNDHWM);
-  poll_items_.push_back(GetChannelPollItem());
-  poll_items_.push_back({ 
-      static_cast<void*>(client_socket_),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */});
-}
+    txn_id_counter_(0) {}
 
 /***********************************************
                 SetUp and Loop
 ***********************************************/
 
-void Server::SetUp() {
+std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
   string endpoint = 
       "tcp://*:" + std::to_string(config_->GetServerPort());
-  client_socket_.bind(endpoint);
+  zmq::socket_t client_socket(*GetContext(), ZMQ_ROUTER);
+  client_socket.setsockopt(ZMQ_LINGER, 0);
+  client_socket.setsockopt(ZMQ_RCVHWM, SERVER_RCVHWM);
+  client_socket.setsockopt(ZMQ_SNDHWM, SERVER_SNDHWM);
+  client_socket.bind(endpoint);
+
   LOG(INFO) << "Bound Server to: " << endpoint;
-}
 
-void Server::Loop() {
-
-  zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
-
-  if (HasMessageFromChannel()) {
-    MMessage msg;
-    ReceiveFromChannel(msg);
-
-    if (msg.IsProto<internal::Request>()) {
-      internal::Request req;
-      msg.GetProto(req);
-      auto from_machine_id = msg.GetIdentity();
-      string from_channel;
-      msg.GetString(from_channel, MM_FROM_CHANNEL);
-      HandleInternalRequest(
-          move(req),
-          move(from_machine_id),
-          move(from_channel));
-    } else if (msg.IsProto<internal::Response>()) {
-      internal::Response res;
-      msg.GetProto(res);
-      HandleInternalResponse(move(res));
-    }
-  }
-
-  if (HasMessageFromClient()) {
-    MMessage msg(client_socket_);
-    if (msg.IsProto<api::Request>()) {
-      HandleAPIRequest(move(msg));
-    }
-  }
-
-  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Server is alive";
-}
-
-bool Server::HasMessageFromChannel() const {
-  return poll_items_[0].revents & ZMQ_POLLIN;
-}
-
-bool Server::HasMessageFromClient() const {
-  return poll_items_[1].revents & ZMQ_POLLIN;
+  vector<zmq::socket_t> sockets;
+  sockets.push_back(move(client_socket));
+  return sockets;
 }
 
 /***********************************************
                   API Requests
 ***********************************************/
 
-void Server::HandleAPIRequest(MMessage&& msg) {
+void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
   api::Request request;
   if (!msg.GetProto(request)) {
     LOG(ERROR) << "Invalid request from client";
@@ -159,14 +113,12 @@ void Server::HandleAPIRequest(MMessage&& msg) {
 
 void Server::HandleInternalRequest(
     internal::Request&& req,
-    string&& from_machine_id,
-    string&& from_channel) {
+    string&& from_machine_id) {
   switch (req.type_case()) {
     case internal::Request::kLookupMaster: 
       ProcessLookUpMasterRequest(
           req.mutable_lookup_master(),
-          move(from_machine_id),
-          move(from_channel));
+          move(from_machine_id));
       break;
     case internal::Request::kCompletedSubtxn:
       ProcessCompletedSubtxn(req.mutable_completed_subtxn());
@@ -180,8 +132,7 @@ void Server::HandleInternalRequest(
 
 void Server::ProcessLookUpMasterRequest(
     internal::LookupMasterRequest* lookup_master,
-    string&& from_machine_id,
-    string&& from_channel) {
+    string&& from_machine_id) {
   internal::Response response;
   auto lookup_response = response.mutable_lookup_master();
   lookup_response->set_txn_id(lookup_master->txn_id());
@@ -207,7 +158,7 @@ void Server::ProcessLookUpMasterRequest(
       }
     }
   }
-  Send(response, from_machine_id, from_channel);
+  Send(response, from_machine_id, FORWARDER_CHANNEL);
 }
 
 void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {
@@ -296,7 +247,7 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  HandleInternalResponse(std::move(res));
+  HandleInternalResponse(std::move(res), "");
 }
 
 
@@ -304,7 +255,9 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
               Internal Responses
 ***********************************************/
 
-void Server::HandleInternalResponse(internal::Response&& res) {
+void Server::HandleInternalResponse(
+    internal::Response&& res,
+    std::string&&) {
   if (res.type_case() != internal::Response::kStats) {
     LOG(ERROR) << "Unexpected response type received: \""
                << CASE_NAME(res.type_case(), internal::Response) << "\"";
@@ -325,7 +278,7 @@ void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
   auto& pr = pending_responses_.at(txn_id);
   res.set_stream_id(pr.stream_id);
   pr.response.Set(MM_PROTO, res);
-  pr.response.SendTo(client_socket_);
+  pr.response.SendTo(GetCustomSocket(0));
   pending_responses_.erase(txn_id);
 }
 
