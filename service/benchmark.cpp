@@ -213,7 +213,8 @@ void RunBenchmark() {
   LOG(INFO) << workload->GetParamsStr();
 
   stats.start_time = Clock::now();
-  while (!StopConditionMet() || !outstanding_txns.empty()) {
+  // while (!StopConditionMet() || !outstanding_txns.empty()) {
+  while (!StopConditionMet() ) {
     if (zmq::poll(poll_items, 10)) {
       // Check if the ticker ticks
       if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
