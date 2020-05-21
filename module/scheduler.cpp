@@ -336,7 +336,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
     auto key = txn->write_set().begin()->first;
-    auto counter = txn->internal().master_metadata().at(key).master() + 1;
+    auto counter = txn->internal().master_metadata().at(key).counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
 
@@ -532,6 +532,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
     }
     case VerifyMasterResult::ABORT: {
       TriggerPreDispatchAbort(txn->internal().id());
+      break;
     }
     case VerifyMasterResult::WAITING: {
       // Do nothing
@@ -651,7 +652,7 @@ void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {
 
   // release LOs in remaster manager
   ProcessRemasterResult(
-      remaster_manager_.ReleaseTransaction(txn_id, involved_replicas));
+      remaster_manager_.ReleaseTransaction(&txn_holder));
 
   // release LOs in lock manager
   for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {

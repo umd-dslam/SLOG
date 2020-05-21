@@ -60,7 +60,7 @@ public:
    * @param txn_id Transaction to be checked
    * @return Transactions that are now unblocked
    */
-  virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id) = 0;
+  virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder) = 0;
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
