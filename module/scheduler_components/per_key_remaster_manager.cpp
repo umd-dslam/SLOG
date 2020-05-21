@@ -94,7 +94,7 @@ void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
   auto itr = blocked_queue_[key].begin();
-  while (itr != blocked_queue_[key].end() && (*itr).second <= counter) {
+  while (itr != blocked_queue_[key].end() && (*itr).second <= counter /* note <= */) {
     itr++;
   }
   blocked_queue_[key].insert(itr, entry);
@@ -125,8 +125,9 @@ void PerKeyRemasterManager::TryToUnblock(Key unblocked_key, RemasterOccurredResu
     case VerifyMasterResult::ABORT: {
       result.should_abort.push_back(txn_holder);
       auto release_result = ReleaseTransaction(txn_holder);
-      result.unblocked.merge(release_result.unblocked);
-      result.should_abort.merge(release_result.should_abort);
+      // Newly unblocked txns are added to the end of the list
+      result.unblocked.splice(result.unblocked.end(), release_result.unblocked);
+      result.should_abort.splice(result.should_abort.end(), release_result.should_abort);
       return;
     }
     case VerifyMasterResult::WAITING: {
