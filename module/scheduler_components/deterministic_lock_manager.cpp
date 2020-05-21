@@ -171,11 +171,13 @@ DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
 
   for (const auto& pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
-
+    auto old_mode = lock_table_[key].mode;
     auto new_grantees = lock_table_[key].Release(txn_id);
      // Prevent the lock table from growing too big
     if (lock_table_[key].mode == LockMode::UNLOCKED) {
-      num_locked_keys_--;
+      if (old_mode != LockMode::UNLOCKED) {
+        num_locked_keys_--;
+      }
       if (lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
         lock_table_.erase(key);
       }
