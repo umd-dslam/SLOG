@@ -22,7 +22,7 @@ public:
     shared_ptr<const Storage<Key, Record>> storage);
 
   virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
-  virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter);
+  virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
 
 private:

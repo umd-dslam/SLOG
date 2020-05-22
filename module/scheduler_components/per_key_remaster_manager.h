@@ -12,9 +12,10 @@ using std::pair;
 namespace slog {
 
 /**
- * Basic, inefficient implimentation of remastering. Transactions are kept in the exact
- * order as their local logs: if a transaction from region 1 is blocked in the queue, all
- * following transactions from region 1 will be blocked behind it
+ * Alternative implementation of remastering. Txns only block if they have a high counter, or if
+ * a transaction with a high counter arrived first with an overlapping read/write set.
+ * With small transactions, should acheive lower latency than SimpleRemasterManager. For large
+ * transactions, the overhead of creating queues may be too high.
  */
 class PerKeyRemasterManager :
     public RemasterManager {
@@ -23,7 +24,7 @@ public:
     shared_ptr<const Storage<Key, Record>> storage);
 
   virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
-  virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter);
+  virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
 
 private:
@@ -32,14 +33,12 @@ private:
    * unblock txns starting from the front of the queue, and stop when they reach a
    * larger counter.
    */
-  void InsertIntoBlockedQueue(Key key, uint32_t counter, const TransactionHolder* txn_holder);
+  void InsertIntoBlockedQueue(const Key& key, uint32_t counter, const TransactionHolder* txn_holder);
 
   /**
    * Test if the head of this queue can be unblocked
    */
-  void TryToUnblock(Key unblocked_key, RemasterOccurredResult& result);
-
-  // VerifyMasterResult CheckCounters(const TransactionHolder* txn_holder);
+  void TryToUnblock(const Key& unblocked_key, RemasterOccurredResult& result);
 
   // Needs access to storage to check counters
   shared_ptr<const Storage<Key, Record>> storage_;

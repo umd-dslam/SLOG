@@ -51,7 +51,7 @@ public:
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */
-  virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter) = 0;
+  virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) = 0;
 
   /**
    * Release a transaction from remaster queues. It's guaranteed that the released transaction

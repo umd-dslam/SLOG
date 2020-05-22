@@ -42,7 +42,7 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 }
 
 RemasterOccurredResult
-SimpleRemasterManager::RemasterOccured(Key remaster_key, uint32_t /* remaster_counter */) {
+SimpleRemasterManager::RemasterOccured(const Key& remaster_key, uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
   // Try to unblock each txn at the head of a queue, if it contains the remastered key.
   // Note that multiple queues could contain the same key with different counters
@@ -66,11 +66,11 @@ SimpleRemasterManager::RemasterOccured(Key remaster_key, uint32_t /* remaster_co
 RemasterOccurredResult
 SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->GetTransaction()->internal().id();
-  for (auto& p : txn_holder->InvolvedReplicas()) {
-    if (blocked_queue_.count(p) == 0 || blocked_queue_[p].empty()) {
+  for (auto replica : txn_holder->InvolvedReplicas()) {
+    if (blocked_queue_.count(replica) == 0 || blocked_queue_[replica].empty()) {
       continue;
     }
-    auto& queue = blocked_queue_[p];
+    auto& queue = blocked_queue_[replica];
     for (auto itr = queue.begin(); itr != queue.end(); itr++) {
       if ((*itr)->GetTransaction()->internal().id() == txn_id) {
         queue.erase(itr);
@@ -82,9 +82,9 @@ SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
   // Note: this must happen after the transaction is released, otherwise it could be returned in
   // the unblocked list
   RemasterOccurredResult result;
-  for (auto& p : txn_holder->InvolvedReplicas()) {
+  for (auto replica : txn_holder->InvolvedReplicas()) {
     // TODO: only necessary if a removed txn was front of the queue
-    TryToUnblock(p, result);
+    TryToUnblock(replica, result);
   }
   return result;
 }

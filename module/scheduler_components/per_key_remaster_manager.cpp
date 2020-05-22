@@ -89,7 +89,7 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
   return result;
 }
 
-void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t counter, const TransactionHolder* txn_holder) {
+void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter, const TransactionHolder* txn_holder) {
   auto entry = make_pair(txn_holder, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
@@ -100,7 +100,7 @@ void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key key, const uint32_t
   blocked_queue_[key].insert(itr, entry);
 }
 
-RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(Key key, const uint32_t remaster_counter) {
+RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(const Key& key, const uint32_t remaster_counter) {
   RemasterOccurredResult result;
 
   // No txns waiting for this remaster
@@ -113,7 +113,7 @@ RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(Key key, const uin
   return result;
 }
 
-void PerKeyRemasterManager::TryToUnblock(Key unblocked_key, RemasterOccurredResult& result) {
+void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccurredResult& result) {
   if (blocked_queue_.count(unblocked_key) == 0) {
     return;
   }
