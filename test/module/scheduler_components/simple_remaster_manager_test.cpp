@@ -72,7 +72,7 @@ TEST_F(SimpleRemasterManagerTest, BlockLocalLog) {
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::VALID);
 }
 
-TEST_F(SimpleRemasterManagerTest, RemasterReleases) {
+TEST_F(SimpleRemasterManagerTest, RemasterUnblocks) {
   storage->Write("A", Record("value", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}));
   auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}));
@@ -88,35 +88,19 @@ TEST_F(SimpleRemasterManagerTest, RemasterReleases) {
 
 TEST_F(SimpleRemasterManagerTest, ReleaseTransaction) {
   storage->Write("A", Record("value", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
+  storage->Write("B", Record("valueB", 1, 1));
+  auto txn1 = MakeHolder(MakeTransaction({"B"}, {}, "some code", {{"B", {0, 2}}}), 100);
   auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 101);
+  auto txn3 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 102);
 
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
 
-  auto result = remaster_manager->ReleaseTransaction(100);
-  ASSERT_THAT(result.unblocked, ElementsAre(&txn2));
-  ASSERT_THAT(result.should_abort, ElementsAre());
-}
-
-TEST_F(SimpleRemasterManagerTest, ReleaseTransactionInPartition) {
-  storage->Write("A", Record("value", 0, 1));
-  storage->Write("B", Record("value", 1, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 100);
-  auto txn2 = MakeHolder(MakeTransaction({"B"}, {}, "some code", {{"B", {1, 2}}}), 101);
-  auto txn3 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 102);
-
-  EXPECT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::WAITING);
-
-  unordered_set<uint32_t> partition_1({1});
-  auto result = remaster_manager->ReleaseTransaction(100, partition_1);
+  auto result = remaster_manager->ReleaseTransaction(&txn3);
   ASSERT_THAT(result.unblocked, ElementsAre());
   ASSERT_THAT(result.should_abort, ElementsAre());
 
-  unordered_set<uint32_t> partition_0({0});
-  result = remaster_manager->ReleaseTransaction(100, partition_0);
-  ASSERT_THAT(result.unblocked, ElementsAre(&txn3));
+  result = remaster_manager->ReleaseTransaction(&txn1);
+  ASSERT_THAT(result.unblocked, ElementsAre(&txn2));
   ASSERT_THAT(result.should_abort, ElementsAre());
 }

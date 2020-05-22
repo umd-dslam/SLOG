@@ -51,7 +51,7 @@ public:
    * @return A queue of transactions that are now unblocked, in the
    * order they were submitted
    */
-  virtual RemasterOccurredResult RemasterOccured(Key key, uint32_t remaster_counter) = 0;
+  virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) = 0;
 
   /**
    * Release a transaction from remaster queues. It's guaranteed that the released transaction
@@ -60,7 +60,7 @@ public:
    * @param txn_id Transaction to be checked
    * @return Transactions that are now unblocked
    */
-  virtual RemasterOccurredResult ReleaseTransaction(TxnId txn_id) = 0;
+  virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder) = 0;
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
@@ -76,6 +76,8 @@ public:
       LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->GetTransaction()->internal().id();
       return VerifyMasterResult::VALID;
     }
+
+    auto waiting = false;
     for (auto& key_pair : keys) {
       auto& key = key_pair.first;
 
@@ -92,7 +94,7 @@ public:
       if (txn_counter < storage_counter) {
         return VerifyMasterResult::ABORT;
       } else if (txn_counter > storage_counter) {
-        return VerifyMasterResult::WAITING;
+        waiting = true;
       } else {
         CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
             << "Masters don't match for same key \"" << key
@@ -100,7 +102,12 @@ public:
             << ". In storage: " << record.metadata.master;
       }
     }
-    return VerifyMasterResult::VALID;
+    
+    if (waiting) {
+      return VerifyMasterResult::WAITING;
+    } else {
+      return VerifyMasterResult::VALID;
+    }
   }
 };
 
