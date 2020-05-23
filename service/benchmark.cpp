@@ -15,6 +15,7 @@
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_uint32(replica, 0, "The region where the current machine is located");
 DEFINE_string(data_dir, "", "Directory containing intial data");
+DEFINE_string(out_dir, "", "Directory containing output data");
 DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
 DEFINE_uint32(
     duration,
@@ -50,24 +51,28 @@ uint64_t TimeElapsedSince(TimePoint tp) {
 }
 
 const uint32_t STATS_PRINT_EVERY_MS = 1000;
-const string TXNS_FILE = "transactions.csv";
 
-// Time points are in microseconds since epoch
-// Time spans are in microseconds
+const string TXNS_FILE = "transactions.csv";
 const vector<string> TXN_COLUMNS = {
     "client_txn_id",
     "txn_id",
     "is_mh",
     "is_mp",
-    "sent_at",
-    "received_at",
+    "sent_at",      // microseconds since epoch
+    "received_at",  // microseconds since epoch
     "rtt"};
+
 const string EVENTS_FILE = "events.csv";
 const vector<string> EVENT_COLUMNS = {
     "txn_id",
     "event",
-    "time",
+    "time",     // microseconds since epoch
     "machine"};
+
+const string THROUGHPUT_FILE = "throughput.csv";
+const vector<string> THROUGHPUT_COLUMNS = {
+    "time",
+    "txns_per_sec"};
 
 /**
  * Connection stuff
@@ -99,6 +104,7 @@ struct TransactionInfo {
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
 std::unique_ptr<CSVWriter> txn_writer;
 std::unique_ptr<CSVWriter> event_writer;
+std::unique_ptr<CSVWriter> throughput_writer;
 
 /**
  * Statistics
@@ -138,10 +144,15 @@ private:
   }
 
   void Print() {
+    double tp = Throughput();
     cout.precision(1);
     cout << "\nTransactions sent: " << txn_counter << "\n";
     cout << "Responses received: " << resp_counter << "\n";
-    cout << "Throughput: " << fixed << Throughput() << " txns/s" << endl;
+    cout << "Throughput: " << fixed << tp << " txns/s" << endl;
+
+    (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count()
+                         << tp
+                         << csvendl;
   }
 
 } stats;
@@ -150,6 +161,9 @@ void InitializeBenchmark() {
   if (FLAGS_duration > 0 && FLAGS_num_txns > 0) {
     LOG(FATAL) << "Only either \"duration\" or \"num_txns\" can be set"; 
   }
+
+  // Potentially speed up execution
+  std::ios_base::sync_with_stdio(false);
   
   // Create a ticker and subscribe to it
   ticker = MakeRunnerFor<Ticker>(context, FLAGS_rate);
@@ -198,8 +212,9 @@ void InitializeBenchmark() {
     LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
   }
 
-  txn_writer = make_unique<CSVWriter>(TXNS_FILE, TXN_COLUMNS);
-  event_writer = make_unique<CSVWriter>(EVENTS_FILE, EVENT_COLUMNS);
+  txn_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + TXNS_FILE, TXN_COLUMNS);
+  event_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENT_COLUMNS);
+  throughput_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + THROUGHPUT_FILE, THROUGHPUT_COLUMNS);
 }
 
 bool StopConditionMet();
