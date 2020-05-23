@@ -76,7 +76,7 @@ ConfigVec MakeTestConfigurations(
   return configs;
 }
 
-TestSlog::TestSlog(ConfigurationPtr config)
+TestSlog::TestSlog(const ConfigurationPtr& config)
   : config_(config),
     context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage<Key, Record, Metadata>()),

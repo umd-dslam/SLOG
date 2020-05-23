@@ -13,10 +13,10 @@ using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
 class TransactionHolder {
 public:
   TransactionHolder();
-  TransactionHolder(ConfigurationPtr config, Transaction* txn);
+  TransactionHolder(const ConfigurationPtr& config, Transaction* txn);
   ~TransactionHolder();
 
-  void SetTransaction(ConfigurationPtr config, Transaction* txn);
+  void SetTransaction(const ConfigurationPtr& config, Transaction* txn);
   void SetTransactionNoProcessing(Transaction* txn);
   Transaction* GetTransaction() const;
   Transaction* ReleaseTransaction();

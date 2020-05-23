@@ -2,16 +2,19 @@
 
 #include <glog/logging.h>
 
+using std::shared_ptr;
+using std::string;
+
 namespace slog {
 
 Channel::Channel(
-    std::shared_ptr<zmq::context_t> context, 
-    const std::string& name) 
+    const shared_ptr<zmq::context_t>& context, 
+    const string& name) 
   : Channel(context, name, false) {}
 
 Channel::Channel(
-    std::shared_ptr<zmq::context_t> context, 
-    const std::string& name, 
+    const shared_ptr<zmq::context_t>& context, 
+    const string& name, 
     bool is_listener)
   : context_(context),
     name_(name),
@@ -65,7 +68,7 @@ std::unique_ptr<Channel> Channel::GetListener() {
   return std::unique_ptr<Channel>(new Channel(context_, name_, true /* is_listener */));
 }
 
-const std::shared_ptr<zmq::context_t>& Channel::GetContext() const {
+const shared_ptr<zmq::context_t>& Channel::GetContext() const {
   return context_;
 }
 

@@ -21,7 +21,7 @@ class PerKeyRemasterManager :
     public RemasterManager {
 public:
   PerKeyRemasterManager(
-    shared_ptr<const Storage<Key, Record>> storage);
+    const shared_ptr<const Storage<Key, Record>>& storage);
 
   virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);

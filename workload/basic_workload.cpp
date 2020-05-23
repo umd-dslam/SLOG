@@ -69,7 +69,7 @@ Key KeyList::GetRandomColdKey() {
 }
 
 BasicWorkload::BasicWorkload(
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     const string& data_dir,
     const string& params_str)
   : WorkloadGenerator(DEFAULT_PARAMS, params_str),

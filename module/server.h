@@ -46,9 +46,9 @@ struct CompletedTransaction {
 class Server : public BasicModule {
 public:
   Server(
-      ConfigurationPtr config,
+      const ConfigurationPtr& config,
       Broker& broker,
-      shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index);
+      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;

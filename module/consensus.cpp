@@ -6,7 +6,7 @@ namespace slog {
 
 using internal::Request;
 
-vector<string> GlobalPaxos::GetMembers(ConfigurationPtr config) {
+vector<string> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
   auto part = config->GetLeaderPartitionForMultiHomeOrdering();
   vector<string> members;
   // Enlist a fixed machine at each region as members
@@ -17,7 +17,7 @@ vector<string> GlobalPaxos::GetMembers(ConfigurationPtr config) {
   return members;
 }
 
-GlobalPaxos::GlobalPaxos(ConfigurationPtr config, Broker& broker)
+GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, Broker& broker)
   : SimpleMultiPaxos(
       GLOBAL_PAXOS,
       broker,
@@ -32,7 +32,7 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   SendSameMachine(req, MULTI_HOME_ORDERER_CHANNEL);
 }
 
-vector<string> LocalPaxos::GetMembers(ConfigurationPtr config) {
+vector<string> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
   auto local_rep = config->GetLocalReplica();
   vector<string> members;
   // Enlist all machines in the same region as members
@@ -42,7 +42,7 @@ vector<string> LocalPaxos::GetMembers(ConfigurationPtr config) {
   return members;
 }
 
-LocalPaxos::LocalPaxos(ConfigurationPtr config, Broker& broker)
+LocalPaxos::LocalPaxos(const ConfigurationPtr& config, Broker& broker)
   : SimpleMultiPaxos(
       LOCAL_PAXOS,
       broker,

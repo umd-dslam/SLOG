@@ -10,7 +10,7 @@ namespace slog {
 using internal::Batch;
 using internal::Request;
 
-MultiHomeOrderer::MultiHomeOrderer(ConfigurationPtr config, Broker& broker) 
+MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, Broker& broker) 
   : BasicModule(
         "MultiHomeOrderer",
         broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL)),

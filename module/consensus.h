@@ -6,24 +6,24 @@ namespace slog {
 
 class GlobalPaxos : public SimpleMultiPaxos {
 public:
-  GlobalPaxos(ConfigurationPtr config, Broker& broker);
+  GlobalPaxos(const ConfigurationPtr& config, Broker& broker);
 
 protected:
   void OnCommit(uint32_t slot, uint32_t value) final;
 
 private:
-  static vector<string> GetMembers(ConfigurationPtr config);
+  static vector<string> GetMembers(const ConfigurationPtr& config);
 };
 
 class LocalPaxos : public SimpleMultiPaxos {
 public:
-  LocalPaxos(ConfigurationPtr config, Broker& broker);
+  LocalPaxos(const ConfigurationPtr& config, Broker& broker);
 
 protected:
   void OnCommit(uint32_t slot, uint32_t value) final;
 
 private:
-  static vector<string> GetMembers(ConfigurationPtr config);
+  static vector<string> GetMembers(const ConfigurationPtr& config);
 };
 
 } // namespace slog

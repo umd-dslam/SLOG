@@ -9,9 +9,6 @@
 #include "module/base/basic_module.h"
 #include "proto/transaction.pb.h"
 
-using std::shared_ptr;
-using std::unordered_map;
-
 namespace slog {
 
 /**
@@ -28,7 +25,7 @@ namespace slog {
  */
 class Forwarder : public BasicModule {
 public:
-  Forwarder(ConfigurationPtr config, Broker& broker);
+  Forwarder(const ConfigurationPtr& config, Broker& broker);
 
 protected:
   void HandleInternalRequest(
@@ -46,7 +43,7 @@ private:
   void Forward(Transaction* txn);
 
   ConfigurationPtr config_;
-  unordered_map<TxnId, Transaction*> pending_transaction_;
+  std::unordered_map<TxnId, Transaction*> pending_transaction_;
 
   // A constant seed is fine so we don't need a random_device
   std::mt19937 re_;

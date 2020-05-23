@@ -10,9 +10,9 @@ using std::move;
 namespace slog {
 
 Server::Server(
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     Broker& broker,
-    shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index)
+    const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index)
   : BasicModule("Server", broker.AddChannel(SERVER_CHANNEL)), 
     config_(config),
     lookup_master_index_(lookup_master_index),

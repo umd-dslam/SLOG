@@ -7,7 +7,7 @@ using std::make_pair;
 namespace slog {
 
 PerKeyRemasterManager::PerKeyRemasterManager(
-    shared_ptr<const Storage<Key, Record>> storage) : storage_(storage) {}
+    const shared_ptr<const Storage<Key, Record>>& storage) : storage_(storage) {}
 
 VerifyMasterResult
 PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
@@ -100,7 +100,7 @@ void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_
   blocked_queue_[key].insert(itr, entry);
 }
 
-RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(const Key& key, const uint32_t remaster_counter) {
+RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(const Key& key, const uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
 
   // No txns waiting for this remaster

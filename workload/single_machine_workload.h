@@ -14,7 +14,7 @@ namespace slog {
 class SingleMachineWorkload : public WorkloadGenerator {
 public:
   SingleMachineWorkload(
-      ConfigurationPtr config,
+      const ConfigurationPtr& config,
       const std::string& data_dir,
       const std::string& params_str);
 

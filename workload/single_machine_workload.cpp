@@ -42,7 +42,7 @@ const RawParamMap DEFAULT_PARAMS = {
 } // namespace
 
 SingleMachineWorkload::SingleMachineWorkload(
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     const string& data_dir,
     const string& params_str)
   : WorkloadGenerator(DEFAULT_PARAMS, params_str),

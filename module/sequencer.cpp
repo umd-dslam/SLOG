@@ -10,7 +10,7 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(ConfigurationPtr config, Broker& broker)
+Sequencer::Sequencer(const ConfigurationPtr& config, Broker& broker)
   : BasicModule(
         "Sequencer",
         broker.AddChannel(SEQUENCER_CHANNEL)),

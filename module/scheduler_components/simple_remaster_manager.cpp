@@ -5,7 +5,7 @@
 namespace slog {
 
 SimpleRemasterManager::SimpleRemasterManager(
-    shared_ptr<const Storage<Key, Record>> storage)
+    const shared_ptr<const Storage<Key, Record>>& storage)
   : storage_(storage) {}
 
 VerifyMasterResult

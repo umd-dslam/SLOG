@@ -68,7 +68,7 @@ public:
    */
   static VerifyMasterResult CheckCounters(
       const TransactionHolder* txn_holder,
-      shared_ptr<const Storage<Key, Record>> storage) {
+      const shared_ptr<const Storage<Key, Record>>& storage) {
     auto& keys = txn_holder->KeysInPartition();
     auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
     

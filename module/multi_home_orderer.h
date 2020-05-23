@@ -24,7 +24,7 @@ namespace slog {
  */
 class MultiHomeOrderer : public BasicModule {
 public:
-  MultiHomeOrderer(ConfigurationPtr config, Broker& broker);
+  MultiHomeOrderer(const ConfigurationPtr& config, Broker& broker);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;

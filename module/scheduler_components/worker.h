@@ -31,9 +31,9 @@ class Worker : public Module {
 public:
   Worker(
       const string& identity,
-      ConfigurationPtr config,
+      const ConfigurationPtr& config,
       zmq::context_t& context,
-      shared_ptr<Storage<Key, Record>> storage);
+      const shared_ptr<Storage<Key, Record>>& storage);
   void SetUp() final;
   void Loop() final;
 
