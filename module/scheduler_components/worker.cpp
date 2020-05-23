@@ -13,9 +13,9 @@ using internal::Response;
 
 Worker::Worker(
     const string& identity,
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     zmq::context_t& context,
-    shared_ptr<Storage<Key, Record>> storage)
+    const shared_ptr<Storage<Key, Record>>& storage)
   : identity_(identity),
     config_(config),
     scheduler_socket_(context, ZMQ_DEALER),

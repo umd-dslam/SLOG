@@ -34,7 +34,7 @@ using std::make_shared;
 
 void LoadData(
     slog::Storage<Key, Record>& storage,
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     const string& data_dir) {
   if (data_dir.empty()) {
     LOG(INFO) << "No initial data directory specified. Starting with an empty storage.";

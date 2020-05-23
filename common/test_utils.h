@@ -33,7 +33,7 @@ using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
  */
 class TestSlog {
 public:
-  TestSlog(ConfigurationPtr config);
+  TestSlog(const ConfigurationPtr& config);
   void Data(Key&& key, Record&& record);
   void AddServerAndClient();
   void AddForwarder();

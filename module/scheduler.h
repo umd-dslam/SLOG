@@ -17,14 +17,6 @@
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
-using std::shared_ptr;
-using std::queue;
-using std::unique_ptr;
-using std::map;
-using std::unordered_map;
-using std::unordered_set;
-using std::vector;
-
 namespace slog {
 
 class Scheduler : public Module, ChannelHolder {
@@ -33,10 +25,10 @@ public:
   static const uint32_t WORKER_LOAD_THRESHOLD;
 
   Scheduler(
-      ConfigurationPtr config,
+      const ConfigurationPtr& config,
       zmq::context_t& context,
       Broker& broker,
-      shared_ptr<Storage<Key, Record>> storage);
+      const std::shared_ptr<Storage<Key, Record>>& storage);
 
   void SetUp() final;
 
@@ -112,36 +104,36 @@ private:
 
   ConfigurationPtr config_;
   zmq::socket_t worker_socket_;
-  vector<zmq::pollitem_t> poll_items_;
-  vector<string> worker_identities_;
-  vector<unique_ptr<ModuleRunner>> workers_;
+  std::vector<zmq::pollitem_t> poll_items_;
+  std::vector<string> worker_identities_;
+  std::vector<unique_ptr<ModuleRunner>> workers_;
   size_t next_worker_;
 
-  unordered_map<uint32_t, BatchLog> all_logs_;
+  std::unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
   SimpleRemasterManager remaster_manager_;
 
-  unordered_map<TxnId, TransactionHolder> all_txns_;
+  std::unordered_map<TxnId, TransactionHolder> all_txns_;
   
   /**
    * Lock-only transactions are kept here during remaster checking and locking.
    * This map is also used to track which LOs have arrived during an abort, which means
    * that LOs should not be removed until the txn is dispatched.
    */
-  map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
+  std::map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
 
   /**
    * Transactions that are in the process of aborting
    */
-  unordered_set<TxnId> aborting_txns_;
+  std::unordered_set<TxnId> aborting_txns_;
   /**
    * Stores how many lock-only transactions need aborting during
    * mutli-home abort
    * 
    * Note: can be negative, if lock-onlys abort before the multi-home
    */
-  unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
+  std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
 };
 
 } // namespace slog

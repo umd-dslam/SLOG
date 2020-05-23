@@ -11,7 +11,7 @@ using std::string;
 namespace slog {
 
 TransactionHolder::TransactionHolder() : txn_(nullptr), worker_("") {}
-TransactionHolder::TransactionHolder(ConfigurationPtr config, Transaction* txn) : worker_("") {
+TransactionHolder::TransactionHolder(const ConfigurationPtr& config, Transaction* txn) : worker_("") {
   SetTransaction(config, txn);
 }
 
@@ -19,7 +19,7 @@ TransactionHolder::~TransactionHolder() {
   delete txn_;
 }
 
-void TransactionHolder::SetTransaction(const ConfigurationPtr config, Transaction* txn) {
+void TransactionHolder::SetTransaction(const ConfigurationPtr& config, Transaction* txn) {
   keys_in_partition_.clear();
   involved_partitions_.clear();
   active_partitions_.clear();

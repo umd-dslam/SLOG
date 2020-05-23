@@ -27,7 +27,7 @@ namespace slog {
  */
 class Sequencer : public BasicModule {
 public:
-  Sequencer(ConfigurationPtr config, Broker& broker);
+  Sequencer(const ConfigurationPtr& config, Broker& broker);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;

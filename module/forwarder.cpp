@@ -36,7 +36,7 @@ Request MakeLookupMasterRequest(const Transaction& txn) {
 
 } // namespace
 
-Forwarder::Forwarder(ConfigurationPtr config, Broker& broker) 
+Forwarder::Forwarder(const ConfigurationPtr& config, Broker& broker) 
   : BasicModule("Forwarder", broker.AddChannel(FORWARDER_CHANNEL)),
     config_(config),
     RandomPartition(0, config->GetNumPartitions() - 1) {}

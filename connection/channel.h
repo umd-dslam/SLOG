@@ -14,7 +14,7 @@ namespace slog {
  */
 class Channel {
 public:
-  Channel(std::shared_ptr<zmq::context_t> context, const std::string& name);
+  Channel(const std::shared_ptr<zmq::context_t>& context, const std::string& name);
   Channel(const Channel&) = delete;
   Channel& operator=(const Channel&) = delete;
 
@@ -51,7 +51,7 @@ public:
 
 private:
   Channel(
-      std::shared_ptr<zmq::context_t> context,
+      const std::shared_ptr<zmq::context_t>& context,
       const std::string& name,
       bool is_listener);
 

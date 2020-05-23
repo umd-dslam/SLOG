@@ -18,10 +18,10 @@ const string Scheduler::WORKERS_ENDPOINT("inproc://workers");
 const uint32_t Scheduler::WORKER_LOAD_THRESHOLD = 5;
 
 Scheduler::Scheduler(
-    ConfigurationPtr config,
+    const ConfigurationPtr& config,
     zmq::context_t& context,
     Broker& broker,
-    shared_ptr<Storage<Key, Record>> storage)
+    const shared_ptr<Storage<Key, Record>>& storage)
   : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
     // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
     // range, num_replicas can be used as the marker for MULTI-HOME txn log
