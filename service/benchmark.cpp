@@ -1,6 +1,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <random>
 
 #include "common/configuration.h"
 #include "common/csv_writer.h"
@@ -13,7 +14,9 @@
 #include "workload/single_machine_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
-DEFINE_uint32(replica, 0, "The region where the current machine is located");
+DEFINE_uint32(r, 0, "The region where the current machine is located");
+DEFINE_int32(p, -1, "The partition the transactions are sent to. "
+                     "Set to a negative number to randomly send to any partiton");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_string(out_dir, "", "Directory containing output data");
 DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
@@ -83,6 +86,11 @@ unique_ptr<zmq::socket_t> ticker_socket;
 vector<zmq::pollitem_t> poll_items;
 
 /**
+ * Configuration
+ */
+ConfigurationPtr config;
+
+/**
  * Used for controlling rate
  * Note: This must be declared after `context` so that
  *       it is destructed before `context`.
@@ -93,6 +101,12 @@ unique_ptr<ModuleRunner> ticker;
  * Selected workload
  */
 unique_ptr<WorkloadGenerator> workload;
+
+/**
+ * Random generator
+ */
+std::random_device rd;
+std::mt19937 gen(rd());
 
 /**
  * Data structure for keeping track of the transactions
@@ -177,8 +191,12 @@ void InitializeBenchmark() {
       ZMQ_POLLIN,
       0 /* revent */});
 
-  ConfigurationPtr config =
-      Configuration::FromFile(FLAGS_config, "", FLAGS_replica);
+  config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
+
+  if (FLAGS_p >= 0 && static_cast<uint32_t>(FLAGS_p) >= config->GetNumPartitions()) {
+    LOG(FATAL) << "Invalid partition: " << FLAGS_p
+               << ". Number of partition is: " << config->GetNumPartitions();
+  }
 
   // Connect to all server in the same region
   for (uint32_t p = 0; p < config->GetNumPartitions(); p++) {
@@ -186,7 +204,7 @@ void InitializeBenchmark() {
     if (config->GetProtocol() == "ipc") {
       endpoint_s << "tcp://localhost:"  << config->GetServerPort();
     } else {
-      endpoint_s << "tcp://" << config->GetAddress(FLAGS_replica, p) << ":" << config->GetServerPort();
+      endpoint_s << "tcp://" << config->GetAddress(FLAGS_r, p) << ":" << config->GetServerPort();
     }
     auto endpoint = endpoint_s.str();
 
@@ -291,8 +309,12 @@ void SendNextTransaction() {
   MMessage msg;
   msg.Push(req);
 
-  // TODO: Add an option to randomly send to any server in the same region
-  msg.SendTo(*server_sockets[0]);
+  if (FLAGS_p < 0) {
+    std::uniform_int_distribution<> dis(0, config->GetNumPartitions() - 1);
+    msg.SendTo(*server_sockets[dis(gen)]);
+  } else {
+    msg.SendTo(*server_sockets[FLAGS_p]);
+  }
 
   auto& txn_info = outstanding_txns[stats.txn_counter];
   txn_info.sent_at = Clock::now();
