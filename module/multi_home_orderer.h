@@ -3,8 +3,7 @@
 #include "common/configuration.h"
 #include "connection/broker.h"
 #include "data_structure/batch_log.h"
-#include "module/base/basic_module.h"
-#include "paxos/paxos_client.h"
+#include "module/base/networked_module.h"
 
 namespace slog {
 
@@ -22,9 +21,9 @@ namespace slog {
  *         ForwardBatch'es are serialized into a log according to
  *         their globally orderred IDs and then forwarded to the Sequencer.
  */
-class MultiHomeOrderer : public BasicModule {
+class MultiHomeOrderer : public NetworkedModule {
 public:
-  MultiHomeOrderer(const ConfigurationPtr& config, Broker& broker);
+  MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
@@ -45,7 +44,6 @@ private:
       internal::ForwardBatch* forward_batch);
 
   ConfigurationPtr config_;
-  unique_ptr<PaxosClient> global_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId local_batch_id_counter_;
   BatchId batch_id_counter_;

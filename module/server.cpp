@@ -11,9 +11,9 @@ namespace slog {
 
 Server::Server(
     const ConfigurationPtr& config,
-    Broker& broker,
+    const shared_ptr<Broker>& broker,
     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index)
-  : BasicModule("Server", broker.AddChannel(SERVER_CHANNEL)), 
+  : NetworkedModule(broker, SERVER_CHANNEL),
     config_(config),
     lookup_master_index_(lookup_master_index),
     txn_id_counter_(0) {}
@@ -75,7 +75,7 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
       forward_request.mutable_forward_txn()->set_allocated_txn(txn);
 
       RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
-      SendSameMachine(forward_request, FORWARDER_CHANNEL);
+      Send(forward_request, FORWARDER_CHANNEL);
       break;
     }
     case api::Request::kStats: {
@@ -91,7 +91,7 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
           ProcessStatsRequest(stats_request.stats());
           break;
         case api::StatsModule::SCHEDULER:
-          SendSameMachine(stats_request, SCHEDULER_CHANNEL);
+          Send(stats_request, SCHEDULER_CHANNEL);
           break;
         default:
           LOG(ERROR) << "Invalid module for stats request";
@@ -158,7 +158,7 @@ void Server::ProcessLookUpMasterRequest(
       }
     }
   }
-  Send(response, from_machine_id, FORWARDER_CHANNEL);
+  Send(response, FORWARDER_CHANNEL, from_machine_id);
 }
 
 void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {

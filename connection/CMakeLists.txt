@@ -1,10 +1,6 @@
 project(connection)
 
-set(SOURCES
-  broker.cpp
-  channel.cpp)
-
-add_library(connection ${SOURCES})
+add_library(connection broker.cpp sender.cpp)
 
 target_link_libraries(connection 
   common

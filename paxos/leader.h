@@ -32,12 +32,12 @@ struct Proposal {
 class Leader {
 public:
   /**
-   * @param sender  The enclosing Paxos class
+   * @param paxos   The enclosing Paxos class
    * @param members Machine Id of all members participating in this Paxos process
    * @param me      Machine Id of the current machine
    */
   Leader(
-      SimpleMultiPaxos& sender,
+      SimpleMultiPaxos& paxos,
       const vector<string>& members,
       const string& me);
 
@@ -60,7 +60,7 @@ private:
 
   void SendToAllMembers(const internal::Request& request);
 
-  SimpleMultiPaxos& sender_;
+  SimpleMultiPaxos& paxos_;
 
   const vector<string> members_;
   const string me_;

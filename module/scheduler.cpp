@@ -19,20 +19,29 @@ const uint32_t Scheduler::WORKER_LOAD_THRESHOLD = 5;
 
 Scheduler::Scheduler(
     const ConfigurationPtr& config,
-    zmq::context_t& context,
-    Broker& broker,
+    const shared_ptr<Broker>& broker,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
-    // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
+  : // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
     // range, num_replicas can be used as the marker for MULTI-HOME txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
-    worker_socket_(context, ZMQ_ROUTER),
+    pull_socket_(*broker->GetContext(), ZMQ_PULL),
+    worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
+    sender_(broker),
     remaster_manager_(storage) {
+  broker->AddChannel(SCHEDULER_CHANNEL);
+  pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
+  pull_socket_.setsockopt(ZMQ_LINGER, 0);
+  pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
+  poll_items_.push_back({
+      static_cast<void*>(pull_socket_),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */});
+
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
   worker_socket_.setsockopt(ZMQ_SNDHWM, 0);
-  poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
       static_cast<void*>(worker_socket_),
       0, /* fd */
@@ -43,7 +52,7 @@ Scheduler::Scheduler(
     workers_.push_back(MakeRunnerFor<Worker>(
         std::to_string(i), /* identity */
         config,
-        context,
+        *broker->GetContext(),
         storage));
   }
 }
@@ -69,8 +78,7 @@ void Scheduler::Loop() {
   zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
   if (HasMessageFromChannel()) {
-    MMessage msg;
-    ReceiveFromChannel(msg);
+    MMessage msg(pull_socket_);
     Request req;
     if (msg.GetProto(req)) {
       HandleInternalRequest(move(req), msg.GetIdentity());
@@ -90,7 +98,7 @@ void Scheduler::Loop() {
       // Worker to specify the destination of this message
       msg.GetString(destination, MM_PROTO + 1);
       // Send to the Scheduler of the remote machine
-      SendSameChannel(forwarded_req, destination);
+      sender_.Send(forwarded_req, SCHEDULER_CHANNEL, destination);
     } else if (msg.IsProto<Response>()) {
       Response res;
       msg.GetProto(res);
@@ -306,7 +314,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  SendSameMachine(res, SERVER_CHANNEL);
+  sender_.Send(res, SERVER_CHANNEL);
 }
 
 /***********************************************
@@ -361,7 +369,7 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
 
   auto coordinating_server = MakeMachineIdAsString(
       txn->internal().coordinating_server());
-  Send(req, coordinating_server, SERVER_CHANNEL);
+  sender_.Send(req, SERVER_CHANNEL, coordinating_server);
   
   txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
@@ -384,10 +392,10 @@ void Scheduler::MaybeUpdateLocalLog() {
     forward_batch_order->set_slot(slot_id);
     auto num_replicas = config_->GetNumReplicas();
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      SendSameChannel(
+      sender_.Send(
           request,
-          MakeMachineIdAsString(rep, local_partition),
-          rep + 1 < num_replicas /* has_more */);
+          SCHEDULER_CHANNEL,
+          MakeMachineIdAsString(rep, local_partition));
     }
   }
 }
@@ -678,7 +686,7 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   for (auto p : txn_holder.ActivePartitions()) {
     if (p != config_->GetLocalPartition()) {
       auto machine_id = MakeMachineIdAsString(local_replica, p);
-      SendSameChannel(request, machine_id);
+      sender_.Send(request, SCHEDULER_CHANNEL, machine_id);
     }
   }
 }

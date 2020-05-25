@@ -9,7 +9,7 @@ namespace slog {
 
 class Ticker : public Module {
 public:
-  const static string ENDPOINT;
+  const static std::string ENDPOINT;
   static zmq::socket_t Subscribe(zmq::context_t& context);
 
   Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms);

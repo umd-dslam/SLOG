@@ -80,7 +80,7 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
   : config_(config),
     context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage<Key, Record, Metadata>()),
-    broker_(config, context_, 5),
+    broker_(new Broker(config, context_, 5)),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {
   ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->GetBatchDuration()));
@@ -105,8 +105,7 @@ void TestSlog::AddSequencer() {
 }
 
 void TestSlog::AddScheduler() {
-  scheduler_ = MakeRunnerFor<Scheduler>(
-      config_, *context_, broker_, storage_);
+  scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_);
 }
 
 void TestSlog::AddLocalPaxos() {
@@ -121,12 +120,35 @@ void TestSlog::AddMultiHomeOrderer() {
   multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_);
 }
 
-unique_ptr<Channel> TestSlog::AddChannel(const string& name) {
-  return broker_.AddChannel(name);
+void TestSlog::AddChannel(const string& name) {
+  broker_->AddChannel(name);
+
+  zmq::socket_t socket(*context_, ZMQ_PULL);
+  socket.setsockopt(ZMQ_LINGER, 0);
+  socket.bind("inproc://" + name);
+  channels_[name] = std::move(socket);
+}
+
+zmq::pollitem_t TestSlog::GetPollItemForChannel(const string& name) {
+  CHECK(channels_.count(name) > 0) << "Channel " << name << " does not exist";
+  return {
+      static_cast<void*>(channels_[name]),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */};
+}
+
+void TestSlog::ReceiveFromChannel(MMessage& msg, const string& name) {
+  CHECK(channels_.count(name) > 0) << "Channel " << name << " does not exist";
+  msg.ReceiveFrom(channels_[name]);
+}
+
+unique_ptr<Sender> TestSlog::GetSender() {
+  return std::make_unique<Sender>(broker_);
 }
 
 void TestSlog::StartInNewThreads() {
-  broker_.StartInNewThread();
+  broker_->StartInNewThread();
   ticker_->StartInNewThread();
   if (server_) {
     server_->StartInNewThread();

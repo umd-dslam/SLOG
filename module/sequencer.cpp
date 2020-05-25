@@ -10,12 +10,11 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(const ConfigurationPtr& config, Broker& broker)
-  : BasicModule(
-        "Sequencer",
-        broker.AddChannel(SEQUENCER_CHANNEL)),
+Sequencer::Sequencer(
+    const ConfigurationPtr& config,
+    const std::shared_ptr<Broker>& broker)
+  : NetworkedModule(broker, SEQUENCER_CHANNEL),
     config_(config),
-    local_paxos_(new SimpleMultiPaxosClient(*this, LOCAL_PAXOS)),
     batch_id_counter_(0) {
   NewBatch();
 }
@@ -75,14 +74,16 @@ void Sequencer::HandleCustomSocketMessage(
   VLOG(3) << "Finished batch " << batch_id
           << ". Sending out for ordering and replicating";
 
-  Request req;
-  auto forward_batch = req.mutable_forward_batch();
+  Request paxos_req;
+  auto paxos_propose = paxos_req.mutable_paxos_propose();
+  paxos_propose->set_value(config_->GetLocalPartition());
+  Send(paxos_req, LOCAL_PAXOS);
+
+  Request batch_req;
+  auto forward_batch = batch_req.mutable_forward_batch();
   // minus 1 so that batch id counter starts from 0
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
   forward_batch->set_allocated_batch_data(batch_.release());
-
-  // Send batch id to local paxos for ordering
-  local_paxos_->Propose(config_->GetLocalPartition());
 
   // Replicate batch to all machines
   RecordTxnEvent(
@@ -96,10 +97,9 @@ void Sequencer::HandleCustomSocketMessage(
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       auto machine_id = MakeMachineIdAsString(rep, part);
       Send(
-          req,
-          machine_id,
+          batch_req,
           SCHEDULER_CHANNEL,
-          part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
+          machine_id);
     }
   }
 
@@ -163,9 +163,8 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     auto machine_id = MakeMachineIdAsString(local_rep, part);
     Send(
         req,
-        machine_id,
         SCHEDULER_CHANNEL,
-        part + 1 < num_partitions /* has_more */);
+        machine_id);
   }
 }
 

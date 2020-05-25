@@ -1,9 +1,8 @@
 #pragma once
 
 #include "connection/broker.h"
-#include "module/base/basic_module.h"
+#include "module/base/networked_module.h"
 #include "paxos/acceptor.h"
-#include "paxos/paxos_client.h"
 #include "paxos/leader.h"
 
 using std::shared_ptr;
@@ -11,9 +10,8 @@ using std::string;
 
 namespace slog {
 
-class SimpleMultiPaxos : public BasicModule {
+class SimpleMultiPaxos : public NetworkedModule {
 public:
-  static const string CHANNEL_PREFIX;
 
   /**
    * @param group_name  Name of the current paxos group. Used to differentiate messages 
@@ -24,7 +22,7 @@ public:
    */
   SimpleMultiPaxos(
       const string& group_name,
-      Broker& broker,
+      const shared_ptr<Broker>& broker,
       const vector<string>& group_members,
       const string& me);
 
@@ -45,20 +43,12 @@ private:
   Leader leader_;
   Acceptor acceptor_;
 
+  void SendSameChannel(
+      const google::protobuf::Message& request_or_response,
+      const std::string& to_machine_id);
+
   friend class Leader;
   friend class Acceptor;
-};
-
-class SimpleMultiPaxosClient : public PaxosClient {
-public:
-  SimpleMultiPaxosClient(ChannelHolder& channel_holder, const string& group_name);
-
-  void Propose(uint32_t value) final;
-
-private:
-
-  ChannelHolder& channel_holder_;
-  const string group_name_;
 };
 
 } // namespace slog

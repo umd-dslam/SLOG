@@ -10,7 +10,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
-#include "module/base/basic_module.h"
+#include "module/base/networked_module.h"
 #include "storage/lookup_master_index.h"
 #include "proto/api.pb.h"
 
@@ -43,11 +43,11 @@ struct CompletedTransaction {
  *         For LookUpMasterRequest, a LookUpMasterResponse is sent back to
  *         the requester.
  */
-class Server : public BasicModule {
+class Server : public NetworkedModule {
 public:
   Server(
       const ConfigurationPtr& config,
-      Broker& broker,
+      const shared_ptr<Broker>& broker,
       const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index);
 
 protected:
