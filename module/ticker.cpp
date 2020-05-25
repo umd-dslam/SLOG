@@ -1,5 +1,7 @@
 #include "ticker.h"
 
+using std::string;
+
 namespace slog {
 
 const string Ticker::ENDPOINT("inproc://ticker");

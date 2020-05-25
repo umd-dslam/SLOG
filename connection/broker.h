@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <thread>
 #include <unordered_map>
 
@@ -7,7 +8,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "connection/channel.h"
+#include "common/mmessage.h"
 
 using std::shared_ptr;
 using std::string;
@@ -54,7 +55,13 @@ public:
 
   void StartInNewThread();
 
-  unique_ptr<Channel> AddChannel(const string& name);
+  string AddChannel(const string& name);
+
+  const std::shared_ptr<zmq::context_t>& GetContext() const;
+
+  std::string GetEndpointByMachineId(const std::string& machine_id);
+
+  std::string GetLocalMachineId() const;
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -73,36 +80,39 @@ private:
 
   void HandleIncomingMessage(MMessage&& msg);
 
-  void HandleOutgoingMessage(MMessage && msg);
-
-  void SendToTargetChannel(MMessage&& msg);
-
   zmq::pollitem_t GetRouterPollItem();
 
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   long poll_timeout_ms_;
   zmq::socket_t router_;
-  std::atomic<bool> running_;
 
+  // Thread stuff
+  std::atomic<bool> running_;
   std::thread thread_;
+
+  // Synchronization
+  bool is_synchronized_;
+  std::condition_variable cv_;
+  std::mutex mutex_;
 
   // Messages that are sent to this broker when it is not READY yet
   vector<MMessage> unhandled_incoming_messages_;
   // Map from channel name to the channel
-  unordered_map<string, unique_ptr<Channel>> channels_;
-  // Map from ip addresses to sockets
-  unordered_map<string, unique_ptr<zmq::socket_t>> address_to_socket_;
-
-  // Map from connection ids (zmq identities) to serialized-to-string MachineIds
-  // Used to translate the identities of incoming messages
-  unordered_map<string, string> connection_id_to_machine_id_;
-  // Cache this to detect that a message comes from the local machine (loop-back)
-  string loopback_connection_id_;
+  unordered_map<string, zmq::socket_t> channels_;
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages
-  unordered_map<string, string> machine_id_to_address_;
+  std::unordered_map<std::string, std::string> machine_id_to_endpoint_;
+
+  // This is a hack so that tests behave correctly. Ideally, these sockets
+  // should be scoped within InitializeConnection(). However, if we let them
+  // linger indefinitely and a test ends before the cluster fully synchronized,
+  // some of these sockets would hang up if their recipients already terminated.
+  // If we don't let them linger at all, some of them might be destroyed at end
+  // of function scope and the system would hang up, waiting for READY messages.
+  // Putting them here solves the problem but is not ideal.
+  std::vector<zmq::socket_t> tmp_sockets_;
 };
 
 } // namespace slog

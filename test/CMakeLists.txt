@@ -4,8 +4,7 @@ project(test)
 set(ALL_TESTS
   batch_log_test
   batch_interleaver_test
-  broker_test
-  channel_test
+  broker_and_sender_test
   commands_test
   concurrent_hash_map_test
   deterministic_lock_manager_test
@@ -30,11 +29,8 @@ add_executable(batch_interleaver_test
   module/scheduler_components/batch_interleaver_test.cpp)
 target_link_libraries(batch_interleaver_test scheduler_components proto)
 
-add_executable(broker_test connection/broker_test.cpp)
-target_link_libraries(broker_test test_utils)
-
-add_executable(channel_test connection/channel_test.cpp)
-target_link_libraries(channel_test test_utils)
+add_executable(broker_and_sender_test connection/broker_and_sender_test.cpp)
+target_link_libraries(broker_and_sender_test test_utils)
 
 add_executable(commands_test module/scheduler_components/commands_test.cpp)
 target_link_libraries(commands_test test_utils)

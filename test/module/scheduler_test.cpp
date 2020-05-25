@@ -42,8 +42,8 @@ protected:
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddScheduler();
-      input_[i] = test_slogs_[i]->AddChannel(SEQUENCER_CHANNEL);
-      output_[i] = test_slogs_[i]->AddChannel(SERVER_CHANNEL);
+      sender_[i] = test_slogs_[i]->GetSender();
+      test_slogs_[i]->AddChannel(SERVER_CHANNEL);
     }
     // Relica 0
     test_slogs_[0]->Data("A", {"valueA", 0, 1});
@@ -84,21 +84,14 @@ protected:
       size_t batch_order_offset = 0) {
     auto batch = MakeBatch(batch_id, txns, SINGLE_HOME);
     for (auto partition : partitions) {
-      // Simulate a message containing a batch
-      MMessage batch_msg;
-      batch_msg.Set(MM_PROTO, batch);
-      // Destination
-      batch_msg.SetIdentity(MakeMachineIdAsString(0, partition));
-      batch_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
       // This message is sent from machine 0:0, so it will be queued up in queue 0
-      input_[0]->Send(batch_msg);
+      sender_[0]->Send(batch, SCHEDULER_CHANNEL, MakeMachineIdAsString(0, partition));
 
       // Simulate a local paxos order message
-      MMessage order_msg;
-      order_msg.Set(MM_PROTO, MakeLocalQueueOrder(batch_order_offset, 0 /* queue_id */));
-      order_msg.SetIdentity(MakeMachineIdAsString(0, partition));
-      order_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
-      input_[0]->Send(order_msg);
+      sender_[0]->Send(
+          MakeLocalQueueOrder(batch_order_offset, 0 /* queue_id */),
+          SCHEDULER_CHANNEL,
+          MakeMachineIdAsString(0, partition));
     }
   }
 
@@ -110,10 +103,7 @@ protected:
     for (auto partition : partitions) {
       // Simulate a message containing a batch. It doesn't matter where
       // this message comes from.
-      MMessage batch_msg;
-      batch_msg.Set(MM_PROTO, batch);
-      batch_msg.Set(MM_TO_CHANNEL, SCHEDULER_CHANNEL);
-      input_[partition]->Send(batch_msg);
+      sender_[partition]->Send(batch, SCHEDULER_CHANNEL);
       // Unlike single-home batch, multi-home batches are pre-ordered
       // and this order follows batch_id
     }
@@ -124,7 +114,7 @@ protected:
     bool first_time = true;
     for (uint32_t i = 0; i < num_partitions; i++) {
       MMessage msg;
-      output_[receiver]->Receive(msg);
+      test_slogs_[receiver]->ReceiveFromChannel(msg, SERVER_CHANNEL);
       internal::Request req;
       CHECK(msg.GetProto(req));
       CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);
@@ -144,11 +134,8 @@ protected:
   }
 
 private:
-  // Make sure to maintain the order of these variables otherwise the channels are
-  // deallocated before the test slogs leading to ZMQ somehow hanging up.
-  unique_ptr<Channel> input_[NUM_MACHINES];
-  unique_ptr<Channel> output_[NUM_MACHINES];
   unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
+  unique_ptr<Sender> sender_[NUM_MACHINES];
 };
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {

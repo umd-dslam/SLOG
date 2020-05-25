@@ -16,21 +16,18 @@ protected:
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    input_ = slog_->AddChannel(FORWARDER_CHANNEL);
-    output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->AddChannel(SCHEDULER_CHANNEL);
+    sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
   }
 
   void SendToSequencer(internal::Request req) {
-    MMessage msg;
-    msg.Set(MM_PROTO, req);
-    msg.Set(MM_TO_CHANNEL, SEQUENCER_CHANNEL);
-    input_->Send(msg);
+    sender_->Send(req, SEQUENCER_CHANNEL);
   }
 
   internal::Batch* ReceiveBatch() {
     MMessage msg;
-    output_->Receive(msg);
+    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     if (!msg.GetProto(req)) {
       return nullptr;
@@ -47,8 +44,7 @@ protected:
   }
 
 private:
-  unique_ptr<Channel> input_;
-  unique_ptr<Channel> output_;
+  unique_ptr<Sender> sender_;
   unique_ptr<TestSlog> slog_;
 };
 
@@ -60,7 +56,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
       {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   Request req;
-  req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+  req.mutable_forward_txn()->set_allocated_txn(txn);
 
   SendToSequencer(req);
 
