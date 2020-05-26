@@ -76,22 +76,18 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   const auto& state = InitializeTransactionState(txn_holder);
 
   auto will_abort = false;
-  switch(RemasterManager::CheckCounters(txn_holder, storage_)) {
-    case VerifyMasterResult::VALID: {
-      break;
+  for (auto& key_pair : txn->internal().master_metadata()) {
+    auto& key = key_pair.first;
+    auto txn_master = key_pair.second.master();
+
+    Record record;
+    bool found = storage_->Read(key, record);
+    if (found) {
+      if (txn_master != record.metadata.master) {
+        will_abort = true;
+        break;
+      }
     }
-    case VerifyMasterResult::ABORT: {
-      txn->set_status(TransactionStatus::ABORTED);
-      will_abort = true;
-      break;
-    }
-    case VerifyMasterResult::WAITING: {
-      LOG(ERROR) << "Transaction " << txn_id << " was sent to worker with a high counter";
-      break;
-    }
-    default:
-      LOG(ERROR) << "Unrecognized check counter result";
-      break;
   }
 
   if (!will_abort) {

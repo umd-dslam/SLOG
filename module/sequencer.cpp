@@ -147,8 +147,19 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
-    // TODO: Ignore lock only txns with no key
-    PutSingleHomeTransactionIntoBatch(lock_only_txn);
+
+    if (txn.procedure_case() == Transaction::kNewMaster) {
+      lock_only_txn->set_new_master(txn.new_master());
+      if (txn.new_master() == local_rep) {
+        // TODO: check that remaster txn only has 1 key
+        lock_only_txn->mutable_write_set()->insert(*txn.write_set().begin());
+        lock_only_metadata->insert(*txn.internal().master_metadata().begin());
+      }
+    }
+
+    if (!lock_only_txn->internal().master_metadata().empty()) {
+      PutSingleHomeTransactionIntoBatch(lock_only_txn);
+    }
   }
 
   // Replicate the batch of multi-home txns to all machines in the same region

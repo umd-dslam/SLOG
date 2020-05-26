@@ -136,13 +136,28 @@ TransactionType SetTransactionType(Transaction& txn) {
   // If this is a single-home txn, home of all other keys must
   // be the same as that of the first key
   // TODO: check and report empty transaction
-  const auto& home_replica = master_metadata.begin()->second.master();
-  for (const auto& pair : master_metadata) {
-    if (pair.second.master() != home_replica) {
+
+  switch(txn.procedure_case()) {
+    case Transaction::kCode: {
+      const auto& home_replica = master_metadata.begin()->second.master();
+      for (const auto& pair : master_metadata) {
+        if (pair.second.master() != home_replica) {
+          is_single_home = false;
+          break;
+        }
+      }
+      break;
+    }
+    case Transaction::kNewMaster: {
       is_single_home = false;
       break;
     }
+    default: {
+      // TODO: log fatal
+      break;
+    }
   }
+
   txn_internal->set_type(
       is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME);
   return txn_internal->type();

@@ -443,7 +443,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             if (aborting_txns_.count(txn_id)) {
               AddTransactionToAbort(txn_id);
             } else {
-              SendToRemasterManager(txn_holder);
+              SendToLockManager(txn_holder);
             }
             break;
           }
@@ -455,8 +455,10 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
 
             if (aborting_txns_.count(txn_id)) {
               AddLockOnlyTransactionToAbort(txn_replica_id);
+            } else if (remaster_txns_waiting_to_dispatch_.count(txn_id)){
+              DispatchTransaction(txn_id);
             } else {
-              SendToRemasterManager(txn_holder);
+              SendToLockManager(txn_holder);
             }
             break;
           }
@@ -726,9 +728,17 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
-
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
+
+  if (txn->procedure_case() == Transaction::kNewMaster) {
+    if (remaster_txns_waiting_to_dispatch_.count(txn_id) == 0) {
+      remaster_txns_waiting_to_dispatch_.insert(txn_id);
+      return;
+    } else {
+      remaster_txns_waiting_to_dispatch_.erase(txn_id);
+    }
+  }
 
   // Delete lock-only transactions
   if (txn->internal().type() == TransactionType::MULTI_HOME) {
