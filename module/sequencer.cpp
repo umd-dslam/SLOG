@@ -147,8 +147,9 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
-    // TODO: Ignore lock only txns with no key
-    PutSingleHomeTransactionIntoBatch(lock_only_txn);
+    if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
+      PutSingleHomeTransactionIntoBatch(lock_only_txn);
+    }
   }
 
   // Replicate the batch of multi-home txns to all machines in the same region
