@@ -25,10 +25,15 @@ namespace slog {
 
 namespace {
 
+// Replica of the target machine
 constexpr char REPLICA[] = "rep";
+// Partition of the target machine
 constexpr char PARTITION[] = "part";
+// Number of records in a transaction
 constexpr char NUM_RECORDS[] = "num_records";
+// Number of write records in a transaction
 constexpr char NUM_WRITES[] = "num_writes";
+// Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
 
 const RawParamMap DEFAULT_PARAMS = {
@@ -36,7 +41,7 @@ const RawParamMap DEFAULT_PARAMS = {
   { PARTITION, "0" },
   { NUM_RECORDS, "10" },
   { NUM_WRITES, "2" },
-  { VALUE_SIZE, "100" } // bytes
+  { VALUE_SIZE, "100" }
 };
 
 } // namespace

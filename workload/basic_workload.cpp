@@ -24,13 +24,24 @@ using std::unordered_set;
 namespace slog {
 namespace {
 
+// Percentage of multi-home transactions
 constexpr char MH_PCT[] = "mh";
+// Number of regions selected as homes in a multi-home transaction
 constexpr char MH_NUM_HOMES[] = "mh_homes";
+// Percentage of multi-partition transactions
 constexpr char MP_PCT[] = "mp";
+// Number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_NUM_PARTS[] = "mp_parts";
+// Number of records in a transaction
 constexpr char NUM_RECORDS[] = "num_records";
+// Number of write records in a transaction
 constexpr char NUM_WRITES[] = "num_writes";
+// Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
+// Region that is home to a single-home transaction.
+// Use a negative number to select a random region for
+// each transaction
+constexpr char SH_REGION[] = "sh_region";
 
 const RawParamMap DEFAULT_PARAMS = {
   { MH_PCT, "0" },
@@ -39,7 +50,8 @@ const RawParamMap DEFAULT_PARAMS = {
   { MP_NUM_PARTS, "2" },
   { NUM_RECORDS, "10" },
   { NUM_WRITES, "2" },
-  { VALUE_SIZE, "100" } // bytes
+  { VALUE_SIZE, "100" },
+  { SH_REGION, "-1" }
 };
 
 } // namespace
@@ -133,10 +145,22 @@ BasicWorkload::NextTransaction() {
   pro.is_multi_home = shmh(re_);
 
   // Select a number of homes to choose from for each record
-  auto candidate_homes = Choose(
-      config_->GetNumReplicas(),
-      pro.is_multi_home ? params_.GetUInt32(MH_NUM_HOMES) : 1,
-      re_);
+  vector<uint32_t> candidate_homes;
+  if (pro.is_multi_home) {
+    candidate_homes = Choose(
+        config_->GetNumReplicas(),
+        params_.GetUInt32(MH_NUM_HOMES),
+        re_);
+  } else {
+    auto sh_region = params_.GetInt(SH_REGION);
+    if (sh_region < 0) {
+      candidate_homes = Choose(config_->GetNumReplicas(), 1, re_);
+    } else {
+      CHECK_LT(static_cast<uint32_t>(sh_region), config_->GetNumReplicas())
+          << "Selected single-home region does not exist";
+      candidate_homes.push_back(sh_region);
+    }
+  }
 
   unordered_set<Key> read_set;
   unordered_set<Key> write_set;

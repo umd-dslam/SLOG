@@ -36,6 +36,11 @@ public:
     return std::stod(raw_params_.at(key));
   }
 
+  int GetInt(const std::string& key) const {
+    CheckKeyExists(key);
+    return std::stoi(raw_params_.at(key));
+  }
+
   uint32_t GetUInt32(const std::string& key) const {
     CheckKeyExists(key);
     return std::stoul(raw_params_.at(key));
