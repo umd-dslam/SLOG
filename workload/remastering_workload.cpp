@@ -31,15 +31,19 @@ RemasteringWorkload::RemasteringWorkload(
 std::pair<Transaction*, TransactionProfile>
 RemasteringWorkload::NextTransaction() {
   if (client_txn_id_counter_ % params_.GetUInt32(REMASTER_GAP) == 0) {
-    return BasicWorkload::NextTransaction();
-  } else {
     return NextRemasterTransaction();
+  } else {
+    return BasicWorkload::NextTransaction();
   }
 }
 
 std::pair<Transaction*, TransactionProfile>
 RemasteringWorkload::NextRemasterTransaction() {
+
   TransactionProfile pro;
+
+  pro.client_txn_id = client_txn_id_counter_;
+
   pro.is_multi_home = false;
   pro.is_multi_partition = false;
 
@@ -65,6 +69,10 @@ RemasteringWorkload::NextRemasterTransaction() {
     metadata,
     MakeMachineId("0:0"),
     new_master);
+  txn->mutable_internal()->set_id(client_txn_id_counter_);
+
+  client_txn_id_counter_++;
+
   return std::make_pair(txn, pro);
 }
 
