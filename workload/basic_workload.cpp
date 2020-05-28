@@ -57,15 +57,11 @@ const RawParamMap BasicWorkload::GetDefaultParams() {
 BasicWorkload::BasicWorkload(
     ConfigurationPtr config,
     const string& data_dir,
-    const string& params_str)
-  : BasicWorkload(config, data_dir, GetDefaultParams(), params_str) {}
-
-BasicWorkload::BasicWorkload(
-    const ConfigurationPtr& config,
-    const string& data_dir,
-    const RawParamMap default_params,
-    const string& params_str)
-  : WorkloadGenerator(default_params, params_str),
+    const string& params_str,
+    const RawParamMap extra_default_params)
+  : WorkloadGenerator(
+        MergeParams(extra_default_params, BASIC_DEFAULT_PARAMS),
+        params_str),
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
     client_txn_id_counter_(0) {

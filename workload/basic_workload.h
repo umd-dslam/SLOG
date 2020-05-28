@@ -11,18 +11,33 @@ using std::vector;
 
 namespace slog {
 
+namespace {
+constexpr char MH_PCT[] = "mh";
+constexpr char MH_NUM_HOMES[] = "mh_homes";
+constexpr char MP_PCT[] = "mp";
+constexpr char MP_NUM_PARTS[] = "mp_parts";
+constexpr char NUM_RECORDS[] = "num_records";
+constexpr char NUM_WRITES[] = "num_writes";
+constexpr char VALUE_SIZE[] = "value_size";
+
+const RawParamMap BASIC_DEFAULT_PARAMS = {
+  { MH_PCT, "0" },
+  { MH_NUM_HOMES, "2" },
+  { MP_PCT, "0" },
+  { MP_NUM_PARTS, "2" },
+  { NUM_RECORDS, "10" },
+  { NUM_WRITES, "2" },
+  { VALUE_SIZE, "100" } // bytes
+};
+} // namespace
+
 class BasicWorkload : public WorkloadGenerator {
 public:
   BasicWorkload(
-      const ConfigurationPtr& config,
-      const std::string& data_dir,
-      const std::string& params_str);
-
-  BasicWorkload(
       ConfigurationPtr config,
       const std::string& data_dir,
-      const RawParamMap default_params,
-      const std::string& params_str);
+      const std::string& params_str,
+      const RawParamMap extra_default_params = {});
 
   std::pair<Transaction*, TransactionProfile> NextTransaction();
 

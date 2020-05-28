@@ -6,27 +6,16 @@ using std::unordered_set;
 
 namespace slog {
 
-namespace {
-constexpr char REMASTER_GAP[] = "remaster_gap";
-
-const RawParamMap DEFAULT_PARAMS = {
-  { REMASTER_GAP, "50" }
-};
-}
-
-const RawParamMap RemasteringWorkload::GetDefaultParams() {
-  return MergeParams(DEFAULT_PARAMS, BasicWorkload::GetDefaultParams());
-}
-
 RemasteringWorkload::RemasteringWorkload(
     ConfigurationPtr config,
     const string& data_dir,
-    const string& params_str)
+    const string& params_str,
+    const RawParamMap extra_default_params)
   : BasicWorkload(
       config,
       data_dir,
-      GetDefaultParams(),
-      params_str) {}
+      params_str,
+      MergeParams(extra_default_params, REMASTERING_DEFAULT_PARAMS)) {}
 
 std::pair<Transaction*, TransactionProfile>
 RemasteringWorkload::NextTransaction() {

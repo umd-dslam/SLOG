@@ -119,7 +119,7 @@ public:
     return params_.ToString();
   }
 
-  static RawParamMap MergeParams(const RawParamMap& p1, const RawParamMap& p2) {
+  static const RawParamMap MergeParams(const RawParamMap& p1, const RawParamMap& p2) {
     RawParamMap params;
     params.insert(p1.begin(), p1.end());
     params.insert(p2.begin(), p2.end());
