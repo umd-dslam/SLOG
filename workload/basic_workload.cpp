@@ -6,7 +6,6 @@
 #include <random>
 #include <sstream>
 #include <unordered_set>
-#include <vector>
 
 #include <glog/logging.h>
 
@@ -15,10 +14,6 @@
 #include "proto/offline_data.pb.h"
 
 using std::discrete_distribution;
-using std::shuffle;
-using std::uniform_int_distribution;
-using std::string;
-using std::vector;
 using std::unordered_set;
 
 namespace slog {
@@ -56,11 +51,20 @@ const RawParamMap DEFAULT_PARAMS = {
 
 } // namespace
 
+const RawParamMap BasicWorkload::default_params_ = DEFAULT_PARAMS;
+
+BasicWorkload::BasicWorkload(
+    ConfigurationPtr config,
+    const string& data_dir,
+    const string& params_str)
+  : BasicWorkload(config, data_dir, default_params_, params_str) {}
+
 BasicWorkload::BasicWorkload(
     const ConfigurationPtr& config,
     const string& data_dir,
+    const RawParamMap default_params,
     const string& params_str)
-  : WorkloadGenerator(DEFAULT_PARAMS, params_str),
+  : WorkloadGenerator(default_params, params_str),
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
     client_txn_id_counter_(0) {

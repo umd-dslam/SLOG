@@ -18,9 +18,15 @@ public:
       const std::string& data_dir,
       const std::string& params_str);
 
-  std::pair<Transaction*, TransactionProfile> NextTransaction() final;
+  BasicWorkload(
+      ConfigurationPtr config,
+      const std::string& data_dir,
+      const RawParamMap default_params,
+      const std::string& params_str);
 
-private:
+  std::pair<Transaction*, TransactionProfile> NextTransaction();
+
+protected:
   ConfigurationPtr config_;
 
   // This is an index of keys by their partition and home.
@@ -31,6 +37,8 @@ private:
   std::mt19937 re_;
 
   TxnId client_txn_id_counter_;
+
+  static const RawParamMap default_params_;
 };
 
 } // namespace slog
