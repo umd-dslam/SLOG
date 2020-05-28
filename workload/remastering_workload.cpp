@@ -9,21 +9,24 @@ namespace slog {
 namespace {
 constexpr char REMASTER_GAP[] = "remaster_gap";
 
-RawParamMap addtional_params = {
+const RawParamMap DEFAULT_PARAMS = {
   { REMASTER_GAP, "50" }
 };
-
-RawParamMap MergeParams(const RawParamMap& p) {
-  addtional_params.insert(p.begin(), p.end());
-  return addtional_params;
 }
+
+const RawParamMap RemasteringWorkload::GetDefaultParams() {
+  return MergeParams(DEFAULT_PARAMS, BasicWorkload::GetDefaultParams());
 }
 
 RemasteringWorkload::RemasteringWorkload(
     ConfigurationPtr config,
     const string& data_dir,
     const string& params_str)
-  : BasicWorkload(config, data_dir, MergeParams(BasicWorkload::default_params_), params_str) {}
+  : BasicWorkload(
+      config,
+      data_dir,
+      GetDefaultParams(),
+      params_str) {}
 
 std::pair<Transaction*, TransactionProfile>
 RemasteringWorkload::NextTransaction() {

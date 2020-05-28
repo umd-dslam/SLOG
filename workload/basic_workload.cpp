@@ -17,8 +17,8 @@ using std::discrete_distribution;
 using std::unordered_set;
 
 namespace slog {
-namespace {
 
+namespace {
 // Percentage of multi-home transactions
 constexpr char MH_PCT[] = "mh";
 // Number of regions selected as homes in a multi-home transaction
@@ -48,16 +48,17 @@ const RawParamMap DEFAULT_PARAMS = {
   { VALUE_SIZE, "100" },
   { SH_REGION, "-1" }
 };
-
 } // namespace
 
-const RawParamMap BasicWorkload::default_params_ = DEFAULT_PARAMS;
+const RawParamMap BasicWorkload::GetDefaultParams() {
+  return DEFAULT_PARAMS;
+}
 
 BasicWorkload::BasicWorkload(
     ConfigurationPtr config,
     const string& data_dir,
     const string& params_str)
-  : BasicWorkload(config, data_dir, default_params_, params_str) {}
+  : BasicWorkload(config, data_dir, GetDefaultParams(), params_str) {}
 
 BasicWorkload::BasicWorkload(
     const ConfigurationPtr& config,

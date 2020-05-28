@@ -38,7 +38,7 @@ protected:
 
   TxnId client_txn_id_counter_;
 
-  static const RawParamMap default_params_;
+  static const RawParamMap GetDefaultParams();
 };
 
 } // namespace slog

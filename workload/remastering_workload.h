@@ -15,6 +15,9 @@ public:
 
   std::pair<Transaction*, TransactionProfile> NextTransaction();
   std::pair<Transaction*, TransactionProfile> NextRemasterTransaction();
+
+protected:
+  static const RawParamMap GetDefaultParams();
 };
 
 } // namespace slog
