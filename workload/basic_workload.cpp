@@ -6,7 +6,6 @@
 #include <random>
 #include <sstream>
 #include <unordered_set>
-#include <vector>
 
 #include <glog/logging.h>
 
@@ -15,10 +14,6 @@
 #include "proto/offline_data.pb.h"
 
 using std::discrete_distribution;
-using std::shuffle;
-using std::uniform_int_distribution;
-using std::string;
-using std::vector;
 using std::unordered_set;
 
 namespace slog {
@@ -56,35 +51,14 @@ const RawParamMap DEFAULT_PARAMS = {
 
 } // namespace
 
-KeyList::KeyList(size_t num_hot_keys) : num_hot_keys_(num_hot_keys) {}
-
-void KeyList::AddKey(Key key) {
-  if (hot_keys_.size() < num_hot_keys_) {
-    hot_keys_.push_back(key);
-    return;
-  }
-  cold_keys_.push_back(key);
-}
-
-Key KeyList::GetRandomHotKey() {
-  if (hot_keys_.empty()) {
-    throw std::runtime_error("There is no hot key to pick from. Please check your data");
-  }
-  return PickOne(hot_keys_, re_);
-}
-
-Key KeyList::GetRandomColdKey() {
-  if (cold_keys_.empty()) {
-    throw std::runtime_error("There is no cold key to pick from. Please check your data");
-  }
-  return PickOne(cold_keys_, re_);
-}
-
 BasicWorkload::BasicWorkload(
-    const ConfigurationPtr& config,
+    const ConfigurationPtr config,
     const string& data_dir,
-    const string& params_str)
-  : WorkloadGenerator(DEFAULT_PARAMS, params_str),
+    const string& params_str,
+    const RawParamMap extra_default_params)
+  : WorkloadGenerator(
+        MergeParams(extra_default_params, DEFAULT_PARAMS),
+        params_str),
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
     client_txn_id_counter_(0) {

@@ -12,6 +12,7 @@
 #include "proto/api.pb.h"
 #include "workload/basic_workload.h"
 #include "workload/single_machine_workload.h"
+#include "workload/remastering_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_uint32(r, 0, "The region where the current machine is located");
@@ -226,6 +227,8 @@ void InitializeBenchmark() {
     workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
   } else if (FLAGS_wl == "1machine") {
     workload = make_unique<SingleMachineWorkload>(config, FLAGS_data_dir, FLAGS_params);
+  } else if (FLAGS_wl == "remastering") {
+    workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
   } else {
     LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
   }

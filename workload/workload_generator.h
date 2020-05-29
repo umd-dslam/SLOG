@@ -119,6 +119,13 @@ public:
     return params_.ToString();
   }
 
+  static const RawParamMap MergeParams(const RawParamMap& p1, const RawParamMap& p2) {
+    RawParamMap params;
+    params.insert(p1.begin(), p1.end());
+    params.insert(p2.begin(), p2.end());
+    return params;
+  }
+
 protected:
   WorkloadParams params_;
 };
@@ -167,5 +174,37 @@ inline std::string RandomString(size_t n, std::mt19937& re) {
   }
   return s;
 }
+
+class KeyList {
+public:
+  KeyList(size_t num_hot_keys = 0) : num_hot_keys_(num_hot_keys){}
+
+  void AddKey(Key key) {
+    if (hot_keys_.size() < num_hot_keys_) {
+      hot_keys_.push_back(key);
+      return;
+    }
+    cold_keys_.push_back(key);
+  }
+  Key GetRandomHotKey() {
+    if (hot_keys_.empty()) {
+      throw std::runtime_error("There is no hot key to pick from. Please check your data");
+    }
+    return PickOne(hot_keys_, re_);
+  }
+  Key GetRandomColdKey() {
+    if (cold_keys_.empty()) {
+      throw std::runtime_error("There is no cold key to pick from. Please check your data");
+    }
+    return PickOne(cold_keys_, re_);
+  }
+
+private:
+  size_t num_hot_keys_;
+  std::vector<Key> cold_keys_;
+  std::vector<Key> hot_keys_;
+
+  std::mt19937 re_;
+};
 
 } // namespace slog
