@@ -1,6 +1,6 @@
 #pragma once
 
-#include <unordered_set>
+#include <list>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -47,10 +47,15 @@ private:
   void ProcessMultiHomeBatch(internal::Request&& request);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
+  void DelaySingleHomeBatch(internal::Request&& request);
+  void MaybeSendSingleHomeBatches();
+
   ConfigurationPtr config_;
   unique_ptr<PaxosClient> local_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
+
+  std::list<internal::Request> delayed_batches_;
 };
 
 } // namespace slog

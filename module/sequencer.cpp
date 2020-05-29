@@ -84,22 +84,28 @@ void Sequencer::HandleCustomSocketMessage(
   // Send batch id to local paxos for ordering
   local_paxos_->Propose(config_->GetLocalPartition());
 
-  // Replicate batch to all machines
   RecordTxnEvent(
       config_,
       forward_batch->mutable_batch_data(),
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
-  auto num_partitions = config_->GetNumPartitions();
-  auto num_replicas = config_->GetNumReplicas();
-  for (uint32_t part = 0; part < num_partitions; part++) {
-    for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      auto machine_id = MakeMachineIdAsString(rep, part);
-      Send(
-          req,
-          machine_id,
-          SCHEDULER_CHANNEL,
-          part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
+  if (config_->GetReplicationDelayEnabled()
+      && (rand() % 100 < config_->GetReplicationDelayPercent())) {
+    DelaySingleHomeBatch(std::move(req));
+  } else {
+
+    // Replicate batch to all machines
+    auto num_partitions = config_->GetNumPartitions();
+    auto num_replicas = config_->GetNumReplicas();
+    for (uint32_t part = 0; part < num_partitions; part++) {
+      for (uint32_t rep = 0; rep < num_replicas; rep++) {
+        auto machine_id = MakeMachineIdAsString(rep, part);
+        Send(
+            req,
+            machine_id,
+            SCHEDULER_CHANNEL,
+            part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
+      }
     }
   }
 
@@ -181,6 +187,52 @@ void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
 BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
   return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
+}
+
+void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
+  delayed_batches_.push_back(request);
+
+  // Send the batch to the local scheduler only
+  auto rep = config_->GetLocalReplica();
+  auto part = config_->GetLocalPartition();
+  auto machine_id = MakeMachineIdAsString(rep, part);
+  Send(
+      request,
+      machine_id,
+      SCHEDULER_CHANNEL,
+      // Note: atomicity is lost already, since the batch
+      // is sent to the local scheduler first
+      false /* has_more */);
+}
+
+void Sequencer::MaybeSendSingleHomeBatches() {
+  for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
+    // Create exponential distribution of delay
+    if (rand() % config_->GetReplicationDelayAmount() == 0) {
+      // Replicate batch to all machines EXCEPT local
+      auto req = *itr;
+      auto num_partitions = config_->GetNumPartitions();
+      auto num_replicas = config_->GetNumReplicas();
+      for (uint32_t part = 0; part < num_partitions; part++) {
+        for (uint32_t rep = 0; rep < num_replicas; rep++) {
+          if (part == config_->GetLocalPartition() && rep == config_->GetLocalReplica()) {
+            continue;
+          }
+          auto machine_id = MakeMachineIdAsString(rep, part);
+          Send(
+              req,
+              machine_id,
+              SCHEDULER_CHANNEL,
+              // Note: atomicity is lost already, since the batch
+              // is sent to the local scheduler first
+              false /* has_more */);
+        }
+      }
+      itr = delayed_batches_.erase(itr);
+    } else {
+      itr++;
+    }
+  }
 }
 
 } // namespace slog
