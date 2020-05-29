@@ -19,31 +19,46 @@ using std::vector;
 namespace slog {
 
 /**
- * A Broker distributes messages into and out of a machine.
+ * A Broker distributes messages coming into a machine to the modules
  * It runs its own thread with the components depicted below
  * 
- *                   -----------------------
- *                   |                     |
- *  Module A <---> Channel A             Router  <----- Incoming Message
- *                   |         B           |
- *                   |          R          |
- *  Module B <---> Channel B     O         |
- *                   |            K      Dealer  -----> Outgoing Message to XXX.XXX.XXX.XXX
- *                   |             E     Dealer  -----> Outgoing Message to YYY.YYY.YYY.YYY
- *  Module C <---> Channel C        R    Dealer  -----> Outgoing Message to ZZZ.ZZZ.ZZZ.ZZZ
- *                   |                    ....                      ....
- *                   |                     |
- *                   -----------------------
+ *                   --------------------------
+ *                   |                        |
+ *  Module A <---- Channel A                Router  <----- Incoming Messages
+ *                   |          B             |
+ *                   |           R            |
+ *  Module B <---- Channel B      O           |
+ *                   |             K          |
+ *                   |              E         |
+ *  Module C <---- Channel C         R        |
+ *                   |                        |
+ *                   |                        |
+ *                   --------------------------
+ *                      ^         ^         ^
+ *                      |         |         |
+ *                    < Broker Synchronization >
+ *                      |         |         |
+ *                      |         |         |
+ *  Module A  ------> Sender -----------------------> Outgoing Messages
+ *                                |         |
+ *  Module B  ----------------> Sender -------------> Outgoing Messages
+ *                                          |
+ *  Module C  --------------------------> Sender ---> Outgoing Messages
  * 
- * To receive messages from other machines, it uses a ZMQ_ROUTER socket, which automatically
- * prepends a connection identity to an arriving zmq message. Using this identity, it can
+ * 
+ * To receive messages from other machines, it uses a ZMQ_ROUTER socket, which constructs
+ * a map from an identity to the corresponding connection. Using this identity, it can
  * tell where the message comes from.
  * 
  * The messages going into the system via the router will be brokered to the channel
  * specified in each message. On the other end of each channel is a module which also runs
- * in its own thread. A module can also send messages back to the broker and the broker
- * will subsequently send them to other machines through the appropriate ZMQ_DEALER sockets.
+ * in its own thread.
  * 
+ * A module sends message to another machine via a Sender object. Each Sender object maintains
+ * a weak pointer to the broker to get notified when the brokers are synchronized and to access
+ * the map translating logical machine IDs to physical machine addresses.
+ * 
+ * Not showed above: the modules can send message to each other using Sender without going through the Broker.
  */
 class Broker {
 public:
@@ -107,11 +122,13 @@ private:
 
   // This is a hack so that tests behave correctly. Ideally, these sockets
   // should be scoped within InitializeConnection(). However, if we let them
-  // linger indefinitely and a test ends before the cluster fully synchronized,
-  // some of these sockets would hang up if their recipients already terminated.
-  // If we don't let them linger at all, some of them might be destroyed at end
-  // of function scope and the system would hang up, waiting for READY messages.
-  // Putting them here solves the problem but is not ideal.
+  // linger indefinitely and a test ends before the cluster is fully synchronized,
+  // some of these sockets would hang up if one of their READY message recipients
+  // is already terminated, leaving the READY message unconsumed in the queue and
+  // in turn hanging up the cleaning up process of the test. If we don't let them
+  // linger at all, some of them  might be destroyed at end of function scope and
+  // the READY message does not have enought time to be sent out.
+  // Putting them here solves those problems but is not ideal.
   std::vector<zmq::socket_t> tmp_sockets_;
 };
 

@@ -18,10 +18,12 @@ void Sender::Send(
     const google::protobuf::Message& request_or_response,
     const std::string& to_channel,
     const std::string& to_machine_id) {
+  // If sending to local module, use the other function to bypass the local broker
   if (to_machine_id.empty() || to_machine_id == local_machine_id_) {
     Send(request_or_response, to_channel);
     return;
   }
+  // Lazily establish a new connection when necessary
   if (machine_id_to_socket_.count(to_machine_id) == 0) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_DEALER);
@@ -33,8 +35,7 @@ void Sender::Send(
       new_socket.connect(br->GetEndpointByMachineId(to_machine_id));
       machine_id_to_socket_[to_machine_id] = move(new_socket);
     } else {
-      // Broker has been destroyed. This can only happen during clean up
-      // when the whole process is terminated.
+      // Broker has been destroyed. This can only happen during cleaning up
       return;
     }
   }
@@ -47,6 +48,7 @@ void Sender::Send(
 void Sender::Send(
     const google::protobuf::Message& request_or_response,
     const std::string& to_channel) {
+  // Lazily establish a new connection when necessary
   if (local_channel_to_socket_.count(to_channel) == 0) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
@@ -55,8 +57,7 @@ void Sender::Send(
       new_socket.setsockopt(ZMQ_SNDHWM, 0);
       local_channel_to_socket_[to_channel] = move(new_socket);
     } else {
-      // Broker has been destroyed. This can only happen during clean up
-      // when the whole process is terminated.
+      // Broker has been destroyed. This can only happen during cleaning up
       return;
     }
   }
