@@ -187,6 +187,7 @@ void Broker::Run() {
 
   if (!InitializeConnection()) {
     LOG(ERROR) << "Unable to initialize connection";
+    return;
   }
 
   // Notify threads waiting in GetEndpointByMachineId() that all brokers
