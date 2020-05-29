@@ -5,21 +5,21 @@ using std::discrete_distribution;
 using std::unordered_set;
 
 namespace slog {
-
 namespace {
+
 // Number of normal transactions to send between each remastering
 constexpr char REMASTER_GAP[] = "remaster_gap";
 
 const RawParamMap DEFAULT_PARAMS = {
   { REMASTER_GAP, "50" }
 };
+
 } // namespace
 
 RemasteringWorkload::RemasteringWorkload(
-    ConfigurationPtr config,
+    const ConfigurationPtr config,
     const string& data_dir,
-    const string& params_str,
-    const RawParamMap extra_default_params)
+    const string& params_str)
   : BasicWorkload(
       config,
       data_dir,
