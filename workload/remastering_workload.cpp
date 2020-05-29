@@ -6,6 +6,15 @@ using std::unordered_set;
 
 namespace slog {
 
+namespace {
+// Number of normal transactions to send between each remastering
+constexpr char REMASTER_GAP[] = "remaster_gap";
+
+const RawParamMap DEFAULT_PARAMS = {
+  { REMASTER_GAP, "50" }
+};
+} // namespace
+
 RemasteringWorkload::RemasteringWorkload(
     ConfigurationPtr config,
     const string& data_dir,
@@ -15,7 +24,7 @@ RemasteringWorkload::RemasteringWorkload(
       config,
       data_dir,
       params_str,
-      MergeParams(extra_default_params, REMASTERING_DEFAULT_PARAMS)) {}
+      DEFAULT_PARAMS) {}
 
 std::pair<Transaction*, TransactionProfile>
 RemasteringWorkload::NextTransaction() {

@@ -11,26 +11,6 @@ using std::vector;
 
 namespace slog {
 
-namespace {
-constexpr char MH_PCT[] = "mh";
-constexpr char MH_NUM_HOMES[] = "mh_homes";
-constexpr char MP_PCT[] = "mp";
-constexpr char MP_NUM_PARTS[] = "mp_parts";
-constexpr char NUM_RECORDS[] = "num_records";
-constexpr char NUM_WRITES[] = "num_writes";
-constexpr char VALUE_SIZE[] = "value_size";
-
-const RawParamMap BASIC_DEFAULT_PARAMS = {
-  { MH_PCT, "0" },
-  { MH_NUM_HOMES, "2" },
-  { MP_PCT, "0" },
-  { MP_NUM_PARTS, "2" },
-  { NUM_RECORDS, "10" },
-  { NUM_WRITES, "2" },
-  { VALUE_SIZE, "100" } // bytes
-};
-} // namespace
-
 class BasicWorkload : public WorkloadGenerator {
 public:
   BasicWorkload(
@@ -52,8 +32,6 @@ protected:
   std::mt19937 re_;
 
   TxnId client_txn_id_counter_;
-
-  static const RawParamMap GetDefaultParams();
 };
 
 } // namespace slog

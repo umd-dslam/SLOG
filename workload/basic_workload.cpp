@@ -50,17 +50,13 @@ const RawParamMap DEFAULT_PARAMS = {
 };
 } // namespace
 
-const RawParamMap BasicWorkload::GetDefaultParams() {
-  return DEFAULT_PARAMS;
-}
-
 BasicWorkload::BasicWorkload(
     ConfigurationPtr config,
     const string& data_dir,
     const string& params_str,
     const RawParamMap extra_default_params)
   : WorkloadGenerator(
-        MergeParams(extra_default_params, BASIC_DEFAULT_PARAMS),
+        MergeParams(extra_default_params, DEFAULT_PARAMS),
         params_str),
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
