@@ -9,6 +9,9 @@
 
 namespace slog {
 
+/*
+ * See Broker class for details about this class
+ */
 class Sender {
 public:
   Sender(const std::shared_ptr<Broker>& broker);
