@@ -64,7 +64,6 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleCustomSocketMessage(
     const MMessage& /* msg */,
     size_t /* socket_index */) {
-
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
