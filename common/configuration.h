@@ -57,9 +57,10 @@ public:
   uint32_t GetPartitionOfKey(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
 
-  bool GetReplicationDelayEnabled() const;
+#ifdef ENABLE_REPLICATION_DELAY
   uint32_t GetReplicationDelayPercent() const;
   uint32_t GetReplicationDelayAmount() const;
+#endif /* ENABLE_REPLICATION_DELAY */
 
 private:
   internal::Configuration config_;

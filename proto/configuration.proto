@@ -43,5 +43,4 @@ message Configuration {
     // If present: replication of txn batches will be delayed to
     // simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 9;
-
 }

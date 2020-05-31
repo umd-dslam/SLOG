@@ -47,8 +47,10 @@ private:
   void ProcessMultiHomeBatch(internal::Request&& request);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
+#ifdef ENABLE_REPLICATION_DELAY
   void DelaySingleHomeBatch(internal::Request&& request);
-  void MaybeSendSingleHomeBatches();
+  void MaybeSendDelayedBatches();
+#endif /* ENABLE_REPLICATION_DELAY */
 
   ConfigurationPtr config_;
   unique_ptr<PaxosClient> local_paxos_;

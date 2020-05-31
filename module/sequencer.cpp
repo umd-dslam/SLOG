@@ -64,6 +64,7 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleCustomSocketMessage(
     const MMessage& /* msg */,
     size_t /* socket_index */) {
+
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
@@ -89,23 +90,28 @@ void Sequencer::HandleCustomSocketMessage(
       forward_batch->mutable_batch_data(),
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
-  if (config_->GetReplicationDelayEnabled()
-      && (rand() % 100 < config_->GetReplicationDelayPercent())) {
-    DelaySingleHomeBatch(std::move(req));
-  } else {
+#ifdef ENABLE_REPLICATION_DELAY
+  MaybeSendDelayedBatches();
 
-    // Replicate batch to all machines
-    auto num_partitions = config_->GetNumPartitions();
-    auto num_replicas = config_->GetNumReplicas();
-    for (uint32_t part = 0; part < num_partitions; part++) {
-      for (uint32_t rep = 0; rep < num_replicas; rep++) {
-        auto machine_id = MakeMachineIdAsString(rep, part);
-        Send(
-            req,
-            machine_id,
-            SCHEDULER_CHANNEL,
-            part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
-      }
+  // Maybe delay current batch
+  if (rand() % 100 < config_->GetReplicationDelayPercent()) {
+    DelaySingleHomeBatch(std::move(req));
+    NewBatch();
+    return;
+  } // Else send it normally
+#endif /* GetReplicationDelayEnabled */
+
+  // Replicate batch to all machines
+  auto num_partitions = config_->GetNumPartitions();
+  auto num_replicas = config_->GetNumReplicas();
+  for (uint32_t part = 0; part < num_partitions; part++) {
+    for (uint32_t rep = 0; rep < num_replicas; rep++) {
+      auto machine_id = MakeMachineIdAsString(rep, part);
+      Send(
+          req,
+          machine_id,
+          SCHEDULER_CHANNEL,
+          part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
     }
   }
 
@@ -189,6 +195,7 @@ BatchId Sequencer::NextBatchId() {
   return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
 }
 
+#ifdef ENABLE_REPLICATION_DELAY
 void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   delayed_batches_.push_back(request);
 
@@ -205,7 +212,7 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
       false /* has_more */);
 }
 
-void Sequencer::MaybeSendSingleHomeBatches() {
+void Sequencer::MaybeSendDelayedBatches() {
   for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
     // Create exponential distribution of delay
     if (rand() % config_->GetReplicationDelayAmount() == 0) {
@@ -234,5 +241,6 @@ void Sequencer::MaybeSendSingleHomeBatches() {
     }
   }
 }
+#endif /* ENABLE_REPLICATION_DELAY */
 
 } // namespace slog

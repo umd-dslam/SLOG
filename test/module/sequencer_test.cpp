@@ -46,11 +46,27 @@ protected:
     return batch;
   }
 
-private:
   unique_ptr<Channel> input_;
   unique_ptr<Channel> output_;
   unique_ptr<TestSlog> slog_;
 };
+
+#ifdef ENABLE_REPLICATION_DELAY
+class SequencerTestReplicationDelay : SequencerTest {
+protected:
+  void SetUp() {
+    internal::Configuration extra_config;
+    extra_config.mutable_replication_delay()->set_batch_delay_percent(100);
+    extra_config.mutable_replication_delay()->set_batch_delay_amount(100);
+    auto configs = MakeTestConfigurations("sequencer", 1, 1, 0, extra_config);
+    slog_ = make_unique<TestSlog>(configs[0]);
+    slog_->AddSequencer();
+    input_ = slog_->AddChannel(FORWARDER_CHANNEL);
+    output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->StartInNewThreads();
+  }
+};
+#endif /* ENABLE_REPLICATION_DELAY */
 
 TEST_F(SequencerTest, SingleHomeTransaction) {
   auto txn = MakeTransaction(
