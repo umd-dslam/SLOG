@@ -97,7 +97,7 @@ TEST_F(E2ETest, MultiPartitionTxn) {
 }
 
 TEST_F(E2ETest, MultiHomeTxn) {
-  for (size_t i = 0; i < 1; i++) {//NUM_MACHINES; i++) {
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A", "C"} /* read_set */, {}  /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
