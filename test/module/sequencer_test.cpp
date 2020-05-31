@@ -61,13 +61,19 @@ public:
     extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
-    auto slog2 = make_unique<TestSlog>(configs[1]);
     slog_->AddSequencer();
     input_ = slog_->AddChannel(FORWARDER_CHANNEL);
     output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
+
+    slog_2_ = make_unique<TestSlog>(configs[1]);
+    output_2_ = slog_2_->AddChannel(SCHEDULER_CHANNEL);
+
     slog_->StartInNewThreads();
-    slog2->StartInNewThreads();
+    slog_2_->StartInNewThreads();
   }
+
+  unique_ptr<TestSlog> slog_2_;
+  unique_ptr<Channel> output_2_;
 };
 #endif /* ENABLE_REPLICATION_DELAY */
 
@@ -181,7 +187,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   }
   {
     MMessage msg;
-    output_->Receive(msg);
+    output_2_->Receive(msg);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
