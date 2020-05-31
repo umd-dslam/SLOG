@@ -61,10 +61,12 @@ public:
     extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
+    auto slog2 = make_unique<TestSlog>(configs[1]);
     slog_->AddSequencer();
     input_ = slog_->AddChannel(FORWARDER_CHANNEL);
     output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
     slog_->StartInNewThreads();
+    slog2->StartInNewThreads();
   }
 };
 #endif /* ENABLE_REPLICATION_DELAY */
@@ -152,7 +154,7 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
 
 #ifdef ENABLE_REPLICATION_DELAY
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
-  CustomSetUp(0, 3);
+  CustomSetUp(100, 3);
   auto txn = MakeTransaction(
       {"A", "B"},
       {"C"},

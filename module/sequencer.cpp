@@ -64,6 +64,10 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleCustomSocketMessage(
     const MMessage& /* msg */,
     size_t /* socket_index */) {
+#ifdef ENABLE_REPLICATION_DELAY
+  MaybeSendDelayedBatches();
+#endif /* ENABLE_REPLICATION_DELAY */
+
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
@@ -90,8 +94,6 @@ void Sequencer::HandleCustomSocketMessage(
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
 #ifdef ENABLE_REPLICATION_DELAY
-  MaybeSendDelayedBatches();
-
   // Maybe delay current batch
   if (rand() % 100 < config_->GetReplicationDelayPercent()) {
     DelaySingleHomeBatch(std::move(req));
@@ -206,7 +208,7 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
       request,
       machine_id,
       SCHEDULER_CHANNEL,
-      // Note: atomicity is lost already, since the batch
+      // Note: atomicity is lost, since the batch
       // is sent to the local scheduler first
       false /* has_more */);
 }
@@ -221,6 +223,7 @@ void Sequencer::MaybeSendDelayedBatches() {
       auto num_replicas = config_->GetNumReplicas();
       for (uint32_t part = 0; part < num_partitions; part++) {
         for (uint32_t rep = 0; rep < num_replicas; rep++) {
+          // Already sent to local scheduler
           if (part == config_->GetLocalPartition() && rep == config_->GetLocalReplica()) {
             continue;
           }
