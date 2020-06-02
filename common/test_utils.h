@@ -4,6 +4,7 @@
 
 #include "common/configuration.h"
 #include "connection/broker.h"
+#include "connection/sender.h"
 #include "module/base/module.h"
 #include "storage/mem_only_storage.h"
 #include "proto/internal.pb.h"
@@ -44,7 +45,10 @@ public:
   void AddGlobalPaxos();
   void AddMultiHomeOrderer();
 
-  unique_ptr<Channel> AddChannel(const string& name);
+  void AddChannel(const string& name);
+  zmq::pollitem_t GetPollItemForChannel(const string& name);
+  void ReceiveFromChannel(MMessage& msg, const string& name);
+  unique_ptr<Sender> GetSender();
 
   void StartInNewThreads();
   void SendTxn(Transaction* txn);
@@ -54,7 +58,7 @@ private:
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
-  Broker broker_;
+  shared_ptr<Broker> broker_;
   ModuleRunnerPtr ticker_;
   ModuleRunnerPtr server_;
   ModuleRunnerPtr forwarder_;
@@ -63,6 +67,8 @@ private:
   ModuleRunnerPtr local_paxos_;
   ModuleRunnerPtr global_paxos_;
   ModuleRunnerPtr multi_home_orderer_;
+
+  unordered_map<string, zmq::socket_t> channels_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

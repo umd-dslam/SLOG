@@ -16,21 +16,18 @@ public:
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    input_ = slog_->AddChannel(FORWARDER_CHANNEL);
-    output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->AddChannel(SCHEDULER_CHANNEL);
+    sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
   }
 
   void SendToSequencer(internal::Request req) {
-    MMessage msg;
-    msg.Set(MM_PROTO, req);
-    msg.Set(MM_TO_CHANNEL, SEQUENCER_CHANNEL);
-    input_->Send(msg);
+    sender_->Send(req, SEQUENCER_CHANNEL);
   }
 
   internal::Batch* ReceiveBatch() {
     MMessage msg;
-    output_->Receive(msg);
+    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     if (!msg.GetProto(req)) {
       return nullptr;
@@ -46,8 +43,7 @@ public:
     return batch;
   }
 
-  unique_ptr<Channel> input_;
-  unique_ptr<Channel> output_;
+  unique_ptr<Sender> sender_;
   unique_ptr<TestSlog> slog_;
 };
 
@@ -62,18 +58,18 @@ public:
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    input_ = slog_->AddChannel(FORWARDER_CHANNEL);
-    output_ = slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->AddChannel(SCHEDULER_CHANNEL);
+    sender_ = slog_->GetSender();
 
+    // This machine has no sequencer, it only receives the messages in the SCHEDULER_CHANNEL
     slog_2_ = make_unique<TestSlog>(configs[1]);
-    output_2_ = slog_2_->AddChannel(SCHEDULER_CHANNEL);
+    slog_2_->AddChannel(SCHEDULER_CHANNEL);
 
     slog_->StartInNewThreads();
     slog_2_->StartInNewThreads();
   }
 
   unique_ptr<TestSlog> slog_2_;
-  unique_ptr<Channel> output_2_;
 };
 #endif /* ENABLE_REPLICATION_DELAY */
 
@@ -85,7 +81,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
       {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   Request req;
-  req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+  req.mutable_forward_txn()->set_allocated_txn(txn);
 
   SendToSequencer(req);
 
@@ -174,7 +170,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
 
   {
     MMessage msg;
-    output_->Receive(msg);
+    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
@@ -187,7 +183,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   }
   {
     MMessage msg;
-    output_2_->Receive(msg);
+    slog_2_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);

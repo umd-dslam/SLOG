@@ -10,12 +10,11 @@ namespace slog {
 using internal::Batch;
 using internal::Request;
 
-MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, Broker& broker) 
-  : BasicModule(
-        "MultiHomeOrderer",
-        broker.AddChannel(MULTI_HOME_ORDERER_CHANNEL)),
+MultiHomeOrderer::MultiHomeOrderer(
+    const ConfigurationPtr& config,
+    const shared_ptr<Broker>& broker) 
+  : NetworkedModule(broker, MULTI_HOME_ORDERER_CHANNEL),
     config_(config),
-    global_paxos_(new SimpleMultiPaxosClient(*this, GLOBAL_PAXOS)),
     batch_id_counter_(0) {
   NewBatch();
 }
@@ -69,12 +68,15 @@ void MultiHomeOrderer::HandleCustomSocketMessage(
   VLOG(1) << "Finished multi-home batch " << batch_id
           << ". Sending out for ordering and replicating";
   
-  Request req;
-  auto forward_batch = req.mutable_forward_batch();
-  forward_batch->set_allocated_batch_data(batch_.release());
-
   // Make a proposal for multi-home batch ordering
-  global_paxos_->Propose(batch_id);
+  Request paxos_req;
+  auto paxos_propose = paxos_req.mutable_paxos_propose();
+  paxos_propose->set_value(batch_id);
+  Send(paxos_req, GLOBAL_PAXOS);
+
+  Request batch_req;
+  auto forward_batch = batch_req.mutable_forward_batch();
+  forward_batch->set_allocated_batch_data(batch_.release());
 
   // Replicate new batch to other regions
   auto part = config_->GetLeaderPartitionForMultiHomeOrdering();
@@ -82,10 +84,9 @@ void MultiHomeOrderer::HandleCustomSocketMessage(
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
     auto machine_id = MakeMachineIdAsString(rep, part);
     Send(
-        req,
-        machine_id,
+        batch_req,
         MULTI_HOME_ORDERER_CHANNEL,
-        rep + 1 < num_replicas /* has_more */);
+        machine_id);
   }
 
   NewBatch();
@@ -132,7 +133,7 @@ void MultiHomeOrderer::ProcessForwardBatch(
         TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
 
     // Send the newly ordered multi-home batch to the sequencer
-    SendSameMachine(req, SEQUENCER_CHANNEL);
+    Send(req, SEQUENCER_CHANNEL);
   }
 }
 

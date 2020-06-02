@@ -5,8 +5,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
-#include "module/base/basic_module.h"
-#include "paxos/paxos_client.h"
+#include "module/base/networked_module.h"
 
 namespace slog {
 
@@ -25,9 +24,11 @@ namespace slog {
  *         and put into the same batch as the SINGLE_HOME txn above. The 
  *         MULTI_HOME txn is sent to all Schedulers in the SAME region.
  */
-class Sequencer : public BasicModule {
+class Sequencer : public NetworkedModule {
 public:
-  Sequencer(const ConfigurationPtr& config, Broker& broker);
+  Sequencer(
+      const ConfigurationPtr& config,
+      const std::shared_ptr<Broker>& broker);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
@@ -47,17 +48,16 @@ private:
   void ProcessMultiHomeBatch(internal::Request&& request);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
-#ifdef ENABLE_REPLICATION_DELAY
-  void DelaySingleHomeBatch(internal::Request&& request);
-  void MaybeSendDelayedBatches();
-#endif /* ENABLE_REPLICATION_DELAY */
-
   ConfigurationPtr config_;
-  unique_ptr<PaxosClient> local_paxos_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
 
+#ifdef ENABLE_REPLICATION_DELAY
+  void DelaySingleHomeBatch(internal::Request&& request);
+  void MaybeSendDelayedBatches();
+  
   std::list<internal::Request> delayed_batches_;
+#endif /* ENABLE_REPLICATION_DELAY */
 };
 
 } // namespace slog

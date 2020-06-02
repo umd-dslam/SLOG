@@ -36,8 +36,8 @@ Request MakeLookupMasterRequest(const Transaction& txn) {
 
 } // namespace
 
-Forwarder::Forwarder(const ConfigurationPtr& config, Broker& broker) 
-  : BasicModule("Forwarder", broker.AddChannel(FORWARDER_CHANNEL)),
+Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker) 
+  : NetworkedModule(broker, FORWARDER_CHANNEL),
     config_(config),
     RandomPartition(0, config->GetNumPartitions() - 1) {}
 
@@ -73,9 +73,8 @@ void Forwarder::HandleInternalRequest(
   for (uint32_t part = 0; part < num_partitions; part++) {
     Send(
         lookup_master_request,
-        MakeMachineIdAsString(rep, part),
         SERVER_CHANNEL,
-        part + 1 < num_partitions /* has_more */);
+        MakeMachineIdAsString(rep, part));
   }
 }
 
@@ -141,7 +140,7 @@ void Forwarder::Forward(Transaction* txn) {
           config_,
           txn_internal,
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
-      SendSameMachine(forward_txn, SEQUENCER_CHANNEL);
+      Send(forward_txn, SEQUENCER_CHANNEL);
     } else {
       auto partition = RandomPartition(re_);
       auto random_machine_in_home_replica = MakeMachineIdAsString(home_replica, partition);
@@ -155,8 +154,8 @@ void Forwarder::Forward(Transaction* txn) {
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(
           forward_txn,
-          random_machine_in_home_replica,
-          SEQUENCER_CHANNEL);
+          SEQUENCER_CHANNEL,
+          random_machine_in_home_replica);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
     auto destination = MakeMachineIdAsString(
@@ -171,8 +170,8 @@ void Forwarder::Forward(Transaction* txn) {
         TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
     Send(
         forward_txn,
-        destination,
-        MULTI_HOME_ORDERER_CHANNEL);
+        MULTI_HOME_ORDERER_CHANNEL,
+        destination);
   }
 }
 

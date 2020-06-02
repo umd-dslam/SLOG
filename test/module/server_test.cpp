@@ -22,8 +22,10 @@ TEST(ServerTest, LookupMaster) {
   test_slog.Data("A", {"vzxcv", 0, 1});
   test_slog.Data("B", {"fbczx", 1, 1});
   test_slog.Data("C", {"bzxcv", 2, 2});
-  unique_ptr<Channel> requester(
-      test_slog.AddChannel(FORWARDER_CHANNEL));
+
+  test_slog.AddChannel(FORWARDER_CHANNEL);
+  auto sender = test_slog.GetSender();
+
   test_slog.StartInNewThreads();
 
   // Send a lookup request to the server
@@ -33,14 +35,11 @@ TEST(ServerTest, LookupMaster) {
   lookup->add_keys("A");
   lookup->add_keys("B");
   lookup->add_keys("D");
-  MMessage msg;
-  msg.Set(MM_PROTO, req);
-  msg.Set(MM_FROM_CHANNEL, FORWARDER_CHANNEL);
-  msg.Set(MM_TO_CHANNEL, SERVER_CHANNEL);
-  requester->Send(msg);
+  sender->Send(req, SERVER_CHANNEL);
 
   // Wait and receive the response
-  requester->Receive(msg);
+  MMessage msg;
+  test_slog.ReceiveFromChannel(msg, FORWARDER_CHANNEL);
   internal::Response res;
   ASSERT_TRUE(msg.GetProto(res));
   ASSERT_TRUE(res.has_lookup_master());

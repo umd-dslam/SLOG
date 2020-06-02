@@ -1,7 +1,7 @@
 project(module)
 
 add_library(base_module 
-  base/basic_module.cpp
+  base/networked_module.cpp
   base/module.cpp)
 target_link_libraries(base_module
   common

@@ -1,6 +1,6 @@
 # SLOG
 
-[![Build Status](https://travis-ci.org/ctring/SLOG.svg?branch=master)](https://travis-ci.org/ctring/SLOG)
+[![Build Status](https://travis-ci.com/ctring/SLOG.svg?branch=master)](https://travis-ci.com/ctring/SLOG)
 
 # What is SLOG?
 

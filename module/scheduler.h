@@ -9,8 +9,8 @@
 #include "common/transaction_holder.h"
 #include "common/types.h"
 #include "connection/broker.h"
+#include "connection/sender.h"
 #include "data_structure/batch_log.h"
-#include "module/base/basic_module.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
 #include "module/scheduler_components/simple_remaster_manager.h"
@@ -19,15 +19,15 @@
 
 namespace slog {
 
-class Scheduler : public Module, ChannelHolder {
+// TODO: extend Scheduler from NetworkedModule to simply the code
+class Scheduler : public Module {
 public:
   static const string WORKERS_ENDPOINT;
   static const uint32_t WORKER_LOAD_THRESHOLD;
 
   Scheduler(
       const ConfigurationPtr& config,
-      zmq::context_t& context,
-      Broker& broker,
+      const std::shared_ptr<Broker>& broker,
       const std::shared_ptr<Storage<Key, Record>>& storage);
 
   void SetUp() final;
@@ -103,11 +103,14 @@ private:
   void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
+  zmq::socket_t pull_socket_;
   zmq::socket_t worker_socket_;
   std::vector<zmq::pollitem_t> poll_items_;
   std::vector<string> worker_identities_;
   std::vector<unique_ptr<ModuleRunner>> workers_;
   size_t next_worker_;
+
+  Sender sender_;
 
   std::unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
