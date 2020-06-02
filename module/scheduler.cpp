@@ -585,8 +585,6 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
     }
     case TransactionType::LOCK_ONLY: {
       if (lock_manager_.AcquireLocks(*txn_holder)) {
-        CHECK(all_txns_.count(txn_id) > 0) 
-            << "Txn " << txn_id << " is not found for dispatching";
         DispatchTransaction(txn_id);
       }
       break;
@@ -632,6 +630,19 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
     SendAbortToPartitions(txn_id);
   }
 
+  // Release txn from remaster manager and lock manager.
+  //
+  // If the abort was triggered by a remote partition,
+  // then the single-home or multi-home transaction may still
+  // be in one of the managers, and needs to be removed.
+  //
+  // This also releases any lock-only transactions.
+  ProcessRemasterResult(
+    remaster_manager_.ReleaseTransaction(&txn_holder)); 
+  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
+    DispatchTransaction(unblocked_txn);
+  }
+
   if (txn_type == TransactionType::MULTI_HOME) {
     CollectLockOnlyTransactionsForAbort(txn_id);
   }
@@ -655,15 +666,6 @@ void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
   auto& involved_replicas = txn_holder.InvolvedReplicas();
   mh_abort_waiting_on_[txn_id] += involved_replicas.size();
-
-  // release LOs in remaster manager
-  ProcessRemasterResult(
-      remaster_manager_.ReleaseTransaction(&txn_holder));
-
-  // release LOs in lock manager
-  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
-    DispatchTransaction(unblocked_txn);
-  }
 
   // Erase the LOs that have already arrived - the same that have been released
   // from remaster and lock managers
@@ -735,6 +737,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
+  CHECK(all_txns_.count(txn_id) > 0) << "Txn not in all_txns_: " << txn_id;
 
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
