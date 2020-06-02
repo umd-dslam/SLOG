@@ -216,6 +216,7 @@ void Sequencer::MaybeSendDelayedBatches() {
     // Create an exponential distribution of delay. Each batch has 1 / DelayAmount chance
     // of being sent at every tick
     if (rand() % config_->GetReplicationDelayAmount() == 0) {
+      VLOG(4) << "Sending delayed batch";
       auto request = *itr;
 
       // Replicate batch to all machines EXCEPT local
