@@ -13,9 +13,14 @@
 #include "data_structure/batch_log.h"
 #include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/deterministic_lock_manager.h"
-#include "module/scheduler_components/simple_remaster_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
+
+#ifdef REMASTER_PROTOCOL_SIMPLE
+  #include "module/scheduler_components/simple_remaster_manager.h"
+#elif defined REMASTER_PROTOCOL_PER_KEY
+  #include "module/scheduler_components/per_key_remaster_manager.h"
+#endif /* REMASTER_PROTOCOL_SIMPLE */
 
 namespace slog {
 
@@ -115,7 +120,12 @@ private:
   std::unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
   DeterministicLockManager lock_manager_;
+  
+#ifdef REMASTER_PROTOCOL_SIMPLE
   SimpleRemasterManager remaster_manager_;
+#elif defined REMASTER_PROTOCOL_PER_KEY
+  PerKeyRemasterManager remaster_manager_;
+#endif /* REMASTER_PROTOCOL_SIMPLE */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
   
