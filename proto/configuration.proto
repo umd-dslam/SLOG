@@ -40,7 +40,7 @@ message Configuration {
     uint32 num_workers = 7;
     // How long the sequencer wait for batching
     uint64 batch_duration = 8;
-    // If present: replication of txn batches will be delayed to
-    // simulate uneven network latency
+    // Config for CMake option ENABLE_REPLICATION_DELAY. Replication
+    // of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 9;
 }

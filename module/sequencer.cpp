@@ -201,33 +201,35 @@ BatchId Sequencer::NextBatchId() {
 void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   delayed_batches_.push_back(request);
 
-  // Send the batch to the local scheduler only
-  auto rep = config_->GetLocalReplica();
-  auto part = config_->GetLocalPartition();
-  auto machine_id = MakeMachineIdAsString(rep, part);
-  Send(
-      request,
-      SCHEDULER_CHANNEL,
-      machine_id);
+  // Send the batch to schedulers in the local replica only
+  auto local_rep = config_->GetLocalReplica();
+  auto num_partitions = config_->GetNumPartitions();
+  for (uint32_t part = 0; part < num_partitions; part++) {
+      auto machine_id = MakeMachineIdAsString(local_rep, part);
+      Send(
+          request,
+          SCHEDULER_CHANNEL,
+          machine_id);
+  }
 }
 
 void Sequencer::MaybeSendDelayedBatches() {
   for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
-    // Create an exponential distribution of delay. Each batch has 1 / DelayAmount chance
+    // Create a geometric distribution of delay. Each batch has 1 / DelayAmount chance
     // of being sent at every tick
     if (rand() % config_->GetReplicationDelayAmount() == 0) {
       VLOG(4) << "Sending delayed batch";
       auto request = *itr;
 
-      // Replicate batch to all machines EXCEPT local
-      auto num_partitions = config_->GetNumPartitions();
+      // Replicate batch to all machines EXCEPT local replica
       auto num_replicas = config_->GetNumReplicas();
-      for (uint32_t part = 0; part < num_partitions; part++) {
-        for (uint32_t rep = 0; rep < num_replicas; rep++) {
-          if (part == config_->GetLocalPartition() && rep == config_->GetLocalReplica()) {
-            // Already sent to local scheduler
-            continue;
-          }
+      auto num_partitions = config_->GetNumPartitions();
+      for (uint32_t rep = 0; rep < num_replicas; rep++) {
+        if (rep == config_->GetLocalReplica()) {
+          // Already sent to local replica
+          continue;
+        }
+        for (uint32_t part = 0; part < num_partitions; part++) {
           auto machine_id = MakeMachineIdAsString(rep, part);
           Send(
               request,
