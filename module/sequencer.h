@@ -1,6 +1,6 @@
 #pragma once
 
-#include <unordered_set>
+#include <list>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -51,6 +51,13 @@ private:
   ConfigurationPtr config_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
+
+#ifdef ENABLE_REPLICATION_DELAY
+  void DelaySingleHomeBatch(internal::Request&& request);
+  void MaybeSendDelayedBatches();
+  
+  std::list<internal::Request> delayed_batches_;
+#endif /* ENABLE_REPLICATION_DELAY */
 };
 
 } // namespace slog

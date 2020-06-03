@@ -24,7 +24,8 @@ ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
     int num_partitions,
-    uint32_t seed = 0);
+    uint32_t seed = 0,
+    internal::Configuration common_config = {});
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 

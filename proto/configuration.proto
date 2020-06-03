@@ -10,6 +10,13 @@ message Replica {
     repeated bytes addresses = 1;
 }
 
+message ReplicationDelayExperiment {
+    // Percent of batches that are delayed
+    uint32 batch_delay_percent = 1;
+    // Average duration of delay in ticks (module/Ticker)
+    uint32 batch_delay_amount = 2;
+}
+
 /**
  * The schema of a configuration file.
  */
@@ -33,4 +40,7 @@ message Configuration {
     uint32 num_workers = 7;
     // How long the sequencer wait for batching
     uint64 batch_duration = 8;
+    // Config for CMake option ENABLE_REPLICATION_DELAY. Replication
+    // of txn batches will be delayed to simulate uneven network latency
+    ReplicationDelayExperiment replication_delay = 9;
 }

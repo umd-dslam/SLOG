@@ -8,6 +8,16 @@ include(CTest)
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
+option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
+# Note: BUILD_TESTING is defined by CTest
+
+#========================================
+#               Macros
+#========================================
+
+if(ENABLE_REPLICATION_DELAY)
+    add_compile_definitions(ENABLE_REPLICATION_DELAY)
+endif(ENABLE_REPLICATION_DELAY)
 
 #========================================
 #               Setup

@@ -63,6 +63,11 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleCustomSocketMessage(
     const MMessage& /* msg */,
     size_t /* socket_index */) {
+
+#ifdef ENABLE_REPLICATION_DELAY
+  MaybeSendDelayedBatches();
+#endif /* ENABLE_REPLICATION_DELAY */
+
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
@@ -91,6 +96,16 @@ void Sequencer::HandleCustomSocketMessage(
       forward_batch->mutable_batch_data(),
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
+#ifdef ENABLE_REPLICATION_DELAY
+  // Maybe delay current batch
+  if ((uint32_t)(rand() % 100) < config_->GetReplicationDelayPercent()) {
+    DelaySingleHomeBatch(std::move(batch_req));
+    NewBatch();
+    return;
+  } // Otherwise send it normally
+#endif /* GetReplicationDelayEnabled */
+
+  // Replicate batch to all machines
   auto num_partitions = config_->GetNumPartitions();
   auto num_replicas = config_->GetNumReplicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
@@ -181,5 +196,54 @@ BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
   return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
 }
+
+#ifdef ENABLE_REPLICATION_DELAY
+void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
+  delayed_batches_.push_back(request);
+
+  // Send the batch to schedulers in the local replica only
+  auto local_rep = config_->GetLocalReplica();
+  auto num_partitions = config_->GetNumPartitions();
+  for (uint32_t part = 0; part < num_partitions; part++) {
+      auto machine_id = MakeMachineIdAsString(local_rep, part);
+      Send(
+          request,
+          SCHEDULER_CHANNEL,
+          machine_id);
+  }
+}
+
+void Sequencer::MaybeSendDelayedBatches() {
+  for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
+    // Create a geometric distribution of delay. Each batch has 1 / DelayAmount chance
+    // of being sent at every tick
+    if (rand() % config_->GetReplicationDelayAmount() == 0) {
+      VLOG(4) << "Sending delayed batch";
+      auto request = *itr;
+
+      // Replicate batch to all machines EXCEPT local replica
+      auto num_replicas = config_->GetNumReplicas();
+      auto num_partitions = config_->GetNumPartitions();
+      for (uint32_t rep = 0; rep < num_replicas; rep++) {
+        if (rep == config_->GetLocalReplica()) {
+          // Already sent to local replica
+          continue;
+        }
+        for (uint32_t part = 0; part < num_partitions; part++) {
+          auto machine_id = MakeMachineIdAsString(rep, part);
+          Send(
+              request,
+              SCHEDULER_CHANNEL,
+              machine_id);
+        }
+      }
+
+      itr = delayed_batches_.erase(itr);
+    } else {
+      itr++;
+    }
+  }
+}
+#endif /* ENABLE_REPLICATION_DELAY */
 
 } // namespace slog

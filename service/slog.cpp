@@ -88,6 +88,11 @@ int main(int argc, char* argv[]) {
             << std::get<1>(zmq_version) << "."
             << std::get<2>(zmq_version);
 
+#ifdef ENABLE_REPLICATION_DELAY
+  LOG(INFO) << "Replication delay enabled";
+#endif /* GetReplicationDelayEnabled */
+
+
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 
       FLAGS_address,

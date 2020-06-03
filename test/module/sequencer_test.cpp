@@ -11,7 +11,7 @@ using namespace slog;
 using internal::Request;
 
 class SequencerTest : public ::testing::Test {
-protected:
+public:
   void SetUp() {
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
@@ -43,10 +43,35 @@ protected:
     return batch;
   }
 
-private:
   unique_ptr<Sender> sender_;
   unique_ptr<TestSlog> slog_;
 };
+
+#ifdef ENABLE_REPLICATION_DELAY
+class SequencerReplicationDelayTest : public SequencerTest {
+public:
+  void SetUp() {}
+  void CustomSetUp(uint32_t delay_percent, uint32_t delay_amount) {
+    internal::Configuration extra_config;
+    extra_config.mutable_replication_delay()->set_batch_delay_percent(delay_percent);
+    extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
+    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
+    slog_ = make_unique<TestSlog>(configs[0]);
+    slog_->AddSequencer();
+    slog_->AddChannel(SCHEDULER_CHANNEL);
+    sender_ = slog_->GetSender();
+
+    // This machine has no sequencer, it only receives the messages in the SCHEDULER_CHANNEL
+    slog_2_ = make_unique<TestSlog>(configs[1]);
+    slog_2_->AddChannel(SCHEDULER_CHANNEL);
+
+    slog_->StartInNewThreads();
+    slog_2_->StartInNewThreads();
+  }
+
+  unique_ptr<TestSlog> slog_2_;
+};
+#endif /* ENABLE_REPLICATION_DELAY */
 
 TEST_F(SequencerTest, SingleHomeTransaction) {
   auto txn = MakeTransaction(
@@ -128,3 +153,46 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
     delete batch;
   }
 }
+
+#ifdef ENABLE_REPLICATION_DELAY
+TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
+  CustomSetUp(100, 3);
+  auto txn = MakeTransaction(
+      {"A", "B"},
+      {"C"},
+      "some code",
+      {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
+
+  Request req;
+  req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+
+  SendToSequencer(req);
+
+  {
+    MMessage msg;
+    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
+    Request req;
+    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_EQ(req.type_case(), Request::kForwardBatch);
+    auto forward_batch = req.mutable_forward_batch();
+    ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);
+    auto batch = req.mutable_forward_batch()->release_batch_data();
+    ASSERT_EQ(batch->transactions_size(), 1);
+    ASSERT_EQ(batch->transactions().at(0), *txn);
+    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
+  }
+  {
+    MMessage msg;
+    slog_2_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
+    Request req;
+    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_EQ(req.type_case(), Request::kForwardBatch);
+    auto forward_batch = req.mutable_forward_batch();
+    ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);
+    auto batch = req.mutable_forward_batch()->release_batch_data();
+    ASSERT_EQ(batch->transactions_size(), 1);
+    ASSERT_EQ(batch->transactions().at(0), *txn);
+    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
+  }
+}
+#endif /* ENABLE_REPLICATION_DELAY */

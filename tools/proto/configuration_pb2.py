@@ -18,7 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='slog.internal',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"\xdb\x01\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12\x1f\n\x17partition_key_num_bytes\x18\x06 \x01(\r\x12\x13\n\x0bnum_workers\x18\x07 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\x08 \x01(\x04\x62\x06proto3'
+  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"\xa1\x02\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12\x1f\n\x17partition_key_num_bytes\x18\x06 \x01(\r\x12\x13\n\x0bnum_workers\x18\x07 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\x08 \x01(\x04\x12\x44\n\x11replication_delay\x18\t \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentb\x06proto3'
 )
 
 
@@ -52,6 +52,44 @@ _REPLICA = _descriptor.Descriptor(
   ],
   serialized_start=44,
   serialized_end=72,
+)
+
+
+_REPLICATIONDELAYEXPERIMENT = _descriptor.Descriptor(
+  name='ReplicationDelayExperiment',
+  full_name='slog.internal.ReplicationDelayExperiment',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='batch_delay_percent', full_name='slog.internal.ReplicationDelayExperiment.batch_delay_percent', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='batch_delay_amount', full_name='slog.internal.ReplicationDelayExperiment.batch_delay_amount', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=74,
+  serialized_end=159,
 )
 
 
@@ -118,6 +156,13 @@ _CONFIGURATION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='replication_delay', full_name='slog.internal.Configuration.replication_delay', index=8,
+      number=9, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -130,12 +175,14 @@ _CONFIGURATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=75,
-  serialized_end=294,
+  serialized_start=162,
+  serialized_end=451,
 )
 
 _CONFIGURATION.fields_by_name['replicas'].message_type = _REPLICA
+_CONFIGURATION.fields_by_name['replication_delay'].message_type = _REPLICATIONDELAYEXPERIMENT
 DESCRIPTOR.message_types_by_name['Replica'] = _REPLICA
+DESCRIPTOR.message_types_by_name['ReplicationDelayExperiment'] = _REPLICATIONDELAYEXPERIMENT
 DESCRIPTOR.message_types_by_name['Configuration'] = _CONFIGURATION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -145,6 +192,13 @@ Replica = _reflection.GeneratedProtocolMessageType('Replica', (_message.Message,
   # @@protoc_insertion_point(class_scope:slog.internal.Replica)
   })
 _sym_db.RegisterMessage(Replica)
+
+ReplicationDelayExperiment = _reflection.GeneratedProtocolMessageType('ReplicationDelayExperiment', (_message.Message,), {
+  'DESCRIPTOR' : _REPLICATIONDELAYEXPERIMENT,
+  '__module__' : 'proto.configuration_pb2'
+  # @@protoc_insertion_point(class_scope:slog.internal.ReplicationDelayExperiment)
+  })
+_sym_db.RegisterMessage(ReplicationDelayExperiment)
 
 Configuration = _reflection.GeneratedProtocolMessageType('Configuration', (_message.Message,), {
   'DESCRIPTOR' : _CONFIGURATION,

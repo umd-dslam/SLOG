@@ -540,6 +540,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
       break;
     }
     case VerifyMasterResult::WAITING: {
+      VLOG(4) << "Txn waiting on remaster: " << txn->internal().id();
       // Do nothing
       break;
     }

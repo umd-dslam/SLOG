@@ -36,13 +36,13 @@ ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
     int num_partitions,
-    uint32_t seed) {
+    uint32_t seed,
+    internal::Configuration common_config) {
   std::mt19937 re(seed);
   std::uniform_int_distribution<> dis(20000, 30000);
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;
 
-  internal::Configuration common_config;
   common_config.set_protocol("ipc");
   common_config.set_broker_port(0);
   common_config.set_num_partitions(num_partitions);
