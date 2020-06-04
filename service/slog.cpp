@@ -92,6 +92,14 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Replication delay enabled";
 #endif /* GetReplicationDelayEnabled */
 
+#ifdef REMASTER_PROTOCOL_SIMPLE
+  LOG(INFO) << "Simple remaster protocol";
+#elif defined REMASTER_PROTOCOL_PER_KEY
+  LOG(INFO) << "Per key remaster protocol";
+#else
+  #error "Remaster protocol not defined"
+#endif /* REMASTER_PROTOCOL_SIMPLE */
+
 
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 

@@ -1,5 +1,5 @@
 FROM ubuntu:bionic AS builder
-    ARG ENABLE_REPLICATION_DELAY=OFF
+    ARG CMAKE_OPTIONS
 
     RUN apt-get update
     RUN apt-get -y install wget
@@ -20,7 +20,7 @@ FROM ubuntu:bionic AS builder
     RUN rm -rf build \
         && mkdir build \
         && cd build \
-        && cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTING=OFF -DENABLE_REPLICATION_DELAY=${ENABLE_REPLICATION_DELAY}\
+        && cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTING=OFF ${CMAKE_OPTIONS}\
         && make -j$(nproc) \
         && cd ..
 
