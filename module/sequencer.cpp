@@ -162,7 +162,6 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
-<<<<<<< HEAD
 
     if (txn.procedure_case() == Transaction::kNewMaster) {
       lock_only_txn->set_new_master(txn.new_master());
@@ -174,9 +173,6 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     }
 
     if (!lock_only_txn->internal().master_metadata().empty()) {
-=======
-    if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
->>>>>>> master
       PutSingleHomeTransactionIntoBatch(lock_only_txn);
     }
   }

@@ -739,11 +739,8 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
-<<<<<<< HEAD
-=======
   CHECK(all_txns_.count(txn_id) > 0) << "Txn not in all_txns_: " << txn_id;
 
->>>>>>> master
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
 
