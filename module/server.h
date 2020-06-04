@@ -83,6 +83,8 @@ private:
 
   void SendAPIResponse(TxnId txn_id, api::Response&& res);
 
+  bool ValidateTransaction(const Transaction* txn);
+
   TxnId NextTxnId();
 
   ConfigurationPtr config_;

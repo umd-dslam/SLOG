@@ -27,8 +27,11 @@ Scheduler::Scheduler(
     config_(config),
     pull_socket_(*broker->GetContext(), ZMQ_PULL),
     worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
-    sender_(broker),
-    remaster_manager_(storage) {
+    sender_(broker)
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+    , remaster_manager_(storage)
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+      {
   broker->AddChannel(SCHEDULER_CHANNEL);
   pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
@@ -338,12 +341,14 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     txn->mutable_internal(),
     TransactionEvent::RELEASE_LOCKS);
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
     auto key = txn->write_set().begin()->first;
     auto counter = txn->internal().master_metadata().at(key).counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
   SendToCoordinatingServer(txn_id);
   all_txns_.erase(txn_id);
@@ -439,19 +444,22 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
             auto txn_holder = &all_txns_[txn_id];
 
-            // Check that remaster txns aren't remastering to the same master
-            if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
-              auto past_master = txn->internal().master_metadata().begin()->second.master();
-              if (txn->new_master() == past_master) {
-                TriggerPreDispatchAbort(txn_id);
-                break;
-              }
-            }
-
             if (aborting_txns_.count(txn_id)) {
               AddTransactionToAbort(txn_id);
             } else {
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+              if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+                if (!ValidateRemasterTransaction(txn)) {
+                  break;
+                }
+              }
+
               SendToRemasterManager(txn_holder);
+#else
+              SendToLockManager(txn_holder);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
             }
             break;
           }
@@ -464,7 +472,13 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             if (aborting_txns_.count(txn_id)) {
               AddLockOnlyTransactionToAbort(txn_replica_id);
             } else {
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
               SendToRemasterManager(txn_holder);
+#else
+              SendToLockManager(txn_holder);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
             }
             break;
           }
@@ -475,6 +489,15 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             if (aborting_txns_.count(txn_id)) {
               AddTransactionToAbort(txn_id);
             } else {
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+            if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+              if (!ValidateRemasterTransaction(txn)) {
+                break;
+              }
+            }
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
               SendToLockManager(txn_holder);
             }
             break;
@@ -491,6 +514,17 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
 /***********************************************
               Transaction Processing
 ***********************************************/
+
+bool Scheduler::ValidateRemasterTransaction(Transaction* txn) {
+  // TODO: this check can be done as soon as metadata is assigned
+  auto txn_id = txn->internal().id();
+  auto past_master = txn->internal().master_metadata().begin()->second.master();
+  if (txn->new_master() == past_master) {
+    TriggerPreDispatchAbort(txn_id);
+    return false;
+  }
+  return true;
+}
 
 bool Scheduler::AcceptTransaction(Transaction* txn) {
   switch(txn->internal().type()) {
@@ -523,6 +557,8 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
   }
   return true;
 }
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 
 void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   auto txn = txn_holder->GetTransaction();
@@ -562,6 +598,8 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
     TriggerPreDispatchAbort(txn_id);
   }
 }
+
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->GetTransaction()->internal().id();
@@ -637,8 +675,11 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
   // be in one of the managers, and needs to be removed.
   //
   // This also releases any lock-only transactions.
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   ProcessRemasterResult(
-    remaster_manager_.ReleaseTransaction(&txn_holder)); 
+    remaster_manager_.ReleaseTransaction(&txn_holder));
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
   for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
     DispatchTransaction(unblocked_txn);
   }

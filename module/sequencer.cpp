@@ -148,6 +148,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     const auto& metadata = txn.internal().master_metadata();
     auto lock_only_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
     
+    // Copy keys and metadata in local replica
     for (auto& key_value : txn.read_set()) {
       auto master = metadata.at(key_value.first).master();
       if (master == local_rep) {
@@ -162,6 +163,23 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+    // Add additional lock only at new replica. Metadata
+    // uses the new master so that the lock manager can check
+    // that both lock-onlys are received
+    // TODO: refactor to remote metadata from lock-onlys. Requires
+    // changes in the scheduler
+    if (txn.procedure_case() == Transaction::kNewMaster) {
+      if (txn.new_master() == local_rep) {
+        auto key = *txn.write_set().begin();
+        auto new_metadata = Metadata(txn.new_master());
+        lock_only_txn->mutable_write_set()->insert(key);
+        lock_only_metadata->insert({key, new_metadata});
+      }
+    }
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */ 
+
     if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
       PutSingleHomeTransactionIntoBatch(lock_only_txn);
     }

@@ -62,12 +62,19 @@ private:
   void MaybeUpdateLocalLog();
   void MaybeProcessNextBatchesFromGlobalLog();
 
+  // Check that remaster txn doesn't keep key at same master
+  bool ValidateRemasterTransaction(Transaction* txn);
+
   // Place a transaction in a holder if it has keys in this partition
   bool AcceptTransaction(Transaction* txn);
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking
   void SendToRemasterManager(TransactionHolder* txn_holder);
   // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
 
