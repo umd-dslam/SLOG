@@ -172,10 +172,10 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     // changes in the scheduler
     if (txn.procedure_case() == Transaction::kNewMaster) {
       if (txn.new_master() == local_rep) {
-        auto key = *txn.write_set().begin();
-        auto new_metadata = Metadata(txn.new_master());
-        lock_only_txn->mutable_write_set()->insert(key);
-        lock_only_metadata->insert({key, new_metadata});
+        auto key_value = *txn.write_set().begin();
+        lock_only_txn->mutable_write_set()->insert(key_value);
+        auto& new_metadata = (*lock_only_metadata)[key_value.first];
+        new_metadata.set_master(txn.new_master());
       }
     }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */ 
