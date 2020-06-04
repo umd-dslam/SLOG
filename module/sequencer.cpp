@@ -10,12 +10,11 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(const ConfigurationPtr& config, Broker& broker)
-  : BasicModule(
-        "Sequencer",
-        broker.AddChannel(SEQUENCER_CHANNEL)),
+Sequencer::Sequencer(
+    const ConfigurationPtr& config,
+    const std::shared_ptr<Broker>& broker)
+  : NetworkedModule(broker, SEQUENCER_CHANNEL),
     config_(config),
-    local_paxos_(new SimpleMultiPaxosClient(*this, LOCAL_PAXOS)),
     batch_id_counter_(0) {
   NewBatch();
 }
@@ -64,6 +63,11 @@ void Sequencer::HandleInternalRequest(
 void Sequencer::HandleCustomSocketMessage(
     const MMessage& /* msg */,
     size_t /* socket_index */) {
+
+#ifdef ENABLE_REPLICATION_DELAY
+  MaybeSendDelayedBatches();
+#endif /* ENABLE_REPLICATION_DELAY */
+
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
     return;
@@ -75,14 +79,16 @@ void Sequencer::HandleCustomSocketMessage(
   VLOG(3) << "Finished batch " << batch_id
           << ". Sending out for ordering and replicating";
 
-  Request req;
-  auto forward_batch = req.mutable_forward_batch();
+  Request paxos_req;
+  auto paxos_propose = paxos_req.mutable_paxos_propose();
+  paxos_propose->set_value(config_->GetLocalPartition());
+  Send(paxos_req, LOCAL_PAXOS);
+
+  Request batch_req;
+  auto forward_batch = batch_req.mutable_forward_batch();
   // minus 1 so that batch id counter starts from 0
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
   forward_batch->set_allocated_batch_data(batch_.release());
-
-  // Send batch id to local paxos for ordering
-  local_paxos_->Propose(config_->GetLocalPartition());
 
   // Replicate batch to all machines
   RecordTxnEvent(
@@ -90,16 +96,25 @@ void Sequencer::HandleCustomSocketMessage(
       forward_batch->mutable_batch_data(),
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
+#ifdef ENABLE_REPLICATION_DELAY
+  // Maybe delay current batch
+  if ((uint32_t)(rand() % 100) < config_->GetReplicationDelayPercent()) {
+    DelaySingleHomeBatch(std::move(batch_req));
+    NewBatch();
+    return;
+  } // Otherwise send it normally
+#endif /* GetReplicationDelayEnabled */
+
+  // Replicate batch to all machines
   auto num_partitions = config_->GetNumPartitions();
   auto num_replicas = config_->GetNumReplicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       auto machine_id = MakeMachineIdAsString(rep, part);
       Send(
-          req,
-          machine_id,
+          batch_req,
           SCHEDULER_CHANNEL,
-          part + 1 < num_partitions || rep + 1 < num_replicas /* has_more */);
+          machine_id);
     }
   }
 
@@ -147,6 +162,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
         lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
       }
     }
+<<<<<<< HEAD
 
     if (txn.procedure_case() == Transaction::kNewMaster) {
       lock_only_txn->set_new_master(txn.new_master());
@@ -158,6 +174,9 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     }
 
     if (!lock_only_txn->internal().master_metadata().empty()) {
+=======
+    if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
+>>>>>>> master
       PutSingleHomeTransactionIntoBatch(lock_only_txn);
     }
   }
@@ -173,9 +192,8 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     auto machine_id = MakeMachineIdAsString(local_rep, part);
     Send(
         req,
-        machine_id,
         SCHEDULER_CHANNEL,
-        part + 1 < num_partitions /* has_more */);
+        machine_id);
   }
 }
 
@@ -192,5 +210,54 @@ BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
   return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
 }
+
+#ifdef ENABLE_REPLICATION_DELAY
+void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
+  delayed_batches_.push_back(request);
+
+  // Send the batch to schedulers in the local replica only
+  auto local_rep = config_->GetLocalReplica();
+  auto num_partitions = config_->GetNumPartitions();
+  for (uint32_t part = 0; part < num_partitions; part++) {
+      auto machine_id = MakeMachineIdAsString(local_rep, part);
+      Send(
+          request,
+          SCHEDULER_CHANNEL,
+          machine_id);
+  }
+}
+
+void Sequencer::MaybeSendDelayedBatches() {
+  for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
+    // Create a geometric distribution of delay. Each batch has 1 / DelayAmount chance
+    // of being sent at every tick
+    if (rand() % config_->GetReplicationDelayAmount() == 0) {
+      VLOG(4) << "Sending delayed batch";
+      auto request = *itr;
+
+      // Replicate batch to all machines EXCEPT local replica
+      auto num_replicas = config_->GetNumReplicas();
+      auto num_partitions = config_->GetNumPartitions();
+      for (uint32_t rep = 0; rep < num_replicas; rep++) {
+        if (rep == config_->GetLocalReplica()) {
+          // Already sent to local replica
+          continue;
+        }
+        for (uint32_t part = 0; part < num_partitions; part++) {
+          auto machine_id = MakeMachineIdAsString(rep, part);
+          Send(
+              request,
+              SCHEDULER_CHANNEL,
+              machine_id);
+        }
+      }
+
+      itr = delayed_batches_.erase(itr);
+    } else {
+      itr++;
+    }
+  }
+}
+#endif /* ENABLE_REPLICATION_DELAY */
 
 } // namespace slog

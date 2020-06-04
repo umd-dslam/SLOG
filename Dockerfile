@@ -1,4 +1,6 @@
 FROM ubuntu:bionic AS builder
+    ARG CMAKE_OPTIONS
+
     RUN apt-get update
     RUN apt-get -y install wget
 
@@ -18,7 +20,7 @@ FROM ubuntu:bionic AS builder
     RUN rm -rf build \
         && mkdir build \
         && cd build \
-        && cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTING=OFF\
+        && cmake .. -DBUILD_CLIENT=OFF -DBUILD_TESTING=OFF ${CMAKE_OPTIONS}\
         && make -j$(nproc) \
         && cd ..
 

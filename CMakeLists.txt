@@ -8,6 +8,26 @@ include(CTest)
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
+set(REMASTER_PROTOCOL SIMPLE CACHE STRING "Protocol for remastering")
+option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
+
+# Note: BUILD_TESTING is defined by CTest
+
+#========================================
+#               Macros
+#========================================
+
+if(REMASTER_PROTOCOL STREQUAL "SIMPLE")
+  add_compile_definitions(REMASTER_PROTOCOL_SIMPLE)
+elseif(REMASTER_PROTOCOL STREQUAL "PER_KEY")
+  add_compile_definitions(REMASTER_PROTOCOL_PER_KEY)
+else()
+  message(FATAL_ERROR "Invalid REMASTER_PROTOCOL")
+endif()
+
+if(ENABLE_REPLICATION_DELAY)
+    add_compile_definitions(ENABLE_REPLICATION_DELAY)
+endif()
 
 #========================================
 #               Setup

@@ -3,6 +3,7 @@
 #include <fcntl.h>
 
 #include "common/configuration.h"
+#include "common/constants.h"
 #include "common/offline_data_reader.h"
 #include "common/service_utils.h"
 #include "connection/broker.h"
@@ -87,6 +88,19 @@ int main(int argc, char* argv[]) {
             << std::get<1>(zmq_version) << "."
             << std::get<2>(zmq_version);
 
+#ifdef ENABLE_REPLICATION_DELAY
+  LOG(INFO) << "Replication delay enabled";
+#endif /* GetReplicationDelayEnabled */
+
+#ifdef REMASTER_PROTOCOL_SIMPLE
+  LOG(INFO) << "Simple remaster protocol";
+#elif defined REMASTER_PROTOCOL_PER_KEY
+  LOG(INFO) << "Per key remaster protocol";
+#else
+  #error "Remaster protocol not defined"
+#endif /* REMASTER_PROTOCOL_SIMPLE */
+
+
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 
       FLAGS_address,
@@ -105,7 +119,7 @@ int main(int argc, char* argv[]) {
       << "Partition number must be within number of partitions";
 
   auto context = make_shared<zmq::context_t>(1);
-  Broker broker(config, context);
+  auto broker = make_shared<Broker>(config, context);
 
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
@@ -125,7 +139,7 @@ int main(int argc, char* argv[]) {
   modules.push_back(
       MakeRunnerFor<slog::Sequencer>(config, broker));
   modules.push_back(
-      MakeRunnerFor<slog::Scheduler>(config, *context, broker, storage));
+      MakeRunnerFor<slog::Scheduler>(config, broker, storage));
   
   // Only one partition per replica participates in the global paxos process
   if (config->GetLeaderPartitionForMultiHomeOrdering() 
@@ -138,7 +152,7 @@ int main(int argc, char* argv[]) {
 
   // New modules cannot be bound to the broker after it starts so start 
   // the Broker only after it is used to initialized all modules.
-  broker.StartInNewThread();
+  broker->StartInNewThread();
   
   // Start modules in their own threads
   for (auto& module : modules) {

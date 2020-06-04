@@ -6,7 +6,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "connection/broker.h"
-#include "module/base/basic_module.h"
+#include "module/base/networked_module.h"
 #include "proto/transaction.pb.h"
 
 namespace slog {
@@ -23,9 +23,9 @@ namespace slog {
  * OUTPUT: If the txn is SINGLE_HOME, forward to the Sequencer in its home region.
  *         If the txn is MULTI_HOME, forward to the GlobalPaxos for ordering.
  */
-class Forwarder : public BasicModule {
+class Forwarder : public NetworkedModule {
 public:
-  Forwarder(const ConfigurationPtr& config, Broker& broker);
+  Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker);
 
 protected:
   void HandleInternalRequest(

@@ -15,7 +15,7 @@ using Pair = pair<uint32_t, uint32_t>;
 class TestSimpleMultiPaxos : public SimpleMultiPaxos {
 public:
   TestSimpleMultiPaxos(
-      Broker& broker,
+      const shared_ptr<Broker>& broker,
       const vector<string>& group_members,
       const string& me)
     : SimpleMultiPaxos("test", broker, group_members, me) {}
@@ -64,29 +64,36 @@ protected:
       const vector<string>& members,
       const string& me) {
     auto context = make_shared<zmq::context_t>(1);
-    auto broker = new Broker(config, context, 5 /* timeout_ms */);
-    auto paxos = make_shared<TestSimpleMultiPaxos>(*broker, members, me);
+    auto broker = make_shared<Broker>(config, context, 5 /* timeout_ms */);
+    auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
+    auto sender = make_unique<Sender>(broker);
     auto paxos_runner = new ModuleRunner(paxos);
-    auto client = new SimpleMultiPaxosClient(*paxos, "test");
 
     broker->StartInNewThread();
     paxos_runner->StartInNewThread();
 
     contexts_.push_back(context);
-    broker_.emplace_back(broker);
-    paxos_runner_.emplace_back(paxos_runner);
+    brokers_.emplace_back(broker);
+    senders_.push_back(move(sender));
+    paxos_runners_.emplace_back(paxos_runner);
     
     paxi.push_back(paxos);
-    clients.emplace_back(client);
+  }
+
+  void Propose(int index, int value) {
+    internal::Request paxos_req;
+    auto paxos_propose = paxos_req.mutable_paxos_propose();
+    paxos_propose->set_value(value);
+    senders_[index]->Send(paxos_req, "test");
   }
 
   vector<shared_ptr<TestSimpleMultiPaxos>> paxi;
-  vector<unique_ptr<PaxosClient>> clients;
 
 private:
   vector<shared_ptr<zmq::context_t>> contexts_;
-  vector<unique_ptr<Broker>> broker_;
-  vector<unique_ptr<ModuleRunner>> paxos_runner_;
+  vector<shared_ptr<Broker>> brokers_;
+  vector<unique_ptr<ModuleRunner>> paxos_runners_;
+  vector<unique_ptr<Sender>> senders_;
 };
 
 TEST_F(PaxosTest, ProposeWithoutForwarding) {
@@ -95,7 +102,7 @@ TEST_F(PaxosTest, ProposeWithoutForwarding) {
     AddAndStartNewPaxos(config);
   }
 
-  clients[0]->Propose(111);
+  Propose(0, 111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
     ASSERT_EQ(0U, ret.first);
@@ -109,7 +116,7 @@ TEST_F(PaxosTest, ProposeWithForwarding) {
     AddAndStartNewPaxos(config);
   }
 
-  clients[1]->Propose(111);
+  Propose(1, 111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
     ASSERT_EQ(0U, ret.first);
@@ -123,21 +130,21 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
     AddAndStartNewPaxos(config);
   }
 
-  clients[0]->Propose(111);
+  Propose(0, 111);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
     ASSERT_EQ(0U, ret.first);
     ASSERT_EQ(111U, ret.second);
   }
 
-  clients[1]->Propose(222);
+  Propose(1, 222);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
     ASSERT_EQ(1U, ret.first);
     ASSERT_EQ(222U, ret.second);
   }
 
-  clients[2]->Propose(333);
+  Propose(2, 333);
   for (auto& paxos : paxi) {
     auto ret = paxos->Poll();
     ASSERT_EQ(2U, ret.first);
@@ -157,7 +164,7 @@ TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   }
 
   auto non_member = (member_part + 1) % configs.front()->GetNumPartitions(); 
-  clients[non_member]->Propose(111);
+  Propose(non_member, 111);
   for (auto& paxos : paxi) {
     if (paxos->IsMember()) {
       auto ret = paxos->Poll();

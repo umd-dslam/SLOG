@@ -28,8 +28,8 @@ protected:
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
-      sequencer_channels_[i] = test_slogs[i]->AddChannel(SEQUENCER_CHANNEL);
-      orderer_channels_[i] = test_slogs[i]->AddChannel(MULTI_HOME_ORDERER_CHANNEL);
+      test_slogs[i]->AddChannel(SEQUENCER_CHANNEL);
+      test_slogs[i]->AddChannel(MULTI_HOME_ORDERER_CHANNEL);
     }
     // Replica 0
     test_slogs[0]->Data("A", {"xxxxx", 0, 0});
@@ -51,7 +51,8 @@ protected:
     CHECK(!indices.empty());
     vector<zmq::pollitem_t> poll_items;
     for (auto i : indices) {
-      poll_items.push_back(sequencer_channels_[i]->GetPollItem());
+      poll_items.push_back(
+          test_slogs[i]->GetPollItemForChannel(SEQUENCER_CHANNEL));
     }
     auto rc = zmq::poll(poll_items, 1000);
     if (rc == 0) return nullptr;
@@ -59,8 +60,7 @@ protected:
     MMessage msg;
     for (size_t i = 0; i < poll_items.size(); i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        auto& sink = sequencer_channels_[indices[i]];
-        sink->Receive(msg);
+        test_slogs[indices[i]]->ReceiveFromChannel(msg, SEQUENCER_CHANNEL);
         break;
       }
     }
@@ -69,7 +69,7 @@ protected:
 
   Transaction* ReceiveOnOrdererChannel(size_t index) {
     MMessage msg;
-    orderer_channels_[index]->Receive(msg);
+    test_slogs[index]->ReceiveFromChannel(msg, MULTI_HOME_ORDERER_CHANNEL);
     return ExtractTxn(msg);
   }
 
@@ -88,9 +88,6 @@ private:
     }
     return req.mutable_forward_txn()->release_txn();
   }
-
-  unique_ptr<Channel> sequencer_channels_[NUM_MACHINES];
-  unique_ptr<Channel> orderer_channels_[NUM_MACHINES];
 };
 
 TEST_F(ForwarderTest, ForwardToSameRegion) {
@@ -100,7 +97,7 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   test_slogs[0]->SendTxn(txn);
 
   auto forwarded_txn = ReceiveOnSequencerChannel({0});
-  // The txn should be forwarded to the scheduler of the same machine
+  // The txn should be forwarded to the sequencer of the same machine
   if (forwarded_txn == nullptr) {
     FAIL() << "Message was not received before timing out";
   }

@@ -11,32 +11,17 @@ using std::vector;
 
 namespace slog {
 
-class KeyList {
-public:
-  KeyList(size_t num_hot_keys = 0);
-
-  void AddKey(Key key);
-  Key GetRandomHotKey();
-  Key GetRandomColdKey();
-
-private:
-  size_t num_hot_keys_;
-  vector<Key> cold_keys_;
-  vector<Key> hot_keys_;
-
-  std::mt19937 re_;
-};
-
 class BasicWorkload : public WorkloadGenerator {
 public:
   BasicWorkload(
-      const ConfigurationPtr& config,
+      const ConfigurationPtr config,
       const std::string& data_dir,
-      const std::string& params_str);
+      const std::string& params_str,
+      const RawParamMap extra_default_params = {});
 
-  std::pair<Transaction*, TransactionProfile> NextTransaction() final;
+  std::pair<Transaction*, TransactionProfile> NextTransaction();
 
-private:
+protected:
   ConfigurationPtr config_;
 
   // This is an index of keys by their partition and home.

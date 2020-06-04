@@ -17,7 +17,9 @@ vector<string> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
   return members;
 }
 
-GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, Broker& broker)
+GlobalPaxos::GlobalPaxos(
+    const ConfigurationPtr& config,
+    const shared_ptr<Broker>& broker)
   : SimpleMultiPaxos(
       GLOBAL_PAXOS,
       broker,
@@ -29,7 +31,7 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   auto order = req.mutable_forward_batch()->mutable_batch_order();
   order->set_slot(slot);
   order->set_batch_id(value);
-  SendSameMachine(req, MULTI_HOME_ORDERER_CHANNEL);
+  Send(req, MULTI_HOME_ORDERER_CHANNEL);
 }
 
 vector<string> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
@@ -42,7 +44,9 @@ vector<string> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
   return members;
 }
 
-LocalPaxos::LocalPaxos(const ConfigurationPtr& config, Broker& broker)
+LocalPaxos::LocalPaxos(
+    const ConfigurationPtr& config,
+    const shared_ptr<Broker>& broker)
   : SimpleMultiPaxos(
       LOCAL_PAXOS,
       broker,
@@ -54,7 +58,7 @@ void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   auto order = req.mutable_local_queue_order();
   order->set_queue_id(value);
   order->set_slot(slot);
-  SendSameMachine(req, SCHEDULER_CHANNEL);
+  Send(req, SCHEDULER_CHANNEL);
 }
 
 } // namespace slog

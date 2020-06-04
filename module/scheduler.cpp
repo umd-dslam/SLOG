@@ -19,20 +19,29 @@ const uint32_t Scheduler::WORKER_LOAD_THRESHOLD = 5;
 
 Scheduler::Scheduler(
     const ConfigurationPtr& config,
-    zmq::context_t& context,
-    Broker& broker,
+    const shared_ptr<Broker>& broker,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : ChannelHolder(broker.AddChannel(SCHEDULER_CHANNEL)),
-    // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
+  : // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
     // range, num_replicas can be used as the marker for MULTI-HOME txn log
     kMultiHomeTxnLogMarker(config->GetNumReplicas()),
     config_(config),
-    worker_socket_(context, ZMQ_ROUTER),
+    pull_socket_(*broker->GetContext(), ZMQ_PULL),
+    worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
+    sender_(broker),
     remaster_manager_(storage) {
+  broker->AddChannel(SCHEDULER_CHANNEL);
+  pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
+  pull_socket_.setsockopt(ZMQ_LINGER, 0);
+  pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
+  poll_items_.push_back({
+      static_cast<void*>(pull_socket_),
+      0, /* fd */
+      ZMQ_POLLIN,
+      0 /* revent */});
+
   worker_socket_.setsockopt(ZMQ_LINGER, 0);
   worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
   worker_socket_.setsockopt(ZMQ_SNDHWM, 0);
-  poll_items_.push_back(GetChannelPollItem());
   poll_items_.push_back({
       static_cast<void*>(worker_socket_),
       0, /* fd */
@@ -43,7 +52,7 @@ Scheduler::Scheduler(
     workers_.push_back(MakeRunnerFor<Worker>(
         std::to_string(i), /* identity */
         config,
-        context,
+        *broker->GetContext(),
         storage));
   }
 }
@@ -69,8 +78,7 @@ void Scheduler::Loop() {
   zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
   if (HasMessageFromChannel()) {
-    MMessage msg;
-    ReceiveFromChannel(msg);
+    MMessage msg(pull_socket_);
     Request req;
     if (msg.GetProto(req)) {
       HandleInternalRequest(move(req), msg.GetIdentity());
@@ -90,7 +98,7 @@ void Scheduler::Loop() {
       // Worker to specify the destination of this message
       msg.GetString(destination, MM_PROTO + 1);
       // Send to the Scheduler of the remote machine
-      SendSameChannel(forwarded_req, destination);
+      sender_.Send(forwarded_req, SCHEDULER_CHANNEL, destination);
     } else if (msg.IsProto<Response>()) {
       Response res;
       msg.GetProto(res);
@@ -306,7 +314,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  SendSameMachine(res, SERVER_CHANNEL);
+  sender_.Send(res, SERVER_CHANNEL);
 }
 
 /***********************************************
@@ -361,7 +369,7 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
 
   auto coordinating_server = MakeMachineIdAsString(
       txn->internal().coordinating_server());
-  Send(req, coordinating_server, SERVER_CHANNEL);
+  sender_.Send(req, SERVER_CHANNEL, coordinating_server);
   
   txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
@@ -384,10 +392,10 @@ void Scheduler::MaybeUpdateLocalLog() {
     forward_batch_order->set_slot(slot_id);
     auto num_replicas = config_->GetNumReplicas();
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      SendSameChannel(
+      sender_.Send(
           request,
-          MakeMachineIdAsString(rep, local_partition),
-          rep + 1 < num_replicas /* has_more */);
+          SCHEDULER_CHANNEL,
+          MakeMachineIdAsString(rep, local_partition));
     }
   }
 }
@@ -534,6 +542,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
       break;
     }
     case VerifyMasterResult::WAITING: {
+      VLOG(4) << "Txn waiting on remaster: " << txn->internal().id();
       // Do nothing
       break;
     }
@@ -578,8 +587,6 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
     }
     case TransactionType::LOCK_ONLY: {
       if (lock_manager_.AcquireLocks(*txn_holder)) {
-        CHECK(all_txns_.count(txn_id) > 0) 
-            << "Txn " << txn_id << " is not found for dispatching";
         DispatchTransaction(txn_id);
       }
       break;
@@ -625,6 +632,19 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
     SendAbortToPartitions(txn_id);
   }
 
+  // Release txn from remaster manager and lock manager.
+  //
+  // If the abort was triggered by a remote partition,
+  // then the single-home or multi-home transaction may still
+  // be in one of the managers, and needs to be removed.
+  //
+  // This also releases any lock-only transactions.
+  ProcessRemasterResult(
+    remaster_manager_.ReleaseTransaction(&txn_holder)); 
+  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
+    DispatchTransaction(unblocked_txn);
+  }
+
   if (txn_type == TransactionType::MULTI_HOME) {
     CollectLockOnlyTransactionsForAbort(txn_id);
   }
@@ -649,15 +669,6 @@ void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {
   auto& involved_replicas = txn_holder.InvolvedReplicas();
   mh_abort_waiting_on_[txn_id] += involved_replicas.size();
 
-  // release LOs in remaster manager
-  ProcessRemasterResult(
-      remaster_manager_.ReleaseTransaction(&txn_holder));
-
-  // release LOs in lock manager
-  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
-    DispatchTransaction(unblocked_txn);
-  }
-
   // Erase the LOs that have already arrived - the same that have been released
   // from remaster and lock managers
   for (auto replica : involved_replicas) {
@@ -680,7 +691,7 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   for (auto p : txn_holder.ActivePartitions()) {
     if (p != config_->GetLocalPartition()) {
       auto machine_id = MakeMachineIdAsString(local_replica, p);
-      SendSameChannel(request, machine_id);
+      sender_.Send(request, SCHEDULER_CHANNEL, machine_id);
     }
   }
 }
@@ -728,6 +739,11 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::DispatchTransaction(TxnId txn_id) {
+<<<<<<< HEAD
+=======
+  CHECK(all_txns_.count(txn_id) > 0) << "Txn not in all_txns_: " << txn_id;
+
+>>>>>>> master
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
 

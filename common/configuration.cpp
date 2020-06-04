@@ -159,4 +159,14 @@ bool Configuration::KeyIsInLocalPartition(const Key& key) const {
   return GetPartitionOfKey(key) == local_partition_;
 }
 
+#ifdef ENABLE_REPLICATION_DELAY
+uint32_t Configuration::GetReplicationDelayPercent() const {
+  return config_.replication_delay().batch_delay_percent();
+}
+
+uint32_t Configuration::GetReplicationDelayAmount() const {
+  return config_.replication_delay().batch_delay_amount();
+}
+#endif /* ENABLE_REPLICATION_DELAY */
+
 } // namespace slog
