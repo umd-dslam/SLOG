@@ -317,7 +317,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {"A"},  /* write_set */
       "", /* code */
       {{"A", {0,1}}}, /* master metadata */
-      MakeMachineId("0:1") /* coordinating server */,
+      MakeMachineId("0:1"), /* coordinating server */
       1 /* new master */);
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   remaster_txn->mutable_internal()->set_id(11);
@@ -338,6 +338,66 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
 }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
+  auto remaster_txn = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {{"A", {0,0}}}, /* master metadata */
+      MakeMachineId("0:1"), /* coordinating server */
+      1 /* new master */);
+  remaster_txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
+  remaster_txn->mutable_internal()->set_id(11);
+
+    auto remaster_txn_lo_0 = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {{"A", {0,0}}}, /* master metadata */
+      MakeMachineId("0:1"), /* coordinating server */
+      1 /* new master */);
+  remaster_txn_lo_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+  remaster_txn_lo_0->mutable_internal()->set_id(11);
+
+    auto remaster_txn_lo_1 = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {{"A", {1,0}}}, /* master metadata */
+      MakeMachineId("0:1"), /* coordinating server */
+      1 /* new master */);
+  remaster_txn_lo_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+  remaster_txn_lo_1->mutable_internal()->set_id(11);
+
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {},  /* write_set */
+      "GET A     \n", /* code */
+      {{"A", {1,0}}},
+      MakeMachineId("0:0") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_id(12);
+
+  SendMultiHomeBatch(0, {remaster_txn}, {0});
+  SendSingleHomeBatch(100, {remaster_txn_lo_1, txn}, {0});
+  SendSingleHomeBatch(200, {remaster_txn_lo_0}, {0});
+
+  auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_remaster_txn;
+  ASSERT_EQ(output_remaster_txn.internal().id(), 11);
+  ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_remaster_txn.new_master(), 1);
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.internal().id(), 10);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_txn.read_set_size(), 1);
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+}
+#endif /* REMASTERING_PROTOCOL_COUNTERLESS */
 
 TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
   auto txn = MakeTransaction(
