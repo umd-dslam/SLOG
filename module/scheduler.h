@@ -133,6 +133,11 @@ private:
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
   PerKeyRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+  /*
+  Remaster txns require 2 lock onlys to arrive, but only the first
+  should obtain a lock (since they both would write lock the same key).
+  If a txn is in this set, it is waiting for the second lock-only to arrive
+  */
   std::unordered_set<TxnId> remaster_txns_waiting_to_dispatch_;
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
