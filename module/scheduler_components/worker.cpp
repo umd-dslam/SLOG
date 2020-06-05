@@ -1,5 +1,8 @@
 #include "module/scheduler_components/worker.h"
-#include "module/scheduler_components/remaster_manager.h"
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  #include "module/scheduler_components/remaster_manager.h"
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 #include <thread>
 
@@ -76,12 +79,13 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   const auto& state = InitializeTransactionState(txn_holder);
 
   auto will_abort = false;
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   switch(RemasterManager::CheckCounters(txn_holder, storage_)) {
     case VerifyMasterResult::VALID: {
       break;
     }
     case VerifyMasterResult::ABORT: {
-      txn->set_status(TransactionStatus::ABORTED);
       will_abort = true;
       break;
     }
@@ -93,8 +97,25 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
       LOG(ERROR) << "Unrecognized check counter result";
       break;
   }
+#else
+  for (auto& key_pair : txn->internal().master_metadata()) {
+    auto& key = key_pair.first;
+    auto txn_master = key_pair.second.master();
 
-  if (!will_abort) {
+    Record record;
+    bool found = storage_->Read(key, record);
+    if (found) {
+      if (txn_master != record.metadata.master) {
+        will_abort = true;
+        break;
+      }
+    }
+  }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
+  if (will_abort) {
+    txn->set_status(TransactionStatus::ABORTED);
+  } else {
     PopulateDataFromLocalStorage(txn);
   }
 

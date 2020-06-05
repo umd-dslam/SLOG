@@ -134,7 +134,12 @@ TEST_F(E2ETest, RemasterTxn) {
   test_slogs[1]->SendTxn(remaster_txn);
   auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::COMMITTED, remaster_txn_resp.status());
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+  ASSERT_EQ(TransactionType::MULTI_HOME, remaster_txn_resp.internal().type());
+#else
   ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
   auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
 

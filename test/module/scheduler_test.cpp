@@ -301,6 +301,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
   ASSERT_EQ(output_txn.write_set().at("D"), "newD");
 }
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   auto txn = MakeTransaction(
       {"A"}, /* read_set */
@@ -336,6 +337,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
 }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
   auto txn = MakeTransaction(
@@ -351,12 +353,6 @@ TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
-}
-
-int main(int argc, char* argv[]) {
-  ::testing::InitGoogleTest(&argc, argv);
-  google::InstallFailureSignalHandler();
-  return RUN_ALL_TESTS();
 }
 
 TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
@@ -452,4 +448,10 @@ TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
+
+int main(int argc, char* argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  google::InstallFailureSignalHandler();
+  return RUN_ALL_TESTS();
 }

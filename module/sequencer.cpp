@@ -165,6 +165,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     }
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
+    lock_only_txn->set_new_master(txn.new_master());
     // Add additional lock only at new replica. Metadata
     // uses the new master so that the lock manager can check
     // that both lock-onlys are received

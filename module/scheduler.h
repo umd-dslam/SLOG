@@ -18,7 +18,7 @@
 
 #ifdef REMASTER_PROTOCOL_SIMPLE
   #include "module/scheduler_components/simple_remaster_manager.h"
-#elif defined REMASTER_PROTOCOL_PER_KEY
+#elif defined(REMASTER_PROTOCOL_PER_KEY)
   #include "module/scheduler_components/per_key_remaster_manager.h"
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
@@ -130,7 +130,7 @@ private:
   
 #ifdef REMASTER_PROTOCOL_SIMPLE
   SimpleRemasterManager remaster_manager_;
-#elif defined REMASTER_PROTOCOL_PER_KEY
+#elif defined(REMASTER_PROTOCOL_PER_KEY)
   PerKeyRemasterManager remaster_manager_;
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
