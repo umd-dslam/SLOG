@@ -111,14 +111,6 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
 
-#ifdef REMASTER_PROTOCOL_COUNTERLESS
-  // Two lock-onlys will arrive
-  auto txn = txn_holder.GetTransaction();
-  if (txn->procedure_case() == Transaction::kNewMaster) {
-    num_locks_waited_[txn_id] = 2;
-  }
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
-
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;
@@ -132,24 +124,6 @@ bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder)
   }
 
   auto txn_id = txn_holder.GetTransaction()->internal().id();
-
-#ifdef REMASTER_PROTOCOL_COUNTERLESS
-  auto txn = txn_holder.GetTransaction();
-  if (txn->procedure_case() == Transaction::kNewMaster) {
-    // Only one of the two lock-onlys receives a write lock, but both
-    // must have arrived. The 'new' lock only has the new_master in
-    // its metadata, and will not request the lock
-    if (txn->internal().master_metadata().begin()->second.master() == txn->new_master()) {
-      num_locks_waited_[txn_id] -= 1;
-      if (num_locks_waited_[txn_id] == 0) {
-        num_locks_waited_.erase(txn_id);
-        return true;
-      }
-      return false;
-    }
-  }
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
-
   int num_locks_acquired = 0;
   for (auto pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;

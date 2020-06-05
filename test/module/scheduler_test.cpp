@@ -381,18 +381,16 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   txn->mutable_internal()->set_id(12);
 
   SendMultiHomeBatch(0, {remaster_txn}, {0});
-  SendSingleHomeBatch(100, {remaster_txn_lo_1, txn}, {0});
-  SendSingleHomeBatch(200, {remaster_txn_lo_0}, {0});
+  SendSingleHomeBatch(200, {remaster_txn_lo_1, remaster_txn_lo_0, txn}, {0});
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
   ASSERT_EQ(output_remaster_txn.internal().id(), 11);
   ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_remaster_txn.new_master(), 1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
-  ASSERT_EQ(output_txn.internal().id(), 10);
+  ASSERT_EQ(output_txn.internal().id(), 12);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");

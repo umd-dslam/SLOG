@@ -63,7 +63,7 @@ private:
   void MaybeProcessNextBatchesFromGlobalLog();
 
   // Check that remaster txn doesn't keep key at same master
-  bool ValidateRemasterTransaction(Transaction* txn);
+  bool MaybeAbortRemasterTransaction(Transaction* txn);
 
   // Place a transaction in a holder if it has keys in this partition
   bool AcceptTransaction(Transaction* txn);
@@ -132,6 +132,8 @@ private:
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
   PerKeyRemasterManager remaster_manager_;
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+  std::unordered_set<TxnId> remaster_txns_waiting_to_dispatch_;
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
