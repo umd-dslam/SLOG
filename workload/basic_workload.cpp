@@ -48,7 +48,7 @@ constexpr char SH_REGION[] = "sh_region";
 // Partition that used in a single-partition transaction.
 // Use a negative number to select a random partition for
 // each transaction
-constexpr char SP_PARTITION[] = "sp_parition";
+constexpr char SP_PARTITION[] = "sp_partition";
 
 const RawParamMap DEFAULT_PARAMS = {
   { MH_PCT, "0" },
