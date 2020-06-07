@@ -45,7 +45,7 @@ constexpr char VALUE_SIZE[] = "value_size";
 // Use a negative number to select a random region for
 // each transaction
 constexpr char SH_REGION[] = "sh_region";
-// Partition that used in a single-partition transaction.
+// Partition that is used in a single-partition transaction.
 // Use a negative number to select a random partition for
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";

@@ -155,8 +155,11 @@ inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& re) {
 /**
  * Randomly picks an element from a vector uniformly
  */
-template<typename T>
-T PickOne(const std::vector<T>& v, std::mt19937& re) {
+template<
+    template <typename, typename...> class Container,
+    typename T, 
+    typename... Args>
+T PickOne(const Container<T, Args...>& v, std::mt19937& re) {
   if (v.empty()) {
     throw std::runtime_error("Cannot pick from an empty container");
   }
@@ -172,8 +175,7 @@ const std::string CHARACTERS("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn
 inline std::string RandomString(size_t n, std::mt19937& re) {
   std::string s;
   for (size_t i = 0; i < n; i++) {
-    auto k = Choose(CHARACTERS.size(), 1, re)[0];
-    s += CHARACTERS[k];
+    s += PickOne(CHARACTERS, re);
   }
   return s;
 }
@@ -189,12 +191,14 @@ public:
     }
     cold_keys_.push_back(key);
   }
+
   Key GetRandomHotKey() {
     if (hot_keys_.empty()) {
       throw std::runtime_error("There is no hot key to pick from. Please check your params");
     }
     return PickOne(hot_keys_, re_);
   }
+
   Key GetRandomColdKey() {
     if (cold_keys_.empty()) {
       throw std::runtime_error("There is no cold key to pick from. Please check your params");
