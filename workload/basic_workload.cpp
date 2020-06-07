@@ -169,7 +169,7 @@ BasicWorkload::NextTransaction() {
   CHECK_LE(num_hot_records, num_records)
       << "Number of hot records exceed number of records in a transaction!";
 
-  auto hot_indices = Choose(num_records, params_.GetUInt32(NUM_HOT_RECORDS), re_);
+  auto hot_indices = Choose(num_records, num_hot_records, re_);
   for (size_t i = 0; i < num_records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
