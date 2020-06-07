@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <sstream>
 #include <random>
 #include <unordered_map>
@@ -95,8 +96,10 @@ struct TransactionProfile {
   bool is_multi_home;
   bool is_multi_partition;
 
-  std::unordered_map<Key, uint32_t> key_to_partition;
-  std::unordered_map<Key, uint32_t> key_to_home;
+  std::map<Key, uint32_t> key_to_partition;
+  std::map<Key, uint32_t> key_to_home;
+  std::map<Key, bool> is_hot_record;
+  std::map<Key, bool> is_write_record;
 };
 
 /**
@@ -188,13 +191,13 @@ public:
   }
   Key GetRandomHotKey() {
     if (hot_keys_.empty()) {
-      throw std::runtime_error("There is no hot key to pick from. Please check your data");
+      throw std::runtime_error("There is no hot key to pick from. Please check your params");
     }
     return PickOne(hot_keys_, re_);
   }
   Key GetRandomColdKey() {
     if (cold_keys_.empty()) {
-      throw std::runtime_error("There is no cold key to pick from. Please check your data");
+      throw std::runtime_error("There is no cold key to pick from. Please check your params");
     }
     return PickOne(cold_keys_, re_);
   }

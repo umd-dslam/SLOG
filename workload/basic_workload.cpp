@@ -27,26 +27,41 @@ constexpr char MH_NUM_HOMES[] = "mh_homes";
 constexpr char MP_PCT[] = "mp";
 // Number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_NUM_PARTS[] = "mp_parts";
+// Number of hot keys across the key space. The actual number of
+// hot keys won't match exactly the specified number but will be close. 
+// Precisely, it will be:
+//        floor(hot / num_key_lists) * num_key_lists
+//  where: num_key_lists = total_num_replicas * total_num_partitions
+constexpr char HOT[] = "hot";
 // Number of records in a transaction
-constexpr char NUM_RECORDS[] = "num_records";
+constexpr char NUM_RECORDS[] = "records";
+// Number of hot records in a transaction
+constexpr char NUM_HOT_RECORDS[] = "hot_records";
 // Number of write records in a transaction
-constexpr char NUM_WRITES[] = "num_writes";
+constexpr char NUM_WRITES[] = "writes";
 // Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
 // Region that is home to a single-home transaction.
 // Use a negative number to select a random region for
 // each transaction
 constexpr char SH_REGION[] = "sh_region";
+// Partition that used in a single-partition transaction.
+// Use a negative number to select a random partition for
+// each transaction
+constexpr char SP_PARTITION[] = "sp_parition";
 
 const RawParamMap DEFAULT_PARAMS = {
   { MH_PCT, "0" },
   { MH_NUM_HOMES, "2" },
   { MP_PCT, "0" },
   { MP_NUM_PARTS, "2" },
+  { HOT, "10000" },
   { NUM_RECORDS, "10" },
-  { NUM_WRITES, "2" },
+  { NUM_HOT_RECORDS, "2" },
+  { NUM_WRITES, "4" },
   { VALUE_SIZE, "100" },
-  { SH_REGION, "-1" }
+  { SH_REGION, "-1" },
+  { SP_PARTITION, "-1" }
 };
 
 } // namespace
@@ -62,16 +77,17 @@ BasicWorkload::BasicWorkload(
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
     client_txn_id_counter_(0) {
-
+  auto num_replicas = config->GetNumReplicas();
+  auto num_partitions = config->GetNumPartitions();
+  auto hot_keys_per_list = params_.GetUInt32(HOT) / (num_replicas * num_partitions);
   for (auto& key_lists : partition_to_key_lists_) {
-    for (uint32_t rep = 0; rep < config->GetNumReplicas(); rep++) {
-      // TODO (ctring): initialize each key list with some hot keys
-      key_lists.emplace_back();
+    for (uint32_t rep = 0; rep < num_replicas; rep++) {
+      key_lists.emplace_back(hot_keys_per_list);
     }
   }
 
   // Load and index the initial data
-  for (uint32_t partition = 0; partition < config->GetNumPartitions(); partition++) {
+  for (uint32_t partition = 0; partition < num_partitions; partition++) {
     auto data_file = data_dir + "/" + std::to_string(partition) + ".dat";
     auto fd = open(data_file.c_str(), O_RDONLY);
     if (fd < 0) {
@@ -82,7 +98,7 @@ BasicWorkload::BasicWorkload(
     LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums from " << data_file;
     while (reader.HasNextDatum()) {
       auto datum = reader.GetNextDatum();
-      CHECK_LT(datum.master(), config->GetNumReplicas())
+      CHECK_LT(datum.master(), num_replicas)
           << "Master number exceeds number of replicas";
 
       partition_to_key_lists_[partition][datum.master()].AddKey(datum.key());
@@ -93,11 +109,6 @@ BasicWorkload::BasicWorkload(
 
 std::pair<Transaction*, TransactionProfile>
 BasicWorkload::NextTransaction() {
-  auto num_writes = params_.GetUInt32(NUM_WRITES);
-  auto num_records = params_.GetUInt32(NUM_RECORDS);
-  CHECK_LE(num_writes, num_records)
-      << "Number of writes cannot exceed number of records in a txn!";
-
   TransactionProfile pro;
 
   pro.client_txn_id = client_txn_id_counter_;
@@ -108,10 +119,20 @@ BasicWorkload::NextTransaction() {
   pro.is_multi_partition = spmp(re_);
 
   // Select a number of partitions to choose from for each record
-  auto candidate_partitions = Choose(
-      config_->GetNumPartitions(),
-      pro.is_multi_partition ? params_.GetUInt32(MP_NUM_PARTS) : 1,
-      re_);
+  vector<uint32_t> candidate_partitions;
+  if (pro.is_multi_partition) {
+    auto mp_num_partitions = params_.GetUInt32(MP_NUM_PARTS);
+    candidate_partitions = Choose(config_->GetNumPartitions(), mp_num_partitions, re_);
+  } else {
+    auto sp_partition = params_.GetInt(SP_PARTITION);
+    if (sp_partition < 0) {
+      candidate_partitions = Choose(config_->GetNumPartitions(), 1, re_);
+    } else {
+      CHECK_LT(static_cast<uint32_t>(sp_partition), config_->GetNumPartitions())
+          << "Selected single-partition partition does not exist";
+      candidate_partitions.push_back(sp_partition);
+    }
+  }
 
   // Decide if this is a multi-home txn or not
   auto multi_home_pct = params_.GetDouble(MH_PCT);
@@ -121,10 +142,8 @@ BasicWorkload::NextTransaction() {
   // Select a number of homes to choose from for each record
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
-    candidate_homes = Choose(
-        config_->GetNumReplicas(),
-        params_.GetUInt32(MH_NUM_HOMES),
-        re_);
+    auto mh_num_homes = params_.GetUInt32(MH_NUM_HOMES);
+    candidate_homes = Choose(config_->GetNumReplicas(), mh_num_homes, re_);
   } else {
     auto sh_region = params_.GetInt(SH_REGION);
     if (sh_region < 0) {
@@ -140,33 +159,47 @@ BasicWorkload::NextTransaction() {
   unordered_set<Key> write_set;
   std::ostringstream code;
 
-  // Fill txn with write operators
+  auto num_writes = params_.GetUInt32(NUM_WRITES);
+  auto num_hot_records = params_.GetUInt32(NUM_HOT_RECORDS);
+  auto num_records = params_.GetUInt32(NUM_RECORDS);
   auto value_size = params_.GetUInt32(VALUE_SIZE);
-  for (size_t i = 0; i < num_writes; i++) {
+
+  CHECK_LE(num_writes, num_records)
+      << "Number of writes cannot exceed number of records in a transaction!";
+  CHECK_LE(num_hot_records, num_records)
+      << "Number of hot records exceed number of records in a transaction!";
+
+  auto hot_indices = Choose(num_records, params_.GetUInt32(NUM_HOT_RECORDS), re_);
+  for (size_t i = 0; i < num_records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
-    // TODO: Add hot keys later
-    auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
-    code << "SET " << key << " " << RandomString(value_size, re_) << " ";
-    write_set.insert(key);
+    
+    Key key;
+    // Decide whether to pick a hot or cold key
+    if (std::find(hot_indices.begin(), hot_indices.end(), i) != hot_indices.end()) {
+      key = partition_to_key_lists_[partition][home].GetRandomHotKey();
+      pro.is_hot_record[key] = true;
+    } else {
+      key = partition_to_key_lists_[partition][home].GetRandomColdKey();
+      pro.is_hot_record[key] = false;
+    }
+
+    // Decide whether this is a read or a write record
+    if (i < num_writes) {
+      code << "SET " << key << " " << RandomString(value_size, re_) << " ";
+      write_set.insert(key);
+      pro.is_write_record[key] = true;
+    } else {
+      code << "GET " << key << " ";
+      read_set.insert(key);
+      pro.is_write_record[key] = false;
+    }
 
     pro.key_to_home[key] = home;
     pro.key_to_partition[key] = partition;
   }
 
-  // Fill txn with read operators
-  for (size_t i = 0; i < num_records - num_writes; i++) {
-    auto partition = candidate_partitions[(num_writes + i) % candidate_partitions.size()];
-    auto home = candidate_homes[(num_writes + i) % candidate_homes.size()];
-    // TODO: Add hot keys later
-    auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
-    code << "GET " << key << " ";
-    read_set.insert(key);
-
-    pro.key_to_home[key] = home;
-    pro.key_to_partition[key] = partition;
-  }
-
+  // Construct a new transaction
   auto txn = MakeTransaction(read_set, write_set, code.str());
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 
