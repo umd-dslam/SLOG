@@ -11,7 +11,6 @@
 #include "module/ticker.h"
 #include "proto/api.pb.h"
 #include "workload/basic_workload.h"
-#include "workload/single_machine_workload.h"
 #include "workload/remastering_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
@@ -31,7 +30,7 @@ DEFINE_uint32(
     0,
     "Total number of txns being sent. "
     "This is mutually exclusive with \"duration\"");
-DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, 1machine)");
+DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_bool(print_txn, false, "Print each generated transaction");
@@ -225,8 +224,6 @@ void InitializeBenchmark() {
 
   if (FLAGS_wl == "basic") {
     workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
-  } else if (FLAGS_wl == "1machine") {
-    workload = make_unique<SingleMachineWorkload>(config, FLAGS_data_dir, FLAGS_params);
   } else if (FLAGS_wl == "remastering") {
     workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
   } else {
@@ -297,7 +294,15 @@ void SendNextTransaction() {
     for (const auto& p : profile.key_to_home) {
       log << std::setw(2) << p.second << " ";
     }
-    LOG(INFO) << "Source of keys:\n" << log.str();
+    log << "\n" << std::setw(11) << "is_write: ";
+    for (const auto&p : profile.is_write_record) {
+      log << std::setw(2) << p.second << " ";
+    }
+    log << "\n" << std::setw(11) << "is_hot: ";
+    for (const auto&p : profile.is_hot_record) {
+      log << std::setw(2) << p.second << " ";
+    }
+    LOG(INFO) << "Transaction profile:\n" << log.str();
   }
 
   stats.txn_counter++;
