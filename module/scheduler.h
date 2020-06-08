@@ -77,6 +77,7 @@ private:
 
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
+  void ProcessLockReleaseResult(LockReleaseResult result);
 
   // Prepare transaction to be sent to worker
   void DispatchTransaction(TxnId txn_id);
@@ -132,13 +133,6 @@ private:
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
   PerKeyRemasterManager remaster_manager_;
-#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
-  /*
-  Remaster txns require 2 lock onlys to arrive, but only the first
-  should obtain a lock (since they both would write lock the same key).
-  If a txn is in this set, it is waiting for the second lock-only to arrive
-  */
-  std::unordered_set<TxnId> remaster_txns_waiting_to_dispatch_;
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
@@ -155,9 +149,8 @@ private:
    */
   std::unordered_set<TxnId> aborting_txns_;
   /**
-   * Stores how many lock-only transactions need aborting during
+   * Stores how many lock-only transactions are yet to arrive during
    * mutli-home abort
-   * 
    * Note: can be negative, if lock-onlys abort before the multi-home
    */
   std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;

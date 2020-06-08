@@ -21,8 +21,8 @@ using std::vector;
 namespace slog {
 
 struct LockReleaseResult {
-  unordered_set<TxnId> new_holders;
-  unordered_set<TxnId> should_abort;
+  list<TxnId> unblocked;
+  list<TxnId> should_abort;
 };
 
 /**
@@ -102,7 +102,7 @@ public:
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  LockReleaseResult ReleaseLocks(const TransactionHolder& txn_holder);
+  unordered_set<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager

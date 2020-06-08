@@ -1,4 +1,4 @@
-#include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
 
 #include <glog/logging.h>
 
@@ -166,8 +166,9 @@ bool DeterministicLockManager::AcceptTransactionAndAcquireLocks(const Transactio
   return AcquireLocks(txn_holder);
 }
 
-LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
-  LockReleaseResult result;
+unordered_set<TxnId>
+DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+  unordered_set<TxnId> ready_txns;
   auto txn_id = txn_holder.GetTransaction()->internal().id();
 
   for (const auto& pair : txn_holder.KeysInPartition()) {
@@ -188,14 +189,14 @@ LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder
       num_locks_waited_[new_txn]--;
       if (num_locks_waited_[new_txn] == 0) {
         num_locks_waited_.erase(new_txn);
-        result.new_holders.insert(new_txn);
+        ready_txns.insert(new_txn);
       }
     }
   }
 
   num_locks_waited_.erase(txn_id);
 
-  return result;
+  return ready_txns;
 }
 
 void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {

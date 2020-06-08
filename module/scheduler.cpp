@@ -331,10 +331,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
-  for (auto unblocked_txn : unblocked_txns) {
-    DispatchTransaction(unblocked_txn);
-  }
+  ProcessLockReleaseResult(lock_manager_.ReleaseLocks(all_txns_[txn_id]));
 
   RecordTxnEvent(
     config_,
@@ -594,10 +591,14 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
   for (auto unblocked_txn_holder : result.unblocked) {
     SendToLockManager(unblocked_txn_holder);
   }
+  // Check for duplicates
+  // TODO: remove this set and check
   unordered_set<TxnId> aborting_txn_ids;
   for (auto unblocked_txn_holder : result.should_abort) {
     aborting_txn_ids.insert(unblocked_txn_holder->GetTransaction()->internal().id());
   }
+  CHECK_EQ(result.should_abort.size(), aborting_txn_ids.size())
+      << "Duplicate transactions returned for abort";
   for (auto txn_id : aborting_txn_ids) {
     TriggerPreDispatchAbort(txn_id);
   }
@@ -633,6 +634,15 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
     default:
       LOG(ERROR) << "Unknown transaction type";
       break;
+  }
+}
+
+void Scheduler::ProcessLockReleaseResult(LockReleaseResult result) {
+  for (auto txn_id : result.new_holders) {
+    DispatchTransaction(txn_id);
+  }
+  for (auto txn_id : result.should_abort) {
+    TriggerPreDispatchAbort(txn_id);
   }
 }
 
@@ -683,9 +693,7 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
     remaster_manager_.ReleaseTransaction(&txn_holder));
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
-    DispatchTransaction(unblocked_txn);
-  }
+  ProcessLockReleaseResult(lock_manager_.ReleaseLocks(txn_holder));
 
   if (txn_type == TransactionType::MULTI_HOME) {
     CollectLockOnlyTransactionsForAbort(txn_id);

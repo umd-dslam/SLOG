@@ -15,8 +15,8 @@ TEST(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
     {"writeC"});
   TransactionHolder holder(configs[0], txn);
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder));
-  auto new_holders = lock_manager.ReleaseLocks(holder);
-  ASSERT_TRUE(new_holders.empty());
+  auto result = lock_manager.ReleaseLocks(holder);
+  ASSERT_TRUE(result.new_holders.empty());
 }
 
 TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
@@ -47,8 +47,8 @@ TEST(DeterministicLockManager, ReadLocks) {
 
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).empty());
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).new_holders.empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).new_holders.empty());
 }
 
 TEST(DeterministicLockManager, WriteLocks) {
@@ -65,7 +65,7 @@ TEST(DeterministicLockManager, WriteLocks) {
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager.ReleaseLocks(holder1).size(), 1U);
+  ASSERT_EQ(lock_manager.ReleaseLocks(holder1).new_holders.size(), 1U);
   // Make sure the lock is already held by txn2
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
 }
@@ -91,14 +91,14 @@ TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder3));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder4));
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).new_holders.empty());
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
+  auto result = lock_manager.ReleaseLocks(holder1);
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
-  ASSERT_EQ(new_ready_txns.size(), 2U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
-  ASSERT_TRUE(new_ready_txns.count(400) > 0);
+  ASSERT_EQ(result.new_holders.size(), 2U);
+  ASSERT_TRUE(result.new_holders.count(200) > 0);
+  ASSERT_TRUE(result.new_holders.count(400) > 0);
 }
 
 TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
@@ -118,13 +118,13 @@ TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder3));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+  auto result = lock_manager.ReleaseLocks(holder1);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(200) > 0);
 
-  new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(300) > 0);
+  result = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(300) > 0);
 }
 
 TEST(DeterministicLockManager, PrioritizeWriteLock) {
@@ -140,9 +140,9 @@ TEST(DeterministicLockManager, PrioritizeWriteLock) {
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+  auto result = lock_manager.ReleaseLocks(holder1);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(200) > 0);
 }
 
 TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
@@ -167,9 +167,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_FALSE(lock_manager.AcquireLocks(holder1));
   ASSERT_TRUE(lock_manager.AcquireLocks(holder2_lockonly2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto result = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(100) > 0);
 }
 
 TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
@@ -194,9 +194,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
   ASSERT_TRUE(lock_manager.AcceptTransaction(holder2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto result = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(100) > 0);
 }
 
 TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
@@ -221,9 +221,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
   ASSERT_TRUE(lock_manager.AcquireLocks(holder2_lockonly2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto result = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(result.new_holders.size(), 1U);
+  ASSERT_TRUE(result.new_holders.count(100) > 0);
 }
 
 TEST(DeterministicLockManager, GhostTxns) {
