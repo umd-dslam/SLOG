@@ -215,20 +215,23 @@ AcquireLocksResult DeterministicLockManager::AcceptTransactionAndAcquireLocks(co
 
 unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> result;
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
+  auto txn = txn_holder.GetTransaction();
+  auto txn_id = txn->internal().id();
 
   for (const auto& pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
-    auto old_mode = lock_table_[key].mode;
-    auto new_grantees = lock_table_[key].Release(txn_id);
+    auto master = txn->internal().master_metadata().at(key).master();
+    auto key_replica = MakeKeyReplica(key, master);
+    auto old_mode = lock_table_[key_replica].mode;
+    auto new_grantees = lock_table_[key_replica].Release(txn_id);
      // Prevent the lock table from growing too big
      // TODO: automatically delete remastered keys
-    if (lock_table_[key].mode == LockMode::UNLOCKED) {
+    if (lock_table_[key_replica].mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }
       if (lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
-        lock_table_.erase(key);
+        lock_table_.erase(key_replica);
       }
     }
 

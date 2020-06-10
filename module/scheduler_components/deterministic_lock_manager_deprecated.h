@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef DETERMINISTIC_LOCK_MANAGER
+  #error "Only one lock manager can be included"
+#endif
+#define DETERMINISTIC_LOCK_MANAGER
+
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
