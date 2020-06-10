@@ -132,13 +132,16 @@ private:
 
   std::unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
-  DeterministicLockManager lock_manager_;
   
 #ifdef REMASTER_PROTOCOL_SIMPLE
+  DeterministicLockManagerDeprecated lock_manager_;
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
+  DeterministicLockManagerDeprecated lock_manager_;
   PerKeyRemasterManager remaster_manager_;
-#endif /* REMASTER_PROTOCOL_SIMPLE */
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+  DeterministicLockManager lock_manager_;
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
   

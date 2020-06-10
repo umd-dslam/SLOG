@@ -7,7 +7,7 @@ using std::move;
 
 namespace slog {
 
-bool LockState::AcquireReadLock(TxnId txn_id) {
+bool LockStateDeprecated::AcquireReadLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
       holders_.insert(txn_id);
@@ -31,7 +31,7 @@ bool LockState::AcquireReadLock(TxnId txn_id) {
   }
 }
 
-bool LockState::AcquireWriteLock(TxnId txn_id) {
+bool LockStateDeprecated::AcquireWriteLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
       holders_.insert(txn_id);
@@ -47,11 +47,11 @@ bool LockState::AcquireWriteLock(TxnId txn_id) {
   }
 }
 
-bool LockState::Contains(TxnId txn_id) {
+bool LockStateDeprecated::Contains(TxnId txn_id) {
   return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0;
 }
 
-unordered_set<TxnId> LockState::Release(TxnId txn_id) {
+unordered_set<TxnId> LockStateDeprecated::Release(TxnId txn_id) {
   // If the transaction is not among the lock holders, find and remove it in
   // the queue of waiters
   if (holders_.count(txn_id) == 0) {
@@ -104,7 +104,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool DeterministicLockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     return false;
   }
@@ -118,7 +118,7 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
   return false;
 }
 
-bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+bool DeterministicLockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     return false;
   }
@@ -161,13 +161,13 @@ bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder)
   return false;
 }
 
-bool DeterministicLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+bool DeterministicLockManagerDeprecated::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
 unordered_set<TxnId>
-DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+DeterministicLockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> ready_txns;
   auto txn_id = txn_holder.GetTransaction()->internal().id();
 
@@ -199,7 +199,7 @@ DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   return ready_txns;
 }
 
-void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
+void DeterministicLockManagerDeprecated::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();

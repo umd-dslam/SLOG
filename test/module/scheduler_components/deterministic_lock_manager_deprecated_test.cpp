@@ -7,9 +7,9 @@
 using namespace std;
 using namespace slog;
 
-TEST(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
+TEST(DeterministicLockManagerDeprecatedTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn = MakeTransaction(
     {"readA", "readB"},
     {"writeC"});
@@ -19,9 +19,9 @@ TEST(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   ASSERT_TRUE(new_holders.empty());
 }
 
-TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
+TEST(DeterministicLockManagerDeprecatedTest, GetAllLocksMultiPartitions) {
   auto configs = MakeTestConfigurations("locking", 1, 2);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   // "AAAA" is in partition 0 so lock is acquired
   auto txn1 = MakeTransaction({"readX"}, {"AAAA"});
   txn1->mutable_internal()->set_id(100);
@@ -34,9 +34,9 @@ TEST(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
 }
 
-TEST(DeterministicLockManager, ReadLocks) {
+TEST(DeterministicLockManagerDeprecated, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"readA", "readB"}, {});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -51,9 +51,9 @@ TEST(DeterministicLockManager, ReadLocks) {
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
 }
 
-TEST(DeterministicLockManager, WriteLocks) {
+TEST(DeterministicLockManagerDeprecated, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({}, {"writeA", "writeB"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -70,9 +70,9 @@ TEST(DeterministicLockManager, WriteLocks) {
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
 }
 
-TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
+TEST(DeterministicLockManagerDeprecated, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -101,9 +101,9 @@ TEST(DeterministicLockManager, ReleaseLocksAndGetManyNewHolders) {
   ASSERT_TRUE(new_ready_txns.count(400) > 0);
 }
 
-TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
+TEST(DeterministicLockManagerDeprecated, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -127,9 +127,9 @@ TEST(DeterministicLockManager, PartiallyAcquiredLocks) {
   ASSERT_TRUE(new_ready_txns.count(300) > 0);
 }
 
-TEST(DeterministicLockManager, PrioritizeWriteLock) {
+TEST(DeterministicLockManagerDeprecated, PrioritizeWriteLock) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"A"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -145,9 +145,9 @@ TEST(DeterministicLockManager, PrioritizeWriteLock) {
   ASSERT_TRUE(new_ready_txns.count(200) > 0);
 }
 
-TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
+TEST(DeterministicLockManagerDeprecated, AcquireLocksWithLockOnlyTxn1) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -172,9 +172,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
-TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
+TEST(DeterministicLockManagerDeprecated, AcquireLocksWithLockOnlyTxn2) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -199,9 +199,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
-TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
+TEST(DeterministicLockManagerDeprecated, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   auto txn1 = MakeTransaction({"A"}, {"B", "C"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
@@ -226,9 +226,9 @@ TEST(DeterministicLockManager, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_TRUE(new_ready_txns.count(100) > 0);
 }
 
-TEST(DeterministicLockManager, GhostTxns) {
+TEST(DeterministicLockManagerDeprecated, GhostTxns) {
   auto configs = MakeTestConfigurations("locking", 1, 2);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
   // "X" is in partition 1
   auto txn1 = MakeTransaction({}, {"X"});
   txn1->mutable_internal()->set_id(100);
@@ -242,9 +242,9 @@ TEST(DeterministicLockManager, GhostTxns) {
   ASSERT_FALSE(lock_manager.AcquireLocks(holder2));
 }
 
-TEST(DeterministicLockManager, BlockedLockOnlyTxn) {
+TEST(DeterministicLockManagerDeprecated, BlockedLockOnlyTxn) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  DeterministicLockManager lock_manager;
+  DeterministicLockManagerDeprecated lock_manager;
 
   auto txn1 = MakeTransaction({"A"}, {"B"});
   txn1->mutable_internal()->set_id(100);

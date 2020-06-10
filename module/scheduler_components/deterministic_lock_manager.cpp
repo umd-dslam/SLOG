@@ -113,7 +113,6 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
   }
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
-
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;

@@ -35,7 +35,7 @@ struct LockReleaseResult {
  * It contains the IDs of transactions that are holding and waiting
  * the lock and the mode of the lock.
  */
-class LockState {
+class LockStateDeprecated {
 public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
@@ -66,7 +66,7 @@ private:
  * transaction Y in the log, thus requesting lock before transaction Y,
  * then X always gets all locks before Y.
  */
-class DeterministicLockManager {
+class DeterministicLockManagerDeprecated {
 public:
   /**
    * Counts the number of locks a txn needs.
@@ -117,7 +117,7 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  unordered_map<Key, LockState> lock_table_;
+  unordered_map<Key, LockStateDeprecated> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };
