@@ -111,7 +111,7 @@ build/slog -config examples/cluster.conf -address 192.168.2.14 -replica 1 -parti
 
 Use the client to send a write transaction to a machine in the cluster. If you changed the `port` option in the configuration file, you need to use the `--port` argument in the command to match with the new port.
 ```
-build/client txn examples/write_mh.json --host 192.168.2.11
+build/client txn examples/write.1.json --host 192.168.2.11
 ```
 
 The following confirmation is returned.
@@ -124,16 +124,13 @@ Write set:
          A ==> Hello
          B ==> World
          C ==> !!!!!
-         D ==> Goodbye
-         E ==> World
-         F ==> ??????
 Type: MULTI_HOME
-Code: SET A Hello SET B World SET C !!!!! SET D Goodbye SET E World SET F ??????
+Code: SET A Hello SET B World SET C !!!!!
 ```
 
 Send a read transaction to read the written data. This time, we read from a different replica to demonstrate that the data has been replicated.
 ```
-build/client txn examples/write_mh.json --host 192.168.2.13
+build/client txn examples/write.1.json --host 192.168.2.13
 ```
 The result is
 ```
@@ -143,10 +140,7 @@ Read set:
          A ==> Hello
          B ==> World
          C ==> !!!!!
-         D ==> Goodbye
-         E ==> World
-         F ==> ??????
 Write set:
 Type: MULTI_HOME
-Code: GET A GET B GET C GET D GET E GET F
+Code: GET A GET B GET C
 ```
