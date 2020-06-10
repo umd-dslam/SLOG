@@ -145,7 +145,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       "GET A     \n"
       "SET D newD\n", /* code */
       {},
-      MakeMachineId("0:1") /* coordinating server */));
+      MakeMachineId("0:1") /* coordinating server */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0});
@@ -163,7 +163,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
   auto txn = FillMetadata(MakeTransaction(
       {"A"}, /* read_set */
       {"C"},  /* write_set */
-      "COPY A C" /* code */));
+      "COPY A C" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -182,7 +182,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
       {"B", "C"}, /* read_set */
       {"B", "C"},  /* write_set */
       "COPY C B\n"
-      "COPY B C\n" /* code */));
+      "COPY B C\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -204,7 +204,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
       {"A", "B", "C"},  /* write_set */
       "SET A newA\n"
       "SET B newB\n"
-      "SET C newC\n" /* code */));
+      "SET C newC\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -225,7 +225,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
       {},  /* write_set */
       "GET D\n"
       "GET E\n"
-      "GET F\n" /* code */));
+      "GET F\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -256,7 +256,7 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
   auto lo_txn_0 = FillMetadata(MakeTransaction(
       {"A", "C"}, /* read_set */
       {"B"} /* write_set */,
-      "" /* code */));
+      "" /* code */), 0, 1);
   lo_txn_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
   auto lo_txn_1 = FillMetadata(MakeTransaction(
