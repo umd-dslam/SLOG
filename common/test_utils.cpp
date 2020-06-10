@@ -76,17 +76,17 @@ ConfigVec MakeTestConfigurations(
   return configs;
 }
 
-Transaction* FillMetadata(Transaction* txn, uint32_t master) {
+Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter) {
   auto metadata = txn->mutable_internal()->mutable_master_metadata();
   for (auto& key_value : txn->read_set()) {
-    auto m = (*metadata)[key_value.first];
+    auto& m = (*metadata)[key_value.first];
     m.set_master(master);
-    m.set_counter(0);
+    m.set_counter(counter);
   }
   for (auto& key_value : txn->write_set()) {
-    auto m = (*metadata)[key_value.first];
+    auto& m = (*metadata)[key_value.first];
     m.set_master(master);
-    m.set_counter(0);
+    m.set_counter(counter);
   }
   return txn;
 }

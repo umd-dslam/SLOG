@@ -241,7 +241,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
 }
 
 TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
-  auto txn = FillMetadata(MakeTransaction(
+  auto txn = MakeTransaction(
       {"A", "X", "C"}, /* read_set */
       {"B", "Y", "Z"}, /* write_set */
       "GET A\n"
@@ -249,7 +249,8 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
       "GET C\n"
       "SET B newB\n"
       "SET Y newY\n"
-      "SET Z newZ\n" /* code */));
+      "SET Z newZ\n", /* code */
+      {{"A", {0,1}}, {"B", {0,1}}, {"C", {0,1}}, {"X", {1,1}}, {"Y", {1,1}}, {"Z", {1,1}}});
   txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
 
   auto lo_txn_0 = FillMetadata(MakeTransaction(
@@ -261,7 +262,7 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
   auto lo_txn_1 = FillMetadata(MakeTransaction(
       {"X"}, /* read_set */
       {"Y", "Z"}, /* write_set */
-      ""/* code */), 1);
+      ""/* code */), 1, 1);
   lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
   SendMultiHomeBatch(0, {txn}, {0, 1, 2});

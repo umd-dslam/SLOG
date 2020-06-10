@@ -131,12 +131,31 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   auto txn = txn_holder.GetTransaction();
 
-  int num_locks_acquired = 0;
-  for (auto pair : txn_holder.KeysInPartition()) {
+  vector<pair<KeyReplica, LockMode>> locks_to_request;
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    auto pair = *txn_holder.KeysInPartition().begin();
     auto key = pair.first;
-    auto mode = pair.second;
+    auto mode = LockMode::WRITE;
     auto master = txn->internal().master_metadata().at(key).master();
+    if (txn->remaster().new_master_lock_only()) {
+      master = txn->remaster().new_master();
+    }
     auto key_replica = MakeKeyReplica(key, master);
+    locks_to_request.push_back(make_pair(key_replica, mode));
+  } else {
+    for (auto pair : txn_holder.KeysInPartition()) {
+      auto key = pair.first;
+      auto mode = pair.second;
+      auto master = txn->internal().master_metadata().at(key).master();
+      auto key_replica = MakeKeyReplica(key, master);
+      locks_to_request.push_back(make_pair(key_replica, mode));
+    }
+  }
+
+  int num_locks_acquired = 0;
+  for (auto pair : locks_to_request) {
+    auto key_replica = pair.first;
+    auto mode = pair.second;
 
     CHECK(!lock_table_[key_replica].Contains(txn_id))
         << "Txn requested lock twice: " << txn_id << ", " << key_replica;
@@ -181,10 +200,27 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
   auto txn = txn_holder.GetTransaction();
   auto txn_id = txn->internal().id();
 
-  for (const auto& pair : txn_holder.KeysInPartition()) {
+  vector<KeyReplica> locks_to_release;
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
+    auto pair = *txn_holder.KeysInPartition().begin();
     auto key = pair.first;
-    auto master = txn->internal().master_metadata().at(key).master();
-    auto key_replica = MakeKeyReplica(key, master);
+    auto old_master = txn->internal().master_metadata().at(key).master();
+    auto old_key_replica = MakeKeyReplica(key, old_master);
+    locks_to_release.push_back(old_key_replica);
+    auto new_master = txn->remaster().new_master();
+    auto new_key_replica = MakeKeyReplica(key, new_master);
+    locks_to_release.push_back(new_key_replica);
+  } else {
+    for (auto pair : txn_holder.KeysInPartition()) {
+      auto key = pair.first;
+      auto master = txn->internal().master_metadata().at(key).master();
+      auto key_replica = MakeKeyReplica(key, master);
+      locks_to_release.push_back(key_replica);
+    }
+  }
+
+  for (auto key_replica : locks_to_release) {
     auto old_mode = lock_table_[key_replica].mode;
     auto new_grantees = lock_table_[key_replica].Release(txn_id);
      // Prevent the lock table from growing too big

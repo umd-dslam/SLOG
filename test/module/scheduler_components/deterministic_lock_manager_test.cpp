@@ -256,3 +256,17 @@ TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
   TransactionHolder holder2(configs[0], txn2);
   ASSERT_EQ(lock_manager->AcquireLocks(holder2), AcquireLocksResult::WAITING);
 }
+
+TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
+  auto configs = MakeTestConfigurations("locking", 1, 1);
+  auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
+  txn1->mutable_internal()->set_id(100);
+  TransactionHolder holder1(configs[0], txn1);
+
+  auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}), 1);
+  txn2->mutable_internal()->set_id(200);
+  TransactionHolder holder2(configs[0], txn2);
+
+  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+}
