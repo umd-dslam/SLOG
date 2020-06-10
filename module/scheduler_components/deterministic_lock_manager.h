@@ -131,7 +131,7 @@ private:
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 
-  const std::shared_ptr<const Storage<Key, Record>>& storage_;
+  std::shared_ptr<const Storage<Key, Record>> storage_;
 };
 
 } // namespace slog

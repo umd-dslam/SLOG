@@ -109,8 +109,10 @@ DeterministicLockManager::DeterministicLockManager(const std::shared_ptr<const S
 
 bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
+    LOG(FATAL) << "Empty txn should not have reached lock manager";
     return false;
   }
+
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
   if (num_locks_waited_[txn_id] == 0) {

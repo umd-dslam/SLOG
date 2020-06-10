@@ -20,7 +20,7 @@ protected:
 
 TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn = FillEmptyMetadata(MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
     {"readA", "readB"},
     {"writeC"}));
   TransactionHolder holder(configs[0], txn);
@@ -32,11 +32,11 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
 // TEST_F(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
 //   auto configs = MakeTestConfigurations("locking", 1, 2);
 //   // "AAAA" is in partition 0 so lock is acquired
-//   auto txn1 = FillEmptyMetadata(MakeTransaction({"readX"}, {"AAAA"}));
+//   auto txn1 = FillMetadata(MakeTransaction({"readX"}, {"AAAA"}));
 //   txn1->mutable_internal()->set_id(100);
 //   TransactionHolder holder1(configs[0], txn1);
 //   // "ZZZZ" is in partition 1 so is ignored
-//   auto txn2 = FillEmptyMetadata(MakeTransaction({"readX"}, {"ZZZZ"}));
+//   auto txn2 = FillMetadata(MakeTransaction({"readX"}, {"ZZZZ"}));
 //   txn2->mutable_internal()->set_id(200);
 //   TransactionHolder holder2(configs[0], txn2);
 //   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -45,11 +45,11 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
 
 TEST_F(DeterministicLockManagerTest, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"readA", "readB"}, {}));
+  auto txn1 = FillMetadata(MakeTransaction({"readA", "readB"}, {}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
 
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"readB", "readC"}, {}));
+  auto txn2 = FillMetadata(MakeTransaction({"readB", "readC"}, {}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
 
@@ -61,11 +61,11 @@ TEST_F(DeterministicLockManagerTest, ReadLocks) {
 
 TEST_F(DeterministicLockManagerTest, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({}, {"writeA", "writeB"}));
+  auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
 
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"readA"}, {"writeA"}));
+  auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
 
@@ -79,16 +79,16 @@ TEST_F(DeterministicLockManagerTest, WriteLocks) {
 
 TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B", "C"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"B"}, {"A"}));
+  auto txn2 = FillMetadata(MakeTransaction({"B"}, {"A"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
-  auto txn3 = FillEmptyMetadata(MakeTransaction({"B"}, {}));
+  auto txn3 = FillMetadata(MakeTransaction({"B"}, {}));
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3(configs[0], txn3);
-  auto txn4 = FillEmptyMetadata(MakeTransaction({"C"}, {}));
+  auto txn4 = FillMetadata(MakeTransaction({"C"}, {}));
   txn4->mutable_internal()->set_id(400);
   TransactionHolder holder4(configs[0], txn4);
 
@@ -109,13 +109,13 @@ TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
 
 TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B", "C"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"A"}, {"B"}));
+  auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
-  auto txn3 = FillEmptyMetadata(MakeTransaction({}, {"A", "C"}));
+  auto txn3 = FillMetadata(MakeTransaction({}, {"A", "C"}));
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3(configs[0], txn3);
 
@@ -134,10 +134,10 @@ TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
 
 TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"A"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"A"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"A"}, {}));
+  auto txn2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
  
@@ -151,16 +151,16 @@ TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
 
 TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B", "C"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"A"}, {"B"}));
+  auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
-  auto txn2_lockonly1 = FillEmptyMetadata(MakeTransaction({}, {"B"}));
+  auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
-  auto txn2_lockonly2 = FillEmptyMetadata(MakeTransaction({"A"}, {}));
+  auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
@@ -177,16 +177,16 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
 
 TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B", "C"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"A"}, {"B"}));
+  auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
-  auto txn2_lockonly1 = FillEmptyMetadata(MakeTransaction({}, {"B"}));
+  auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
-  auto txn2_lockonly2 = FillEmptyMetadata(MakeTransaction({"A"}, {}));
+  auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
@@ -203,16 +203,16 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
 
 TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B", "C"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  auto txn2 = FillEmptyMetadata(MakeTransaction({"A"}, {"B"}));
+  auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
-  auto txn2_lockonly1 = FillEmptyMetadata(MakeTransaction({}, {"B"}));
+  auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
-  auto txn2_lockonly2 = FillEmptyMetadata(MakeTransaction({"A"}, {}));
+  auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
@@ -231,13 +231,13 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
 // TEST_F(DeterministicLockManagerTest, GhostTxns) {
 //   auto configs = MakeTestConfigurations("locking", 1, 2);
 //   // "X" is in partition 1
-//   auto txn1 = FillEmptyMetadata(MakeTransaction({}, {"X"}));
+//   auto txn1 = FillMetadata(MakeTransaction({}, {"X"}));
 //   txn1->mutable_internal()->set_id(100);
 //   TransactionHolder holder1(configs[0], txn1);
 //   ASSERT_FALSE(lock_manager->AcceptTransaction(holder1));
 
 //   // "Z" is in partition 1
-//   auto txn2 = FillEmptyMetadata(MakeTransaction({"Z"}, {}));
+//   auto txn2 = FillMetadata(MakeTransaction({"Z"}, {}));
 //   txn2->mutable_internal()->set_id(101);
 //   TransactionHolder holder2(configs[0], txn2);
 //   ASSERT_EQ(lock_manager->AcquireLocks(holder2), AcquireLocksResult::WAITING);
@@ -246,12 +246,12 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
 TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
 
-  auto txn1 = FillEmptyMetadata(MakeTransaction({"A"}, {"B"}));
+  auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
 
-  auto txn2 = FillEmptyMetadata(MakeTransaction({}, {"B"}));
+  auto txn2 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2->mutable_internal()->set_id(101);
   TransactionHolder holder2(configs[0], txn2);
   ASSERT_EQ(lock_manager->AcquireLocks(holder2), AcquireLocksResult::WAITING);
