@@ -68,6 +68,15 @@ private:
  * the order that they request. If transaction X, appears before
  * transaction Y in the log, thus requesting lock before transaction Y,
  * then X always gets all locks before Y.
+ * 
+ * Remastering:
+ * Locks are taken on the tuple <key, replica>, using the transaction's
+ * master metadata. The masters are checked in the worker, so if two
+ * transactions hold separate locks for the same key, then one has an
+ * incorrect master and will be aborted. Remaster transactions request the
+ * locks for both <key, old replica> and <key, new replica>.
+ * 
+ * TODO: aborts can be detected here, before transactions are dispatched
  */
 class DeterministicLockManager {
 public:

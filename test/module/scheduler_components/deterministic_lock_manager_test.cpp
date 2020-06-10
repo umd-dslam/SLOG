@@ -29,20 +29,6 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   ASSERT_TRUE(result.empty());
 }
 
-// TEST_F(DeterministicLockManagerTest, GetAllLocksMultiPartitions) {
-//   auto configs = MakeTestConfigurations("locking", 1, 2);
-//   // "AAAA" is in partition 0 so lock is acquired
-//   auto txn1 = FillMetadata(MakeTransaction({"readX"}, {"AAAA"}));
-//   txn1->mutable_internal()->set_id(100);
-//   TransactionHolder holder1(configs[0], txn1);
-//   // "ZZZZ" is in partition 1 so is ignored
-//   auto txn2 = FillMetadata(MakeTransaction({"readX"}, {"ZZZZ"}));
-//   txn2->mutable_internal()->set_id(200);
-//   TransactionHolder holder2(configs[0], txn2);
-//   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-//   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
-// }
-
 TEST_F(DeterministicLockManagerTest, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"readA", "readB"}, {}));
@@ -226,22 +212,6 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(100) > 0);
 }
-
-// TODO: these txns shouldn't be in the system
-// TEST_F(DeterministicLockManagerTest, GhostTxns) {
-//   auto configs = MakeTestConfigurations("locking", 1, 2);
-//   // "X" is in partition 1
-//   auto txn1 = FillMetadata(MakeTransaction({}, {"X"}));
-//   txn1->mutable_internal()->set_id(100);
-//   TransactionHolder holder1(configs[0], txn1);
-//   ASSERT_FALSE(lock_manager->AcceptTransaction(holder1));
-
-//   // "Z" is in partition 1
-//   auto txn2 = FillMetadata(MakeTransaction({"Z"}, {}));
-//   txn2->mutable_internal()->set_id(101);
-//   TransactionHolder holder2(configs[0], txn2);
-//   ASSERT_EQ(lock_manager->AcquireLocks(holder2), AcquireLocksResult::WAITING);
-// }
 
 TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
