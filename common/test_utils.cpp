@@ -76,6 +76,21 @@ ConfigVec MakeTestConfigurations(
   return configs;
 }
 
+Transaction* FillEmptyMetadata(Transaction* txn) {
+  auto metadata = txn->mutable_internal()->mutable_master_metadata();
+  for (auto& key_value : txn->read_set()) {
+    auto m = (*metadata)[key_value.first];
+    m.set_master(0);
+    m.set_counter(0);
+  }
+  for (auto& key_value : txn->write_set()) {
+    auto m = (*metadata)[key_value.first];
+    m.set_master(0);
+    m.set_counter(0);
+  }
+  return txn;
+}
+
 TestSlog::TestSlog(const ConfigurationPtr& config)
   : config_(config),
     context_(new zmq::context_t(1)),

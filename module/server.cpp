@@ -298,7 +298,7 @@ bool Server::ValidateTransaction(const Transaction* txn) {
   CHECK_NE(txn->read_set_size() + txn->write_set_size(), 0)
     << "Txn accesses no keys: " << txn->internal().id();
 
-  if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
     CHECK_EQ(txn->read_set_size(), 0)
         << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
     CHECK_EQ(txn->write_set_size(), 1)

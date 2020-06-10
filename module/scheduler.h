@@ -12,15 +12,20 @@
 #include "connection/sender.h"
 #include "data_structure/batch_log.h"
 #include "module/scheduler_components/batch_interleaver.h"
-#include "module/scheduler_components/deterministic_lock_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
-#ifdef REMASTER_PROTOCOL_SIMPLE
-  #include "module/scheduler_components/simple_remaster_manager.h"
-#elif defined(REMASTER_PROTOCOL_PER_KEY)
-  #include "module/scheduler_components/per_key_remaster_manager.h"
-#endif /* REMASTER_PROTOCOL_SIMPLE */
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  #include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+
+  #ifdef REMASTER_PROTOCOL_SIMPLE
+    #include "module/scheduler_components/simple_remaster_manager.h"
+  #elif defined(REMASTER_PROTOCOL_PER_KEY)
+    #include "module/scheduler_components/per_key_remaster_manager.h"
+  #endif /* REMASTER_PROTOCOL_SIMPLE */
+#else
+  #include "module/scheduler_components/deterministic_lock_manager.h"
+#endif
 
 namespace slog {
 
@@ -77,7 +82,7 @@ private:
 
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
-  void ProcessLockReleaseResult(LockReleaseResult result);
+  void AcquireLocksAndProcessResult(const TransactionHolder* txn_holder);
 
   // Prepare transaction to be sent to worker
   void DispatchTransaction(TxnId txn_id);

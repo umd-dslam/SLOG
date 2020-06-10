@@ -104,6 +104,9 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
+DeterministicLockManager::DeterministicLockManager(const std::shared_ptr<const Storage<Key, Record>>& storage)
+    : storage_(storage) {}
+
 bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     return false;
@@ -118,27 +121,71 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
   return false;
 }
 
-bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
-    return false;
+    LOG(FATAL) << "Empty txn should not have reached lock manager";
+    return AcquireLocksResult::WAITING;
   }
 
   auto txn_id = txn_holder.GetTransaction()->internal().id();
+  auto txn = txn_holder.GetTransaction();
+
+  // Check that masters are valid
+  for (auto pair : txn_holder.KeysInPartition()) {
+    auto key = pair.first;
+    auto master = txn->internal().master_metadata().at(key).master();
+    auto key_replica = MakeKeyReplica(key, master);
+
+    // Lock must either exist and not be waiting to delete, or match the master in storage
+    if (lock_table_.count(key_replica) > 0) {
+      if (lock_table_[key_replica].will_delete) {
+        return AcquireLocksResult::ABORT;
+      }
+    } else {
+      // Lock could have been garbage collected while not being held
+      Record record;
+      bool found = storage_->Read(key, record);
+      if (found) {
+        if (master != record.metadata.master) {
+          return AcquireLocksResult::ABORT;
+        }
+      }
+    }
+  }
+
   int num_locks_acquired = 0;
   for (auto pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
     auto mode = pair.second;
-    CHECK(!lock_table_[key].Contains(txn_id))
-        << "Txn requested lock twice: " << txn_id << ", " << key;
-    auto before_mode = lock_table_[key].mode;
+    auto master = txn->internal().master_metadata().at(key).master();
+    auto key_replica = MakeKeyReplica(key, master);
+
+    if (txn->procedure_case() == Transaction::kRemaster && txn->remaster().new_master_lock_only()) {
+      // 'new' lock only of remaster. must access a lock that doesn't exist or one that will delete
+      if (lock_table_.count(key_replica) > 0) {
+        // TODO: should this be an abort?
+        CHECK(lock_table_[key_replica].will_delete) << "Remaster doesn't change master: " << txn_id;
+        // Any access after this is ok, remaster will have occured
+        lock_table_[key_replica].will_delete = false;
+      }
+    }
+
+    if (txn->procedure_case() == Transaction::kRemaster && !txn->remaster().new_master_lock_only()) {
+      // 'old' lock only of remaster deletes lock
+      lock_table_[key_replica].will_delete = true;
+    }
+
+    CHECK(!lock_table_[key_replica].Contains(txn_id))
+        << "Txn requested lock twice: " << txn_id << ", " << key_replica;
+    auto before_mode = lock_table_[key_replica].mode;
     switch (mode) {
       case LockMode::READ:
-        if (lock_table_[key].AcquireReadLock(txn_id)) {
+        if (lock_table_[key_replica].AcquireReadLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       case LockMode::WRITE:
-        if (lock_table_[key].AcquireWriteLock(txn_id)) {
+        if (lock_table_[key_replica].AcquireWriteLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
@@ -146,7 +193,7 @@ bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder)
         LOG(FATAL) << "Invalid lock mode";
         break;
     }
-    if (before_mode == LockMode::UNLOCKED && lock_table_[key].mode != before_mode) {
+    if (before_mode == LockMode::UNLOCKED && lock_table_[key_replica].mode != before_mode) {
       num_locked_keys_++;
     }
   }
@@ -155,19 +202,19 @@ bool DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder)
     num_locks_waited_[txn_id] -= num_locks_acquired;
     if (num_locks_waited_[txn_id] == 0) {
       num_locks_waited_.erase(txn_id);
-      return true;
+      return AcquireLocksResult::ACQUIRED;
     }
   }
-  return false;
+  return AcquireLocksResult::WAITING;
 }
 
-bool DeterministicLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult DeterministicLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
-  LockReleaseResult result;
+unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+  unordered_set<TxnId> result;
   auto txn_id = txn_holder.GetTransaction()->internal().id();
 
   for (const auto& pair : txn_holder.KeysInPartition()) {
@@ -175,6 +222,7 @@ LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder
     auto old_mode = lock_table_[key].mode;
     auto new_grantees = lock_table_[key].Release(txn_id);
      // Prevent the lock table from growing too big
+     // TODO: automatically delete remastered keys
     if (lock_table_[key].mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
@@ -188,7 +236,7 @@ LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder
       num_locks_waited_[new_txn]--;
       if (num_locks_waited_[new_txn] == 0) {
         num_locks_waited_.erase(new_txn);
-        result.new_holders.insert(new_txn);
+        result.insert(new_txn);
       }
     }
   }
@@ -196,6 +244,11 @@ LockReleaseResult DeterministicLockManager::ReleaseLocks(const TransactionHolder
   num_locks_waited_.erase(txn_id);
 
   return result;
+}
+
+KeyReplica DeterministicLockManager::MakeKeyReplica(Key key, uint32_t master) {
+  // Note: this is unique, since keys cannot contain spaces
+  return key + " " + std::to_string(master);
 }
 
 void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {

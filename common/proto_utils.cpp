@@ -84,7 +84,7 @@ Transaction* MakeTransaction(
     txn->mutable_write_set()->insert({key, ""});
   }
   if (new_master >= 0) { // Not set as default
-    txn->set_new_master(new_master);
+    txn->mutable_remaster()->set_new_master(new_master);
   } else {
     txn->set_code(code);
   }
@@ -146,7 +146,7 @@ TransactionType SetTransactionType(Transaction& txn) {
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
   // Remaster txn will become multi-home
-  if (txn.procedure_case() == Transaction::kNewMaster) {
+  if (txn.procedure_case() == Transaction::kRemaster) {
     is_single_home = false;
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
@@ -228,7 +228,7 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
     os << "Code: " << txn.code() << std::endl;
   } else {
-    os << "New master: " << txn.new_master() << std::endl;
+    os << "New master: " << txn.remaster().new_master() << std::endl;
   }
   return os;
 }

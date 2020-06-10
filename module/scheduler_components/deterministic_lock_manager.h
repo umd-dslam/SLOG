@@ -11,6 +11,8 @@
 #include "common/transaction_holder.h"
 #include "common/types.h"
 
+#include "storage/storage.h"
+
 using std::list;
 using std::shared_ptr;
 using std::pair;
@@ -20,10 +22,9 @@ using std::vector;
 
 namespace slog {
 
-struct LockReleaseResult {
-  unordered_set<TxnId> new_holders;
-  unordered_set<TxnId> should_abort;
-};
+using KeyReplica = string;
+
+enum class AcquireLocksResult {ACQUIRED, WAITING, ABORT};
 
 /**
  * An object of this class represents the locking state of a key.
@@ -31,6 +32,7 @@ struct LockReleaseResult {
  * the lock and the mode of the lock.
  */
 class LockState {
+
 public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
@@ -38,6 +40,7 @@ public:
   bool Contains(TxnId txn_id);
 
   LockMode mode = LockMode::UNLOCKED;
+  bool will_delete = false;
 
   /* For debugging */
   const unordered_set<TxnId>& GetHolders() const {
@@ -63,6 +66,8 @@ private:
  */
 class DeterministicLockManager {
 public:
+  DeterministicLockManager(const std::shared_ptr<const Storage<Key, Record>>& storage);
+
   /**
    * Counts the number of locks a txn needs.
    * 
@@ -86,13 +91,13 @@ public:
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  bool AcquireLocks(const TransactionHolder& txn);
+  AcquireLocksResult AcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Convenient method to perform txn registration and 
    * lock acquisition at the same time.
    */
-  bool AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder);
+  AcquireLocksResult AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -102,7 +107,7 @@ public:
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  LockReleaseResult ReleaseLocks(const TransactionHolder& txn_holder);
+  unordered_set<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager
@@ -112,9 +117,15 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  unordered_map<Key, LockState> lock_table_;
+  KeyReplica MakeKeyReplica(Key key, uint32_t master);
+
+  bool TransactionRequestsNewLock(const TransactionHolder& txn_holder);
+
+  unordered_map<KeyReplica, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
+
+  const std::shared_ptr<const Storage<Key, Record>>& storage_;
 };
 
 } // namespace slog

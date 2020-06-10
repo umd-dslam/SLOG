@@ -289,7 +289,7 @@ void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
         }
       }
     }
-  } else if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+  } else if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
     const auto& key = txn->write_set().begin()->first;
     if (config_->KeyIsInLocalPartition(key)) {
       auto txn_key_metadata = txn->internal().master_metadata().at(key);
@@ -299,7 +299,7 @@ void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
         // TODO: handle case where key is deleted
         LOG(FATAL) << "Remastering key that does not exist: " << key;
       }
-      record.metadata = Metadata(txn->new_master(), txn_key_metadata.counter() + 1);
+      record.metadata = Metadata(txn->remaster().new_master(), txn_key_metadata.counter() + 1);
       storage_->Write(key, record);
     }
     txn->set_status(TransactionStatus::COMMITTED);
