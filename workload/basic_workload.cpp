@@ -82,6 +82,9 @@ BasicWorkload::BasicWorkload(
   auto hot_keys_per_list = params_.GetUInt32(HOT) / (num_replicas * num_partitions);
   for (auto& key_lists : partition_to_key_lists_) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
+      // Initialize hot keys limit for each key list. When keys are added to a list, 
+      // the first keys are considered hot keys until this limit is reached and any new
+      // keys from there are cold keys.
       key_lists.emplace_back(hot_keys_per_list);
     }
   }
@@ -114,6 +117,7 @@ BasicWorkload::NextTransaction() {
   pro.client_txn_id = client_txn_id_counter_;
 
   // Decide if this is a multi-partition txn or not
+  auto num_partitions = config_->GetNumPartitions();
   auto multi_partition_pct = params_.GetDouble(MP_PCT);
   discrete_distribution<> spmp({100 - multi_partition_pct, multi_partition_pct});
   pro.is_multi_partition = spmp(re_);
@@ -122,19 +126,20 @@ BasicWorkload::NextTransaction() {
   vector<uint32_t> candidate_partitions;
   if (pro.is_multi_partition) {
     auto mp_num_partitions = params_.GetUInt32(MP_NUM_PARTS);
-    candidate_partitions = Choose(config_->GetNumPartitions(), mp_num_partitions, re_);
+    candidate_partitions = Choose(num_partitions, mp_num_partitions, re_);
   } else {
     auto sp_partition = params_.GetInt(SP_PARTITION);
     if (sp_partition < 0) {
-      candidate_partitions = Choose(config_->GetNumPartitions(), 1, re_);
+      candidate_partitions = Choose(num_partitions, 1, re_);
     } else {
-      CHECK_LT(static_cast<uint32_t>(sp_partition), config_->GetNumPartitions())
+      CHECK_LT(static_cast<uint32_t>(sp_partition), num_partitions)
           << "Selected single-partition partition does not exist";
       candidate_partitions.push_back(sp_partition);
     }
   }
 
   // Decide if this is a multi-home txn or not
+  auto num_replicas = config_->GetNumReplicas();
   auto multi_home_pct = params_.GetDouble(MH_PCT);
   discrete_distribution<> shmh({100 - multi_home_pct, multi_home_pct});
   pro.is_multi_home = shmh(re_);
@@ -143,13 +148,13 @@ BasicWorkload::NextTransaction() {
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
     auto mh_num_homes = params_.GetUInt32(MH_NUM_HOMES);
-    candidate_homes = Choose(config_->GetNumReplicas(), mh_num_homes, re_);
+    candidate_homes = Choose(num_replicas, mh_num_homes, re_);
   } else {
     auto sh_region = params_.GetInt(SH_REGION);
     if (sh_region < 0) {
-      candidate_homes = Choose(config_->GetNumReplicas(), 1, re_);
+      candidate_homes = Choose(num_replicas, 1, re_);
     } else {
-      CHECK_LT(static_cast<uint32_t>(sh_region), config_->GetNumReplicas())
+      CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas)
           << "Selected single-home region does not exist";
       candidate_homes.push_back(sh_region);
     }
@@ -167,8 +172,9 @@ BasicWorkload::NextTransaction() {
   CHECK_LE(num_writes, num_records)
       << "Number of writes cannot exceed number of records in a transaction!";
   CHECK_LE(num_hot_records, num_records)
-      << "Number of hot records exceed number of records in a transaction!";
+      << "Number of hot records cannot exceed number of records in a transaction!";
 
+  // Randomly pick some records to be hot records (can be either read or write records)
   auto hot_indices = Choose(num_records, num_hot_records, re_);
   for (size_t i = 0; i < num_records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
