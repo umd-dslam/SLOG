@@ -328,7 +328,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   LOG(INFO) << output_remaster_txn;
   ASSERT_EQ(output_remaster_txn.internal().id(), 11);
   ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_remaster_txn.new_master(), 1);
+  ASSERT_EQ(output_remaster_txn.remaster().new_master(), 1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
