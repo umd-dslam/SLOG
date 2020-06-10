@@ -46,7 +46,6 @@ public:
   bool Contains(TxnId txn_id);
 
   LockMode mode = LockMode::UNLOCKED;
-  bool will_delete = false;
 
   /* For debugging */
   const unordered_set<TxnId>& GetHolders() const {

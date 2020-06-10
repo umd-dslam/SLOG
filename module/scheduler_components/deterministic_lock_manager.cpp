@@ -131,50 +131,12 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
   auto txn_id = txn_holder.GetTransaction()->internal().id();
   auto txn = txn_holder.GetTransaction();
 
-  // Check that masters are valid
-  for (auto pair : txn_holder.KeysInPartition()) {
-    auto key = pair.first;
-    auto master = txn->internal().master_metadata().at(key).master();
-    auto key_replica = MakeKeyReplica(key, master);
-
-    // Lock must either exist and not be waiting to delete, or match the master in storage
-    if (lock_table_.count(key_replica) > 0) {
-      if (lock_table_[key_replica].will_delete) {
-        return AcquireLocksResult::ABORT;
-      }
-    } else {
-      // Lock could have been garbage collected while not being held
-      Record record;
-      bool found = storage_->Read(key, record);
-      if (found) {
-        if (master != record.metadata.master) {
-          return AcquireLocksResult::ABORT;
-        }
-      }
-    }
-  }
-
   int num_locks_acquired = 0;
   for (auto pair : txn_holder.KeysInPartition()) {
     auto key = pair.first;
     auto mode = pair.second;
     auto master = txn->internal().master_metadata().at(key).master();
     auto key_replica = MakeKeyReplica(key, master);
-
-    if (txn->procedure_case() == Transaction::kRemaster && txn->remaster().new_master_lock_only()) {
-      // 'new' lock only of remaster. must access a lock that doesn't exist or one that will delete
-      if (lock_table_.count(key_replica) > 0) {
-        // TODO: should this be an abort?
-        CHECK(lock_table_[key_replica].will_delete) << "Remaster doesn't change master: " << txn_id;
-        // Any access after this is ok, remaster will have occured
-        lock_table_[key_replica].will_delete = false;
-      }
-    }
-
-    if (txn->procedure_case() == Transaction::kRemaster && !txn->remaster().new_master_lock_only()) {
-      // 'old' lock only of remaster deletes lock
-      lock_table_[key_replica].will_delete = true;
-    }
 
     CHECK(!lock_table_[key_replica].Contains(txn_id))
         << "Txn requested lock twice: " << txn_id << ", " << key_replica;
