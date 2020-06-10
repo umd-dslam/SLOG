@@ -113,8 +113,14 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
     return false;
   }
 
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
-  num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
+  auto txn = txn_holder.GetTransaction();
+  auto txn_id = txn->internal().id();
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    num_locks_waited_[txn_id] = 2;
+  } else {
+    num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
+  }
+
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
     return true;

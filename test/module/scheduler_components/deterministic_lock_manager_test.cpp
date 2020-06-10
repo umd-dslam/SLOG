@@ -240,3 +240,37 @@ TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
 }
+
+TEST_F(DeterministicLockManagerTest, RemasterTxn) {
+  auto configs = MakeTestConfigurations("locking", 2, 1);
+  auto txn = FillMetadata(MakeTransaction({}, {"A"}));
+  txn->mutable_internal()->set_id(100);
+  txn->mutable_remaster()->set_new_master(1);
+  TransactionHolder holder(configs[0], txn);
+  auto txn_lockonly1 = FillMetadata(MakeTransaction({}, {"A"}));
+  txn_lockonly1->mutable_internal()->set_id(100);
+  txn_lockonly1->mutable_remaster()->set_new_master(1);
+  TransactionHolder holder_lockonly1(configs[0], txn_lockonly1);
+  auto txn_lockonly2 = FillMetadata(MakeTransaction({}, {"A"}));
+  txn_lockonly2->mutable_internal()->set_id(100);
+  txn_lockonly1->mutable_remaster()->set_new_master(1);
+  txn_lockonly1->mutable_remaster()->set_new_master_lock_only(true);
+  TransactionHolder holder_lockonly2(configs[0], txn_lockonly2);
+
+  ASSERT_FALSE(lock_manager->AcceptTransaction(holder));
+  ASSERT_EQ(lock_manager->AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager->AcquireLocks(holder_lockonly2), AcquireLocksResult::ACQUIRED);
+
+  lock_manager->ReleaseLocks(holder);
+  // Check locks have been released
+  auto txn2 = FillMetadata(MakeTransaction({}, {"A"}));
+  txn_lockonly1->mutable_internal()->set_id(200);
+  TransactionHolder holder2(configs[0], txn2);
+
+  auto txn3 = FillMetadata(MakeTransaction({}, {"A"}), 1);
+  txn_lockonly1->mutable_internal()->set_id(200);
+  TransactionHolder holder3(configs[0], txn3);
+
+  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
+}
