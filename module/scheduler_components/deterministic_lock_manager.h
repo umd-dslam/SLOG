@@ -127,13 +127,16 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  KeyReplica MakeKeyReplica(Key key, uint32_t master);
-
   bool TransactionRequestsNewLock(const TransactionHolder& txn_holder);
 
   unordered_map<KeyReplica, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };
+
+inline KeyReplica MakeKeyReplica(Key key, uint32_t master) {
+  // Note: this is unique, since keys cannot contain spaces
+  return key + " " + std::to_string(master);
+}
 
 } // namespace slog

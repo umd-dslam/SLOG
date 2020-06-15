@@ -107,7 +107,6 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
 bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
-    return false;
   }
 
   auto txn = txn_holder.GetTransaction();
@@ -128,36 +127,37 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
 AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
-    return AcquireLocksResult::WAITING;
   }
 
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
   auto txn = txn_holder.GetTransaction();
+  auto txn_id = txn->internal().id();
 
   vector<pair<KeyReplica, LockMode>> locks_to_request;
   if (txn->procedure_case() == Transaction::kRemaster) {
     auto pair = *txn_holder.KeysInPartition().begin();
-    auto key = pair.first;
+    auto& key = pair.first;
     auto mode = LockMode::WRITE;
+    // Lock on old master if this is the first part of the remaster
     auto master = txn->internal().master_metadata().at(key).master();
     if (txn->remaster().is_new_master_lock_only()) {
+      // Lock on new master if this is the second part of the remaster
       master = txn->remaster().new_master();
     }
     auto key_replica = MakeKeyReplica(key, master);
-    locks_to_request.push_back(make_pair(key_replica, mode));
+    locks_to_request.emplace_back(key_replica, mode);
   } else {
-    for (auto pair : txn_holder.KeysInPartition()) {
-      auto key = pair.first;
+    for (auto& pair : txn_holder.KeysInPartition()) {
+      auto& key = pair.first;
       auto mode = pair.second;
       auto master = txn->internal().master_metadata().at(key).master();
       auto key_replica = MakeKeyReplica(key, master);
-      locks_to_request.push_back(make_pair(key_replica, mode));
+      locks_to_request.emplace_back(key_replica, mode);
     }
   }
 
   int num_locks_acquired = 0;
-  for (auto pair : locks_to_request) {
-    auto key_replica = pair.first;
+  for (auto& pair : locks_to_request) {
+    auto& key_replica = pair.first;
     auto mode = pair.second;
 
     CHECK(!lock_table_[key_replica].Contains(txn_id))
@@ -176,7 +176,6 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
         break;
       default:
         LOG(FATAL) << "Invalid lock mode";
-        break;
     }
     if (before_mode == LockMode::UNLOCKED && lock_table_[key_replica].mode != before_mode) {
       num_locked_keys_++;
@@ -207,7 +206,7 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
   if (txn->procedure_case() == Transaction::kRemaster) {
     // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
     auto pair = *txn_holder.KeysInPartition().begin();
-    auto key = pair.first;
+    auto& key = pair.first;
     auto old_master = txn->internal().master_metadata().at(key).master();
     auto old_key_replica = MakeKeyReplica(key, old_master);
     locks_to_release.push_back(old_key_replica);
@@ -215,15 +214,15 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
     auto new_key_replica = MakeKeyReplica(key, new_master);
     locks_to_release.push_back(new_key_replica);
   } else {
-    for (auto pair : txn_holder.KeysInPartition()) {
-      auto key = pair.first;
+    for (auto& pair : txn_holder.KeysInPartition()) {
+      auto& key = pair.first;
       auto master = txn->internal().master_metadata().at(key).master();
       auto key_replica = MakeKeyReplica(key, master);
       locks_to_release.push_back(key_replica);
     }
   }
 
-  for (auto key_replica : locks_to_release) {
+  for (auto& key_replica : locks_to_release) {
     auto old_mode = lock_table_[key_replica].mode;
     auto new_grantees = lock_table_[key_replica].Release(txn_id);
      // Prevent the lock table from growing too big
@@ -249,11 +248,6 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
   num_locks_waited_.erase(txn_id);
 
   return result;
-}
-
-KeyReplica DeterministicLockManager::MakeKeyReplica(Key key, uint32_t master) {
-  // Note: this is unique, since keys cannot contain spaces
-  return key + " " + std::to_string(master);
 }
 
 void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
