@@ -27,6 +27,8 @@ ConfigVec MakeTestConfigurations(
     uint32_t seed = 0,
     internal::Configuration common_config = {});
 
+Transaction* FillMetadata(Transaction* txn, uint32_t master = 0, uint32_t counter = 0);
+
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 
 /**

@@ -8,6 +8,7 @@ set(ALL_TESTS
   commands_test
   concurrent_hash_map_test
   deterministic_lock_manager_test
+  deterministic_lock_manager_deprecated_test
   e2e_test
   forwarder_test
   mem_only_storage_test
@@ -40,6 +41,10 @@ add_executable(concurrent_hash_map_test data_structure/concurrent_hash_map_test.
 add_executable(deterministic_lock_manager_test 
   module/scheduler_components/deterministic_lock_manager_test.cpp)
 target_link_libraries(deterministic_lock_manager_test test_utils)
+
+add_executable(deterministic_lock_manager_deprecated_test 
+  module/scheduler_components/deterministic_lock_manager_deprecated_test.cpp)
+target_link_libraries(deterministic_lock_manager_deprecated_test test_utils)
 
 add_executable(e2e_test e2e/e2e_test.cpp)
 target_link_libraries(e2e_test test_utils)

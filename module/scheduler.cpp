@@ -27,8 +27,7 @@ Scheduler::Scheduler(
     config_(config),
     pull_socket_(*broker->GetContext(), ZMQ_PULL),
     worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
-    sender_(broker),
-    remaster_manager_(storage) {
+    sender_(broker) {
   broker->AddChannel(SCHEDULER_CHANNEL);
   pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
@@ -55,6 +54,11 @@ Scheduler::Scheduler(
         *broker->GetContext(),
         storage));
   }
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  remaster_manager_.SetStorage(storage);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
 }
 
 /***********************************************
@@ -338,12 +342,14 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
     txn->mutable_internal(),
     TransactionEvent::RELEASE_LOCKS);
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // If a remaster transaction, trigger any unblocked txns
-  if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
-    auto key = txn->write_set().begin()->first;
+  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+    auto& key = txn->write_set().begin()->first;
     auto counter = txn->internal().master_metadata().at(key).counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
   SendToCoordinatingServer(txn_id);
   all_txns_.erase(txn_id);
@@ -439,21 +445,23 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
             auto txn_holder = &all_txns_[txn_id];
 
-            // Check that remaster txns aren't remastering to the same master
-            if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
-              auto past_master = txn->internal().master_metadata().begin()->second.master();
-              if (txn->new_master() == past_master) {
-                TriggerPreDispatchAbort(txn_id);
+            if (MaybeContinuePreDispatchAbort(txn_id)) {
+              break;
+            }
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+            if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+              if (MaybeAbortRemasterTransaction(txn)) {
                 break;
               }
             }
-
-            if (aborting_txns_.count(txn_id)) {
-              AddTransactionToAbort(txn_id);
-            } else {
-              SendToRemasterManager(txn_holder);
-            }
+            SendToRemasterManager(txn_holder);
             break;
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+            SendToLockManager(txn_holder);
+            break;
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
           }
           case TransactionType::LOCK_ONLY: {
             auto txn_replica_id = TransactionHolder::GetTransactionIdReplicaIdPair(txn);
@@ -461,22 +469,37 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
                 << txn_replica_id.first <<", " << txn_replica_id.second;
             auto txn_holder = &lock_only_txns_[txn_replica_id];
 
-            if (aborting_txns_.count(txn_id)) {
-              AddLockOnlyTransactionToAbort(txn_replica_id);
-            } else {
-              SendToRemasterManager(txn_holder);
+            if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
+              break;
             }
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+            SendToRemasterManager(txn_holder);
             break;
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+            SendToLockManager(txn_holder);
+            break;
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
           }
           case TransactionType::MULTI_HOME: {
             VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
             auto txn_holder = &all_txns_[txn_id];
 
             if (aborting_txns_.count(txn_id)) {
-              AddTransactionToAbort(txn_id);
-            } else {
-              SendToLockManager(txn_holder);
+              MaybeContinuePreDispatchAbort(txn_id);
+              break;
             }
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+            if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+              if (MaybeAbortRemasterTransaction(txn)) {
+                break;
+              }
+            }
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
+            SendToLockManager(txn_holder);
             break;
           }
           default:
@@ -491,6 +514,17 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
 /***********************************************
               Transaction Processing
 ***********************************************/
+
+bool Scheduler::MaybeAbortRemasterTransaction(Transaction* txn) {
+  // TODO: this check can be done as soon as metadata is assigned
+  auto txn_id = txn->internal().id();
+  auto past_master = txn->internal().master_metadata().begin()->second.master();
+  if (txn->remaster().new_master() == past_master) {
+    TriggerPreDispatchAbort(txn_id);
+    return true;
+  }
+  return false;
+}
 
 bool Scheduler::AcceptTransaction(Transaction* txn) {
   switch(txn->internal().type()) {
@@ -524,6 +558,7 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
   return true;
 }
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
   auto txn = txn_holder->GetTransaction();
   auto txn_type = txn->internal().type();
@@ -554,27 +589,32 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
   for (auto unblocked_txn_holder : result.unblocked) {
     SendToLockManager(unblocked_txn_holder);
   }
+  // Check for duplicates
+  // TODO: remove this set and check
   unordered_set<TxnId> aborting_txn_ids;
   for (auto unblocked_txn_holder : result.should_abort) {
     aborting_txn_ids.insert(unblocked_txn_holder->GetTransaction()->internal().id());
   }
+  CHECK_EQ(result.should_abort.size(), aborting_txn_ids.size())
+      << "Duplicate transactions returned for abort";
   for (auto txn_id : aborting_txn_ids) {
     TriggerPreDispatchAbort(txn_id);
   }
 }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->GetTransaction()->internal().id();
   auto txn_type = txn_holder->GetTransaction()->internal().type();
   switch(txn_type) {
     case TransactionType::SINGLE_HOME: {
-      if (lock_manager_.AcceptTransactionAndAcquireLocks(*txn_holder)) {
-        DispatchTransaction(txn_id);
-      }
+      lock_manager_.AcceptTransaction(*txn_holder);
+      AcquireLocksAndProcessResult(txn_holder);
       break;
     }
     case TransactionType::MULTI_HOME: {
       if (lock_manager_.AcceptTransaction(*txn_holder)) {
+        // Note: this only records when MH arrives after lock-onlys
         RecordTxnEvent(
             config_,
             txn_holder->GetTransaction()->mutable_internal(),
@@ -584,15 +624,38 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
       break;
     }
     case TransactionType::LOCK_ONLY: {
-      if (lock_manager_.AcquireLocks(*txn_holder)) {
-        DispatchTransaction(txn_id);
-      }
+      AcquireLocksAndProcessResult(txn_holder);
       break;
     }
     default:
       LOG(ERROR) << "Unknown transaction type";
       break;
   }
+}
+
+void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder) {
+  auto txn_id = txn_holder->GetTransaction()->internal().id();
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  if (lock_manager_.AcquireLocks(*txn_holder)) {
+    DispatchTransaction(txn_id);
+  }
+#else
+  switch(lock_manager_.AcquireLocks(*txn_holder)) {
+    case AcquireLocksResult::ACQUIRED:
+      DispatchTransaction(txn_id);
+      break;
+    case AcquireLocksResult::ABORT:
+      TriggerPreDispatchAbort(txn_id);
+      break;
+    case AcquireLocksResult::WAITING:
+      break;
+    default:
+      LOG(ERROR) << "Unknown lock result type";
+      break;
+  }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
 }
 
 /***********************************************
@@ -610,14 +673,17 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   aborting_txns_.insert(txn_id);
 
   if (txn_holder.GetTransaction() != nullptr) {
-    AddTransactionToAbort(txn_id);
+    MaybeContinuePreDispatchAbort(txn_id);
   } else {
     VLOG(3) << "Defering abort until txn arrives: " << txn_id;
   }
 }
 
-void Scheduler::AddTransactionToAbort(TxnId txn_id) {
-  CHECK(aborting_txns_.count(txn_id) > 0) << "Abort not triggered: " << txn_id;
+bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
+  if (aborting_txns_.count(txn_id) == 0) {
+    return false;
+  }
+
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
   auto txn_type = txn->internal().type();
@@ -637,9 +703,15 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
   // be in one of the managers, and needs to be removed.
   //
   // This also releases any lock-only transactions.
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   ProcessRemasterResult(
-    remaster_manager_.ReleaseTransaction(&txn_holder)); 
-  for (auto unblocked_txn : lock_manager_.ReleaseLocks(txn_holder)) {
+    remaster_manager_.ReleaseTransaction(&txn_holder));
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
+  // Release locks held by this txn. Enqueue the txns that
+  // become ready thanks to this release.
+  auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
+  for (auto unblocked_txn : unblocked_txns) {
     DispatchTransaction(unblocked_txn);
   }
 
@@ -648,18 +720,21 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
   }
 
   MaybeFinishAbort(txn_id);
+  return true;
 }
 
-void Scheduler::AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id) {
+bool Scheduler::MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id) {
   auto txn_id = txn_replica_id.first;
-  CHECK(aborting_txns_.count(txn_id) > 0)
-      << "Abort not triggered: " << txn_id << ", " << txn_replica_id.second;
+  if (aborting_txns_.count(txn_id) == 0) {
+    return false;
+  }
   VLOG(3) << "Aborting lo txn arrived: " << txn_id << ", " << txn_replica_id.second;
   lock_only_txns_.erase(txn_replica_id);
   mh_abort_waiting_on_[txn_id] -= 1;
 
   // Check if this was the last lock-only
   MaybeFinishAbort(txn_id);
+  return true;
 }
 
 void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {

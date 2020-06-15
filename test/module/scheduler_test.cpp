@@ -139,13 +139,13 @@ private:
 };
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {
-  auto txn = MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
       {"A"}, /* read_set */
       {"D"},  /* write_set */
       "GET A     \n"
       "SET D newD\n", /* code */
       {},
-      MakeMachineId("0:1") /* coordinating server */);
+      MakeMachineId("0:1") /* coordinating server */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0});
@@ -160,10 +160,10 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
-  auto txn = MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
       {"A"}, /* read_set */
       {"C"},  /* write_set */
-      "COPY A C" /* code */);
+      "COPY A C" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -178,11 +178,11 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
-  auto txn = MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
       {"B", "C"}, /* read_set */
       {"B", "C"},  /* write_set */
       "COPY C B\n"
-      "COPY B C\n" /* code */);
+      "COPY B C\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -199,12 +199,12 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
-  auto txn = MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
       {}, /* read_set */
       {"A", "B", "C"},  /* write_set */
       "SET A newA\n"
       "SET B newB\n"
-      "SET C newC\n" /* code */);
+      "SET C newC\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -220,12 +220,12 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
-  auto txn = MakeTransaction(
+  auto txn = FillMetadata(MakeTransaction(
       {"D", "E", "F"}, /* read_set */
       {},  /* write_set */
       "GET D\n"
       "GET E\n"
-      "GET F\n" /* code */);
+      "GET F\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendSingleHomeBatch(100, {txn}, {0, 1, 2});
@@ -249,19 +249,20 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
       "GET C\n"
       "SET B newB\n"
       "SET Y newY\n"
-      "SET Z newZ\n" /* code */);
+      "SET Z newZ\n", /* code */
+      {{"A", {0,1}}, {"B", {0,1}}, {"C", {0,1}}, {"X", {1,1}}, {"Y", {1,1}}, {"Z", {1,1}}});
   txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
 
-  auto lo_txn_0 = MakeTransaction(
+  auto lo_txn_0 = FillMetadata(MakeTransaction(
       {"A", "C"}, /* read_set */
       {"B"} /* write_set */,
-      "" /* code */);
+      "" /* code */), 0, 1);
   lo_txn_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
-  auto lo_txn_1 = MakeTransaction(
+  auto lo_txn_1 = FillMetadata(MakeTransaction(
       {"X"}, /* read_set */
       {"Y", "Z"}, /* write_set */
-      ""/* code */);
+      ""/* code */), 1, 1);
   lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
   SendMultiHomeBatch(0, {txn}, {0, 1, 2});
@@ -301,6 +302,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
   ASSERT_EQ(output_txn.write_set().at("D"), "newD");
 }
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   auto txn = MakeTransaction(
       {"A"}, /* read_set */
@@ -316,7 +318,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {"A"},  /* write_set */
       "", /* code */
       {{"A", {0,1}}}, /* master metadata */
-      MakeMachineId("0:1") /* coordinating server */,
+      MakeMachineId("0:1"), /* coordinating server */
       1 /* new master */);
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   remaster_txn->mutable_internal()->set_id(11);
@@ -327,7 +329,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   LOG(INFO) << output_remaster_txn;
   ASSERT_EQ(output_remaster_txn.internal().id(), 11);
   ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_remaster_txn.new_master(), 1);
+  ASSERT_EQ(output_remaster_txn.remaster().new_master(), 1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
@@ -336,6 +338,67 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
 }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
+  auto remaster_txn = MakeTransaction(
+      {}, /* read_set */
+      {"A"},  /* write_set */
+      "", /* code */
+      {{"A", {0,0}}}, /* master metadata */
+      MakeMachineId("0:1"), /* coordinating server */
+      1 /* new master */);
+  remaster_txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
+  remaster_txn->mutable_internal()->set_id(11);
+
+  auto remaster_txn_lo_0 = MakeTransaction(
+    {}, /* read_set */
+    {"A"},  /* write_set */
+    "", /* code */
+    {{"A", {0,0}}}, /* master metadata */
+    MakeMachineId("0:1"), /* coordinating server */
+    1 /* new master */);
+  remaster_txn_lo_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+  remaster_txn_lo_0->mutable_internal()->set_id(11);
+
+  auto remaster_txn_lo_1 = MakeTransaction(
+    {}, /* read_set */
+    {"A"},  /* write_set */
+    "", /* code */
+    {{"A", {0,0}}}, /* master metadata */
+    MakeMachineId("0:1"), /* coordinating server */
+    1 /* new master */);
+    
+  remaster_txn_lo_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+  remaster_txn_lo_1->mutable_remaster()->set_is_new_master_lock_only(true);
+  remaster_txn_lo_1->mutable_internal()->set_id(11);
+
+  auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {},  /* write_set */
+      "GET A     \n", /* code */
+      {{"A", {1,0}}},
+      MakeMachineId("0:0") /* coordinating server */);
+  txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
+  txn->mutable_internal()->set_id(12);
+
+  SendMultiHomeBatch(0, {remaster_txn}, {0});
+  SendSingleHomeBatch(200, {remaster_txn_lo_1, remaster_txn_lo_0, txn}, {0});
+
+  auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
+  LOG(INFO) << output_remaster_txn;
+  ASSERT_EQ(output_remaster_txn.internal().id(), 11);
+  ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
+
+  auto output_txn = ReceiveMultipleAndMerge(0, 1);
+  LOG(INFO) << output_txn;
+  ASSERT_EQ(output_txn.internal().id(), 12);
+  ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(output_txn.read_set_size(), 1);
+  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+}
+#endif /* REMASTERING_PROTOCOL_COUNTERLESS */
 
 TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
   auto txn = MakeTransaction(
@@ -351,12 +414,6 @@ TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
-}
-
-int main(int argc, char* argv[]) {
-  ::testing::InitGoogleTest(&argc, argv);
-  google::InstallFailureSignalHandler();
-  return RUN_ALL_TESTS();
 }
 
 TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
@@ -452,4 +509,10 @@ TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::ABORTED);
+}
+
+int main(int argc, char* argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  google::InstallFailureSignalHandler();
+  return RUN_ALL_TESTS();
 }

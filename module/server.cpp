@@ -71,11 +71,23 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
           ->CopyFrom(
               config_->GetLocalMachineIdAsProto());
 
-      internal::Request forward_request;
-      forward_request.mutable_forward_txn()->set_allocated_txn(txn);
-
-      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
-      Send(forward_request, FORWARDER_CHANNEL);
+      if(ValidateTransaction(txn)) {
+        // Send to forwarder
+        internal::Request forward_request;
+        forward_request.mutable_forward_txn()->set_allocated_txn(txn);
+        RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
+        Send(forward_request, FORWARDER_CHANNEL);
+      } else {
+        // Return abort to client
+        txn->set_status(TransactionStatus::ABORTED);
+        internal::Request r;
+        auto completed_subtxn = r.mutable_completed_subtxn();
+        completed_subtxn->set_allocated_txn(txn);
+        // Txn only exists in single, local partition
+        completed_subtxn->set_partition(0);
+        completed_subtxn->add_involved_partitions(0);
+        ProcessCompletedSubtxn(completed_subtxn);
+      }
       break;
     }
     case api::Request::kStats: {
@@ -280,6 +292,20 @@ void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
   pr.response.Set(MM_PROTO, res);
   pr.response.SendTo(GetCustomSocket(0));
   pending_responses_.erase(txn_id);
+}
+
+bool Server::ValidateTransaction(const Transaction* txn) {
+  CHECK_NE(txn->read_set_size() + txn->write_set_size(), 0)
+    << "Txn accesses no keys: " << txn->internal().id();
+
+  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+    CHECK_EQ(txn->read_set_size(), 0)
+        << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
+    CHECK_EQ(txn->write_set_size(), 1)
+        << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
+  }
+
+  return true;
 }
 
 TxnId Server::NextTxnId() {

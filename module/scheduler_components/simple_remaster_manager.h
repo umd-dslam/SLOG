@@ -15,15 +15,18 @@ namespace slog {
  * order as their local logs: if a transaction from region 1 is blocked in the queue, all
  * following transactions from region 1 will be blocked behind it
  */
-class SimpleRemasterManager :
-    public RemasterManager {
+class SimpleRemasterManager : public RemasterManager {
 public:
-  SimpleRemasterManager(
-    const shared_ptr<const Storage<Key, Record>>& storage);
+  SimpleRemasterManager() = default;
+  SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
   virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
+
+  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) {
+    storage_ = storage;
+  }
 
 private:
   /**

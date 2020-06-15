@@ -88,18 +88,19 @@ int main(int argc, char* argv[]) {
             << std::get<1>(zmq_version) << "."
             << std::get<2>(zmq_version);
 
-#ifdef ENABLE_REPLICATION_DELAY
-  LOG(INFO) << "Replication delay enabled";
-#endif /* GetReplicationDelayEnabled */
-
 #ifdef REMASTER_PROTOCOL_SIMPLE
   LOG(INFO) << "Simple remaster protocol";
 #elif defined REMASTER_PROTOCOL_PER_KEY
   LOG(INFO) << "Per key remaster protocol";
+#elif defined REMASTER_PROTOCOL_COUNTERLESS
+  LOG(INFO) << "Counterless remaster protocol";
 #else
   #error "Remaster protocol not defined"
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
+#ifdef ENABLE_REPLICATION_DELAY
+  LOG(INFO) << "Replication delay enabled";
+#endif /* GetReplicationDelayEnabled */
 
   auto config = slog::Configuration::FromFile(
       FLAGS_config, 

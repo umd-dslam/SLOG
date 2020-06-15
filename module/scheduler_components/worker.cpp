@@ -1,5 +1,8 @@
 #include "module/scheduler_components/worker.h"
-#include "module/scheduler_components/remaster_manager.h"
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  #include "module/scheduler_components/remaster_manager.h"
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 #include <thread>
 
@@ -76,12 +79,13 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   const auto& state = InitializeTransactionState(txn_holder);
 
   auto will_abort = false;
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   switch(RemasterManager::CheckCounters(txn_holder, storage_)) {
     case VerifyMasterResult::VALID: {
       break;
     }
     case VerifyMasterResult::ABORT: {
-      txn->set_status(TransactionStatus::ABORTED);
       will_abort = true;
       break;
     }
@@ -93,8 +97,25 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
       LOG(ERROR) << "Unrecognized check counter result";
       break;
   }
+#else
+  for (auto& key_pair : txn->internal().master_metadata()) {
+    auto& key = key_pair.first;
+    auto txn_master = key_pair.second.master();
 
-  if (!will_abort) {
+    Record record;
+    bool found = storage_->Read(key, record);
+    if (found) {
+      if (txn_master != record.metadata.master) {
+        will_abort = true;
+        break;
+      }
+    }
+  }
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
+  if (will_abort) {
+    txn->set_status(TransactionStatus::ABORTED);
+  } else {
     PopulateDataFromLocalStorage(txn);
   }
 
@@ -268,7 +289,7 @@ void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
         }
       }
     }
-  } else if (txn->procedure_case() == Transaction::ProcedureCase::kNewMaster) {
+  } else if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
     const auto& key = txn->write_set().begin()->first;
     if (config_->KeyIsInLocalPartition(key)) {
       auto txn_key_metadata = txn->internal().master_metadata().at(key);
@@ -278,7 +299,7 @@ void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
         // TODO: handle case where key is deleted
         LOG(FATAL) << "Remastering key that does not exist: " << key;
       }
-      record.metadata = Metadata(txn->new_master(), txn_key_metadata.counter() + 1);
+      record.metadata = Metadata(txn->remaster().new_master(), txn_key_metadata.counter() + 1);
       storage_->Write(key, record);
     }
     txn->set_status(TransactionStatus::COMMITTED);

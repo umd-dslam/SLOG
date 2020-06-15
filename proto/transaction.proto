@@ -59,6 +59,12 @@ message TransactionInternal {
     repeated uint32 event_machines = 7; // where the events took place
 }
 
+message RemasterProcedure {
+    uint32 new_master = 1;
+    // The lock only for the new master will create a new key
+    bool is_new_master_lock_only = 2;
+}
+
 message Transaction {
     TransactionInternal internal = 1;
 
@@ -71,11 +77,11 @@ message Transaction {
         COPY key1 key3
         */
         string code = 2;
-         /*
+        /*
         Remaster transactions will move the keys in the write_set to the new master.
         MasterMetadata must still be correct for the keys.
         */
-        uint32 new_master = 3;
+        RemasterProcedure remaster = 3;
     }
 
     map<string, string> read_set = 4;

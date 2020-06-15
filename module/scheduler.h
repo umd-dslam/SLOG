@@ -12,15 +12,18 @@
 #include "connection/sender.h"
 #include "data_structure/batch_log.h"
 #include "module/scheduler_components/batch_interleaver.h"
-#include "module/scheduler_components/deterministic_lock_manager.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
-#ifdef REMASTER_PROTOCOL_SIMPLE
-  #include "module/scheduler_components/simple_remaster_manager.h"
-#elif defined REMASTER_PROTOCOL_PER_KEY
-  #include "module/scheduler_components/per_key_remaster_manager.h"
-#endif /* REMASTER_PROTOCOL_SIMPLE */
+#if defined(REMASTER_PROTOCOL_SIMPLE)
+#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/simple_remaster_manager.h"
+#elif defined(REMASTER_PROTOCOL_PER_KEY)
+#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/per_key_remaster_manager.h"
+#else
+#include "module/scheduler_components/deterministic_lock_manager.h"
+#endif
 
 namespace slog {
 
@@ -62,14 +65,22 @@ private:
   void MaybeUpdateLocalLog();
   void MaybeProcessNextBatchesFromGlobalLog();
 
+  // Check that remaster txn doesn't keep key at same master
+  bool MaybeAbortRemasterTransaction(Transaction* txn);
+
   // Place a transaction in a holder if it has keys in this partition
   bool AcceptTransaction(Transaction* txn);
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking
   void SendToRemasterManager(TransactionHolder* txn_holder);
   // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
   // Send all transactions for locks, multi-home transactions are only registered
   void SendToLockManager(const TransactionHolder* txn_holder);
+  void AcquireLocksAndProcessResult(const TransactionHolder* txn_holder);
 
   // Prepare transaction to be sent to worker
   void DispatchTransaction(TxnId txn_id);
@@ -96,9 +107,9 @@ private:
   void TriggerPreDispatchAbort(TxnId txn_id);
   // Add a single or multi-home transaction to an abort that started before it
   // arrived
-  void AddTransactionToAbort(TxnId txn_id);
+  bool MaybeContinuePreDispatchAbort(TxnId txn_id);
   // Add a lock-only transaction to an abort that started before it arrived
-  void AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id);
+  bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
   // Abort lock-only transactions from the remaster manager and lock manager
   void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
   // Multicast the remote read abort to active partitions
@@ -119,13 +130,16 @@ private:
 
   std::unordered_map<uint32_t, BatchLog> all_logs_;
   BatchInterleaver local_interleaver_;
-  DeterministicLockManager lock_manager_;
   
 #ifdef REMASTER_PROTOCOL_SIMPLE
+  DeterministicLockManagerDeprecated lock_manager_;
   SimpleRemasterManager remaster_manager_;
-#elif defined REMASTER_PROTOCOL_PER_KEY
+#elif defined(REMASTER_PROTOCOL_PER_KEY)
+  DeterministicLockManagerDeprecated lock_manager_;
   PerKeyRemasterManager remaster_manager_;
-#endif /* REMASTER_PROTOCOL_SIMPLE */
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+  DeterministicLockManager lock_manager_;
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
   
@@ -141,9 +155,8 @@ private:
    */
   std::unordered_set<TxnId> aborting_txns_;
   /**
-   * Stores how many lock-only transactions need aborting during
+   * Stores how many lock-only transactions are yet to arrive during
    * mutli-home abort
-   * 
    * Note: can be negative, if lock-onlys abort before the multi-home
    */
   std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
