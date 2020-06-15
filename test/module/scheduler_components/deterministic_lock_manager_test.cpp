@@ -9,13 +9,7 @@ using namespace slog;
 
 class DeterministicLockManagerTest : public ::testing::Test {
 protected:
-  void SetUp() {
-    storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
-    lock_manager = new DeterministicLockManager(storage);
-  }
-
-  shared_ptr<Storage<Key, Record>> storage;
-  DeterministicLockManager* lock_manager;
+  DeterministicLockManager lock_manager;
 };
 
 TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
@@ -24,8 +18,8 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
     {"readA", "readB"},
     {"writeC"}));
   TransactionHolder holder(configs[0], txn);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
-  auto result = lock_manager->ReleaseLocks(holder);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
+  auto result = lock_manager.ReleaseLocks(holder);
   ASSERT_TRUE(result.empty());
 }
 
@@ -39,10 +33,10 @@ TEST_F(DeterministicLockManagerTest, ReadLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager->ReleaseLocks(holder1).empty());
-  ASSERT_TRUE(lock_manager->ReleaseLocks(holder2).empty());
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
 }
 
 TEST_F(DeterministicLockManagerTest, WriteLocks) {
@@ -55,12 +49,12 @@ TEST_F(DeterministicLockManagerTest, WriteLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager->ReleaseLocks(holder1).size(), 1U);
+  ASSERT_EQ(lock_manager.ReleaseLocks(holder1).size(), 1U);
   // Make sure the lock is already held by txn2
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::WAITING);
 }
 
 TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
@@ -78,14 +72,14 @@ TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   txn4->mutable_internal()->set_id(400);
   TransactionHolder holder4(configs[0], txn4);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder4), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder4), AcquireLocksResult::WAITING);
 
-  ASSERT_TRUE(lock_manager->ReleaseLocks(holder3).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
 
-  auto result = lock_manager->ReleaseLocks(holder1);
+  auto result = lock_manager.ReleaseLocks(holder1);
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
   ASSERT_EQ(result.size(), 2U);
@@ -105,15 +99,15 @@ TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3(configs[0], txn3);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager->ReleaseLocks(holder1);
+  auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(200) > 0);
 
-  result = lock_manager->ReleaseLocks(holder2);
+  result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(300) > 0);
 }
@@ -127,10 +121,10 @@ TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
  
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager->ReleaseLocks(holder1);
+  auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(200) > 0);
 }
@@ -150,13 +144,13 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder1));
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder2));
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder1), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly2), AcquireLocksResult::ACQUIRED);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder2));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly2), AcquireLocksResult::ACQUIRED);
 
-  auto result = lock_manager->ReleaseLocks(holder2);
+  auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(100) > 0);
 }
@@ -176,13 +170,13 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder1), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly2), AcquireLocksResult::WAITING);
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder1));
-  ASSERT_TRUE(lock_manager->AcceptTransaction(holder2));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly2), AcquireLocksResult::WAITING);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
+  ASSERT_TRUE(lock_manager.AcceptTransaction(holder2));
 
-  auto result = lock_manager->ReleaseLocks(holder2);
+  auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(100) > 0);
 }
@@ -202,13 +196,13 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   txn2_lockonly2->mutable_internal()->set_id(200);
   TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
 
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder2));
-  ASSERT_EQ(lock_manager->AcquireLocks(holder1), AcquireLocksResult::WAITING);
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder1));
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2_lockonly2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder2));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder1), AcquireLocksResult::WAITING);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly2), AcquireLocksResult::ACQUIRED);
 
-  auto result = lock_manager->ReleaseLocks(holder2);
+  auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
   ASSERT_TRUE(result.count(100) > 0);
 }
@@ -219,12 +213,12 @@ TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1(configs[0], txn1);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
 
   auto txn2 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2->mutable_internal()->set_id(101);
   TransactionHolder holder2(configs[0], txn2);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder2), AcquireLocksResult::WAITING);
 }
 
 TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
@@ -237,8 +231,8 @@ TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
 }
 
 TEST_F(DeterministicLockManagerTest, RemasterTxn) {
@@ -254,14 +248,14 @@ TEST_F(DeterministicLockManagerTest, RemasterTxn) {
   auto txn_lockonly2 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly2->mutable_internal()->set_id(100);
   txn_lockonly1->mutable_remaster()->set_new_master(1);
-  txn_lockonly1->mutable_remaster()->set_new_master_lock_only(true);
+  txn_lockonly1->mutable_remaster()->set_is_new_master_lock_only(true);
   TransactionHolder holder_lockonly2(configs[0], txn_lockonly2);
 
-  ASSERT_FALSE(lock_manager->AcceptTransaction(holder));
-  ASSERT_EQ(lock_manager->AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager->AcquireLocks(holder_lockonly2), AcquireLocksResult::ACQUIRED);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly2), AcquireLocksResult::ACQUIRED);
 
-  lock_manager->ReleaseLocks(holder);
+  lock_manager.ReleaseLocks(holder);
   // Check locks have been released
   auto txn2 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly1->mutable_internal()->set_id(200);
@@ -271,6 +265,6 @@ TEST_F(DeterministicLockManagerTest, RemasterTxn) {
   txn_lockonly1->mutable_internal()->set_id(200);
   TransactionHolder holder3(configs[0], txn3);
 
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager->AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
 }

@@ -104,9 +104,6 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-DeterministicLockManager::DeterministicLockManager(const std::shared_ptr<const Storage<Key, Record>>& storage)
-    : storage_(storage) {}
-
 bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.KeysInPartition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
@@ -143,7 +140,7 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
     auto key = pair.first;
     auto mode = LockMode::WRITE;
     auto master = txn->internal().master_metadata().at(key).master();
-    if (txn->remaster().new_master_lock_only()) {
+    if (txn->remaster().is_new_master_lock_only()) {
       master = txn->remaster().new_master();
     }
     auto key_replica = MakeKeyReplica(key, master);

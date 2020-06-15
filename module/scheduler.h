@@ -15,16 +15,14 @@
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  #include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
-
-  #ifdef REMASTER_PROTOCOL_SIMPLE
-    #include "module/scheduler_components/simple_remaster_manager.h"
-  #elif defined(REMASTER_PROTOCOL_PER_KEY)
-    #include "module/scheduler_components/per_key_remaster_manager.h"
-  #endif /* REMASTER_PROTOCOL_SIMPLE */
+#if defined(REMASTER_PROTOCOL_SIMPLE)
+#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/simple_remaster_manager.h"
+#elif defined(REMASTER_PROTOCOL_PER_KEY)
+#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/per_key_remaster_manager.h"
 #else
-  #include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/deterministic_lock_manager.h"
 #endif
 
 namespace slog {
@@ -109,9 +107,9 @@ private:
   void TriggerPreDispatchAbort(TxnId txn_id);
   // Add a single or multi-home transaction to an abort that started before it
   // arrived
-  void AddTransactionToAbort(TxnId txn_id);
+  bool MaybeContinuePreDispatchAbort(TxnId txn_id);
   // Add a lock-only transaction to an abort that started before it arrived
-  void AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id);
+  bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
   // Abort lock-only transactions from the remaster manager and lock manager
   void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
   // Multicast the remote read abort to active partitions

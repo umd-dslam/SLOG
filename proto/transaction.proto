@@ -62,7 +62,7 @@ message TransactionInternal {
 message RemasterProcedure {
     uint32 new_master = 1;
     // The lock only for the new master will create a new key
-    bool new_master_lock_only = 2;
+    bool is_new_master_lock_only = 2;
 }
 
 message Transaction {

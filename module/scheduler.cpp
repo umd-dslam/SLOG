@@ -27,13 +27,7 @@ Scheduler::Scheduler(
     config_(config),
     pull_socket_(*broker->GetContext(), ZMQ_PULL),
     worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
-    sender_(broker)
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-    , remaster_manager_(storage)
-#else
-    , lock_manager_(storage)
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
-{
+    sender_(broker) {
   broker->AddChannel(SCHEDULER_CHANNEL);
   pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
@@ -60,6 +54,11 @@ Scheduler::Scheduler(
         *broker->GetContext(),
         storage));
   }
+
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  remaster_manager_.SetStorage(storage);
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+
 }
 
 /***********************************************
@@ -346,7 +345,7 @@ void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-    auto key = txn->write_set().begin()->first;
+    auto& key = txn->write_set().begin()->first;
     auto counter = txn->internal().master_metadata().at(key).counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
@@ -446,8 +445,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
             auto txn_holder = &all_txns_[txn_id];
 
-            if (aborting_txns_.count(txn_id)) {
-              AddTransactionToAbort(txn_id);
+            if (MaybeContinuePreDispatchAbort(txn_id)) {
               break;
             }
 
@@ -471,17 +469,16 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
                 << txn_replica_id.first <<", " << txn_replica_id.second;
             auto txn_holder = &lock_only_txns_[txn_replica_id];
 
-            if (aborting_txns_.count(txn_id)) {
-              AddLockOnlyTransactionToAbort(txn_replica_id);
+            if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
               break;
             }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-      SendToRemasterManager(txn_holder);
-      break;
+            SendToRemasterManager(txn_holder);
+            break;
 #elif defined(REMASTER_PROTOCOL_COUNTERLESS)
-      SendToLockManager(txn_holder);
-      break;
+            SendToLockManager(txn_holder);
+            break;
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
           }
@@ -490,7 +487,7 @@ void Scheduler::MaybeProcessNextBatchesFromGlobalLog() {
             auto txn_holder = &all_txns_[txn_id];
 
             if (aborting_txns_.count(txn_id)) {
-              AddTransactionToAbort(txn_id);
+              MaybeContinuePreDispatchAbort(txn_id);
               break;
             }
 
@@ -676,14 +673,17 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   aborting_txns_.insert(txn_id);
 
   if (txn_holder.GetTransaction() != nullptr) {
-    AddTransactionToAbort(txn_id);
+    MaybeContinuePreDispatchAbort(txn_id);
   } else {
     VLOG(3) << "Defering abort until txn arrives: " << txn_id;
   }
 }
 
-void Scheduler::AddTransactionToAbort(TxnId txn_id) {
-  CHECK(aborting_txns_.count(txn_id) > 0) << "Abort not triggered: " << txn_id;
+bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
+  if (aborting_txns_.count(txn_id) == 0) {
+    return false;
+  }
+
   auto& txn_holder = all_txns_[txn_id];
   auto txn = txn_holder.GetTransaction();
   auto txn_type = txn->internal().type();
@@ -720,18 +720,21 @@ void Scheduler::AddTransactionToAbort(TxnId txn_id) {
   }
 
   MaybeFinishAbort(txn_id);
+  return true;
 }
 
-void Scheduler::AddLockOnlyTransactionToAbort(TxnIdReplicaIdPair txn_replica_id) {
+bool Scheduler::MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id) {
   auto txn_id = txn_replica_id.first;
-  CHECK(aborting_txns_.count(txn_id) > 0)
-      << "Abort not triggered: " << txn_id << ", " << txn_replica_id.second;
+  if (aborting_txns_.count(txn_id) == 0) {
+    return false;
+  }
   VLOG(3) << "Aborting lo txn arrived: " << txn_id << ", " << txn_replica_id.second;
   lock_only_txns_.erase(txn_replica_id);
   mh_abort_waiting_on_[txn_id] -= 1;
 
   // Check if this was the last lock-only
   MaybeFinishAbort(txn_id);
+  return true;
 }
 
 void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {

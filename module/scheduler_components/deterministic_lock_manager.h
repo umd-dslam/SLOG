@@ -17,8 +17,6 @@
 #include "common/transaction_holder.h"
 #include "common/types.h"
 
-#include "storage/storage.h"
-
 using std::list;
 using std::shared_ptr;
 using std::pair;
@@ -80,8 +78,6 @@ private:
  */
 class DeterministicLockManager {
 public:
-  DeterministicLockManager(const std::shared_ptr<const Storage<Key, Record>>& storage);
-
   /**
    * Counts the number of locks a txn needs.
    * 
@@ -138,8 +134,6 @@ private:
   unordered_map<KeyReplica, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
-
-  std::shared_ptr<const Storage<Key, Record>> storage_;
 };
 
 } // namespace slog

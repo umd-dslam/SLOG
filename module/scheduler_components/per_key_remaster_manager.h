@@ -17,15 +17,18 @@ namespace slog {
  * With small transactions, should acheive lower latency than SimpleRemasterManager. For large
  * transactions, the overhead of creating queues may be too high.
  */
-class PerKeyRemasterManager :
-    public RemasterManager {
+class PerKeyRemasterManager : public RemasterManager {
 public:
-  PerKeyRemasterManager(
-    const shared_ptr<const Storage<Key, Record>>& storage);
+  PerKeyRemasterManager() = default;
+  PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
   virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder);
   virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
+
+  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) {
+    storage_ = storage;
+  }
 
 private:
   /**
