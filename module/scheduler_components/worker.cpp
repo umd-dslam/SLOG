@@ -1,13 +1,15 @@
 #include "module/scheduler_components/worker.h"
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  #include "module/scheduler_components/remaster_manager.h"
+#include "module/scheduler_components/remaster_manager.h"
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 #include <thread>
 
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
+
+#define FALLTHROUGH __attribute__((fallthrough))
 
 namespace slog {
 
@@ -49,34 +51,153 @@ void Worker::Loop() {
     if (!msg.GetProto(req)) {
       return;
     }
+    TxnId txn_id = 0;
+    bool valid_request = true;
     switch (req.type_case()) {
       case Request::kWorker: {
-        ProcessWorkerRequest(req.worker());
+        txn_id = ProcessWorkerRequest(req.worker());
         break;
       }
       case Request::kRemoteReadResult: {
-        ProcessRemoteReadResult(req.remote_read_result());
+        txn_id = ProcessRemoteReadResult(req.remote_read_result());
         break;
       }
       default:
+        valid_request = false;
         break;
+    }
+    if (valid_request) {
+      AdvanceTransaction(txn_id);
     }
   }
   VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Worker " << identity_ << " is alive.";
 }
 
-void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
+TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
   auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
   auto txn = txn_holder->GetTransaction();
-  auto txn_internal = txn->mutable_internal();
+  auto txn_id = txn->internal().id();
+  auto local_partition = config_->GetLocalPartition();
+
   RecordTxnEvent(
       config_,
-      txn_internal,
+      txn->mutable_internal(),
       TransactionEvent::ENTER_WORKER);
 
-  auto txn_id = txn_internal->id();
+  // Remove keys in remote partitions
+  auto itr = txn->mutable_read_set()->begin();
+  while (itr != txn->mutable_read_set()->end()) {
+    const auto& key = itr->first;
+    auto partition = config_->GetPartitionOfKey(key);
+    if (partition != local_partition) {
+      itr = txn->mutable_read_set()->erase(itr);
+    } else {
+      itr++;
+    }
+  }
+  itr = txn->mutable_write_set()->begin();
+  while (itr != txn->mutable_write_set()->end()) {
+    const auto& key = itr->first;
+    auto partition = config_->GetPartitionOfKey(key);
+    if (partition != local_partition) {
+      itr = txn->mutable_write_set()->erase(itr);
+    } else {
+      itr++;
+    }
+  }
 
-  const auto& state = InitializeTransactionState(txn_holder);
+  // Create a state for the new transaction
+  auto state = txn_states_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(txn_id),
+      std::forward_as_tuple(txn_holder));
+
+  CHECK(state.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
+
+  return txn_id;
+}
+
+TxnId Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
+  auto txn_id = read_result.txn_id();
+
+  CHECK(txn_states_.count(txn_id) > 0)
+      << "Transaction " << txn_id << " does not exist for remote read result";
+
+  auto& state = txn_states_[txn_id];
+  auto txn = state.txn_holder->GetTransaction();
+
+  // Apply the remote read
+  if (read_result.will_abort()) {
+    // TODO: optimize by returning an aborting transaction to the scheduler immediately.
+    // later remote reads will need to be garbage collected.
+    txn->set_status(TransactionStatus::ABORTED);
+  } else {
+    if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
+      for (const auto& key_value : read_result.reads()) {
+        (*txn->mutable_read_set())[key_value.first] = key_value.second;
+      }
+    }
+  }
+
+  state.remote_messages_waiting_on -= 1;
+  
+  // Move the transaction to a new phase if all remote reads arrive
+  if (state.remote_messages_waiting_on == 0) {
+    switch (state.phase) {
+      case TransactionState::Phase::WAIT_REMOTE_READ:
+        state.phase = TransactionState::Phase::EXECUTE;
+        VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
+        break;
+      case TransactionState::Phase::WAIT_CONFIRMATION:
+        state.phase = TransactionState::Phase::COMMIT;
+        break;
+      default:
+        LOG(FATAL) << "Invalid phase";
+    }
+  }
+
+  return txn_id;
+}
+
+void Worker::AdvanceTransaction(TxnId txn_id) {
+  auto& state = txn_states_[txn_id];
+  switch (state.phase) {
+    case TransactionState::Phase::READ_LOCAL_STORAGE:
+      ReadLocalStorage(txn_id);
+      FALLTHROUGH;
+    case TransactionState::Phase::WAIT_REMOTE_READ:
+      if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
+        // The only way to get out of this phase is through remote messages
+        break;
+      }
+      FALLTHROUGH;
+    case TransactionState::Phase::EXECUTE:
+      if (state.phase == TransactionState::Phase::EXECUTE) {
+        Execute(txn_id);
+      }
+      FALLTHROUGH;
+    case TransactionState::Phase::WAIT_CONFIRMATION:
+      if (state.phase == TransactionState::Phase::WAIT_CONFIRMATION) {
+        // The only way to get out of this phase is through remote messages
+        break;
+      }
+      FALLTHROUGH;
+    case TransactionState::Phase::COMMIT:
+      if (state.phase == TransactionState::Phase::COMMIT) {
+        Commit(txn_id);
+      }
+      FALLTHROUGH;
+    case TransactionState::Phase::FINISH:
+      if (state.phase == TransactionState::Phase::FINISH) {
+        Finish(txn_id);
+      }
+  }
+}
+
+void Worker::ReadLocalStorage(TxnId txn_id) {
+  auto& state = txn_states_[txn_id];
+  auto txn_holder = state.txn_holder;
+  auto txn = txn_holder->GetTransaction();
 
   auto will_abort = false;
 
@@ -116,7 +237,18 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
   if (will_abort) {
     txn->set_status(TransactionStatus::ABORTED);
   } else {
-    PopulateDataFromLocalStorage(txn);
+    // If not abort due to remastering, read from local storage
+    for (auto& key_value : *txn->mutable_read_set()) {
+      Record record;
+      storage_->Read(key_value.first, record);
+      key_value.second = record.value;
+    }
+
+    for (auto& key_value : *txn->mutable_write_set()) {
+      Record record;
+      storage_->Read(key_value.first, record);
+      key_value.second = record.value;
+    }
   }
 
   // Send abort result and local reads to all remote active partitions
@@ -132,117 +264,123 @@ void Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request)
       (*reads_to_be_sent)[key_value.first] = key_value.second;
     }
   }
-  auto local_replica = config_->GetLocalReplica();
-  for (auto p : txn_holder->ActivePartitions()) {
-    if (p != local_partition) {
-      auto machine_id = MakeMachineIdAsString(local_replica, p);
-      SendToScheduler(request, std::move(machine_id));
-    }
-  }
+  SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
 
-  // If the txn does not do any write or does not have to wait for remote read, 
-  // move on with executing this transaction.
-  // TODO: optimize by returning an aborting transaction to the scheduler immediately.
-  // later remote reads will need to be garbage collected.
-  if (state.remote_reads_waiting_on == 0) {
-    VLOG(3) << "Execute txn " << txn_id << " without remote reads";
-    ExecuteAndMaybeCommitTransaction(txn_id);
+  if (!will_abort) {
+    // Set the number of remote reads that this partition needs to wait for
+    state.remote_messages_waiting_on = 0;
+    if (txn_holder->ActivePartitions().count(local_partition) > 0) {
+      // Active partition needs remote reads from all partitions
+      state.remote_messages_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+    }
+    if (state.remote_messages_waiting_on == 0) {
+      VLOG(3) << "Execute txn " << txn_id << " without remote reads";
+      state.phase = TransactionState::Phase::EXECUTE;
+    } else {
+      VLOG(3) << "Defer executing txn " << txn_id << " until having enough remote reads";
+      state.phase = TransactionState::Phase::WAIT_REMOTE_READ;
+    }
   } else {
-    VLOG(3) << "Defer executing txn " << txn->internal().id() << " until having enough remote reads";
+    state.phase = TransactionState::Phase::FINISH;
   }
 }
 
-TransactionState& Worker::InitializeTransactionState(TransactionHolder* txn_holder) {
-  auto txn = txn_holder->GetTransaction();
-  auto txn_id = txn->internal().id();
-  auto res = txn_states_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(txn_id),
-      std::forward_as_tuple(txn_holder));
-
-  CHECK(res.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
-
-  auto local_partition = config_->GetLocalPartition();
+void Worker::Execute(TxnId txn_id) {
   auto& state = txn_states_[txn_id];
-  if (txn_holder->ActivePartitions().count(local_partition) > 0) {
-    // Active partition needs remote reads from all partitions
-    state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
-  } else {
-    // Passive needs none
-    state.remote_reads_waiting_on = 0;
-  }
-    
-  // Remove keys in remote partitions
-  auto itr = txn->mutable_read_set()->begin();
-  while (itr != txn->mutable_read_set()->end()) {
-    const auto& key = itr->first;
-    auto partition = config_->GetPartitionOfKey(key);
-    if (partition != local_partition) {
-      itr = txn->mutable_read_set()->erase(itr);
-    } else {
-      itr++;
-    }
-  }
-  itr = txn->mutable_write_set()->begin();
-  while (itr != txn->mutable_write_set()->end()) {
-    const auto& key = itr->first;
-    auto partition = config_->GetPartitionOfKey(key);
-    if (partition != local_partition) {
-      itr = txn->mutable_write_set()->erase(itr);
-    } else {
-      itr++;
-    }
-  }
-
-  return state;
-}
-
-void Worker::PopulateDataFromLocalStorage(Transaction* txn) {
-  for (auto& key_value : *txn->mutable_read_set()) {
-    Record record;
-    storage_->Read(key_value.first, record);
-    key_value.second = record.value;
-  }
-
-  for (auto& key_value : *txn->mutable_write_set()) {
-    Record record;
-    storage_->Read(key_value.first, record);
-    key_value.second = record.value;
-  }
-}
-
-void Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
-  auto txn_id = read_result.txn_id();
-
-  CHECK(txn_states_.count(txn_id) > 0)
-      << "Transaction " << txn_id << " does not exist for remote read result";
-
-  auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
-
-  txn_states_[txn_id].remote_reads_waiting_on -= 1;
-  if (read_result.will_abort()) {
-    txn->set_status(TransactionStatus::ABORTED);
-  }
-  // Apply remote reads to local txn
-  for (const auto& key_value : read_result.reads()) {
-    (*txn->mutable_read_set())[key_value.first] = key_value.second;
-  }
-
-  // If all remote reads arrived, move on with executing this transaction.
-  if (txn_states_[txn_id].remote_reads_waiting_on == 0) {
-    VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
-    ExecuteAndMaybeCommitTransaction(txn_id);
-  }
-}
-
-void Worker::ExecuteAndMaybeCommitTransaction(TxnId txn_id) {
-  const auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
 
-  if (txn->status() != TransactionStatus::ABORTED) {
-    ExecuteAndMaybeCommitTransactionHelper(txn_id);
-  }
+  switch (txn->procedure_case()) {
+    case Transaction::ProcedureCase::kCode: {
+      // Execute the transaction code
+      commands_->Execute(*txn);
 
+      // Send confirmation to other partitions
+      Request request;
+      auto local_partition = config_->GetLocalPartition();
+      auto rrr = request.mutable_remote_read_result();
+      rrr->set_txn_id(txn_id);
+      rrr->set_partition(local_partition);
+      rrr->set_will_abort(txn->status() == TransactionStatus::ABORTED);
+      SendToOtherPartitions(std::move(request), state.txn_holder->ActivePartitions());
+
+      // Set the number of confirmations that this partition needs to wait for
+      state.remote_messages_waiting_on = 0;
+      if (state.txn_holder->ActivePartitions().count(local_partition) > 0) {
+        state.remote_messages_waiting_on = state.txn_holder->InvolvedPartitions().size() - 1;
+      }
+      break;
+    }
+    case Transaction::ProcedureCase::kRemaster:
+      txn->set_status(TransactionStatus::COMMITTED);
+      // Remaster transaction can only be single-partition
+      state.remote_messages_waiting_on = 0;
+      break;
+    default:
+      LOG(FATAL) << "Procedure is not set";
+  }
+  if (state.remote_messages_waiting_on == 0) {
+    state.phase = TransactionState::Phase::COMMIT;
+  } else {
+    VLOG(3) << "Txn " << txn_id << " executed. Waiting for confirmation from other partitions";
+    state.phase = TransactionState::Phase::WAIT_CONFIRMATION;
+  }
+}
+
+void Worker::Commit(TxnId txn_id) {
+  auto& state = txn_states_[txn_id];
+  auto txn = state.txn_holder->GetTransaction();
+  switch (txn->procedure_case()) {
+    case Transaction::ProcedureCase::kCode: {
+      // Apply all writes to local storage if the transaction is not aborted
+      if (txn->status() == TransactionStatus::COMMITTED) {
+        auto& master_metadata = txn->internal().master_metadata();
+        for (const auto& key_value : txn->write_set()) {
+          const auto& key = key_value.first;
+          if (config_->KeyIsInLocalPartition(key)) {
+            const auto& value = key_value.second;
+            Record record;
+            bool found = storage_->Read(key_value.first, record);
+            if (!found) {
+              CHECK(master_metadata.contains(key))
+                  << "Master metadata for key \"" << key << "\" is missing";
+              record.metadata = master_metadata.at(key);
+            }
+            record.value = value;
+            storage_->Write(key, record);
+          }
+        }
+        for (const auto& key : txn->delete_set()) {
+          if (config_->KeyIsInLocalPartition(key)) {
+            storage_->Delete(key);
+          }
+        }
+      }
+      break;
+    }
+    case Transaction::ProcedureCase::kRemaster: {
+      const auto& key = txn->write_set().begin()->first;
+      if (config_->KeyIsInLocalPartition(key)) {
+        auto txn_key_metadata = txn->internal().master_metadata().at(key);
+        Record record;
+        bool found = storage_->Read(key, record);
+        if (!found) {
+          // TODO: handle case where key is deleted
+          LOG(FATAL) << "Remastering key that does not exist: " << key;
+        }
+        record.metadata = Metadata(txn->remaster().new_master(), txn_key_metadata.counter() + 1);
+        storage_->Write(key, record);
+      }
+      break;
+    }
+    default:
+      LOG(FATAL) << "Procedure is not set";
+  }
+  VLOG(3) << "Committed txn " << txn_id;
+  state.phase = TransactionState::Phase::FINISH;
+}
+
+void Worker::Finish(TxnId txn_id) {
+  auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
   // Response back to the scheduler
   Response res;
   res.mutable_worker()->set_txn_id(txn_id);
@@ -258,53 +396,16 @@ void Worker::ExecuteAndMaybeCommitTransaction(TxnId txn_id) {
   txn_states_.erase(txn_id);
 }
 
-void Worker::ExecuteAndMaybeCommitTransactionHelper(TxnId txn_id) {
-  const auto& state = txn_states_[txn_id];
-  auto txn = state.txn_holder->GetTransaction();
-  if (txn->procedure_case() == Transaction::ProcedureCase::kCode) {
-    // Execute the transaction code
-    commands_->Execute(*txn);
-
-    // Apply all writes to local storage if the transaction is not aborted
-    if (txn->status() == TransactionStatus::COMMITTED) {
-      auto& master_metadata = txn->internal().master_metadata();
-      for (const auto& key_value : txn->write_set()) {
-        const auto& key = key_value.first;
-        if (config_->KeyIsInLocalPartition(key)) {
-          const auto& value = key_value.second;
-          Record record;
-          bool found = storage_->Read(key_value.first, record);
-          if (!found) {
-            CHECK(master_metadata.contains(key))
-                << "Master metadata for key \"" << key << "\" is missing";
-            record.metadata = master_metadata.at(key);
-          }
-          record.value = value;
-          storage_->Write(key, record);
-        }
-      }
-      for (const auto& key : txn->delete_set()) {
-        if (config_->KeyIsInLocalPartition(key)) {
-          storage_->Delete(key);
-        }
-      }
+void Worker::SendToOtherPartitions(
+    internal::Request&& request,
+    const std::unordered_set<uint32_t>& partitions) {
+  auto local_replica = config_->GetLocalReplica();
+  auto local_partition = config_->GetLocalPartition();
+  for (auto p : partitions) {
+    if (p != local_partition) {
+      auto machine_id = MakeMachineIdAsString(local_replica, p);
+      SendToScheduler(request, std::move(machine_id));
     }
-  } else if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-    const auto& key = txn->write_set().begin()->first;
-    if (config_->KeyIsInLocalPartition(key)) {
-      auto txn_key_metadata = txn->internal().master_metadata().at(key);
-      Record record;
-      bool found = storage_->Read(key, record);
-      if (!found) {
-        // TODO: handle case where key is deleted
-        LOG(FATAL) << "Remastering key that does not exist: " << key;
-      }
-      record.metadata = Metadata(txn->remaster().new_master(), txn_key_metadata.counter() + 1);
-      storage_->Write(key, record);
-    }
-    txn->set_status(TransactionStatus::COMMITTED);
-  } else {
-    LOG(ERROR) << "Procedure is not set";
   }
 }
 
