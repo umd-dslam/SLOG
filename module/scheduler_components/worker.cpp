@@ -114,6 +114,8 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
 
   CHECK(state.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
+  VLOG(3) << "Initialized state for txn " << txn_id;
+
   return txn_id;
 }
 
@@ -207,6 +209,8 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
       break;
   }
 #else
+  // TODO: this loop can be merged with the one below to avoid
+  // duplicate access to the storage
   for (auto& key_pair : txn->internal().master_metadata()) {
     auto& key = key_pair.first;
     auto txn_master = key_pair.second.master();
@@ -254,22 +258,22 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   }
   SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
 
-  if (!will_abort) {
-    // Set the number of remote reads that this partition needs to wait for
-    state.remote_reads_waiting_on = 0;
-    if (txn_holder->ActivePartitions().count(local_partition) > 0) {
-      // Active partition needs remote reads from all partitions
-      state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
-    }
-    if (state.remote_reads_waiting_on == 0) {
-      VLOG(3) << "Execute txn " << txn_id << " without remote reads";
-      state.phase = TransactionState::Phase::EXECUTE;
-    } else {
-      VLOG(3) << "Defer executing txn " << txn_id << " until having enough remote reads";
-      state.phase = TransactionState::Phase::WAIT_REMOTE_READ;
-    }
+  // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
+  //       This requires removing the CHECK at the start of ProcessRemoteReadResult
+  //       because we're requiring a txn (aborted or not) to receive all remote reads
+  //       before moving on.
+  // Set the number of remote reads that this partition needs to wait for
+  state.remote_reads_waiting_on = 0;
+  if (txn_holder->ActivePartitions().count(local_partition) > 0) {
+    // Active partition needs remote reads from all partitions
+    state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+  }
+  if (state.remote_reads_waiting_on == 0) {
+    VLOG(3) << "Execute txn " << txn_id << " without remote reads";
+    state.phase = TransactionState::Phase::EXECUTE;
   } else {
-    state.phase = TransactionState::Phase::FINISH;
+    VLOG(3) << "Defer executing txn " << txn_id << " until having enough remote reads";
+    state.phase = TransactionState::Phase::WAIT_REMOTE_READ;
   }
 }
 
@@ -279,6 +283,9 @@ void Worker::Execute(TxnId txn_id) {
 
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
+      if (txn->status() == TransactionStatus::ABORTED) {
+        break;
+      }
       // Execute the transaction code
       commands_->Execute(*txn);
       break;
@@ -360,6 +367,8 @@ void Worker::Finish(TxnId txn_id) {
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
+
+  VLOG(3) << "Finished with txn " << txn_id;
 }
 
 void Worker::SendToOtherPartitions(
