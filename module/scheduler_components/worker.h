@@ -25,7 +25,6 @@ struct TransactionState {
     READ_LOCAL_STORAGE,
     WAIT_REMOTE_READ,
     EXECUTE,
-    WAIT_CONFIRMATION,
     COMMIT,
     FINISH,
   };
@@ -33,7 +32,7 @@ struct TransactionState {
   TransactionState() = default;
   TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
   TransactionHolder* txn_holder = nullptr;
-  uint32_t remote_messages_waiting_on = 0;
+  uint32_t remote_reads_waiting_on = 0;
   Phase phase = Phase::READ_LOCAL_STORAGE;
 };
 
