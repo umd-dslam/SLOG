@@ -9,7 +9,11 @@
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
 
-#define FALLTHROUGH __attribute__((fallthrough))
+#ifdef __GNUC__
+#define FALLTHROUGH [[gnu::fallthrough]]
+#else
+#define FALLTHROUGH
+#endif
 
 namespace slog {
 
