@@ -263,8 +263,8 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
 
   // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
-  //       This requires removing the CHECK at the start of ProcessRemoteReadResult
-  //       because we're requiring a txn (aborted or not) to receive all remote reads
+  //       To do this, we need to removing the CHECK at the start of ProcessRemoteReadResult
+  //       because we no longer require an aborted txn to receive all remote reads
   //       before moving on.
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
