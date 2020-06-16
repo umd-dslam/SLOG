@@ -37,7 +37,10 @@ struct TransactionState {
 };
 
 /**
- * 
+ * A worker executes and commits transactions. Every time it receives from
+ * the scheduler a message pertaining to a transaction X, it will either
+ * initializes the state for X if X is a new transaction or try to advance
+ * X to the subsequent phases as much as possible.
  */
 class Worker : public Module {
 public:
@@ -50,18 +53,47 @@ public:
   void Loop() final;
 
 private:
+  /**
+   * Initializes the state of a new transaction
+   */
   TxnId ProcessWorkerRequest(const internal::WorkerRequest& req);
+  
+  /**
+   * Applies remote read for transactions that are in the WAIT_REMOTE_READ phase.
+   * When all remote reads are received, the transaction is moved to the EXECUTE phase.
+   */
   TxnId ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
+
+  /**
+   * Drives most of the phase transition of a transaction
+   */
   void AdvanceTransaction(TxnId txn_id);
 
+  /**
+   * Checks master metadata information and reads local data to the transaction
+   * buffer, then broadcast local data to other partitions
+   */
   void ReadLocalStorage(TxnId txn_id);
+  
+  /**
+   * Executes the code inside the transaction
+   */
   void Execute(TxnId txn_id);
+
+  /**
+   * Applies the writes to local storage
+   */
   void Commit(TxnId txn_id);
+
+  /**
+   * Returns the result back to the scheduler and cleans up the transaction state
+   */
   void Finish(TxnId txn_id);
 
   void SendToOtherPartitions(
       internal::Request&& request,
       const std::unordered_set<uint32_t>& partitions);
+
   void SendToScheduler(
       const google::protobuf::Message& req_or_res,
       string&& forward_to_machine = "");
