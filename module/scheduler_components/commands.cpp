@@ -16,7 +16,7 @@ const string SPACE(" \t\n\v\f\r");
 
 const std::unordered_map<string, size_t>
 KeyValueCommands::COMMAND_NUM_ARGS = {
-  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}
+  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}, {"ABORT", 1}
 };
 
 void KeyValueCommands::Execute(Transaction& txn) {
@@ -40,6 +40,8 @@ void KeyValueCommands::Execute(Transaction& txn) {
       if (read_set.contains(src) && write_set.contains(dst)) {
         write_set[dst] = read_set.at(src);
       }
+    } else if (cmd_ == "ABORT") {
+      Abort() << "User abort (key: " << args_[0] << ")";
     }
   }
 
