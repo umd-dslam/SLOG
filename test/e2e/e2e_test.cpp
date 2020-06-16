@@ -61,9 +61,9 @@ protected:
   ConfigVec configs;
 };
 
-This test submits multiple transactions to the system serially and checks the
-read values for correctness.
-TODO: submit transactions concurrently (multiple outcomes would be valid)
+// This test submits multiple transactions to the system serially and checks the
+// read values for correctness.
+// TODO: submit transactions concurrently (multiple outcomes would be valid)
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
   auto txn1 = MakeTransaction(
     {}, /* read_set */

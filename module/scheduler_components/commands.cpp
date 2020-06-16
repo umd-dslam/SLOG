@@ -41,7 +41,9 @@ void KeyValueCommands::Execute(Transaction& txn) {
         write_set[dst] = read_set.at(src);
       }
     } else if (cmd_ == "ABORT") {
-      Abort() << "User abort (key: " << args_[0] << ")";
+      if (write_set.contains(args_[0]) || read_set.contains(args_[1])) {
+        Abort() << "User abort (key: " << args_[0] << ")";
+      }
     }
   }
 

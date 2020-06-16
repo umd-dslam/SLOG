@@ -132,27 +132,21 @@ TxnId Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_res
     // later remote reads will need to be garbage collected.
     txn->set_status(TransactionStatus::ABORTED);
   } else {
-    if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
-      for (const auto& key_value : read_result.reads()) {
-        (*txn->mutable_read_set())[key_value.first] = key_value.second;
-      }
+    for (const auto& key_value : read_result.reads()) {
+      (*txn->mutable_read_set())[key_value.first] = key_value.second;
     }
   }
 
-  state.remote_messages_waiting_on -= 1;
-  
+  state.remote_reads_waiting_on -= 1;
+
   // Move the transaction to a new phase if all remote reads arrive
-  if (state.remote_messages_waiting_on == 0) {
-    switch (state.phase) {
-      case TransactionState::Phase::WAIT_REMOTE_READ:
-        state.phase = TransactionState::Phase::EXECUTE;
-        VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
-        break;
-      case TransactionState::Phase::WAIT_CONFIRMATION:
-        state.phase = TransactionState::Phase::COMMIT;
-        break;
-      default:
-        LOG(FATAL) << "Invalid phase";
+  if (state.remote_reads_waiting_on == 0) {
+    if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
+      state.phase = TransactionState::Phase::EXECUTE;
+      VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
+    }
+    else {
+      LOG(FATAL) << "Invalid phase";
     }
   }
 
@@ -174,12 +168,6 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
     case TransactionState::Phase::EXECUTE:
       if (state.phase == TransactionState::Phase::EXECUTE) {
         Execute(txn_id);
-      }
-      FALLTHROUGH;
-    case TransactionState::Phase::WAIT_CONFIRMATION:
-      if (state.phase == TransactionState::Phase::WAIT_CONFIRMATION) {
-        // The only way to get out of this phase is through remote messages
-        break;
       }
       FALLTHROUGH;
     case TransactionState::Phase::COMMIT:
@@ -268,12 +256,12 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
   if (!will_abort) {
     // Set the number of remote reads that this partition needs to wait for
-    state.remote_messages_waiting_on = 0;
+    state.remote_reads_waiting_on = 0;
     if (txn_holder->ActivePartitions().count(local_partition) > 0) {
       // Active partition needs remote reads from all partitions
-      state.remote_messages_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+      state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
     }
-    if (state.remote_messages_waiting_on == 0) {
+    if (state.remote_reads_waiting_on == 0) {
       VLOG(3) << "Execute txn " << txn_id << " without remote reads";
       state.phase = TransactionState::Phase::EXECUTE;
     } else {
@@ -293,37 +281,15 @@ void Worker::Execute(TxnId txn_id) {
     case Transaction::ProcedureCase::kCode: {
       // Execute the transaction code
       commands_->Execute(*txn);
-
-      // Send confirmation to other partitions
-      Request request;
-      auto local_partition = config_->GetLocalPartition();
-      auto rrr = request.mutable_remote_read_result();
-      rrr->set_txn_id(txn_id);
-      rrr->set_partition(local_partition);
-      rrr->set_will_abort(txn->status() == TransactionStatus::ABORTED);
-      SendToOtherPartitions(std::move(request), state.txn_holder->ActivePartitions());
-
-      // Set the number of confirmations that this partition needs to wait for
-      state.remote_messages_waiting_on = 0;
-      if (state.txn_holder->ActivePartitions().count(local_partition) > 0) {
-        state.remote_messages_waiting_on = state.txn_holder->InvolvedPartitions().size() - 1;
-      }
       break;
     }
     case Transaction::ProcedureCase::kRemaster:
       txn->set_status(TransactionStatus::COMMITTED);
-      // Remaster transaction can only be single-partition so it does not need to wait
-      state.remote_messages_waiting_on = 0;
       break;
     default:
       LOG(FATAL) << "Procedure is not set";
   }
-  if (state.remote_messages_waiting_on == 0) {
-    state.phase = TransactionState::Phase::COMMIT;
-  } else {
-    VLOG(3) << "Txn " << txn_id << " executed. Waiting for confirmation from other partitions";
-    state.phase = TransactionState::Phase::WAIT_CONFIRMATION;
-  }
+  state.phase = TransactionState::Phase::COMMIT;
 }
 
 void Worker::Commit(TxnId txn_id) {
