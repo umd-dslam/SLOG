@@ -312,7 +312,7 @@ void Worker::Execute(TxnId txn_id) {
     }
     case Transaction::ProcedureCase::kRemaster:
       txn->set_status(TransactionStatus::COMMITTED);
-      // Remaster transaction can only be single-partition
+      // Remaster transaction can only be single-partition so it does not need to wait
       state.remote_messages_waiting_on = 0;
       break;
     default:
@@ -332,27 +332,28 @@ void Worker::Commit(TxnId txn_id) {
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
       // Apply all writes to local storage if the transaction is not aborted
-      if (txn->status() == TransactionStatus::COMMITTED) {
-        auto& master_metadata = txn->internal().master_metadata();
-        for (const auto& key_value : txn->write_set()) {
-          const auto& key = key_value.first;
-          if (config_->KeyIsInLocalPartition(key)) {
-            const auto& value = key_value.second;
-            Record record;
-            bool found = storage_->Read(key_value.first, record);
-            if (!found) {
-              CHECK(master_metadata.contains(key))
-                  << "Master metadata for key \"" << key << "\" is missing";
-              record.metadata = master_metadata.at(key);
-            }
-            record.value = value;
-            storage_->Write(key, record);
+      if (txn->status() != TransactionStatus::COMMITTED) {
+        break;
+      }
+      auto& master_metadata = txn->internal().master_metadata();
+      for (const auto& key_value : txn->write_set()) {
+        const auto& key = key_value.first;
+        if (config_->KeyIsInLocalPartition(key)) {
+          const auto& value = key_value.second;
+          Record record;
+          bool found = storage_->Read(key_value.first, record);
+          if (!found) {
+            CHECK(master_metadata.contains(key))
+                << "Master metadata for key \"" << key << "\" is missing";
+            record.metadata = master_metadata.at(key);
           }
+          record.value = value;
+          storage_->Write(key, record);
         }
-        for (const auto& key : txn->delete_set()) {
-          if (config_->KeyIsInLocalPartition(key)) {
-            storage_->Delete(key);
-          }
+      }
+      for (const auto& key : txn->delete_set()) {
+        if (config_->KeyIsInLocalPartition(key)) {
+          storage_->Delete(key);
         }
       }
       break;
@@ -375,7 +376,6 @@ void Worker::Commit(TxnId txn_id) {
     default:
       LOG(FATAL) << "Procedure is not set";
   }
-  VLOG(3) << "Committed txn " << txn_id;
   state.phase = TransactionState::Phase::FINISH;
 }
 

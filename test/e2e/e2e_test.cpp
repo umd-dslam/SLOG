@@ -61,9 +61,9 @@ protected:
   ConfigVec configs;
 };
 
-// This test submits multiple transactions to the system serially and checks the
-// read values for correctness.
-// TODO: submit transactions concurrently (multiple outcomes would be valid)
+This test submits multiple transactions to the system serially and checks the
+read values for correctness.
+TODO: submit transactions concurrently (multiple outcomes would be valid)
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
   auto txn1 = MakeTransaction(
     {}, /* read_set */
@@ -151,6 +151,33 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type()); // used to be MH
   ASSERT_EQ("valA", txn_resp.read_set().at("A"));
   ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+}
+
+TEST_F(E2ETest, AbortTxn) {
+  // Multi-partition transaction where one of the partition will abort
+  auto aborted_txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"B"},  /* write_set */
+      "SET B notB ABORT A", /* code */
+      {}, /* master metadata */
+      MakeMachineId("0:0") /* coordinating server */);
+
+  test_slogs[1]->SendTxn(aborted_txn);
+  auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
+
+  auto txn = MakeTransaction(
+      {"B"}, /* read_set */
+      {},  /* write_set */
+      "GET B");
+
+  test_slogs[1]->SendTxn(txn);
+  auto txn_resp = test_slogs[1]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+  // Value of B must not change because the previous txn was aborted
+  ASSERT_EQ("valB", txn_resp.read_set().at("B"));
 }
 
 int main(int argc, char* argv[]) {
