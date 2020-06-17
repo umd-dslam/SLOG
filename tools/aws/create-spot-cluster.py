@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
   'availability_zone': '',
 }
 
-deployments = [
+deployments = [ # only one per region
   {
     'region': 'us-east-1',
     'availability_zone': 'us-east-1b',
