@@ -1,7 +1,7 @@
 import boto3
 import pprint
 import random
-from subprocess import call
+import os
 import time
 
 # TODO: place boto3 in dependencies
@@ -158,12 +158,11 @@ def install_docker(instance_ips):
         {} ubuntu@{} "{}" &\
         """.format(SSH_COMMAND, ip, INSTALL_DOCKER_COMMAND).strip()
       commands.append(command)
-  combined_command = "\n".join(commands) + "&& wait"
+  combined_command = "\n".join(commands) + " wait"
   print(combined_command)
 
-  # TODO: this process completes the docker install then hangs
-  # the script finishes, then output arrives
-  call(combined_command, shell=True)
+  # TODO: redirect output?
+  os.system(combined_command)
 
 
 if __name__ == "__main__":
