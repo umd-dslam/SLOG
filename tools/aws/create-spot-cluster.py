@@ -16,6 +16,14 @@ REQUIRED:
 
 If no instances are created in a region, you may need to specifiy an
 availability zone. Check the output of the spot request.
+
+# Get Ubuntu 20.04 AMIs
+aws ec2 describe-images
+  --region <region>
+  --owners 099720109477
+  --filters 'Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-????????' 'Name=state,Values=available'
+  --query 'reverse(sort_by(Images, &CreationDate))[:1].ImageId'
+  --output text
 '''
 
 ##### DEPLOYMENT CONFIG #########
@@ -28,17 +36,6 @@ DEFAULT_CONFIG = {
   'key_name': 'johann-slog',
   'availability_zone': '',
 }
-
-'''
-Get Ubuntu 20.04 AMIs:
-
-aws ec2 describe-images
-  --region <region>
-  --owners 099720109477
-  --filters 'Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-????????' 'Name=state,Values=available'
-  --query 'reverse(sort_by(Images, &CreationDate))[:1].ImageId'
-  --output text
-'''
 
 deployments = [ # only one per region
   {
@@ -62,16 +59,16 @@ MAX_RETRIES = 10 # retries for spot instances to be ready
 REFRESH_WAIT_SCALE = 2 # base for exponential backoff (seconds)
 SSH_DELAY_SECONDS = 10 # may refuse connection if ssh quickly
 
-INSTALL_DOCKER_COMMAND = """ \
-  curl -fsSL https://get.docker.com -o get-docker.sh && \
-  sh get-docker.sh && \
-  sudo usermod -aG docker ubuntu && \
-  newgrp docker \
-""".strip()
+INSTALL_DOCKER_COMMAND = (
+  "curl -fsSL https://get.docker.com -o get-docker.sh &&"
+  "sh get-docker.sh &&"
+  "sudo usermod -aG docker ubuntu &&"
+  "newgrp docker"
+).strip()
 
-SSH_COMMAND = """ \
-  ssh -o "StrictHostKeyChecking no" -i zzz_personal/johann-slog.pem \
-""".strip()
+SSH_COMMAND = (
+  'ssh -o "StrictHostKeyChecking no" -i zzz_personal/johann-slog.pem'
+).strip()
 
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -83,7 +80,7 @@ def main():
     # Send request
     conf = {**DEFAULT_CONFIG, **partial_conf} # overrides defaults
     resp = request_spot_instances(conf)
-    print('\nSpot request ' + conf['region'] + ':')
+    print(f'\nSpot request {conf["region"]} :')
     pp.pprint(resp)
     
     # get request ids
@@ -102,12 +99,12 @@ def main():
       assert retries < MAX_RETRIES
 
       wait_time = REFRESH_WAIT_SCALE ** retries # exponential backoff
-      print("Waiting " + str(wait_time) + " seconds...")
+      print(f"Waiting {wait_time} seconds...")
       time.sleep(wait_time)
 
-      print("Trying to fetch " + str(INSTANCE_COUNT) + " instances...")
+      print(f"Trying to fetch {INSTANCE_COUNT} instances...")
       ips = get_instance_ips(region, request_id)
-      print("Got " + str(len(ips)))
+      print(f"Got {len(ips)}")
 
     assert len(ips) == INSTANCE_COUNT
     instance_ips[region] = ips
@@ -184,9 +181,7 @@ def install_docker(instance_ips):
   commands = []
   for _, ips in instance_ips.items():
     for ip in ips:
-      command = """ \
-        {} ubuntu@{} "{}" &\
-        """.format(SSH_COMMAND, ip, INSTALL_DOCKER_COMMAND).strip()
+      command = f'{SSH_COMMAND} ubuntu@{ip} "{INSTALL_DOCKER_COMMAND}" &'
       commands.append(command)
   combined_command = "\n".join(commands) + " wait"
   print(combined_command)
