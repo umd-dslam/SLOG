@@ -34,7 +34,7 @@ add_executable(broker_and_sender_test connection/broker_and_sender_test.cpp)
 target_link_libraries(broker_and_sender_test test_utils)
 
 add_executable(commands_test module/scheduler_components/commands_test.cpp)
-target_link_libraries(commands_test test_utils)
+target_link_libraries(commands_test scheduler_components test_utils)
 
 add_executable(concurrent_hash_map_test data_structure/concurrent_hash_map_test.cpp)
 

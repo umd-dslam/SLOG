@@ -16,7 +16,7 @@ const string SPACE(" \t\n\v\f\r");
 
 const std::unordered_map<string, size_t>
 KeyValueCommands::COMMAND_NUM_ARGS = {
-  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}, {"ABORT", 1}
+  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}, {"EQ", 2}
 };
 
 void KeyValueCommands::Execute(Transaction& txn) {
@@ -25,6 +25,8 @@ void KeyValueCommands::Execute(Transaction& txn) {
   auto& write_set = *txn.mutable_write_set();
   auto& delete_set = *txn.mutable_delete_set();
 
+  // If a command will write to a key but that key is
+  // not in the write set, that command will be ignored.
   while (NextCommand(txn.code())) {
     if (cmd_ == "SET") {
       if (write_set.contains(args_[0])) {
@@ -37,12 +39,16 @@ void KeyValueCommands::Execute(Transaction& txn) {
     } else if (cmd_ == "COPY") {
       const auto& src = args_[0];
       const auto& dst = args_[1];
-      if (read_set.contains(src) && write_set.contains(dst)) {
+      DCHECK(read_set.contains(src));
+      if (write_set.contains(dst)) {
         write_set[dst] = read_set.at(src);
       }
-    } else if (cmd_ == "ABORT") {
-      if (write_set.contains(args_[0]) || read_set.contains(args_[0])) {
-        Abort() << "User abort (key: " << args_[0] << ")";
+    } else if (cmd_ == "EQ") {
+      DCHECK(read_set.contains(args_[0]));
+      if (read_set[args_[0]] != args_[1]) {
+        Abort() << "Key = " << args_[0]
+                << ". Expected value = " << args_[1]
+                << ". Actual value = " << read_set[args_[0]];
       }
     }
   }
