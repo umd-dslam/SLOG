@@ -72,6 +72,8 @@ void Worker::Loop() {
     }
     if (valid_request) {
       AdvanceTransaction(txn_id);
+    } else {
+      LOG(FATAL) << "Invalid request for worker";
     }
   }
   VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Worker " << identity_ << " is alive.";
@@ -88,7 +90,9 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
       txn->mutable_internal(),
       TransactionEvent::ENTER_WORKER);
 
-  // Remove keys in remote partitions
+  // Remove keys that will be filled in later by remote partitions.
+  // They are removed at this point so that the next phase will only
+  // read the local keys from local storage.
   auto itr = txn->mutable_read_set()->begin();
   while (itr != txn->mutable_read_set()->end()) {
     const auto& key = itr->first;
@@ -132,12 +136,13 @@ TxnId Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_res
   auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->GetTransaction();
 
-  // Apply the remote read
   if (read_result.will_abort()) {
     // TODO: optimize by returning an aborting transaction to the scheduler immediately.
     // later remote reads will need to be garbage collected.
     txn->set_status(TransactionStatus::ABORTED);
   } else {
+    // Apply remote reads. After this point, the transaction has all the data it needs to
+    // execute the code.
     for (const auto& key_value : read_result.reads()) {
       (*txn->mutable_read_set())[key_value.first] = key_value.second;
     }
@@ -213,6 +218,8 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
       break;
   }
 #else
+  // Check whether the store master metadata matches with the information
+  // stored in the transaction
   // TODO: this loop can be merged with the one below to avoid
   // duplicate access to the storage
   for (auto& key_pair : txn->internal().master_metadata()) {
@@ -239,7 +246,6 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
       storage_->Read(key_value.first, record);
       key_value.second = record.value;
     }
-
     for (auto& key_value : *txn->mutable_write_set()) {
       Record record;
       storage_->Read(key_value.first, record);

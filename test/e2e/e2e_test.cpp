@@ -158,7 +158,7 @@ TEST_F(E2ETest, AbortTxn) {
   auto aborted_txn = MakeTransaction(
       {"A"}, /* read_set */
       {"B"},  /* write_set */
-      "SET B notB ABORT A", /* code */
+      "SET B notB EQ A notA", /* code */
       {}, /* master metadata */
       MakeMachineId("0:0") /* coordinating server */);
 
