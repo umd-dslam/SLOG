@@ -74,7 +74,7 @@ private:
     while ((pos = NextToken(token, params_str, ";,", pos)) != std::string::npos) {
       auto eq_pos = token.find_first_of("=");
       if (eq_pos == std::string::npos) {
-        throw std::runtime_error("Invalid param entry: " + token);
+        throw std::runtime_error("Invalid workload param token: " + token);
       }
       auto key = Trim(token.substr(0, eq_pos));
       map[key] = Trim(token.substr(eq_pos + 1));
