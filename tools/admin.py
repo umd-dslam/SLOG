@@ -6,6 +6,7 @@ such as starting a cluster, stopping a cluster, getting status, and more.
 """
 import docker
 import ipaddress
+import json
 import logging
 import os
 
@@ -44,6 +45,7 @@ CONTAINER_SLOG_CONFIG_FILE_PATH = os.path.join(
     SLOG_CONFIG_FILE_NAME
 )
 
+BENCHMARK_CONTAINER_NAME = "benchmark"
 
 def cleanup_container(
     client: docker.DockerClient,
@@ -109,16 +111,17 @@ class Command:
 
     NAME = "<not_implemented>"
     HELP = ""
+    CONFIG_FILE_REQUIRED = True
 
     def __init__(self):
-        self.rep_to_clients = []
-        self.num_clients = 0
         self.config = None
 
     def create_subparser(self, subparsers):
         parser = subparsers.add_parser(self.NAME, help=self.HELP)
         parser.add_argument(
             "config",
+            nargs='?',
+            default="",
             metavar="config_file",
             help="Path to a config file",
         )
@@ -150,11 +153,32 @@ class Command:
         self.do_command(args)
 
     def load_config(self, args):
+        if not os.path.isfile(args.config):
+            if self.CONFIG_FILE_REQUIRED:
+                raise FileNotFoundError(f'Config file does not exist: "{args.config}"')
+            else:
+                return
         with open(args.config, "r") as f:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
+
     
     def init_clients(self, args):
+        # The rep_to_client variable is a list of lists of Docker clients.
+        # The replica and partition numbers match to the indices in the lists.
+        # For example, given the following machines 
+        # in the format (replica, partition, address):
+        #   (0, 0, 192.168.1.1), (0, 1, 192.168.1.2), (1, 0, 192.168.1.3)
+        # The rep_to_clients list will be:
+        #   [
+        #       [
+        #           (<Docker client>, 192.168.1.1),
+        #           (<Docker client>, 192.168.1.2),
+        #       ],
+        #       [
+        #           (<Docker client>, 192.168.1.3),
+        #       ]
+        #   ]
         self.rep_to_clients = []
         self.num_clients = 0
         # Create a docker client for each node
@@ -316,7 +340,7 @@ class StartCommand(Command):
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
         for rep, clients in enumerate(self.rep_to_clients):
-            for part, (client, addr) in enumerate(clients):
+            for client, addr in clients:
                 cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
 
         for rep, clients in enumerate(self.rep_to_clients):
@@ -401,6 +425,7 @@ class LogsCommand(Command):
 
     NAME = "logs"
     HELP = "Stream logs from a server"
+    CONFIG_FILE_REQUIRED = False
 
     def create_subparser(self, subparsers):
         parser = super().create_subparser(subparsers)
@@ -423,6 +448,11 @@ class LogsCommand(Command):
             action="store_true",
             help="Follow log output"
         )
+        parser.add_argument(
+            "--container",
+            default=SLOG_CONTAINER_NAME,
+            help="Name of the Docker container to show logs from"
+        )
 
     def init_clients(self, args):
         """
@@ -432,19 +462,24 @@ class LogsCommand(Command):
         self.addr = None
         try:
             if args.a is not None:
-                # Check if the given address is specified in the config
-                addr_is_in_replica = (
-                    args.a.encode() in rep.addresses
-                    for rep in self.config.replicas
-                )
-                if any(addr_is_in_replica):
+                if self.config is None:
                     self.addr = args.a
                 else:
-                    LOG.error(
-                        "Address \"%s\" is not specified in the config", args.a
+                    # Check if the given address is specified in the config
+                    addr_is_in_replica = (
+                        args.a.encode() in rep.addresses
+                        for rep in self.config.replicas
                     )
-                    return
+                    if any(addr_is_in_replica):
+                        self.addr = args.a
+                    else:
+                        LOG.error(
+                            "Address \"%s\" is not specified in the config", args.a
+                        )
+                        return
             else:
+                if self.config is None:
+                    raise Exception('The "-rp" flag requires a valid config file')
                 r, p = args.rp
                 self.addr = self.config.replicas[r].addresses[p].decode()
 
@@ -468,9 +503,9 @@ class LogsCommand(Command):
             return
 
         try:
-            c = self.client.containers.get(SLOG_CONTAINER_NAME)
+            c = self.client.containers.get(args.container)
         except docker.errors.NotFound:
-            LOG.error("Cannot find container \"%s\"", SLOG_CONTAINER_NAME)
+            LOG.error("Cannot find container \"%s\"", args.container)
             return
 
         if args.follow:
@@ -666,6 +701,141 @@ class LocalCommand(Command):
                 print(f"\tPartition {p} ({addr.decode()}): {status}")
 
 
+class BenchmarkCommand(Command):
+
+    NAME = "benchmark"
+    HELP = "Spawn distributed clients to run benchmark"
+
+    def create_subparser(self, subparsers):
+        parser = super().create_subparser(subparsers)
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument(
+            "--num-txns", type=int,
+            help="Number of transactions sent per client"
+        )
+        group.add_argument(
+            "--duration", type=int,
+            help="How long the benchmark is run in seconds"
+        )
+        parser.add_argument(
+            "--clients",
+            required=True,
+            help="Path to a json file containing lists of clients"
+        )
+        parser.add_argument(
+            "--workload", "-wl",
+            default="basic",
+            help="Name of the workload to run benchmark with"
+        )
+        parser.add_argument(
+            "--params",
+            default="",
+            help="Parameters of the workload"
+        )
+        parser.add_argument(
+            "--rate", type=int,
+            default=1000,
+            help="Maximum number of transactions sent per second"
+        )
+        parser.add_argument(
+            "-e",
+            nargs="*",
+            help="Environment variables to pass to the container. For example, "
+                 "use -e GLOG_v=1 to turn on verbose logging at level 1."
+        )
+
+    def init_clients(self, args):
+        """
+        Override this method because the clients of this command are created from
+        the addresses specified in a json file instead of from the configuration file
+        """
+        # This rep_to_clients variable is slightly different in this benchmark command
+        # than the global default. Here, only the indices of the replica have any
+        # significance while the indices of the elements of each inner list do not
+        # have any meaning because each benchmarking client does not correspond to a partition
+        self.rep_to_clients = []
+        self.num_clients = 0
+        with open(args.clients, 'r') as f:
+            # Load the list of clients from the json file
+            benchmark_clients = json.load(f)
+            for rep, clients_in_rep in enumerate(benchmark_clients):
+                rep_clients = []
+                for addr_str in clients_in_rep:
+                    try:
+                        docker_client = self.new_client(args.user, addr_str)
+                        rep_clients.append((docker_client, addr_str))
+                        self.num_clients += 1
+                        LOG.info("Connected to %s", addr_str)
+                    except PasswordRequiredException as e:
+                        rep_clients.append((None, addr_str))
+                        LOG.error(
+                            "Failed to authenticate when trying to connect to %s. "
+                            "Check username or key files",
+                            f"{args.user}@{addr_str}",
+                        )
+                    except Exception as e:
+                        rep_clients.append((None, addr_str))
+                        LOG.exception(e)
+                
+                self.rep_to_clients.append(rep_clients)
+
+
+    def do_command(self, args):
+        # Prepare a command to update the config file
+        config_text = text_format.MessageToString(self.config)
+        sync_config_cmd = (
+            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
+        )
+
+        # Clean up everything first so that the old running session does not
+        # mess up with broker synchronization of the new session
+        for rep, clients in enumerate(self.rep_to_clients):
+            for client, addr in clients:
+                cleanup_container(client, BENCHMARK_CONTAINER_NAME, addr=addr)
+
+        for rep, clients in enumerate(self.rep_to_clients):
+            for client, addr in clients:
+                if client is None:
+                    # Skip this node because we cannot
+                    # initialize a docker client
+                    continue
+                shell_cmd = (
+                    f"benchmark "
+                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                    f"--r {rep} "
+                    f"--data-dir {CONTAINER_DATA_DIR} "
+                    f"--out-dir {CONTAINER_DATA_DIR} "
+                    f"--wl {args.workload} "
+                    f'--params="{args.params}" '
+                    f"--rate {args.rate} "
+                )
+                if args.num_txns:
+                    shell_cmd += f"--num_txns {args.num_txns} "
+                else:
+                    shell_cmd += f"--duration {args.duration} "
+                client.containers.run(
+                    args.image,
+                    name=BENCHMARK_CONTAINER_NAME,
+                    command=[
+                        "/bin/sh", "-c",
+                        sync_config_cmd + " && " +
+                        shell_cmd
+                    ],
+                    # Mount a directory on the host into the container
+                    mounts=[SLOG_DATA_MOUNT],
+                    # Expose all ports from container to host
+                    network_mode="host",
+                    # Avoid hanging this tool after starting the server
+                    detach=True,
+                    environment=parse_envs(args.e),
+                )
+                LOG.info(
+                    "%s: Synced config and ran command: %s",
+                    addr,
+                    shell_cmd
+                )
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         description="Controls deployment and experiment of SLOG"
@@ -674,6 +844,7 @@ if __name__ == "__main__":
     subparsers.required = True
 
     COMMANDS = [
+        BenchmarkCommand,
         GenDataCommand,
         StartCommand,
         StopCommand,
