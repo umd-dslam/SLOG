@@ -288,7 +288,7 @@ class GenDataCommand(Command):
             f"tools/gen_data.py {CONTAINER_DATA_DIR} "
             f"--num-replicas {len(self.config.replicas)} "
             f"--num-partitions {self.config.num_partitions} "
-            f"--partition-bytes {self.config.partition_key_num_bytes} "
+            f"--partition-bytes {self.config.hash_partitioning.partition_key_num_bytes} "
             f"--partition {args.partition} "
             f"--size {args.size} "
             f"--size-unit {args.size_unit} "

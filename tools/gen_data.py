@@ -304,7 +304,7 @@ if __name__ == "__main__":
             text_format.Parse(f.read(), config)
             num_partitions = config.num_partitions
             num_replicas = len(config.replicas)
-            partition_bytes = config.partition_key_num_bytes
+            partition_bytes = config.hash_partitioning.partition_key_num_bytes
 
     DataGenerator(
         args.data_dir,
