@@ -18,6 +18,38 @@ message ReplicationDelayExperiment {
 }
 
 /**
+ * With hash partitioning, each key is interpreted as a byte string.
+ * The keys are distributed to the partitions based on their
+ * hash values.
+ * Initial data can be loaded from an external file.
+ */
+message HashPartitioning {
+    // Number of prefix bytes of a key to use for partitioning
+    uint32 partition_key_num_bytes = 1;
+}
+
+/**
+ * With range partitioning, each key is assumed to be a number.
+ * The keys are distributed to the partitions based on key values
+ * modulo the number of partitions. 
+ * Initial data can be generated at startup but cannot load from an
+ * external file. For example, given 3 partitions and 4 regions, the
+ * home and partition assignment for the keys is as follows:
+ *
+ *        home | 0 1 2 3  0  1  2  3  0  ...
+ * ------------------------------------------
+ * partition 0 | 0 3 6 9  12 15 18 21 24 ...
+ * partition 1 | 1 4 7 10 13 16 19 22 25 ...
+ * partition 2 | 2 5 8 11 14 17 20 23 26 ...
+ */
+message RangePartitioning {
+    // Number of records to generate
+    uint64 num_records = 1;
+    // Size of a generated record in bytes
+    uint32 record_size_bytes = 2;
+}
+
+/**
  * The schema of a configuration file.
  */
 message Configuration {
@@ -34,13 +66,16 @@ message Configuration {
     uint32 server_port = 4;
     // Number of partitions per replica
     uint32 num_partitions = 5;
-    // Length of the prefix of a key in bytes for partitioning
-    uint32 partition_key_num_bytes = 6;
+    // Partitioning scheme
+    oneof partitioning {
+        HashPartitioning hash_partitioning = 6;
+        RangePartitioning range_partitioning = 7;
+    }
     // Number of worker threads for processing the transactions
-    uint32 num_workers = 7;
+    uint32 num_workers = 8;
     // How long the sequencer wait for batching
-    uint64 batch_duration = 8;
+    uint64 batch_duration = 9;
     // Config for CMake option ENABLE_REPLICATION_DELAY. Replication
     // of txn batches will be delayed to simulate uneven network latency
-    ReplicationDelayExperiment replication_delay = 9;
+    ReplicationDelayExperiment replication_delay = 10;
 }

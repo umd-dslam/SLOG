@@ -12,8 +12,6 @@ using std::vector;
 
 namespace slog {
 
-using internal::MachineId;
-
 class Configuration;
 
 using ConfigurationPtr = std::shared_ptr<const Configuration>;
@@ -47,15 +45,14 @@ public:
   uint32_t GetLocalReplica() const;
   uint32_t GetLocalPartition() const;
   string GetLocalMachineIdAsString() const;
-  MachineId GetLocalMachineIdAsProto() const;
+  internal::MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;
 
   uint32_t GetLeaderPartitionForMultiHomeOrdering() const;
 
-  // TODO: How keys are partitioned is hardcoded for now. 
-  //       Maybe find a more dynamic way to do this
   uint32_t GetPartitionOfKey(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
+  const internal::RangePartitioning* GetRangePartitioning() const;
 
 #ifdef ENABLE_REPLICATION_DELAY
   uint32_t GetReplicationDelayPercent() const;

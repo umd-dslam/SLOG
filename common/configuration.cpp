@@ -12,6 +12,8 @@
 
 namespace slog {
 
+using internal::MachineId;
+
 namespace {
 
 template<class It>
@@ -149,14 +151,22 @@ uint32_t Configuration::GetLeaderPartitionForMultiHomeOrdering() const {
 }
 
 uint32_t Configuration::GetPartitionOfKey(const Key& key) const {
-  auto end = config_.partition_key_num_bytes() >= key.length() 
-      ? key.end() 
-      : key.begin() + config_.partition_key_num_bytes();
-  return FNVHash(key.begin(), end) % GetNumPartitions();
+  if (config_.has_hash_partitioning()) {
+    auto end = config_.hash_partitioning().partition_key_num_bytes() >= key.length() 
+        ? key.end() 
+        : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
+    return FNVHash(key.begin(), end) % GetNumPartitions();
+  } else {
+    return std::stoll(key) % GetNumPartitions();
+  }
 }
 
 bool Configuration::KeyIsInLocalPartition(const Key& key) const {
   return GetPartitionOfKey(key) == local_partition_;
+}
+
+const internal::RangePartitioning* Configuration::GetRangePartitioning() const {
+  return config_.has_range_partitioning() ? &config_.range_partitioning() : nullptr;
 }
 
 #ifdef ENABLE_REPLICATION_DELAY

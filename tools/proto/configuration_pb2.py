@@ -18,7 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='slog.internal',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"\xa1\x02\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12\x1f\n\x17partition_key_num_bytes\x18\x06 \x01(\r\x12\x13\n\x0bnum_workers\x18\x07 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\x08 \x01(\x04\x12\x44\n\x11replication_delay\x18\t \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentb\x06proto3'
+  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"C\n\x11RangePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\x8e\x03\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12>\n\x12range_partitioning\x18\x07 \x01(\x0b\x32 .slog.internal.RangePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\t \x01(\x04\x12\x44\n\x11replication_delay\x18\n \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentB\x0e\n\x0cpartitioningb\x06proto3'
 )
 
 
@@ -93,6 +93,75 @@ _REPLICATIONDELAYEXPERIMENT = _descriptor.Descriptor(
 )
 
 
+_HASHPARTITIONING = _descriptor.Descriptor(
+  name='HashPartitioning',
+  full_name='slog.internal.HashPartitioning',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='partition_key_num_bytes', full_name='slog.internal.HashPartitioning.partition_key_num_bytes', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=161,
+  serialized_end=212,
+)
+
+
+_RANGEPARTITIONING = _descriptor.Descriptor(
+  name='RangePartitioning',
+  full_name='slog.internal.RangePartitioning',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='num_records', full_name='slog.internal.RangePartitioning.num_records', index=0,
+      number=1, type=4, cpp_type=4, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='record_size_bytes', full_name='slog.internal.RangePartitioning.record_size_bytes', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=214,
+  serialized_end=281,
+)
+
+
 _CONFIGURATION = _descriptor.Descriptor(
   name='Configuration',
   full_name='slog.internal.Configuration',
@@ -136,29 +205,36 @@ _CONFIGURATION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='partition_key_num_bytes', full_name='slog.internal.Configuration.partition_key_num_bytes', index=5,
-      number=6, type=13, cpp_type=3, label=1,
+      name='hash_partitioning', full_name='slog.internal.Configuration.hash_partitioning', index=5,
+      number=6, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='range_partitioning', full_name='slog.internal.Configuration.range_partitioning', index=6,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='num_workers', full_name='slog.internal.Configuration.num_workers', index=7,
+      number=8, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='num_workers', full_name='slog.internal.Configuration.num_workers', index=6,
-      number=7, type=13, cpp_type=3, label=1,
+      name='batch_duration', full_name='slog.internal.Configuration.batch_duration', index=8,
+      number=9, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='batch_duration', full_name='slog.internal.Configuration.batch_duration', index=7,
-      number=8, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='replication_delay', full_name='slog.internal.Configuration.replication_delay', index=8,
-      number=9, type=11, cpp_type=10, label=1,
+      name='replication_delay', full_name='slog.internal.Configuration.replication_delay', index=9,
+      number=10, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -174,15 +250,28 @@ _CONFIGURATION = _descriptor.Descriptor(
   syntax='proto3',
   extension_ranges=[],
   oneofs=[
+    _descriptor.OneofDescriptor(
+      name='partitioning', full_name='slog.internal.Configuration.partitioning',
+      index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=162,
-  serialized_end=451,
+  serialized_start=284,
+  serialized_end=682,
 )
 
 _CONFIGURATION.fields_by_name['replicas'].message_type = _REPLICA
+_CONFIGURATION.fields_by_name['hash_partitioning'].message_type = _HASHPARTITIONING
+_CONFIGURATION.fields_by_name['range_partitioning'].message_type = _RANGEPARTITIONING
 _CONFIGURATION.fields_by_name['replication_delay'].message_type = _REPLICATIONDELAYEXPERIMENT
+_CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
+  _CONFIGURATION.fields_by_name['hash_partitioning'])
+_CONFIGURATION.fields_by_name['hash_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
+_CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
+  _CONFIGURATION.fields_by_name['range_partitioning'])
+_CONFIGURATION.fields_by_name['range_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
 DESCRIPTOR.message_types_by_name['Replica'] = _REPLICA
 DESCRIPTOR.message_types_by_name['ReplicationDelayExperiment'] = _REPLICATIONDELAYEXPERIMENT
+DESCRIPTOR.message_types_by_name['HashPartitioning'] = _HASHPARTITIONING
+DESCRIPTOR.message_types_by_name['RangePartitioning'] = _RANGEPARTITIONING
 DESCRIPTOR.message_types_by_name['Configuration'] = _CONFIGURATION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -199,6 +288,20 @@ ReplicationDelayExperiment = _reflection.GeneratedProtocolMessageType('Replicati
   # @@protoc_insertion_point(class_scope:slog.internal.ReplicationDelayExperiment)
   })
 _sym_db.RegisterMessage(ReplicationDelayExperiment)
+
+HashPartitioning = _reflection.GeneratedProtocolMessageType('HashPartitioning', (_message.Message,), {
+  'DESCRIPTOR' : _HASHPARTITIONING,
+  '__module__' : 'proto.configuration_pb2'
+  # @@protoc_insertion_point(class_scope:slog.internal.HashPartitioning)
+  })
+_sym_db.RegisterMessage(HashPartitioning)
+
+RangePartitioning = _reflection.GeneratedProtocolMessageType('RangePartitioning', (_message.Message,), {
+  'DESCRIPTOR' : _RANGEPARTITIONING,
+  '__module__' : 'proto.configuration_pb2'
+  # @@protoc_insertion_point(class_scope:slog.internal.RangePartitioning)
+  })
+_sym_db.RegisterMessage(RangePartitioning)
 
 Configuration = _reflection.GeneratedProtocolMessageType('Configuration', (_message.Message,), {
   'DESCRIPTOR' : _CONFIGURATION,

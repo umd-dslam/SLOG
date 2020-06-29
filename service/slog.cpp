@@ -79,6 +79,25 @@ void LoadData(
   close(fd);
 }
 
+void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
+  auto range_partitioning = config->GetRangePartitioning();
+
+  LOG(INFO) << "Generating " << range_partitioning->num_records()
+            << " records. Record size (bytes) = " << range_partitioning->record_size_bytes();
+
+  // Create a value of specified size by repeating the character 'a'
+  string value(range_partitioning->record_size_bytes(), 'a');
+
+  auto num_partitions = config->GetNumPartitions();
+  auto num_replicas = config->GetNumReplicas();
+  uint64_t start_key = config->GetLocalPartition();
+  for (uint64_t key = start_key; key < range_partitioning->num_records(); key += num_partitions) {
+    int master = (key / num_partitions) % num_replicas;
+    Record record(value, master);
+    storage.Write(std::to_string(key), record);
+  }
+}
+
 int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
   
@@ -124,7 +143,13 @@ int main(int argc, char* argv[]) {
 
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
-  LoadData(*storage, config, FLAGS_data_dir);
+  // If range partitioning is used, generate the data;
+  // otherwise, load data from an external file
+  if (config->GetRangePartitioning()) {
+    GenerateData(*storage, config);
+  } else {
+    LoadData(*storage, config, FLAGS_data_dir);
+  }
 
   // Create the server module. This is not added to the "modules" 
   // list below because it starts differently.
