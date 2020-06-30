@@ -130,7 +130,7 @@ Code: SET A Hello SET B World SET C !!!!!
 
 Send a read transaction to read the written data. This time, we read from a different replica to demonstrate that the data has been replicated.
 ```
-build/client txn examples/write.1.json --host 192.168.2.13
+build/client txn examples/read.1.json --host 192.168.2.13
 ```
 The result is
 ```
