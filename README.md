@@ -124,7 +124,7 @@ Write set:
          A ==> Hello
          B ==> World
          C ==> !!!!!
-Type: MULTI_HOME
+Type: SINGLE_HOME
 Code: SET A Hello SET B World SET C !!!!!
 ```
 
@@ -141,6 +141,6 @@ Read set:
          B ==> World
          C ==> !!!!!
 Write set:
-Type: MULTI_HOME
+Type: SINGLE_HOME
 Code: GET A GET B GET C
 ```
