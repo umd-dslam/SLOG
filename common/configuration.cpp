@@ -157,12 +157,20 @@ uint32_t Configuration::GetPartitionOfKey(const Key& key) const {
         : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
     return FNVHash(key.begin(), end) % GetNumPartitions();
   } else {
-    return std::stoll(key) % GetNumPartitions();
+    return GetPartitionOfKey(std::stoll(key));
   }
 }
 
 bool Configuration::KeyIsInLocalPartition(const Key& key) const {
   return GetPartitionOfKey(key) == local_partition_;
+}
+
+uint32_t Configuration::GetPartitionOfKey(uint32_t key) const {
+  return key % GetNumPartitions();
+}
+
+uint32_t Configuration::GetMasterOfKey(uint32_t key) const {
+  return (key / GetNumPartitions()) % GetNumReplicas();
 }
 
 const internal::RangePartitioning* Configuration::GetRangePartitioning() const {

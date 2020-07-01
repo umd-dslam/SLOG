@@ -89,24 +89,34 @@ BasicWorkload::BasicWorkload(
     }
   }
 
-  // Load and index the initial data
-  for (uint32_t partition = 0; partition < num_partitions; partition++) {
-    auto data_file = data_dir + "/" + std::to_string(partition) + ".dat";
-    auto fd = open(data_file.c_str(), O_RDONLY);
-    if (fd < 0) {
-      LOG(FATAL) << "Error while loading \"" << data_file << "\": " << strerror(errno);
+  auto range_partitioning = config->GetRangePartitioning();
+  if (range_partitioning) {
+    // If range partitioning is used, the data cannot be loaded from file
+    for (uint32_t key = 0; key < range_partitioning->num_records(); key++) {
+      int partition = config->GetPartitionOfKey(key);
+      int master = config->GetMasterOfKey(key);
+      partition_to_key_lists_[partition][master].AddKey(std::to_string(key));
     }
+  } else {
+    // Otherwise, load and index the initial data from file
+    for (uint32_t partition = 0; partition < num_partitions; partition++) {
+      auto data_file = data_dir + "/" + std::to_string(partition) + ".dat";
+      auto fd = open(data_file.c_str(), O_RDONLY);
+      if (fd < 0) {
+        LOG(FATAL) << "Error while loading \"" << data_file << "\": " << strerror(errno);
+      }
 
-    OfflineDataReader reader(fd);
-    LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums from " << data_file;
-    while (reader.HasNextDatum()) {
-      auto datum = reader.GetNextDatum();
-      CHECK_LT(datum.master(), num_replicas)
-          << "Master number exceeds number of replicas";
+      OfflineDataReader reader(fd);
+      LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums from " << data_file;
+      while (reader.HasNextDatum()) {
+        auto datum = reader.GetNextDatum();
+        CHECK_LT(datum.master(), num_replicas)
+            << "Master number exceeds number of replicas";
 
-      partition_to_key_lists_[partition][datum.master()].AddKey(datum.key());
+        partition_to_key_lists_[partition][datum.master()].AddKey(datum.key());
+      }
+      close(fd);
     }
-    close(fd);
   }
 }
 

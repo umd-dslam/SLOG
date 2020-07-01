@@ -52,6 +52,9 @@ public:
 
   uint32_t GetPartitionOfKey(const Key& key) const;
   bool KeyIsInLocalPartition(const Key& key) const;
+  // Only work with range partitioning
+  uint32_t GetPartitionOfKey(uint32_t key) const;
+  uint32_t GetMasterOfKey(uint32_t key) const;
   const internal::RangePartitioning* GetRangePartitioning() const;
 
 #ifdef ENABLE_REPLICATION_DELAY
