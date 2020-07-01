@@ -81,18 +81,18 @@ void LoadData(
 
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
   auto range_partitioning = config->GetRangePartitioning();
+  auto num_records = range_partitioning->num_records();
 
-  LOG(INFO) << "Generating " << range_partitioning->num_records()
+  LOG(INFO) << "Generating " << num_records
             << " records. Record size (bytes) = " << range_partitioning->record_size_bytes();
 
   // Create a value of specified size by repeating the character 'a'
   string value(range_partitioning->record_size_bytes(), 'a');
 
   auto num_partitions = config->GetNumPartitions();
-  auto num_replicas = config->GetNumReplicas();
   uint64_t start_key = config->GetLocalPartition();
-  for (uint64_t key = start_key; key < range_partitioning->num_records(); key += num_partitions) {
-    int master = (key / num_partitions) % num_replicas;
+  for (uint64_t key = start_key; key < num_records; key += num_partitions) {
+    int master = config->GetMasterOfKey(key);
     Record record(value, master);
     storage.Write(std::to_string(key), record);
   }

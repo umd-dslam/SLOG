@@ -194,14 +194,14 @@ public:
 
   Key GetRandomHotKey() {
     if (hot_keys_.empty()) {
-      throw std::runtime_error("There is no hot key to pick from. Please check your params");
+      throw std::runtime_error("There is no hot key to pick from. Please check your params.");
     }
     return PickOne(hot_keys_, re_);
   }
 
   Key GetRandomColdKey() {
     if (cold_keys_.empty()) {
-      throw std::runtime_error("There is no cold key to pick from. Please check your params");
+      throw std::runtime_error("There is no cold key to pick from. Please check your params.");
     }
     return PickOne(cold_keys_, re_);
   }
