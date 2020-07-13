@@ -13,6 +13,7 @@ import os
 import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
+from datetime import datetime
 from threading import Thread
 from typing import Dict, List, Tuple
 
@@ -362,8 +363,7 @@ class StartCommand(Command):
                     name=SLOG_CONTAINER_NAME,
                     command=[
                         "/bin/sh", "-c",
-                        sync_config_cmd + " && " +
-                        shell_cmd
+                        f"{sync_config_cmd} && {shell_cmd}",
                     ],
                     # Mount a directory on the host into the container
                     mounts=[SLOG_DATA_MOUNT],
@@ -655,8 +655,7 @@ class LocalCommand(Command):
                     name=container_name,
                     command=[
                         "/bin/sh", "-c",
-                        sync_config_cmd + " && " +
-                        shell_cmd,
+                        f"{sync_config_cmd} && {shell_cmd}",
                     ],
                     mounts=[SLOG_DATA_MOUNT],
                     environment=parse_envs(args.e)
@@ -787,8 +786,11 @@ class BenchmarkCommand(Command):
             f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
         )
 
-        # Clean up everything first so that the old running session does not
-        # mess up with broker synchronization of the new session
+        tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        output_dir = os.path.join(CONTAINER_DATA_DIR, f"slog-benchmark-{tag}")
+        mkdir_cmd = f"mkdir -p {output_dir}"
+
+        # Clean up everything
         for rep, clients in enumerate(self.rep_to_clients):
             for client, addr in clients:
                 cleanup_container(client, BENCHMARK_CONTAINER_NAME, addr=addr)
@@ -804,7 +806,7 @@ class BenchmarkCommand(Command):
                     f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
                     f"--r {rep} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
-                    f"--out-dir {CONTAINER_DATA_DIR} "
+                    f"--out-dir {output_dir} "
                     f"--wl {args.workload} "
                     f'--params="{args.params}" '
                     f"--rate {args.rate} "
@@ -818,8 +820,7 @@ class BenchmarkCommand(Command):
                     name=BENCHMARK_CONTAINER_NAME,
                     command=[
                         "/bin/sh", "-c",
-                        sync_config_cmd + " && " +
-                        shell_cmd
+                        f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
                     ],
                     # Mount a directory on the host into the container
                     mounts=[SLOG_DATA_MOUNT],
@@ -834,6 +835,8 @@ class BenchmarkCommand(Command):
                     addr,
                     shell_cmd
                 )
+
+        LOG.info("Output dir: %s", output_dir)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ CSVWriter::CSVWriter(
   delim_ = delimiter;
 
   file_ = std::ofstream(file_name, std::ios::out);
+  if (!file_) {
+    throw std::runtime_error(std::string("Cannot open file: ") + file_name);
+  }
   bool first = true;
   for (const auto& col : columns) {
     if (!first) {
