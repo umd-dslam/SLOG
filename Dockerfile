@@ -25,8 +25,8 @@ FROM ubuntu:bionic AS builder
         && cd ..
 
 FROM ubuntu:bionic AS runner
-    # If set (to anything), only create an image with only slog (exclude the toolings)
-    ARG SLOG_ONLY
+    # If set (to anything), also create an image with tools (exclude the toolings)
+    ARG INCLUDE_TOOLS
 
     WORKDIR /opt/slog
     COPY --from=builder /src/build/slog .
@@ -34,7 +34,7 @@ FROM ubuntu:bionic AS runner
     COPY --from=builder /src/examples/*.conf ./
     COPY --from=builder /src/tools/ tools/
 
-    RUN if [ -z "$SLOG_ONLY" ]; then \
+    RUN if [ -n "$INCLUDE_TOOLS" ]; then \
         apt-get update; \
         apt-get -y install python3 python3-pip; \
         python3 -m pip install -r tools/requirements.txt; \
