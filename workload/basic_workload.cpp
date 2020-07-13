@@ -55,7 +55,7 @@ const RawParamMap DEFAULT_PARAMS = {
   { MH_NUM_HOMES, "2" },
   { MP_PCT, "0" },
   { MP_NUM_PARTS, "2" },
-  { HOT, "10000" },
+  { HOT, "1000" },
   { NUM_RECORDS, "10" },
   { NUM_HOT_RECORDS, "2" },
   { NUM_WRITES, "4" },

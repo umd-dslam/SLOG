@@ -84,7 +84,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
   auto num_records = simple_partitioning->num_records();
 
   LOG(INFO) << "Generating " << num_records
-            << " records. Record size (bytes) = " << simple_partitioning->record_size_bytes();
+            << " records. Record size = " << simple_partitioning->record_size_bytes() << " bytes";
 
   // Create a value of specified size by repeating the character 'a'
   string value(simple_partitioning->record_size_bytes(), 'a');

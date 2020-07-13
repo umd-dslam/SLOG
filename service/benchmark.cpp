@@ -34,6 +34,7 @@ DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remaste
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_bool(print_txn, false, "Print each generated transaction");
+DEFINE_bool(print_txn_result, false, "Print the result of each transaction");
 DEFINE_bool(print_profile, false, "Print the profile of each transaction");
 
 using namespace slog;
@@ -345,7 +346,7 @@ void ReceiveResult(int from_socket) {
     LOG(ERROR) << "Received response for a non-outstanding txn "
                 << "(stream_id = " << res.stream_id()
                 << ", txn_id = " << txn_id << "). Dropping...";
-  } 
+  }
 
   stats.resp_counter++;
 
@@ -354,6 +355,10 @@ void ReceiveResult(int from_socket) {
   const auto& txn_internal = txn.internal();
   const auto& txn_info = outstanding_txns[res.stream_id()];
   const auto& sent_at = txn_info.sent_at;
+
+  if (FLAGS_print_txn_result) {
+    LOG(INFO) << txn;
+  }
 
   (*txn_writer) << txn_info.profile.client_txn_id
                 << txn_internal.id()
