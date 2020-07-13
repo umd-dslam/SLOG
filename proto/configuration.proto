@@ -29,7 +29,7 @@ message HashPartitioning {
 }
 
 /**
- * With range partitioning, each key is assumed to be a number.
+ * With simple partitioning, each key is assumed to be a number.
  * The keys are distributed to the partitions based on key values
  * modulo the number of partitions. 
  * Initial data cannot be loaded from an external file but can be
@@ -44,7 +44,7 @@ message HashPartitioning {
  * ------------|-------------------------------
  *             |            keys            
  */
-message RangePartitioning {
+message SimplePartitioning {
     // Number of records to generate
     uint64 num_records = 1;
     // Size of a generated record in bytes
@@ -71,7 +71,7 @@ message Configuration {
     // Partitioning scheme
     oneof partitioning {
         HashPartitioning hash_partitioning = 6;
-        RangePartitioning range_partitioning = 7;
+        SimplePartitioning simple_partitioning = 7;
     }
     // Number of worker threads for processing the transactions
     uint32 num_workers = 8;

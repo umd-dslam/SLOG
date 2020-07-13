@@ -388,12 +388,12 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
-  ASSERT_EQ(output_remaster_txn.internal().id(), 11);
+  ASSERT_EQ(output_remaster_txn.internal().id(), 11U);
   ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
-  ASSERT_EQ(output_txn.internal().id(), 12);
+  ASSERT_EQ(output_txn.internal().id(), 12U);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");

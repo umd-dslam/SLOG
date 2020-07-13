@@ -89,10 +89,10 @@ BasicWorkload::BasicWorkload(
     }
   }
 
-  auto range_partitioning = config->GetRangePartitioning();
-  if (range_partitioning) {
-    // If range partitioning is used, the data cannot be loaded from file
-    for (uint32_t key = 0; key < range_partitioning->num_records(); key++) {
+  auto simple_partitioning = config->GetSimplePartitioning();
+  if (simple_partitioning) {
+    // If simple partitioning is used, the data cannot be loaded from file
+    for (uint32_t key = 0; key < simple_partitioning->num_records(); key++) {
       int partition = config->GetPartitionOfKey(key);
       int master = config->GetMasterOfKey(key);
       partition_to_key_lists_[partition][master].AddKey(std::to_string(key));

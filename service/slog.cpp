@@ -80,14 +80,14 @@ void LoadData(
 }
 
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
-  auto range_partitioning = config->GetRangePartitioning();
-  auto num_records = range_partitioning->num_records();
+  auto simple_partitioning = config->GetSimplePartitioning();
+  auto num_records = simple_partitioning->num_records();
 
   LOG(INFO) << "Generating " << num_records
-            << " records. Record size (bytes) = " << range_partitioning->record_size_bytes();
+            << " records. Record size (bytes) = " << simple_partitioning->record_size_bytes();
 
   // Create a value of specified size by repeating the character 'a'
-  string value(range_partitioning->record_size_bytes(), 'a');
+  string value(simple_partitioning->record_size_bytes(), 'a');
 
   auto num_partitions = config->GetNumPartitions();
   uint64_t start_key = config->GetLocalPartition();
@@ -143,9 +143,9 @@ int main(int argc, char* argv[]) {
 
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
-  // If range partitioning is used, generate the data;
+  // If simple partitioning is used, generate the data;
   // otherwise, load data from an external file
-  if (config->GetRangePartitioning()) {
+  if (config->GetSimplePartitioning()) {
     GenerateData(*storage, config);
   } else {
     LoadData(*storage, config, FLAGS_data_dir);

@@ -18,7 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='slog.internal',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"C\n\x11RangePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\x8e\x03\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12>\n\x12range_partitioning\x18\x07 \x01(\x0b\x32 .slog.internal.RangePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\t \x01(\x04\x12\x44\n\x11replication_delay\x18\n \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentB\x0e\n\x0cpartitioningb\x06proto3'
+  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"D\n\x12SimplePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\x90\x03\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12@\n\x13simple_partitioning\x18\x07 \x01(\x0b\x32!.slog.internal.SimplePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\t \x01(\x04\x12\x44\n\x11replication_delay\x18\n \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentB\x0e\n\x0cpartitioningb\x06proto3'
 )
 
 
@@ -124,22 +124,22 @@ _HASHPARTITIONING = _descriptor.Descriptor(
 )
 
 
-_RANGEPARTITIONING = _descriptor.Descriptor(
-  name='RangePartitioning',
-  full_name='slog.internal.RangePartitioning',
+_SIMPLEPARTITIONING = _descriptor.Descriptor(
+  name='SimplePartitioning',
+  full_name='slog.internal.SimplePartitioning',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='num_records', full_name='slog.internal.RangePartitioning.num_records', index=0,
+      name='num_records', full_name='slog.internal.SimplePartitioning.num_records', index=0,
       number=1, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='record_size_bytes', full_name='slog.internal.RangePartitioning.record_size_bytes', index=1,
+      name='record_size_bytes', full_name='slog.internal.SimplePartitioning.record_size_bytes', index=1,
       number=2, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -158,7 +158,7 @@ _RANGEPARTITIONING = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=214,
-  serialized_end=281,
+  serialized_end=282,
 )
 
 
@@ -212,7 +212,7 @@ _CONFIGURATION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='range_partitioning', full_name='slog.internal.Configuration.range_partitioning', index=6,
+      name='simple_partitioning', full_name='slog.internal.Configuration.simple_partitioning', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -254,24 +254,24 @@ _CONFIGURATION = _descriptor.Descriptor(
       name='partitioning', full_name='slog.internal.Configuration.partitioning',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=284,
-  serialized_end=682,
+  serialized_start=285,
+  serialized_end=685,
 )
 
 _CONFIGURATION.fields_by_name['replicas'].message_type = _REPLICA
 _CONFIGURATION.fields_by_name['hash_partitioning'].message_type = _HASHPARTITIONING
-_CONFIGURATION.fields_by_name['range_partitioning'].message_type = _RANGEPARTITIONING
+_CONFIGURATION.fields_by_name['simple_partitioning'].message_type = _SIMPLEPARTITIONING
 _CONFIGURATION.fields_by_name['replication_delay'].message_type = _REPLICATIONDELAYEXPERIMENT
 _CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
   _CONFIGURATION.fields_by_name['hash_partitioning'])
 _CONFIGURATION.fields_by_name['hash_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
 _CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
-  _CONFIGURATION.fields_by_name['range_partitioning'])
-_CONFIGURATION.fields_by_name['range_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
+  _CONFIGURATION.fields_by_name['simple_partitioning'])
+_CONFIGURATION.fields_by_name['simple_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
 DESCRIPTOR.message_types_by_name['Replica'] = _REPLICA
 DESCRIPTOR.message_types_by_name['ReplicationDelayExperiment'] = _REPLICATIONDELAYEXPERIMENT
 DESCRIPTOR.message_types_by_name['HashPartitioning'] = _HASHPARTITIONING
-DESCRIPTOR.message_types_by_name['RangePartitioning'] = _RANGEPARTITIONING
+DESCRIPTOR.message_types_by_name['SimplePartitioning'] = _SIMPLEPARTITIONING
 DESCRIPTOR.message_types_by_name['Configuration'] = _CONFIGURATION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -296,12 +296,12 @@ HashPartitioning = _reflection.GeneratedProtocolMessageType('HashPartitioning', 
   })
 _sym_db.RegisterMessage(HashPartitioning)
 
-RangePartitioning = _reflection.GeneratedProtocolMessageType('RangePartitioning', (_message.Message,), {
-  'DESCRIPTOR' : _RANGEPARTITIONING,
+SimplePartitioning = _reflection.GeneratedProtocolMessageType('SimplePartitioning', (_message.Message,), {
+  'DESCRIPTOR' : _SIMPLEPARTITIONING,
   '__module__' : 'proto.configuration_pb2'
-  # @@protoc_insertion_point(class_scope:slog.internal.RangePartitioning)
+  # @@protoc_insertion_point(class_scope:slog.internal.SimplePartitioning)
   })
-_sym_db.RegisterMessage(RangePartitioning)
+_sym_db.RegisterMessage(SimplePartitioning)
 
 Configuration = _reflection.GeneratedProtocolMessageType('Configuration', (_message.Message,), {
   'DESCRIPTOR' : _CONFIGURATION,

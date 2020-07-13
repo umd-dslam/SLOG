@@ -67,7 +67,7 @@ TEST_F(TransactionHolderTest, InvolvedPartitions) {
 
     auto holder = TransactionHolder(configs[i], txn);
     auto partitions = holder.InvolvedPartitions();
-    ASSERT_EQ(partitions.size(), 2);
+    ASSERT_EQ(partitions.size(), 2U);
     ASSERT_TRUE(partitions.count(0));
     ASSERT_TRUE(partitions.count(2));
   }

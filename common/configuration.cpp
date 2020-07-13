@@ -173,8 +173,8 @@ uint32_t Configuration::GetMasterOfKey(uint32_t key) const {
   return (key / GetNumPartitions()) % GetNumReplicas();
 }
 
-const internal::RangePartitioning* Configuration::GetRangePartitioning() const {
-  return config_.has_range_partitioning() ? &config_.range_partitioning() : nullptr;
+const internal::SimplePartitioning* Configuration::GetSimplePartitioning() const {
+  return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
