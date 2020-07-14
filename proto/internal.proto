@@ -49,7 +49,6 @@ message Request {
         RemoteReadResult remote_read_result = 12;
         CompletedSubtransaction completed_subtxn = 13;
         StatsRequest stats = 14;
-        DynamicRemasterForward dynamic_remaster_forward = 15;
     }
 }
 
@@ -133,10 +132,6 @@ message CompletedSubtransaction {
 message StatsRequest {
     uint32 id = 1;
     uint32 level = 2;
-}
-
-message DynamicRemasterForward {
-    Transaction txn = 1;
 }
 
 /***********************************************

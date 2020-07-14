@@ -206,7 +206,7 @@ void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
     if (txn->procedure_case() != Transaction::kRemaster) {
       VLOG(3) << "Sending transaction to dynamic remasterer";
       internal::Request req;
-      auto forward = req.mutable_dynamic_remaster_forward();
+      auto forward = req.mutable_forward_txn();
       forward->set_allocated_txn(txn);
       Send(req, DYNAMIC_REMASTERER_CHANNEL);
       forward->release_txn();

@@ -22,10 +22,6 @@ protected:
       internal::Request&& req,
       string&& from_machine_id) final;
 
-  void HandleInternalResponse(
-      internal::Response&& res,
-      string&& from_machine_id) final;
-
 private:
   /*
     Assumes all transactions are either local single home or lock only

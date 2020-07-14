@@ -197,7 +197,7 @@ TEST_F(E2ETest, DynamicRemaster) {
     ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
   }
 
-  auto txn_resp = test_slogs[2]->RecvTxnResult();
+  // auto txn_resp = test_slogs[2]->RecvTxnResult();
 }
 
 int main(int argc, char* argv[]) {

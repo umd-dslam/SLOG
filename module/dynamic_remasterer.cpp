@@ -16,37 +16,33 @@ DynamicRemasterer::DynamicRemasterer(const ConfigurationPtr& config, const share
   : NetworkedModule(broker, DYNAMIC_REMASTERER_CHANNEL),
     config_(config), context_(1), server_socket_(context_, ZMQ_DEALER) {
       std::ostringstream endpoint_s;
-      if (config->GetProtocol() == "ipc") {
-        endpoint_s << "tcp://localhost:"  << config->GetServerPort();
-      } else {
-        endpoint_s << "tcp://" << config->GetLocalAddress() << ":" << config->GetServerPort();
-      }
-      auto endpoint = endpoint_s.str();
-      server_socket_.setsockopt(ZMQ_SNDHWM, 0);
-      server_socket_.setsockopt(ZMQ_RCVHWM, 0);
+      // if (config->GetProtocol() == "ipc") {
+      //   endpoint_s << "tcp://localhost:"  << config->GetServerPort();
+      // } else {
+      //   endpoint_s << "tcp://" << config->GetLocalAddress() << ":" << config->GetServerPort();
+      // }
+      // auto endpoint = endpoint_s.str();
+      string endpoint = "tcp://*:" + std::to_string(config_->GetServerPort());
+      // server_socket_.setsockopt(ZMQ_SNDHWM, 0);
+      // server_socket_.setsockopt(ZMQ_RCVHWM, 0);
       server_socket_.connect(endpoint);
     }
 
 void DynamicRemasterer::HandleInternalRequest(
     Request&& req,
     string&& /* from_machine_id */) {
-  if (req.type_case() != Request::kDynamicRemasterForward) {
+  if (req.type_case() != Request::kForwardTxn) {
     LOG(ERROR) << "Unexpected request type received: \""
                << CASE_NAME(req.type_case(), Request) << "\"";
     return;
   }
   VLOG(3) << "Received txn";
-  auto txn = req.mutable_dynamic_remaster_forward()->release_txn();
+  auto txn = req.mutable_forward_txn()->release_txn();
   MaybeRemasterKeys(txn);
 }
 
-void DynamicRemasterer::HandleInternalResponse(
-    Response&& res,
-    string&& /* from_machine_id */) {
-  LOG(FATAL) << "Not implemented";
-}
-
 void DynamicRemasterer::MaybeRemasterKeys(Transaction* txn) {
+  VLOG(5) << "recieved txn";
   std::unordered_set<Key> local_keys;
   for (auto& key_pair : txn->read_set()) {
     auto& key = key_pair.first;
@@ -84,7 +80,7 @@ void DynamicRemasterer::MaybeRemasterKeys(Transaction* txn) {
     access_history.repeats += 1;
 
     // TODO: place in config
-    if (access_history.repeats >= 3) {
+    if (access_history.repeats == 3) {
         SendRemaster(key, coordinating_replica);
     }
   }
