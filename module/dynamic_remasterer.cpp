@@ -4,6 +4,8 @@
 
 #include "common/constants.h"
 #include "common/proto_utils.h"
+#include "proto/api.pb.h"
+
 
 namespace slog {
 
@@ -12,7 +14,18 @@ using internal::Response;
 
 DynamicRemasterer::DynamicRemasterer(const ConfigurationPtr& config, const shared_ptr<Broker>& broker) 
   : NetworkedModule(broker, DYNAMIC_REMASTERER_CHANNEL),
-    config_(config) {}
+    config_(config), context_(1), server_socket_(context_, ZMQ_DEALER) {
+      std::ostringstream endpoint_s;
+      if (config->GetProtocol() == "ipc") {
+        endpoint_s << "tcp://localhost:"  << config->GetServerPort();
+      } else {
+        endpoint_s << "tcp://" << config->GetLocalAddress() << ":" << config->GetServerPort();
+      }
+      auto endpoint = endpoint_s.str();
+      server_socket_.setsockopt(ZMQ_SNDHWM, 0);
+      server_socket_.setsockopt(ZMQ_RCVHWM, 0);
+      server_socket_.connect(endpoint);
+    }
 
 void DynamicRemasterer::HandleInternalRequest(
     Request&& req,
@@ -22,7 +35,7 @@ void DynamicRemasterer::HandleInternalRequest(
                << CASE_NAME(req.type_case(), Request) << "\"";
     return;
   }
-
+  VLOG(3) << "Received txn";
   auto txn = req.mutable_dynamic_remaster_forward()->release_txn();
   MaybeRemasterKeys(txn);
 }
@@ -30,7 +43,7 @@ void DynamicRemasterer::HandleInternalRequest(
 void DynamicRemasterer::HandleInternalResponse(
     Response&& res,
     string&& /* from_machine_id */) {
-  
+  LOG(FATAL) << "Not implemented";
 }
 
 void DynamicRemasterer::MaybeRemasterKeys(Transaction* txn) {
@@ -45,24 +58,70 @@ void DynamicRemasterer::MaybeRemasterKeys(Transaction* txn) {
   }
 
   auto coordinating_replica = txn->internal().coordinating_server().replica();
+  auto local_access = coordinating_replica == config_->GetLocalReplica();
 
   for (auto& key : local_keys) {
+    auto is_new_key = key_accesses_.count(key) == 0;
+
+    // local accesses don't need to be recorded
+    if (local_access) {
+      if (!is_new_key) {
+        // Note: could just end repeats
+        key_accesses_.erase(key);
+      }
+      continue;
+    }
+
     auto& access_history = key_accesses_[key];
 
-    // Note: local accesses aren't recorded, besides removing the streak of another replica
-    if (access_history.replica != coordinating_replica) {
+    // if streak has been broken or is just starting
+    if (is_new_key || coordinating_replica != access_history.replica) {
       access_history.replica = coordinating_replica;
       access_history.repeats = 1;
+      continue;
+    }
+
+    access_history.repeats += 1;
+
+    // TODO: place in config
+    if (access_history.repeats >= 3) {
+        SendRemaster(key, coordinating_replica);
+    }
+  }
+
+  // TODO: garbage collect non local keys
+}
+
+void DynamicRemasterer::SendRemaster(Key key, uint32_t new_replica) {
+  auto remaster_txn = MakeTransaction(
+    {},
+    {key}, /* write set */
+    "",
+    {},
+    config_->GetLocalMachineIdAsProto(),
+    new_replica /* new master */
+  );
+
+  api::Request req;
+  req.mutable_txn()->set_allocated_txn(remaster_txn);
+
+  // Send to the server
+  {
+    VLOG(3) << "Dynamic remaster txn sent: " << key << " to " << new_replica;
+    MMessage msg;
+    msg.Push(req);
+    msg.SendTo(server_socket_);
+  }
+
+  // Wait and print response
+  {
+    MMessage msg(server_socket_);
+    api::Response res;
+    if (!msg.GetProto(res)) {
+      LOG(FATAL) << "Malformed response";
     } else {
-      if (coordinating_replica != config_->GetLocalReplica()) {
-        // streak continues
-        access_history.repeats += 1;
-        // TODO put in config
-        if (access_history.repeats >= 3) {
-          LOG(INFO) << "remaster key: " << key;
-          // TODO: fire remaster
-        }
-      }
+      const auto& txn = res.txn().txn();
+      VLOG(3) << txn;
     }
   }
 }

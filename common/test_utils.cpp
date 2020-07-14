@@ -137,7 +137,7 @@ void TestSlog::AddMultiHomeOrderer() {
 }
 
 void TestSlog::AddDynamicRemasterer() {
-  multi_home_orderer_ = MakeRunnerFor<DynamicRemasterer>(config_, broker_);
+  dynamic_remasterer_ = MakeRunnerFor<DynamicRemasterer>(config_, broker_);
 }
 
 void TestSlog::AddChannel(const string& name) {

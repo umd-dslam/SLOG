@@ -31,6 +31,7 @@ private:
     Assumes all transactions are either local single home or lock only
   */
   void MaybeRemasterKeys(Transaction* txn);
+  void SendRemaster(Key key, uint32_t new_replica);
 
   using AccessHistory = struct {
     uint32_t replica;
@@ -39,6 +40,9 @@ private:
 
   std::unordered_map<Key, AccessHistory> key_accesses_;
   ConfigurationPtr config_;
+
+  zmq::context_t context_;
+  zmq::socket_t server_socket_;
 };
 
 } // namespace slog
