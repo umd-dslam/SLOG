@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """Admin tool
 
-This tool is used to control a cluster of SLOG servers with tasks
-such as starting a cluster, stopping a cluster, getting status, and more.
+This tool is used to control a cluster of SLOG servers. For example,
+starting a cluster, stopping a cluster, getting status, and more.
 """
 import docker
 import ipaddress
@@ -119,6 +119,11 @@ class Command:
 
     def create_subparser(self, subparsers):
         parser = subparsers.add_parser(self.NAME, help=self.HELP)
+        parser.set_defaults(run=self.__initialize_and_do_command)
+        self.add_arguments(parser)
+        return parser
+
+    def add_arguments(self, parser):
         parser.add_argument(
             "config",
             nargs='?',
@@ -141,8 +146,6 @@ class Command:
             default=USER,
             help="Username of the target machines"
         )
-        parser.set_defaults(run=self.__initialize_and_do_command)
-        return parser
 
     def __initialize_and_do_command(self, args):
         # The initialization phase is broken down into smaller methods so
@@ -280,8 +283,8 @@ class GenDataCommand(Command):
     NAME = "gen_data"
     HELP = "Generate data for one or more SLOG servers"
 
-    def create_subparser(self, subparsers):
-        parser = super().create_subparser(subparsers)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
         add_exported_gen_data_arguments(parser)
 
     def do_command(self, args):
@@ -322,8 +325,8 @@ class StartCommand(Command):
     NAME = "start"
     HELP = "Start an SLOG cluster"
 
-    def create_subparser(self, subparsers):
-        parser = super().create_subparser(subparsers)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
         parser.add_argument(
             "-e",
             nargs="*",
@@ -427,8 +430,8 @@ class LogsCommand(Command):
     HELP = "Stream logs from a server"
     CONFIG_FILE_REQUIRED = False
 
-    def create_subparser(self, subparsers):
-        parser = super().create_subparser(subparsers)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument(
             "-a",
@@ -528,8 +531,8 @@ class LocalCommand(Command):
     SUBNET = "172.28.0.0/16"
     IP_RANGE = "172.28.5.0/24"
 
-    def create_subparser(self, subparsers):
-        parser = super().create_subparser(subparsers)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument(
             "--start",
@@ -705,8 +708,8 @@ class BenchmarkCommand(Command):
     NAME = "benchmark"
     HELP = "Spawn distributed clients to run benchmark"
 
-    def create_subparser(self, subparsers):
-        parser = super().create_subparser(subparsers)
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument(
             "--num-txns", type=int,
@@ -839,6 +842,68 @@ class BenchmarkCommand(Command):
         LOG.info("Output dir: %s", output_dir)
 
 
+class CollectCommand(Command):
+
+    NAME = "collect"
+    HELP = "Collect benchmark data from the clients"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "name",
+            help="Name of the directory containing benchmark data"
+        )
+        parser.add_argument(
+            "clients",
+            help="Path to a json file containing lists of clients"
+        )
+        parser.add_argument(
+            "--out-dir",
+            default='',
+            help="Directory to put the collected data"
+        )
+        parser.add_argument(
+            "--user", "-u",
+            default=USER,
+            help="Username of the target machines"
+        )
+
+    def load_config(self, args):
+        pass
+
+    def init_clients(self, args):
+        pass
+
+    def pull_slog_image(self, args):
+        pass
+
+    def do_command(self, args):
+        data_path = os.path.join(HOST_DATA_DIR, args.name, '*.csv')
+        out_path = os.path.join(args.out_dir, args.name)
+        
+        if not os.path.exists(out_path):
+            os.mkdir(out_path)
+            LOG.info(f"Created directory: {out_path}")
+
+        commands = []
+        with open(args.clients, 'r') as f:
+            # Load the list of clients from the json file
+            benchmark_clients = json.load(f)
+            for addr_list in benchmark_clients:
+                for addr in addr_list:
+                    out_path_per_client = os.path.join(out_path, addr)
+                    
+                    if not os.path.exists(out_path_per_client):
+                        os.mkdir(out_path_per_client)
+                        LOG.info(f"Created directory: {out_path_per_client}")
+
+                    commands.append(
+                        f'scp {args.user}@{addr}:{data_path} {out_path_per_client}'
+                    )
+        
+        LOG.info("Executing commands %s", ';'.join(commands))
+        os.system(';'.join(commands))
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         description="Controls deployment and experiment of SLOG"
@@ -848,6 +913,7 @@ if __name__ == "__main__":
 
     COMMANDS = [
         BenchmarkCommand,
+        CollectCommand,
         GenDataCommand,
         StartCommand,
         StopCommand,
