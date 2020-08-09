@@ -112,13 +112,15 @@ class Command:
 
     NAME = "<not_implemented>"
     HELP = ""
+    DESCRIPTION = ""
     CONFIG_FILE_REQUIRED = True
 
     def __init__(self):
         self.config = None
 
     def create_subparser(self, subparsers):
-        parser = subparsers.add_parser(self.NAME, help=self.HELP)
+        parser = subparsers.add_parser(
+            self.NAME, description=self.DESCRIPTION, help=self.HELP)
         parser.set_defaults(run=self.__initialize_and_do_command)
         self.add_arguments(parser)
         return parser
@@ -282,6 +284,13 @@ class GenDataCommand(Command):
 
     NAME = "gen_data"
     HELP = "Generate data for one or more SLOG servers"
+    DESCRIPTION = """
+    For data with non-numeric keys, there is no way for the benchmarking script
+    to know the location of a key so that it can, for example, vary the
+    percentage of single-home/multi-home transactions. In that case, we need to
+    generate two copies of data, one for the server, and one for the
+    benchmarking tool.
+    """
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
@@ -525,6 +534,11 @@ class LocalCommand(Command):
 
     NAME = "local"
     HELP = "Control a cluster that run on the local machine"
+    DESCRIPTION = """
+    This command is used to run a cluster on the local machine. It has
+    different flags corresponding to the different commands similar to
+    those used to interact with the remote machines.
+    """
 
     # Local network
     NETWORK_NAME = "slog_nw"
@@ -707,10 +721,41 @@ class BenchmarkCommand(Command):
 
     NAME = "benchmark"
     HELP = "Spawn distributed clients to run benchmark"
+    DESCRIPTION = """
+    The format of the client config file is:
+    [
+        {
+            '<addr_0>': <number_of_processes>,
+            '<addr_1>': <number_of_processes>,
+            ...
+        },
+        ...
+    ]
+
+    Example:
+    [
+        {
+            '192.168.0.10': 2,
+            '192.168.0.11': 3
+        },
+        {
+            '192.168.0.13': 2
+        }
+    ]
+
+    This config will start 2 client processes for machine at '192.168.0.10',
+    3 clients for machine at '192.168.0.11', and 2 clients for machine at
+    '192.168.0.13'. The first two machines will send transactions to the first
+    region and the last machine will send transactions to the second region.
+    """
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
         group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument(
+            "--tag",
+            help="Tag of this benchmark run. Auto-generated if not provided"
+        )
         group.add_argument(
             "--num-txns", type=int,
             help="Number of transactions sent per client"
@@ -759,8 +804,8 @@ class BenchmarkCommand(Command):
         self.num_clients = 0
         with open(args.clients, 'r') as f:
             # Load the list of clients from the json file
-            benchmark_clients = json.load(f)
-            for rep, clients_in_rep in enumerate(benchmark_clients):
+            self.client_config = json.load(f)
+            for rep, clients_in_rep in enumerate(self.client_config):
                 rep_clients = []
                 for addr_str in clients_in_rep:
                     try:
@@ -789,14 +834,18 @@ class BenchmarkCommand(Command):
             f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
         )
 
-        tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        output_dir = os.path.join(CONTAINER_DATA_DIR, f"slog-benchmark-{tag}")
-        mkdir_cmd = f"mkdir -p {output_dir}"
+        if args.tag:
+            tag = args.tag
+        else:
+            tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
         # Clean up everything
         for rep, clients in enumerate(self.rep_to_clients):
             for client, addr in clients:
-                cleanup_container(client, BENCHMARK_CONTAINER_NAME, addr=addr)
+                num_procs = self.client_config[rep][addr]
+                for proc in range(num_procs):
+                    container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
+                    cleanup_container(client, container_name, addr=addr)
 
         for rep, clients in enumerate(self.rep_to_clients):
             for client, addr in clients:
@@ -804,42 +853,51 @@ class BenchmarkCommand(Command):
                     # Skip this node because we cannot
                     # initialize a docker client
                     continue
-                shell_cmd = (
-                    f"benchmark "
-                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
-                    f"--r {rep} "
-                    f"--data-dir {CONTAINER_DATA_DIR} "
-                    f"--out-dir {output_dir} "
-                    f"--wl {args.workload} "
-                    f'--params="{args.params}" '
-                    f"--rate {args.rate} "
-                )
-                if args.num_txns:
-                    shell_cmd += f"--num_txns {args.num_txns} "
-                else:
-                    shell_cmd += f"--duration {args.duration} "
-                client.containers.run(
-                    args.image,
-                    name=BENCHMARK_CONTAINER_NAME,
-                    command=[
-                        "/bin/sh", "-c",
-                        f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
-                    ],
-                    # Mount a directory on the host into the container
-                    mounts=[SLOG_DATA_MOUNT],
-                    # Expose all ports from container to host
-                    network_mode="host",
-                    # Avoid hanging this tool after starting the server
-                    detach=True,
-                    environment=parse_envs(args.e),
-                )
-                LOG.info(
-                    "%s: Synced config and ran command: %s",
-                    addr,
-                    shell_cmd
-                )
 
-        LOG.info("Output dir: %s", output_dir)
+                num_procs = self.client_config[rep][addr]
+                for proc in range(num_procs):
+                    out_dir = os.path.join(
+                        CONTAINER_DATA_DIR,
+                        f"slog-benchmark-{tag}",
+                        str(proc),
+                    )
+                    mkdir_cmd = f"mkdir -p {out_dir}"
+                    shell_cmd = (
+                        f"benchmark "
+                        f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                        f"--r {rep} "
+                        f"--data-dir {CONTAINER_DATA_DIR} "
+                        f"--out-dir {out_dir} "
+                        f"--wl {args.workload} "
+                        f'--params="{args.params}" '
+                        f"--rate {args.rate} "
+                    )
+                    if args.num_txns:
+                        shell_cmd += f"--num_txns {args.num_txns} "
+                    else:
+                        shell_cmd += f"--duration {args.duration} "
+                    client.containers.run(
+                        args.image,
+                        name=f'{BENCHMARK_CONTAINER_NAME}_{proc}',
+                        command=[
+                            "/bin/sh", "-c",
+                            f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
+                        ],
+                        # Mount a directory on the host into the container
+                        mounts=[SLOG_DATA_MOUNT],
+                        # Expose all ports from container to host
+                        network_mode="host",
+                        # Avoid hanging this tool after starting the server
+                        detach=True,
+                        environment=parse_envs(args.e),
+                    )
+                    LOG.info(
+                        "%s: Synced config and ran command: %s",
+                        addr,
+                        shell_cmd
+                    )
+
+        LOG.info("Tag: %s", tag)
 
 
 class CollectCommand(Command):
@@ -849,12 +907,12 @@ class CollectCommand(Command):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "name",
-            help="Name of the directory containing benchmark data"
+            "tag",
+            help="Tag of the benchmark data"
         )
         parser.add_argument(
             "clients",
-            help="Path to a json file containing lists of clients"
+            help="Path to a json file containing lists of clients."
         )
         parser.add_argument(
             "--out-dir",
@@ -877,8 +935,8 @@ class CollectCommand(Command):
         pass
 
     def do_command(self, args):
-        data_path = os.path.join(HOST_DATA_DIR, args.name, '*.csv')
-        out_path = os.path.join(args.out_dir, args.name)
+        name = f"slog-benchmark-{args.tag}"
+        out_path = os.path.join(args.out_dir, name)
         
         if not os.path.exists(out_path):
             os.mkdir(out_path)
@@ -889,16 +947,18 @@ class CollectCommand(Command):
             # Load the list of clients from the json file
             benchmark_clients = json.load(f)
             for addr_list in benchmark_clients:
-                for addr in addr_list:
-                    out_path_per_client = os.path.join(out_path, addr)
-                    
-                    if not os.path.exists(out_path_per_client):
-                        os.mkdir(out_path_per_client)
-                        LOG.info(f"Created directory: {out_path_per_client}")
-
-                    commands.append(
-                        f'scp {args.user}@{addr}:{data_path} {out_path_per_client}'
-                    )
+                for addr, num_procs in addr_list.items():
+                    for proc in range(num_procs):
+                        out_path_per_client = os.path.join(
+                            out_path, addr, str(proc)
+                        )
+                        data_path = os.path.join(
+                            HOST_DATA_DIR, name, str(proc), '*.csv'
+                        )
+                        os.makedirs(out_path_per_client, exist_ok=True)
+                        commands.append(
+                            f'scp {args.user}@{addr}:{data_path} {out_path_per_client}'
+                        )
         
         LOG.info("Executing commands %s", ';'.join(commands))
         os.system(';'.join(commands))
