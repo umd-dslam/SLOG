@@ -4,15 +4,20 @@
 set -e
 
 # Install toolings to compile dependencies
-apt-get update
-apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
+sudo apt-get update
+sudo apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
 mkdir -p $INSTALL_PREFIX
 cd $INSTALL_PREFIX
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libzmq.a')" ]; then
+installed() {
+  # Skip finding in $DOWNLOAD_DIR
+  test -n "$(find $INSTALL_PREFIX -path $DOWNLOAD_DIR -prune -o -name $1 -print)"
+}
+
+if installed 'libzmq.a'; then
   echo "Found zmq. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -35,7 +40,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'cppzmq*')" ]; then
+if installed 'cppzmq*'; then
   echo "Found cppzmq. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -49,7 +54,7 @@ else
   cd cppzmq-4.5.0
   mkdir -p build
   cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX
+  cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX -DCPPZMQ_BUILD_TESTS=OFF
   make -j$(nproc) install
   cd ../..
 
@@ -57,7 +62,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libprotobuf*')" ]; then
+if installed 'libprotobuf*'; then
   echo "Found protobuf. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -78,7 +83,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libgflags*')" ]; then
+if installed 'libgflags*'; then
   echo "Found gflags. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -101,7 +106,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libglog*')" ]; then
+if installed 'libglog*'; then
   echo "Found glog. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -121,7 +126,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if [ -n "$(find $INSTALL_PREFIX -name 'libgtest*')" ]; then
+if installed 'libgtest*'; then
   echo "Found gtest. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
