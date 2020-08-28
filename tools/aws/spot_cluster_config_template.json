@@ -1,0 +1,57 @@
+{
+    "default": {
+        "IamFleetRole": "<arn-of-aws-ec2-spot-fleet-tagging-role>",
+        "AllocationStrategy": "capacityOptimized",
+        "TargetCapacity": 6,
+        "TerminateInstancesWithExpiration": true,
+        "Type": "request"
+    },
+    "us-east-1": {
+        "LaunchSpecifications": [
+            {
+                "ImageId": "ami-...",
+                "InstanceType": "m2.4xlarge",
+                "KeyName": "slog",
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-..."
+                    }
+                ]
+            },
+            {
+                "ImageId": "ami-...",
+                "InstanceType": "r3.2xlarge",
+                "KeyName": "slog",
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-..."
+                    }
+                ]
+            }
+        ]
+    },
+    "us-east-2": {
+        "LaunchSpecifications": [
+            {
+                "ImageId": "ami-...",
+                "InstanceType": "r3.2xlarge",
+                "KeyName": "slog",
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-..."
+                    }
+                ]
+            },
+            {
+                "ImageId": "ami-...",
+                "InstanceType": "r4.2xlarge",
+                "KeyName": "slog",
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-..."
+                    }
+                ]
+            }
+        ]
+    }
+}
