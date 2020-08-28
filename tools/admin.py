@@ -753,16 +753,16 @@ class BenchmarkCommand(Command):
         super().add_arguments(parser)
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument(
-            "--tag",
-            help="Tag of this benchmark run. Auto-generated if not provided"
-        )
-        group.add_argument(
             "--num-txns", type=int,
             help="Number of transactions sent per client"
         )
         group.add_argument(
             "--duration", type=int,
             help="How long the benchmark is run in seconds"
+        )
+        parser.add_argument(
+            "--tag",
+            help="Tag of this benchmark run. Auto-generated if not provided"
         )
         parser.add_argument(
             "--clients",
