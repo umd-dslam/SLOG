@@ -4,12 +4,14 @@
 This tool is used to control a cluster of SLOG servers. For example,
 starting a cluster, stopping a cluster, getting status, and more.
 """
-import docker
+import collections
 import ipaddress
+import itertools
 import json
 import logging
 import os
 
+import docker
 import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
@@ -47,6 +49,18 @@ CONTAINER_SLOG_CONFIG_FILE_PATH = os.path.join(
 )
 
 BENCHMARK_CONTAINER_NAME = "benchmark"
+
+RemoteProcess = collections.namedtuple(
+    'RemoteProcess',
+    [
+        'docker_client',
+        'address',
+        'replica',
+        'partition',
+        'procnum',
+    ]
+)
+
 
 def cleanup_container(
     client: docker.DockerClient,
@@ -153,7 +167,7 @@ class Command:
         # The initialization phase is broken down into smaller methods so
         # that subclasses can override them with different behaviors
         self.load_config(args)
-        self.init_clients(args)
+        self.init_remote_processes(args)
         self.pull_slog_image(args)
         # Perform the command
         self.do_command(args)
@@ -168,50 +182,29 @@ class Command:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
 
-    
-    def init_clients(self, args):
-        # The rep_to_client variable is a list of lists of Docker clients.
-        # The replica and partition numbers match to the indices in the lists.
-        # For example, given the following machines 
-        # in the format (replica, partition, address):
-        #   (0, 0, 192.168.1.1), (0, 1, 192.168.1.2), (1, 0, 192.168.1.3)
-        # The rep_to_clients list will be:
-        #   [
-        #       [
-        #           (<Docker client>, 192.168.1.1),
-        #           (<Docker client>, 192.168.1.2),
-        #       ],
-        #       [
-        #           (<Docker client>, 192.168.1.3),
-        #       ]
-        #   ]
-        self.rep_to_clients = []
-        self.num_clients = 0
+    def init_remote_processes(self, args):
+        self.remote_procs = []
         # Create a docker client for each node
-        for rep in self.config.replicas:
-            rep_clients = []
-            for addr in rep.addresses:
+        for rep, machines in enumerate(self.config.replicas):
+            for part, addr in enumerate(machines.addresses):
                 addr_str = addr.decode()
                 try:
                     client = self.new_client(args.user, addr_str)
-                    rep_clients.append((client, addr_str))
-                    self.num_clients += 1
+                    self.remote_procs.append(RemoteProcess(
+                        client, addr_str, rep, part, None
+                    ))
                     LOG.info("Connected to %s", addr_str)
                 except PasswordRequiredException as e:
-                    rep_clients.append((None, addr_str))
                     LOG.error(
                         "Failed to authenticate when trying to connect to %s. "
                         "Check username or key files",
                         f"{args.user}@{addr_str}",
                     )
                 except Exception as e:
-                    rep_clients.append((None, addr_str))
                     LOG.exception(e)
 
-            self.rep_to_clients.append(rep_clients)
-
     def pull_slog_image(self, args):
-        if self.num_clients == 0 or args.no_pull:
+        if len(self.remote_procs) == 0 or args.no_pull:
             LOG.info(
                 "Skipped image pulling. Using the local version of \"%s\"", 
                 args.image,
@@ -222,8 +215,10 @@ class Command:
             "This might take a while."
         )
 
+        clients = {(client, addr) for client, addr, *_ in self.remote_procs}
+
         threads = []
-        for client, addr in self.clients():
+        for client, addr in clients:
             LOG.info(
                 "%s: Pulling latest docker image \"%s\"...",
                 addr,
@@ -249,15 +244,6 @@ class Command:
         return docker.DockerClient(
             base_url=f'ssh://{user}@{addr}',
         )
-
-    def clients(self) -> Tuple[docker.DockerClient, str]:
-        """
-        Generator to iterate through all available docker clients.
-        """
-        for clients in self.rep_to_clients:
-            for (client, addr) in clients:
-                if client is not None:
-                    yield (client, addr)
     
     def wait_for_containers(
         self,
@@ -309,7 +295,7 @@ class GenDataCommand(Command):
             f"--max-jobs {args.max_jobs} "
         )
         containers = []
-        for client, addr in self.clients():
+        for client, addr, *_ in self.remote_procs:
             cleanup_container(client, self.NAME, addr=addr)
             LOG.info(
                 "%s: Running command: %s",
@@ -352,44 +338,38 @@ class StartCommand(Command):
 
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
-        for rep, clients in enumerate(self.rep_to_clients):
-            for client, addr in clients:
-                cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
+        for client, addr, *_ in self.remote_procs:
+            cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
 
-        for rep, clients in enumerate(self.rep_to_clients):
-            for part, (client, addr) in enumerate(clients):
-                if client is None:
-                    # Skip this node because we cannot
-                    # initialize a docker client
-                    continue
-                shell_cmd = (
-                    f"slog "
-                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
-                    f"--address {addr} "
-                    f"--replica {rep} "
-                    f"--partition {part} "
-                    f"--data-dir {CONTAINER_DATA_DIR} "
-                )
-                client.containers.run(
-                    args.image,
-                    name=SLOG_CONTAINER_NAME,
-                    command=[
-                        "/bin/sh", "-c",
-                        f"{sync_config_cmd} && {shell_cmd}",
-                    ],
-                    # Mount a directory on the host into the container
-                    mounts=[SLOG_DATA_MOUNT],
-                    # Expose all ports from container to host
-                    network_mode="host",
-                    # Avoid hanging this tool after starting the server
-                    detach=True,
-                    environment=parse_envs(args.e),
-                )
-                LOG.info(
-                    "%s: Synced config and ran command: %s",
-                    addr,
-                    shell_cmd
-                )
+        for client, addr, rep, part, *_ in self.remote_procs:
+            shell_cmd = (
+                f"slog "
+                f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                f"--address {addr} "
+                f"--replica {rep} "
+                f"--partition {part} "
+                f"--data-dir {CONTAINER_DATA_DIR} "
+            )
+            client.containers.run(
+                args.image,
+                name=SLOG_CONTAINER_NAME,
+                command=[
+                    "/bin/sh", "-c",
+                    f"{sync_config_cmd} && {shell_cmd}",
+                ],
+                # Mount a directory on the host into the container
+                mounts=[SLOG_DATA_MOUNT],
+                # Expose all ports from container to host
+                network_mode="host",
+                # Avoid hanging this tool after starting the server
+                detach=True,
+                environment=parse_envs(args.e),
+            )
+            LOG.info(
+                "%s: Synced config and ran command: %s",
+                addr,
+                shell_cmd
+            )
 
 
 class StopCommand(Command):
@@ -404,7 +384,7 @@ class StopCommand(Command):
         pass
         
     def do_command(self, args):
-        for (client, addr) in self.clients():
+        for client, addr, *_ in self.remote_procs:
             try:
                 LOG.info("Stopping SLOG on %s...", addr)
                 c = client.containers.get(SLOG_CONTAINER_NAME)
@@ -426,9 +406,11 @@ class StatusCommand(Command):
         pass
         
     def do_command(self, args):
-        for rep, clients in enumerate(self.rep_to_clients):
+        key_func = lambda p : p.replica
+        remote_procs = sorted(self.remote_procs, key=key_func)
+        for rep, g in itertools.groupby(remote_procs, key_func):
             print(f"Replica {rep}:")
-            for part, (client, addr) in enumerate(clients):
+            for client, addr, _, part, *_ in g:
                 status = get_container_status(client, SLOG_CONTAINER_NAME)
                 print(f"\tPartition {part} ({addr}): {status}")
 
@@ -466,7 +448,7 @@ class LogsCommand(Command):
             help="Name of the Docker container to show logs from"
         )
 
-    def init_clients(self, args):
+    def init_remote_processes(self, args):
         """
         Override this method because we only need one client
         """
@@ -585,7 +567,7 @@ class LocalCommand(Command):
                 ip_address = str(next(address_generator))
                 rep.addresses.append(ip_address.encode())
 
-    def init_clients(self, args):
+    def init_remote_processes(self, args):
         """
         Override this method because we only need one client
         """
@@ -791,41 +773,32 @@ class BenchmarkCommand(Command):
                  "use -e GLOG_v=1 to turn on verbose logging at level 1."
         )
 
-    def init_clients(self, args):
+    def init_remote_processes(self, args):
         """
         Override this method because the clients of this command are created from
         the addresses specified in a json file instead of from the configuration file
         """
-        # This rep_to_clients variable is slightly different in this benchmark command
-        # than the global default. Here, only the indices of the replica have any
-        # significance while the indices of the elements of each inner list do not
-        # have any meaning because each benchmarking client does not correspond to a partition
-        self.rep_to_clients = []
-        self.num_clients = 0
+        self.remote_procs = []
         with open(args.clients, 'r') as f:
             # Load the list of clients from the json file
-            self.client_config = json.load(f)
-            for rep, clients_in_rep in enumerate(self.client_config):
-                rep_clients = []
-                for addr_str in clients_in_rep:
+            client_config = json.load(f)
+            for rep, clients_in_rep in enumerate(client_config):
+                for addr, num_procs in clients_in_rep.items():
                     try:
-                        docker_client = self.new_client(args.user, addr_str)
-                        rep_clients.append((docker_client, addr_str))
-                        self.num_clients += 1
-                        LOG.info("Connected to %s", addr_str)
+                        docker_client = self.new_client(args.user, addr)
+                        self.remote_procs += [
+                            RemoteProcess(docker_client, addr, rep, None, proc)
+                            for proc in range(num_procs)
+                        ]
+                        LOG.info("Connected to %s", addr)
                     except PasswordRequiredException as e:
-                        rep_clients.append((None, addr_str))
                         LOG.error(
                             "Failed to authenticate when trying to connect to %s. "
                             "Check username or key files",
-                            f"{args.user}@{addr_str}",
+                            f"{args.user}@{addr}",
                         )
                     except Exception as e:
-                        rep_clients.append((None, addr_str))
                         LOG.exception(e)
-                
-                self.rep_to_clients.append(rep_clients)
-
 
     def do_command(self, args):
         # Prepare a command to update the config file
@@ -840,62 +813,51 @@ class BenchmarkCommand(Command):
             tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
         # Clean up everything
-        for rep, clients in enumerate(self.rep_to_clients):
-            for client, addr in clients:
-                num_procs = self.client_config[rep][addr]
-                for proc in range(num_procs):
-                    container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
-                    cleanup_container(client, container_name, addr=addr)
+        for client, addr, rep, _, proc in self.remote_procs:
+            container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
+            cleanup_container(client, container_name, addr=addr)
 
-        for rep, clients in enumerate(self.rep_to_clients):
-            for client, addr in clients:
-                if client is None:
-                    # Skip this node because we cannot
-                    # initialize a docker client
-                    continue
-
-                num_procs = self.client_config[rep][addr]
-                for proc in range(num_procs):
-                    out_dir = os.path.join(
-                        CONTAINER_DATA_DIR,
-                        f"slog-benchmark-{tag}",
-                        str(proc),
-                    )
-                    mkdir_cmd = f"mkdir -p {out_dir}"
-                    shell_cmd = (
-                        f"benchmark "
-                        f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
-                        f"--r {rep} "
-                        f"--data-dir {CONTAINER_DATA_DIR} "
-                        f"--out-dir {out_dir} "
-                        f"--wl {args.workload} "
-                        f'--params="{args.params}" '
-                        f"--rate {args.rate} "
-                    )
-                    if args.num_txns:
-                        shell_cmd += f"--num_txns {args.num_txns} "
-                    else:
-                        shell_cmd += f"--duration {args.duration} "
-                    client.containers.run(
-                        args.image,
-                        name=f'{BENCHMARK_CONTAINER_NAME}_{proc}',
-                        command=[
-                            "/bin/sh", "-c",
-                            f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
-                        ],
-                        # Mount a directory on the host into the container
-                        mounts=[SLOG_DATA_MOUNT],
-                        # Expose all ports from container to host
-                        network_mode="host",
-                        # Avoid hanging this tool after starting the server
-                        detach=True,
-                        environment=parse_envs(args.e),
-                    )
-                    LOG.info(
-                        "%s: Synced config and ran command: %s",
-                        addr,
-                        shell_cmd
-                    )
+        for client, addr, rep, _, proc in self.remote_procs:
+            out_dir = os.path.join(
+                CONTAINER_DATA_DIR,
+                f"slog-benchmark-{tag}",
+                str(proc),
+            )
+            mkdir_cmd = f"mkdir -p {out_dir}"
+            shell_cmd = (
+                f"benchmark "
+                f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                f"--r {rep} "
+                f"--data-dir {CONTAINER_DATA_DIR} "
+                f"--out-dir {out_dir} "
+                f"--wl {args.workload} "
+                f'--params="{args.params}" '
+                f"--rate {args.rate} "
+            )
+            if args.num_txns:
+                shell_cmd += f"--num_txns {args.num_txns} "
+            else:
+                shell_cmd += f"--duration {args.duration} "
+            client.containers.run(
+                args.image,
+                name=f'{BENCHMARK_CONTAINER_NAME}_{proc}',
+                command=[
+                    "/bin/sh", "-c",
+                    f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
+                ],
+                # Mount a directory on the host into the container
+                mounts=[SLOG_DATA_MOUNT],
+                # Expose all ports from container to host
+                network_mode="host",
+                # Avoid hanging this tool after starting the server
+                detach=True,
+                environment=parse_envs(args.e),
+            )
+            LOG.info(
+                "%s: Synced config and ran command: %s",
+                addr,
+                shell_cmd
+            )
 
         LOG.info("Tag: %s", tag)
 
@@ -928,7 +890,7 @@ class CollectCommand(Command):
     def load_config(self, args):
         pass
 
-    def init_clients(self, args):
+    def init_remote_processes(self, args):
         pass
 
     def pull_slog_image(self, args):
