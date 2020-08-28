@@ -5,6 +5,7 @@
 #include <random>
 #include <unordered_map>
 
+#include "common/configuration.h"
 #include "common/types.h"
 #include "common/string_utils.h"
 #include "proto/transaction.pb.h"
@@ -182,9 +183,30 @@ inline std::string RandomString(size_t n, std::mt19937& re) {
 
 class KeyList {
 public:
-  KeyList(size_t num_hot_keys = 0) : num_hot_keys_(num_hot_keys){}
+  KeyList(size_t num_hot_keys = 0)
+    : is_simple_(false),
+      num_hot_keys_(num_hot_keys) {}
+
+  KeyList(
+      const ConfigurationPtr config,
+      int partition,
+      int master,
+      size_t num_hot_keys = 0)
+    : is_simple_(true),
+      partition_(partition),
+      master_(master),
+      num_hot_keys_(num_hot_keys) {
+    auto simple_partitioning = config->GetSimplePartitioning();
+    auto num_records = simple_partitioning->num_records();
+    num_partitions_ = config->GetNumPartitions();
+    num_replicas_ = config->GetNumReplicas();
+    num_keys_ =  ((num_records - partition) / num_partitions_ - master) / num_replicas_;
+  }
 
   void AddKey(Key key) {
+    if (is_simple_) {
+      throw std::runtime_error("Cannot add keys to a simple key list");
+    }
     if (hot_keys_.size() < num_hot_keys_) {
       hot_keys_.push_back(key);
       return;
@@ -193,13 +215,28 @@ public:
   }
 
   Key GetRandomHotKey() {
-    if (hot_keys_.empty()) {
+    if (num_hot_keys_ == 0) {
       throw std::runtime_error("There is no hot key to pick from. Please check your params.");
+    }
+    if (is_simple_) {
+      std::uniform_int_distribution<uint64_t> dis(
+        0,
+        std::min(num_hot_keys_, num_keys_) - 1);
+      uint64_t key = num_partitions_ * (dis(re_) * num_replicas_ + master_) + partition_;
+      return std::to_string(key);
     }
     return PickOne(hot_keys_, re_);
   }
 
   Key GetRandomColdKey() {
+    if (is_simple_) {
+      if (num_hot_keys_ >= num_keys_) {
+        throw std::runtime_error("There is no cold key to pick from. Please check your params.");
+      }
+      std::uniform_int_distribution<uint64_t> dis(num_hot_keys_, num_keys_ - 1);
+      uint64_t key = num_partitions_ * (dis(re_) * num_replicas_ + master_) + partition_;
+      return std::to_string(key);
+    }
     if (cold_keys_.empty()) {
       throw std::runtime_error("There is no cold key to pick from. Please check your params.");
     }
@@ -207,7 +244,13 @@ public:
   }
 
 private:
-  size_t num_hot_keys_;
+  bool is_simple_;
+  int partition_;
+  int master_;
+  int num_partitions_;
+  int num_replicas_;
+  uint64_t num_keys_;
+  uint64_t num_hot_keys_;
   std::vector<Key> cold_keys_;
   std::vector<Key> hot_keys_;
 

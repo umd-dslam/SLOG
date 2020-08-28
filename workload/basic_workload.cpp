@@ -80,25 +80,22 @@ BasicWorkload::BasicWorkload(
   auto num_replicas = config->GetNumReplicas();
   auto num_partitions = config->GetNumPartitions();
   auto hot_keys_per_list = params_.GetUInt32(HOT) / (num_replicas * num_partitions);
-  for (auto& key_lists : partition_to_key_lists_) {
+  auto simple_partitioning = config->GetSimplePartitioning();
+  for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       // Initialize hot keys limit for each key list. When keys are added to a list, 
       // the first keys are considered hot keys until this limit is reached and any new
       // keys from there are cold keys.
-      key_lists.emplace_back(hot_keys_per_list);
+      if (simple_partitioning) {
+        partition_to_key_lists_[part].emplace_back(config, part, rep, hot_keys_per_list);
+      } else {
+        partition_to_key_lists_[part].emplace_back(hot_keys_per_list);
+      }
     }
   }
 
-  auto simple_partitioning = config->GetSimplePartitioning();
-  if (simple_partitioning) {
-    // If simple partitioning is used, the data cannot be loaded from file
-    for (uint32_t key = 0; key < simple_partitioning->num_records(); key++) {
-      int partition = config->GetPartitionOfKey(key);
-      int master = config->GetMasterOfKey(key);
-      partition_to_key_lists_[partition][master].AddKey(std::to_string(key));
-    }
-  } else {
-    // Otherwise, load and index the initial data from file
+  if (!simple_partitioning) {
+    // Load and index the initial data from file if simple partitioning is not used
     for (uint32_t partition = 0; partition < num_partitions; partition++) {
       auto data_file = data_dir + "/" + std::to_string(partition) + ".dat";
       auto fd = open(data_file.c_str(), O_RDONLY);
