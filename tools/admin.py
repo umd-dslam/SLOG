@@ -10,6 +10,7 @@ import itertools
 import json
 import logging
 import os
+import time
 
 import docker
 import google.protobuf.text_format as text_format
@@ -210,10 +211,10 @@ class Command:
                 # Use None as a placeholder for the first value
                 procs.append([None, addr.decode(), rep, part])
         
-        def init_docker_client(machine):
-            _, addr, rep, part = machine
+        def init_docker_client(remote_proc):
+            _, addr, rep, part = remote_proc
             try:
-                machine[0] = self.new_client(args.user, addr)
+                remote_proc[0] = self.new_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
             except PasswordRequiredException as e:
                 LOG.error(
@@ -749,6 +750,13 @@ class BenchmarkCommand(Command):
             help="How long the benchmark is run in seconds"
         )
         parser.add_argument(
+            "--steps", type=int, default=1,
+            help=(
+                "Can only be used with --duration. Step up from 0 client to "
+                "all clients in given number of steps"
+            )
+        )
+        parser.add_argument(
             "--tag",
             help="Tag of this benchmark run. Auto-generated if not provided"
         )
@@ -784,27 +792,45 @@ class BenchmarkCommand(Command):
         Override this method because the clients of this command are created from
         the addresses specified in a json file instead of from the configuration file
         """
-        self.remote_procs = []
+        proc_lists = []
         with open(args.clients, 'r') as f:
             # Load the list of clients from the json file
             client_config = json.load(f)
             for rep, clients_in_rep in enumerate(client_config):
                 for addr, num_procs in clients_in_rep.items():
-                    try:
-                        docker_client = self.new_client(args.user, addr)
-                        self.remote_procs += [
-                            RemoteProcess(docker_client, addr, rep, None, proc)
-                            for proc in range(num_procs)
-                        ]
-                        LOG.info("Connected to %s", addr)
-                    except PasswordRequiredException as e:
-                        LOG.error(
-                            "Failed to authenticate when trying to connect to %s. "
-                            "Check username or key files",
-                            f"{args.user}@{addr}",
-                        )
-                    except Exception as e:
-                        LOG.exception(e)
+                    # Create a list of processes per machine
+                    proc_lists.append([
+                        [None, addr, rep, None, procnum] for procnum in range(num_procs)
+                    ])
+        
+        # Interleave the lists of processes across machines
+        proc_lists = itertools.zip_longest(*proc_lists)
+        procs = [
+            proc for proc_list in proc_lists 
+            for proc in proc_list if proc is not None
+        ]
+
+        def init_docker_client(proc):
+            _, addr, rep, _, procnum = proc
+            try:
+                proc[0] = self.new_client(args.user, addr)         
+                LOG.info("Connected to %s", addr)
+            except PasswordRequiredException as e:
+                LOG.error(
+                    "Failed to authenticate when trying to connect to %s. "
+                    "Check username or key files",
+                    f"{args.user}@{addr}",
+                )
+            except Exception as e:
+                LOG.exception(e)
+        
+        with Pool(processes=len(procs)) as pool:
+            pool.map(init_docker_client, procs)
+
+        self.remote_procs = [
+            RemoteProcess(docker_client, addr, rep, None, procnum)
+            for docker_client, addr, rep, _, procnum in procs
+        ]
 
     def do_command(self, args):
         # Prepare a command to update the config file
@@ -827,12 +853,13 @@ class BenchmarkCommand(Command):
         with Pool(processes=len(self.remote_procs)) as pool:
             pool.map(clean_up, self.remote_procs)
 
-        def run_benchmark(remote_proc):
-            client, addr, rep, _, proc = remote_proc
+        def run_benchmark(proc_and_params):
+            proc, num_txns, duration = proc_and_params
+            client, addr, rep, _, procnum = proc
             out_dir = os.path.join(
                 CONTAINER_DATA_DIR,
                 f"slog-benchmark-{tag}",
-                str(proc),
+                str(procnum),
             )
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
@@ -845,13 +872,13 @@ class BenchmarkCommand(Command):
                 f'--params="{args.params}" '
                 f"--rate {args.rate} "
             )
-            if args.num_txns:
-                shell_cmd += f"--num_txns {args.num_txns} "
+            if num_txns:
+                shell_cmd += f"--num_txns {num_txns} "
             else:
-                shell_cmd += f"--duration {args.duration} "
+                shell_cmd += f"--duration {duration} "
             client.containers.run(
                 args.image,
-                name=f'{BENCHMARK_CONTAINER_NAME}_{proc}',
+                name=f'{BENCHMARK_CONTAINER_NAME}_{procnum}',
                 command=[
                     "/bin/sh", "-c",
                     f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
@@ -869,9 +896,33 @@ class BenchmarkCommand(Command):
                 addr,
                 shell_cmd
             )
+        
+        num_procs = len(self.remote_procs)
+        batch_size = num_procs
+        num_txns = args.num_txns
+        duration = args.duration
+        if duration:
+            batch_size = (num_procs + 1) // args.steps
+            step_duration = args.duration // args.steps
+        
+        offsets = list(range(0, num_procs, batch_size))
+        for i in offsets:
+            batch = self.remote_procs[i:i + batch_size]
+            proc_and_params = zip(
+                batch,
+                itertools.repeat(num_txns),
+                itertools.repeat(duration),
+            )
+            with Pool(processes=len(batch)) as pool:
+                pool.map(run_benchmark, proc_and_params)
+            LOG.info("Started %d clients", len(batch))
 
-        with Pool(processes=len(self.remote_procs)) as pool:
-            pool.map(run_benchmark, self.remote_procs)
+            if i == offsets[-1]:
+                break
+
+            if duration:
+                time.sleep(step_duration)
+                duration -= step_duration
 
         LOG.info("Tag: %s", tag)
 
