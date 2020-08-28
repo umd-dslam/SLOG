@@ -974,20 +974,21 @@ class CollectCommand(Command):
             # Load the list of clients from the json file
             benchmark_clients = json.load(f)
             for addr_list in benchmark_clients:
-                for addr, num_procs in addr_list.items():
-                    for proc in range(num_procs):
-                        out_path_per_client = os.path.join(
-                            out_path, addr, str(proc)
-                        )
-                        data_path = os.path.join(
-                            HOST_DATA_DIR, name, str(proc), '*.csv'
-                        )
-                        os.makedirs(out_path_per_client, exist_ok=True)
-                        commands.append(
-                            f'scp {args.user}@{addr}:{data_path} {out_path_per_client}'
-                        )
+                for addr, _ in addr_list.items():
+                    data_path = os.path.join(HOST_DATA_DIR, name)
+                    data_tar_file = f'{addr}.tar.gz'
+                    data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
+                    out_tar_path = os.path.join(out_path, data_tar_file)
+                    out_addr_path = os.path.join(out_path, addr)
+
+                    os.makedirs(out_addr_path, exist_ok=True)
+                    commands.append(
+                        f'ssh {args.user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
+                        f'scp {args.user}@{addr}:{data_tar_path} {out_path} && '
+                        f'tar -xzf {out_tar_path} -C {out_addr_path}'
+                    )
         
-        LOG.info("Executing commands %s", ';'.join(commands))
+        LOG.info("Executing commands\n%s", '\n'.join(commands))
         os.system(';'.join(commands))
 
 
