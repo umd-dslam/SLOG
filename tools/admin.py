@@ -16,7 +16,7 @@ import google.protobuf.text_format as text_format
 
 from argparse import ArgumentParser
 from datetime import datetime
-from threading import Thread
+from multiprocessing.dummy import Pool
 from typing import Dict, List, Tuple
 
 from docker.models.containers import Container
@@ -94,6 +94,26 @@ def get_container_status(client: docker.DockerClient, name: str) -> str:
         except:
             pass
     return "unknown"
+
+
+def wait_for_containers(
+    containers: List[Tuple[Container, str]]
+) -> None:
+    """
+    Waits until all given containers stop.
+    """
+    for c, addr in containers:
+        res = c.wait()
+        if res['StatusCode'] == 0:
+            LOG.info("%s: Done", addr)
+        else:
+            LOG.error(
+                "%s: Finished with non-zero status (%d). "
+                "Check the logs of the container \"%s\" for more details",
+                addr,
+                res['StatusCode'],
+                c.name,
+            )
 
 
 def parse_envs(envs: List[str]) -> Dict[str, str]:
@@ -183,25 +203,31 @@ class Command:
             text_format.Parse(f.read(), self.config)
 
     def init_remote_processes(self, args):
-        self.remote_procs = []
+        procs = []
         # Create a docker client for each node
-        for rep, machines in enumerate(self.config.replicas):
-            for part, addr in enumerate(machines.addresses):
-                addr_str = addr.decode()
-                try:
-                    client = self.new_client(args.user, addr_str)
-                    self.remote_procs.append(RemoteProcess(
-                        client, addr_str, rep, part, None
-                    ))
-                    LOG.info("Connected to %s", addr_str)
-                except PasswordRequiredException as e:
-                    LOG.error(
-                        "Failed to authenticate when trying to connect to %s. "
-                        "Check username or key files",
-                        f"{args.user}@{addr_str}",
-                    )
-                except Exception as e:
-                    LOG.exception(e)
+        for rep, rep_info in enumerate(self.config.replicas):
+            for part, addr in enumerate(rep_info.addresses):
+                # Use None as a placeholder for the first value
+                procs.append([None, addr.decode(), rep, part])
+        
+        def init_docker_client(machine):
+            _, addr, rep, part = machine
+            try:
+                machine[0] = self.new_client(args.user, addr)
+                LOG.info("Connected to %s", addr)
+            except PasswordRequiredException as e:
+                LOG.error(
+                    "Failed to authenticate when trying to connect to %s. "
+                    "Check username or key files",
+                    f"{args.user}@{addr}",
+                )
+            except Exception as e:
+                LOG.exception(e)
+
+        with Pool(processes=len(procs)) as pool:
+            pool.map(init_docker_client, procs)
+
+        self.remote_procs = [RemoteProcess(*m, None) for m in procs]
 
     def pull_slog_image(self, args):
         if len(self.remote_procs) == 0 or args.no_pull:
@@ -215,21 +241,9 @@ class Command:
             "This might take a while."
         )
 
-        clients = {(client, addr) for client, addr, *_ in self.remote_procs}
-
-        threads = []
-        for client, addr in clients:
-            LOG.info(
-                "%s: Pulling latest docker image \"%s\"...",
-                addr,
-                args.image,
-            )
-            th = Thread(target=client.images.pull, args=(args.image,))
-            th.start()
-            threads.append(th)
-
-        for th in threads:
-            th.join()
+        clients = {client for client, *_ in self.remote_procs}
+        with Pool(processes=len(clients)) as pool:
+            pool.map(lambda client : client.images.pull, clients)
 
     def do_command(self, args):
         raise NotImplementedError
@@ -244,26 +258,6 @@ class Command:
         return docker.DockerClient(
             base_url=f'ssh://{user}@{addr}',
         )
-    
-    def wait_for_containers(
-        self,
-        containers: List[Tuple[Container, str]]
-    ) -> None:
-        """
-        Waits until all given containers stop.
-        """
-        for c, addr in containers:
-            res = c.wait()
-            if res['StatusCode'] == 0:
-                LOG.info("%s: Done", addr)
-            else:
-                LOG.error(
-                    "%s: Finished with non-zero status (%d). "
-                    "Check the logs of the container \"%s\" for more details",
-                    addr,
-                    res['StatusCode'],
-                    c.name,
-                )
 
 
 class GenDataCommand(Command):
@@ -312,7 +306,7 @@ class GenDataCommand(Command):
             c.start()
             containers.append((c, addr))
         
-        self.wait_for_containers(containers)
+        wait_for_containers(containers)
         
 
 class StartCommand(Command):
@@ -338,10 +332,15 @@ class StartCommand(Command):
 
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
-        for client, addr, *_ in self.remote_procs:
+        def clean_up(remote_proc):
+            client, addr, *_ = remote_proc
             cleanup_container(client, SLOG_CONTAINER_NAME, addr=addr)
 
-        for client, addr, rep, part, *_ in self.remote_procs:
+        with Pool(processes=len(self.remote_procs)) as pool:
+            pool.map(clean_up, self.remote_procs)
+
+        def start_container(remote_proc):
+            client, addr, rep, part, *_ = remote_proc
             shell_cmd = (
                 f"slog "
                 f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
@@ -371,6 +370,9 @@ class StartCommand(Command):
                 shell_cmd
             )
 
+        with Pool(processes=len(self.remote_procs)) as pool:
+            pool.map(start_container, self.remote_procs)
+
 
 class StopCommand(Command):
 
@@ -384,7 +386,8 @@ class StopCommand(Command):
         pass
         
     def do_command(self, args):
-        for client, addr, *_ in self.remote_procs:
+        def stop_container(remote_proc):
+            client, addr, *_  = remote_proc
             try:
                 LOG.info("Stopping SLOG on %s...", addr)
                 c = client.containers.get(SLOG_CONTAINER_NAME)
@@ -392,6 +395,9 @@ class StopCommand(Command):
                 c.stop(timeout=0)
             except docker.errors.NotFound:
                 pass
+
+        with Pool(processes=len(self.remote_procs)) as pool:
+            pool.map(stop_container, self.remote_procs)
 
 
 class StatusCommand(Command):
@@ -813,11 +819,16 @@ class BenchmarkCommand(Command):
             tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
         # Clean up everything
-        for client, addr, rep, _, proc in self.remote_procs:
+        def clean_up(remote_proc):
+            client, addr, _, _, proc = remote_proc
             container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
             cleanup_container(client, container_name, addr=addr)
 
-        for client, addr, rep, _, proc in self.remote_procs:
+        with Pool(processes=len(self.remote_procs)) as pool:
+            pool.map(clean_up, self.remote_procs)
+
+        def run_benchmark(remote_proc):
+            client, addr, rep, _, proc = remote_proc
             out_dir = os.path.join(
                 CONTAINER_DATA_DIR,
                 f"slog-benchmark-{tag}",
@@ -858,6 +869,9 @@ class BenchmarkCommand(Command):
                 addr,
                 shell_cmd
             )
+
+        with Pool(processes=len(self.remote_procs)) as pool:
+            pool.map(run_benchmark, self.remote_procs)
 
         LOG.info("Tag: %s", tag)
 
