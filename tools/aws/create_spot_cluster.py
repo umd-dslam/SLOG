@@ -77,6 +77,12 @@ if __name__ == "__main__":
     # Wait for the fleets to come up
     instance_ids = {}
     for region in regions:
+        if region not in spot_fleet_requests:
+            LOG.warn(
+                "%s: No spot fleet request found. Skipping", region
+            )
+            continue
+
         ec2 = boto3.client('ec2', region_name=region)
 
         request_id = spot_fleet_requests[region]['request_id']
@@ -87,10 +93,14 @@ if __name__ == "__main__":
         wait_time = 4
         attempted = 0
         while len(region_instances) < target_capacity and attempted < MAX_RETRIES:
-            response = ec2.describe_spot_fleet_instances(
-                SpotFleetRequestId=request_id
-            )
-            region_instances = response['ActiveInstances']
+            try:
+                response = ec2.describe_spot_fleet_instances(
+                    SpotFleetRequestId=request_id
+                )
+                region_instances = response['ActiveInstances']
+            except Exception as e:
+                LOG.exception(region, e)
+
             LOG.info(
                 '%s: %d/%d instances started',
                 region,
@@ -121,16 +131,19 @@ if __name__ == "__main__":
         ec2 = boto3.client('ec2', region_name=region)
         ids = instance_ids[region]
 
-        LOG.info("%s: Waiting for OK status from all instances", region)
-        status_waiter = ec2.get_waiter('instance_status_ok')
-        status_waiter.wait(InstanceIds=ids)
+        try:
+            LOG.info("%s: Waiting for OK status from all instances", region)
+            status_waiter = ec2.get_waiter('instance_status_ok')
+            status_waiter.wait(InstanceIds=ids)
 
-        LOG.info("%s: Collecting IP addresses", region)
-        response = ec2.describe_instances(InstanceIds=ids)
-        for r in response['Reservations']:
-            instance_ips[region] = [
-                i['PublicIpAddress'].strip() for i in r['Instances']
-            ]
+            LOG.info("%s: Collecting IP addresses", region)
+            response = ec2.describe_instances(InstanceIds=ids)
+            for r in response['Reservations']:
+                instance_ips[region] = [
+                    i['PublicIpAddress'].strip() for i in r['Instances']
+                ]
+        except Exception as e:
+            LOG.exception(region, e)
 
     # Install Docker
     commands = []

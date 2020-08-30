@@ -905,8 +905,7 @@ class BenchmarkCommand(Command):
             batch_size = (num_procs + 1) // args.steps
             step_duration = args.duration // args.steps
         
-        offsets = list(range(0, num_procs, batch_size))
-        for i in offsets:
+        for i in range(0, num_procs, batch_size):
             batch = self.remote_procs[i:i + batch_size]
             proc_and_params = zip(
                 batch,
@@ -916,9 +915,6 @@ class BenchmarkCommand(Command):
             with Pool(processes=len(batch)) as pool:
                 pool.map(run_benchmark, proc_and_params)
             LOG.info("Started %d clients", len(batch))
-
-            if i == offsets[-1]:
-                break
 
             if duration:
                 time.sleep(step_duration)
