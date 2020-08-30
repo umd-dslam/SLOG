@@ -14,7 +14,7 @@ FROM ubuntu:bionic AS builder
     WORKDIR /src
 
     COPY install-deps.sh .
-    RUN ./install-deps.sh
+    RUN ./install-deps.sh --docker
 
     COPY . .
     RUN rm -rf build \

@@ -1,11 +1,39 @@
 #!/bin/bash
+# This script is used to install dependencies for SLOG.
+#
+# Usage:
+#   ./install-deps.sh [--docker] [--reinstall]
+# 
+#   --docker: Use this flag when calling this script in Dockerfile 
+#   --reinstall: Reinstall everything including already-installed libraries
 
 # stop on error
 set -e
 
+REINSTALL=false
+SUDO="sudo"
+
+OPTIONS=$(getopt --long docker --long reinstall -- "" "$@")
+eval set -- "$OPTIONS"
+while true; do
+  case "$1" in
+  --docker)
+    SUDO=""
+    ;;
+  --reinstall)
+    REINSTALL=true
+    ;;
+  --)
+    shift
+    break
+    ;;
+  esac
+  shift
+done
+
 # Install toolings to compile dependencies
-sudo apt-get update
-sudo apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
+$SUDO apt-get update
+$SUDO apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
@@ -17,7 +45,7 @@ installed() {
   test -n "$(find $INSTALL_PREFIX -path $DOWNLOAD_DIR -prune -o -name $1 -print)"
 }
 
-if installed 'libzmq.a'; then
+if installed 'libzmq.a' && [ $REINSTALL = false ]; then
   echo "Found zmq. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -40,7 +68,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if installed 'cppzmq*'; then
+if installed 'cppzmq*' && [ $REINSTALL = false ]; then
   echo "Found cppzmq. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -62,7 +90,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if installed 'libprotobuf*'; then
+if installed 'libprotobuf*' && [ $REINSTALL = false ]; then
   echo "Found protobuf. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -83,7 +111,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if installed 'libgflags*'; then
+if installed 'libgflags*' && [ $REINSTALL = false ]; then
   echo "Found gflags. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -106,7 +134,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if installed 'libglog*'; then
+if installed 'libglog*' && [ $REINSTALL = false ]; then
   echo "Found glog. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
@@ -126,7 +154,7 @@ else
   rm -rf $DOWNLOAD_DIR
 fi
 
-if installed 'libgtest*'; then
+if installed 'libgtest*' && [ $REINSTALL = false ]; then
   echo "Found gtest. Skipping installation."
 else
   mkdir -p $DOWNLOAD_DIR
