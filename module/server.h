@@ -25,9 +25,9 @@ struct PendingResponse {
 };
 
 struct CompletedTransaction {
-  Transaction* txn;
+  Transaction* txn = nullptr;
   std::unordered_set<uint32_t> awaited_partitions;
-  bool initialized;
+  bool initialized = false;
 };
 
 /**
