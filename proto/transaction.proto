@@ -55,7 +55,7 @@ message TransactionInternal {
 
     // for recording time of different events of txn
     repeated TransactionEvent events = 5;
-    repeated uint64 event_times = 6;    // when the events took place
+    repeated int64 event_times = 6;    // when the events took place
     repeated uint32 event_machines = 7; // where the events took place
 }
 

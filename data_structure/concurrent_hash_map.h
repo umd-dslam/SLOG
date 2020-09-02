@@ -52,7 +52,7 @@ public:
    * initial_bucket_count must be a power of 2
    */
   SegmentT(size_t initial_bucket_count = 8)
-    : load_factor_max_size_(kLoadFactor * initial_bucket_count),
+    : load_factor_max_size_(static_cast<size_t>(kLoadFactor * initial_bucket_count)),
       size_(0) {
     buckets_.reset(Buckets::CreateBuckets(initial_bucket_count));
   }
@@ -194,7 +194,7 @@ private:
       buckets_->bucket_roots[idx] = nullptr;
     }
     buckets_.reset(new_buckets);
-    load_factor_max_size_ = kLoadFactor * buckets_->count;
+    load_factor_max_size_ = static_cast<size_t>(kLoadFactor * buckets_->count);
   }
   
   struct Buckets {
@@ -287,7 +287,7 @@ private:
     return segment;
   }
 
-  static constexpr uint64_t NumShards = (1 << ShardBits);
+  static constexpr uint64_t NumShards = (1LL << ShardBits);
   
   mutable std::atomic<Segment*> segments_[NumShards];
 };
