@@ -6,6 +6,7 @@
 #include "common/constants.h"
 #include "common/offline_data_reader.h"
 #include "common/service_utils.h"
+#include "common/types.h"
 #include "connection/broker.h"
 #include "module/consensus.h"
 #include "module/forwarder.h"
@@ -82,19 +83,34 @@ void LoadData(
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
   auto simple_partitioning = config->GetSimplePartitioning();
   auto num_records = simple_partitioning->num_records();
-
-  LOG(INFO) << "Generating " << num_records
-            << " records. Record size = " << simple_partitioning->record_size_bytes() << " bytes";
-
+  auto num_threads = config->GetNumWorkers();
+  auto num_partitions = config->GetNumPartitions();
+  auto partition = config->GetLocalPartition();
+  
   // Create a value of specified size by repeating the character 'a'
   string value(simple_partitioning->record_size_bytes(), 'a');
 
-  auto num_partitions = config->GetNumPartitions();
-  uint64_t start_key = config->GetLocalPartition();
-  for (uint64_t key = start_key; key < num_records; key += num_partitions) {
-    int master = config->GetMasterOfKey(key);
-    Record record(value, master);
-    storage.Write(std::to_string(key), record);
+  LOG(INFO) << "Generating ~" << num_records/num_partitions << " records using " << num_threads << " threads. "
+            << "Record size = " << simple_partitioning->record_size_bytes() << " bytes";
+
+  auto GenerateFn = [&](uint64_t from_key, uint64_t to_key) {
+    uint64_t start_key = from_key + (partition + num_partitions - from_key % num_partitions) % num_partitions;
+    uint64_t end_key = std::min(to_key, num_records);
+    uint64_t counter = 0;
+    for (uint64_t key = start_key; key < end_key; key += num_partitions) {
+      int master = config->GetMasterOfKey(key);
+      Record record(value, master);
+      storage.Write(std::to_string(key), record);
+      counter++;
+    }
+  };
+  std::vector<std::thread> threads;
+  uint64_t range = num_records / num_threads + 1;
+  for (uint32_t i = 0; i < num_threads; i++) {
+    threads.emplace_back(GenerateFn, i * range, (i + 1) * range);
+  }
+  for (auto& t : threads) {
+    t.join();
   }
 }
 
