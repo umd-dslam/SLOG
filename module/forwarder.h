@@ -45,9 +45,7 @@ private:
   ConfigurationPtr config_;
   std::unordered_map<TxnId, Transaction*> pending_transaction_;
 
-  // A constant seed is fine so we don't need a random_device
-  std::mt19937 re_;
-  std::uniform_int_distribution<> RandomPartition;
+  std::mt19937 rg_;
 };
 
 } // namespace slog

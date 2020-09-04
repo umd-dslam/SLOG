@@ -137,7 +137,7 @@ protected:
 /**
  * Chooses without replacement k elements from [0, n)
  */
-inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& re) {
+inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& rg) {
   if (n == 0) {
     return {};
   }
@@ -145,11 +145,11 @@ inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& re) {
     // For k = 1, it is faster to pick a random key than shuffling
     // the whole vector and pick the first key.
     std::uniform_int_distribution<uint32_t> dis(0, n - 1);
-    return {dis(re)};
+    return {dis(rg)};
   }
   std::vector<uint32_t> a(n);
   std::iota(a.begin(), a.end(), 0);
-  shuffle(a.begin(), a.end(), re);
+  shuffle(a.begin(), a.end(), rg);
   return {a.begin(), a.begin() + std::min(n, k)};
 }
 
@@ -160,11 +160,11 @@ template<
     template <typename, typename...> class Container,
     typename T, 
     typename... Args>
-T PickOne(const Container<T, Args...>& v, std::mt19937& re) {
+T PickOne(const Container<T, Args...>& v, std::mt19937& rg) {
   if (v.empty()) {
     throw std::runtime_error("Cannot pick from an empty container");
   }
-  auto i = Choose(v.size(), 1, re)[0];
+  auto i = Choose(v.size(), 1, rg)[0];
   return v[i];
 }
 
@@ -173,10 +173,10 @@ const std::string CHARACTERS("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn
 /**
  * Generates a random string of length n
  */
-inline std::string RandomString(size_t n, std::mt19937& re) {
+inline std::string RandomString(size_t n, std::mt19937& rg) {
   std::string s;
   for (size_t i = 0; i < n; i++) {
-    s += PickOne(CHARACTERS, re);
+    s += PickOne(CHARACTERS, rg);
   }
   return s;
 }
@@ -195,7 +195,8 @@ public:
     : is_simple_(true),
       partition_(partition),
       master_(master),
-      num_hot_keys_(num_hot_keys) {
+      num_hot_keys_(num_hot_keys),
+      rg_(std::random_device()()) {
     auto simple_partitioning = config->GetSimplePartitioning();
     auto num_records = simple_partitioning->num_records();
     num_partitions_ = config->GetNumPartitions();
@@ -222,10 +223,10 @@ public:
       std::uniform_int_distribution<uint64_t> dis(
         0,
         std::min(num_hot_keys_, num_keys_) - 1);
-      uint64_t key = num_partitions_ * (dis(re_) * num_replicas_ + master_) + partition_;
+      uint64_t key = num_partitions_ * (dis(rg_) * num_replicas_ + master_) + partition_;
       return std::to_string(key);
     }
-    return PickOne(hot_keys_, re_);
+    return PickOne(hot_keys_, rg_);
   }
 
   Key GetRandomColdKey() {
@@ -234,13 +235,13 @@ public:
         throw std::runtime_error("There is no cold key to pick from. Please check your params.");
       }
       std::uniform_int_distribution<uint64_t> dis(num_hot_keys_, num_keys_ - 1);
-      uint64_t key = num_partitions_ * (dis(re_) * num_replicas_ + master_) + partition_;
+      uint64_t key = num_partitions_ * (dis(rg_) * num_replicas_ + master_) + partition_;
       return std::to_string(key);
     }
     if (cold_keys_.empty()) {
       throw std::runtime_error("There is no cold key to pick from. Please check your params.");
     }
-    return PickOne(cold_keys_, re_);
+    return PickOne(cold_keys_, rg_);
   }
 
 private:
@@ -254,7 +255,7 @@ private:
   std::vector<Key> cold_keys_;
   std::vector<Key> hot_keys_;
 
-  std::mt19937 re_;
+  std::mt19937 rg_;
 };
 
 } // namespace slog

@@ -39,7 +39,7 @@ Request MakeLookupMasterRequest(const Transaction& txn) {
 Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker) 
   : NetworkedModule(broker, FORWARDER_CHANNEL),
     config_(config),
-    RandomPartition(0, config->GetNumPartitions() - 1) {}
+    rg_(std::random_device()()) {}
 
 void Forwarder::HandleInternalRequest(
     Request&& req,
@@ -142,7 +142,8 @@ void Forwarder::Forward(Transaction* txn) {
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(forward_txn, SEQUENCER_CHANNEL);
     } else {
-      auto partition = RandomPartition(re_);
+      std::uniform_int_distribution<> RandomPartition(0, config_->GetNumPartitions() - 1);
+      auto partition = RandomPartition(rg_);
       auto random_machine_in_home_replica = MakeMachineIdAsString(home_replica, partition);
 
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: "

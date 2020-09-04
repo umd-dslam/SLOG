@@ -29,7 +29,7 @@ protected:
   // is a list of keys.
   vector<vector<KeyList>> partition_to_key_lists_;
 
-  std::mt19937 re_;
+  std::mt19937 rg_;
 
   TxnId client_txn_id_counter_;
 };

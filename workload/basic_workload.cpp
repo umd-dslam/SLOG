@@ -76,6 +76,7 @@ BasicWorkload::BasicWorkload(
         params_str),
     config_(config),
     partition_to_key_lists_(config->GetNumPartitions()),
+    rg_(std::random_device()()),
     client_txn_id_counter_(0) {
   auto num_replicas = config->GetNumReplicas();
   auto num_partitions = config->GetNumPartitions();
@@ -127,17 +128,17 @@ BasicWorkload::NextTransaction() {
   auto num_partitions = config_->GetNumPartitions();
   auto multi_partition_pct = params_.GetDouble(MP_PCT);
   discrete_distribution<> spmp({100 - multi_partition_pct, multi_partition_pct});
-  pro.is_multi_partition = spmp(re_);
+  pro.is_multi_partition = spmp(rg_);
 
   // Select a number of partitions to choose from for each record
   vector<uint32_t> candidate_partitions;
   if (pro.is_multi_partition) {
     auto mp_num_partitions = params_.GetUInt32(MP_NUM_PARTS);
-    candidate_partitions = Choose(num_partitions, mp_num_partitions, re_);
+    candidate_partitions = Choose(num_partitions, mp_num_partitions, rg_);
   } else {
     auto sp_partition = params_.GetInt(SP_PARTITION);
     if (sp_partition < 0) {
-      candidate_partitions = Choose(num_partitions, 1, re_);
+      candidate_partitions = Choose(num_partitions, 1, rg_);
     } else {
       CHECK_LT(static_cast<uint32_t>(sp_partition), num_partitions)
           << "Selected single-partition partition does not exist";
@@ -149,17 +150,17 @@ BasicWorkload::NextTransaction() {
   auto num_replicas = config_->GetNumReplicas();
   auto multi_home_pct = params_.GetDouble(MH_PCT);
   discrete_distribution<> shmh({100 - multi_home_pct, multi_home_pct});
-  pro.is_multi_home = shmh(re_);
+  pro.is_multi_home = shmh(rg_);
 
   // Select a number of homes to choose from for each record
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
     auto mh_num_homes = params_.GetUInt32(MH_NUM_HOMES);
-    candidate_homes = Choose(num_replicas, mh_num_homes, re_);
+    candidate_homes = Choose(num_replicas, mh_num_homes, rg_);
   } else {
     auto sh_region = params_.GetInt(SH_REGION);
     if (sh_region < 0) {
-      candidate_homes = Choose(num_replicas, 1, re_);
+      candidate_homes = Choose(num_replicas, 1, rg_);
     } else {
       CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas)
           << "Selected single-home region does not exist";
@@ -182,7 +183,7 @@ BasicWorkload::NextTransaction() {
       << "Number of hot records cannot exceed number of records in a transaction!";
 
   // Randomly pick some records to be hot records (can be either read or write records)
-  auto hot_indices = Choose(num_records, num_hot_records, re_);
+  auto hot_indices = Choose(num_records, num_hot_records, rg_);
   for (size_t i = 0; i < num_records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
@@ -199,7 +200,7 @@ BasicWorkload::NextTransaction() {
 
     // Decide whether this is a read or a write record
     if (i < num_writes) {
-      code << "SET " << key << " " << RandomString(value_size, re_) << " ";
+      code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
       write_set.insert(key);
       pro.is_write_record[key] = true;
     } else {
