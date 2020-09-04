@@ -132,14 +132,15 @@ if __name__ == "__main__":
         ids = instance_ids[region]
 
         try:
-            LOG.info("%s: Waiting for OK status from all instances", region)
+            LOG.info("%s: Waiting for OK status from %d instances", region, len(ids))
             status_waiter = ec2.get_waiter('instance_status_ok')
             status_waiter.wait(InstanceIds=ids)
 
             LOG.info("%s: Collecting IP addresses", region)
             response = ec2.describe_instances(InstanceIds=ids)
+            instance_ips[region] = []
             for r in response['Reservations']:
-                instance_ips[region] = [
+                instance_ips[region] += [
                     i['PublicIpAddress'].strip() for i in r['Instances']
                 ]
         except Exception as e:
