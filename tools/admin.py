@@ -10,6 +10,7 @@ import itertools
 import json
 import logging
 import os
+import shutil
 import time
 
 import docker
@@ -223,12 +224,12 @@ class Command:
                     f"{args.user}@{addr}",
                 )
             except Exception as e:
-                LOG.exception(e)
+                LOG.error("Failed to connect to %s", addr)
 
         with Pool(processes=len(procs)) as pool:
             pool.map(init_docker_client, procs)
 
-        self.remote_procs = [RemoteProcess(*m, None) for m in procs]
+        self.remote_procs = [RemoteProcess(*m, None) for m in procs if m[0] is not None]
 
     def pull_slog_image(self, args):
         if len(self.remote_procs) == 0 or args.no_pull:
@@ -238,13 +239,14 @@ class Command:
             )
             return
         LOG.info(
-            "Pulling SLOG image for each node. "
-            "This might take a while."
+            'Pulling image "%s" for each node. '
+            "This might take a while.",
+            args.image
         )
 
         clients = {client for client, *_ in self.remote_procs}
         with Pool(processes=len(clients)) as pool:
-            pool.map(lambda client : client.images.pull, clients)
+            pool.map(lambda client : client.images.pull(args.image), clients)
 
     def do_command(self, args):
         raise NotImplementedError
@@ -325,6 +327,9 @@ class StartCommand(Command):
         )
         
     def do_command(self, args):
+        if len(self.remote_procs) == 0:
+            return
+
         # Prepare a command to update the config file
         config_text = text_format.MessageToString(self.config)
         sync_config_cmd = (
@@ -387,6 +392,9 @@ class StopCommand(Command):
         pass
         
     def do_command(self, args):
+        if len(self.remote_procs) == 0:
+            return
+
         def stop_container(remote_proc):
             client, addr, *_  = remote_proc
             try:
@@ -844,10 +852,20 @@ class BenchmarkCommand(Command):
         else:
             tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
+        parent_dir = os.path.join(CONTAINER_DATA_DIR, f"slog-benchmark-{tag}")
+
         # Clean up everything
         def clean_up(remote_proc):
             client, addr, _, _, proc = remote_proc
             container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
+            cleanup_container(client, container_name, addr=addr)
+            client.containers.run(
+                args.image,
+                name=container_name,
+                command=["/bin/sh", "-c", f"rm -rf {parent_dir}"],
+                # Mount a directory on the host into the container
+                mounts=[SLOG_DATA_MOUNT],
+            )
             cleanup_container(client, container_name, addr=addr)
 
         with Pool(processes=len(self.remote_procs)) as pool:
@@ -856,11 +874,8 @@ class BenchmarkCommand(Command):
         def run_benchmark(proc_and_params):
             proc, num_txns, duration = proc_and_params
             client, addr, rep, _, procnum = proc
-            out_dir = os.path.join(
-                CONTAINER_DATA_DIR,
-                f"slog-benchmark-{tag}",
-                str(procnum),
-            )
+
+            out_dir = os.path.join(parent_dir, str(procnum))
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
@@ -876,7 +891,7 @@ class BenchmarkCommand(Command):
                 shell_cmd += f"--num_txns {num_txns} "
             else:
                 shell_cmd += f"--duration {duration} "
-            client.containers.run(
+            container = client.containers.run(
                 args.image,
                 name=f'{BENCHMARK_CONTAINER_NAME}_{procnum}',
                 command=[
@@ -896,6 +911,7 @@ class BenchmarkCommand(Command):
                 addr,
                 shell_cmd
             )
+            return container, addr
         
         num_procs = len(self.remote_procs)
         batch_size = num_procs
@@ -905,6 +921,7 @@ class BenchmarkCommand(Command):
             batch_size = (num_procs + 1) // args.steps
             step_duration = args.duration // args.steps
         
+        containers = []
         for i in range(0, num_procs, batch_size):
             batch = self.remote_procs[i:i + batch_size]
             proc_and_params = zip(
@@ -913,12 +930,14 @@ class BenchmarkCommand(Command):
                 itertools.repeat(duration),
             )
             with Pool(processes=len(batch)) as pool:
-                pool.map(run_benchmark, proc_and_params)
+                containers += pool.map(run_benchmark, proc_and_params)
             LOG.info("Started %d clients", len(batch))
 
             if duration:
                 time.sleep(step_duration)
                 duration -= step_duration
+
+        wait_for_containers(containers)
 
         LOG.info("Tag: %s", tag)
 
@@ -961,9 +980,12 @@ class CollectCommand(Command):
         name = f"slog-benchmark-{args.tag}"
         out_path = os.path.join(args.out_dir, name)
         
-        if not os.path.exists(out_path):
-            os.mkdir(out_path)
-            LOG.info(f"Created directory: {out_path}")
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path, ignore_errors=True)
+            LOG.info("Removed existing directory: %s", out_path)
+
+        os.makedirs(out_path)
+        LOG.info(f"Created directory: {out_path}")
 
         commands = []
         with open(args.clients, 'r') as f:
@@ -984,7 +1006,7 @@ class CollectCommand(Command):
                         f'tar -xzf {out_tar_path} -C {out_addr_path}'
                     )
         
-        LOG.info("Executing commands\n%s", '\n'.join(commands))
+        LOG.info("Executing commands:\n%s", '\n'.join(commands))
         os.system(';'.join(commands))
 
 
