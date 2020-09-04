@@ -29,14 +29,14 @@ struct Metadata {
 };
 
 struct Record {
-  Record(Value v, uint32_t m, uint32_t c = 0) : value(v), metadata(m, c) {}
+  Record(const Value& v, uint32_t m, uint32_t c = 0) : value(v), metadata(m, c) {}
   Record() = default;
 
   Value value;
   Metadata metadata;
 };
 
-using Clock = steady_clock;
+using Clock = system_clock;
 using TimePoint = Clock::time_point;
 using Duration = Clock::duration;
 
