@@ -866,6 +866,7 @@ class BenchmarkCommand(Command):
                 # Mount a directory on the host into the container
                 mounts=[SLOG_DATA_MOUNT],
             )
+            LOG.info("%s: Removed old data directory", addr)
             cleanup_container(client, container_name, addr=addr)
 
         with Pool(processes=len(self.remote_procs)) as pool:
@@ -922,12 +923,16 @@ class BenchmarkCommand(Command):
             step_duration = args.duration // args.steps
         
         containers = []
-        for i in range(0, num_procs, batch_size):
+        COMPENSATE = 1 # compensation for the overhead at each step
+        steps = range(0, num_procs, batch_size)
+        remaining_steps = len(steps)
+        for i in steps:
+            remaining_steps -= 1
             batch = self.remote_procs[i:i + batch_size]
             proc_and_params = zip(
                 batch,
                 itertools.repeat(num_txns),
-                itertools.repeat(duration),
+                itertools.repeat(duration + remaining_steps * COMPENSATE),
             )
             with Pool(processes=len(batch)) as pool:
                 containers += pool.map(run_benchmark, proc_and_params)
