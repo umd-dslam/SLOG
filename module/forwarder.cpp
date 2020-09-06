@@ -12,7 +12,7 @@ using internal::Response;
 
 namespace {
 
-bool TransactionContainsKey(const Transaction& txn, const Key& key) {
+inline bool TransactionContainsKey(const Transaction& txn, const Key& key) {
   return txn.read_set().contains(key) || txn.write_set().contains(key);
 }
 
@@ -58,7 +58,7 @@ void Forwarder::HandleInternalRequest(
       TransactionEvent::ENTER_FORWARDER);
 
   auto txn_type = SetTransactionType(*txn);
-  // Forward the transaction if we already knoww the type of the txn
+  // Forward the transaction if we already know the type of the txn
   if (txn_type != TransactionType::UNKNOWN) {
     Forward(txn);
     return;

@@ -32,8 +32,10 @@ void Ticker::SetUp() {
 
 void Ticker::Loop() {
   zmq::message_t msg;
+  auto deadline = std::chrono::steady_clock::now() + sleep_us_;
+
   socket_.send(msg, zmq::send_flags::dontwait);
-  std::this_thread::sleep_for(sleep_us_);
+  std::this_thread::sleep_until(deadline);
 }
 
 } // namespace slog
