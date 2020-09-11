@@ -47,9 +47,9 @@ public:
   void AddGlobalPaxos();
   void AddMultiHomeOrderer();
 
-  void AddChannel(const string& name);
+  void AddOutputChannel(const string& name);
   zmq::pollitem_t GetPollItemForChannel(const string& name);
-  void ReceiveFromChannel(MMessage& msg, const string& name);
+  void ReceiveFromOutputChannel(MMessage& msg, const string& name);
   unique_ptr<Sender> GetSender();
 
   void StartInNewThreads();

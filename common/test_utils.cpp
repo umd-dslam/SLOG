@@ -135,7 +135,7 @@ void TestSlog::AddMultiHomeOrderer() {
   multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_);
 }
 
-void TestSlog::AddChannel(const string& name) {
+void TestSlog::AddOutputChannel(const string& name) {
   broker_->AddChannel(name);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
@@ -153,7 +153,7 @@ zmq::pollitem_t TestSlog::GetPollItemForChannel(const string& name) {
       0 /* revent */};
 }
 
-void TestSlog::ReceiveFromChannel(MMessage& msg, const string& name) {
+void TestSlog::ReceiveFromOutputChannel(MMessage& msg, const string& name) {
   CHECK(channels_.count(name) > 0) << "Channel " << name << " does not exist";
   msg.ReceiveFrom(channels_[name]);
 }

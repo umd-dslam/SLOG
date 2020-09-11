@@ -43,7 +43,7 @@ protected:
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddScheduler();
       sender_[i] = test_slogs_[i]->GetSender();
-      test_slogs_[i]->AddChannel(SERVER_CHANNEL);
+      test_slogs_[i]->AddOutputChannel(SERVER_CHANNEL);
     }
     // Relica 0
     test_slogs_[0]->Data("A", {"valueA", 0, 1});
@@ -114,7 +114,7 @@ protected:
     bool first_time = true;
     for (uint32_t i = 0; i < num_partitions; i++) {
       MMessage msg;
-      test_slogs_[receiver]->ReceiveFromChannel(msg, SERVER_CHANNEL);
+      test_slogs_[receiver]->ReceiveFromOutputChannel(msg, SERVER_CHANNEL);
       internal::Request req;
       CHECK(msg.GetProto(req));
       CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);

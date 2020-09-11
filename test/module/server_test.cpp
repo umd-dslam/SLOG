@@ -23,7 +23,7 @@ TEST(ServerTest, LookupMaster) {
   test_slog.Data("B", {"fbczx", 1, 1});
   test_slog.Data("C", {"bzxcv", 2, 2});
 
-  test_slog.AddChannel(FORWARDER_CHANNEL);
+  test_slog.AddOutputChannel(FORWARDER_CHANNEL);
   auto sender = test_slog.GetSender();
 
   test_slog.StartInNewThreads();
@@ -39,7 +39,7 @@ TEST(ServerTest, LookupMaster) {
 
   // Wait and receive the response
   MMessage msg;
-  test_slog.ReceiveFromChannel(msg, FORWARDER_CHANNEL);
+  test_slog.ReceiveFromOutputChannel(msg, FORWARDER_CHANNEL);
   internal::Response res;
   ASSERT_TRUE(msg.GetProto(res));
   ASSERT_TRUE(res.has_lookup_master());

@@ -28,8 +28,8 @@ protected:
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
-      test_slogs[i]->AddChannel(SEQUENCER_CHANNEL);
-      test_slogs[i]->AddChannel(MULTI_HOME_ORDERER_CHANNEL);
+      test_slogs[i]->AddOutputChannel(SEQUENCER_CHANNEL);
+      test_slogs[i]->AddOutputChannel(MULTI_HOME_ORDERER_CHANNEL);
     }
     // Replica 0
     test_slogs[0]->Data("A", {"xxxxx", 0, 0});
@@ -60,7 +60,7 @@ protected:
     MMessage msg;
     for (size_t i = 0; i < poll_items.size(); i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        test_slogs[indices[i]]->ReceiveFromChannel(msg, SEQUENCER_CHANNEL);
+        test_slogs[indices[i]]->ReceiveFromOutputChannel(msg, SEQUENCER_CHANNEL);
         break;
       }
     }
@@ -69,7 +69,7 @@ protected:
 
   Transaction* ReceiveOnOrdererChannel(size_t index) {
     MMessage msg;
-    test_slogs[index]->ReceiveFromChannel(msg, MULTI_HOME_ORDERER_CHANNEL);
+    test_slogs[index]->ReceiveFromOutputChannel(msg, MULTI_HOME_ORDERER_CHANNEL);
     return ExtractTxn(msg);
   }
 

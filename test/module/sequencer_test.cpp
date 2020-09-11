@@ -16,7 +16,7 @@ public:
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->AddOutputChannel(SCHEDULER_CHANNEL);
     sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
   }
@@ -27,7 +27,7 @@ public:
 
   internal::Batch* ReceiveBatch() {
     MMessage msg;
-    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
+    slog_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     if (!msg.GetProto(req)) {
       return nullptr;
@@ -58,12 +58,12 @@ public:
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    slog_->AddChannel(SCHEDULER_CHANNEL);
+    slog_->AddOutputChannel(SCHEDULER_CHANNEL);
     sender_ = slog_->GetSender();
 
     // This machine has no sequencer, it only receives the messages in the SCHEDULER_CHANNEL
     slog_2_ = make_unique<TestSlog>(configs[1]);
-    slog_2_->AddChannel(SCHEDULER_CHANNEL);
+    slog_2_->AddOutputChannel(SCHEDULER_CHANNEL);
 
     slog_->StartInNewThreads();
     slog_2_->StartInNewThreads();
@@ -170,7 +170,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
 
   {
     MMessage msg;
-    slog_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
+    slog_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
@@ -183,7 +183,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   }
   {
     MMessage msg;
-    slog_2_->ReceiveFromChannel(msg, SCHEDULER_CHANNEL);
+    slog_2_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
