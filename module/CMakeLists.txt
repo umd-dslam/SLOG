@@ -21,6 +21,7 @@ target_link_libraries(scheduler_components common string_utils)
 add_library(module
   consensus.cpp
   forwarder.cpp
+  interleaver.cpp
   multi_home_orderer.cpp
   server.cpp
   sequencer.cpp

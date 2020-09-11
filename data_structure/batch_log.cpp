@@ -11,6 +11,11 @@ void BatchLog::AddBatch(BatchPtr&& batch) {
   UpdateReadyBatches();
 }
 
+void BatchLog::AddBatch(BatchId batch_id) {
+  batches_[batch_id] = nullptr;
+  UpdateReadyBatches();
+}
+
 void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id) {
   slots_.Insert(slot_id, batch_id);
   UpdateReadyBatches();
@@ -32,6 +37,18 @@ std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
   batches_.erase(next_batch_id);
 
   return {next_slot, std::move(next_batch)};
+}
+
+std::pair<SlotId, BatchId> BatchLog::NextBatchId() {
+  if (!HasNextBatch()) {
+    throw std::runtime_error("NextBatch() was called when there is no batch");
+  }
+
+  auto next_batch = ready_batches_.front();
+  ready_batches_.pop();
+  batches_.erase(next_batch.second);
+
+  return next_batch;
 }
 
 void BatchLog::UpdateReadyBatches() {

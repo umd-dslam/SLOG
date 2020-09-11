@@ -42,6 +42,7 @@ public:
   void AddServerAndClient();
   void AddForwarder();
   void AddSequencer();
+  void AddInterleaver();
   void AddScheduler();
   void AddLocalPaxos();
   void AddGlobalPaxos();
@@ -65,6 +66,7 @@ private:
   ModuleRunnerPtr server_;
   ModuleRunnerPtr forwarder_;
   ModuleRunnerPtr sequencer_;
+  ModuleRunnerPtr interleaver_;
   ModuleRunnerPtr scheduler_;
   ModuleRunnerPtr local_paxos_;
   ModuleRunnerPtr global_paxos_;

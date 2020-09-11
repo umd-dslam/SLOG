@@ -6,6 +6,7 @@
 
 #include "common/proto_utils.h"
 #include "module/consensus.h"
+#include "module/interleaver.h"
 #include "module/forwarder.h"
 #include "module/multi_home_orderer.h"
 #include "module/server.h"
@@ -119,6 +120,10 @@ void TestSlog::AddSequencer() {
   sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_);
 }
 
+void TestSlog::AddInterleaver() {
+  interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_);
+}
+
 void TestSlog::AddScheduler() {
   scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_);
 }
@@ -177,6 +182,9 @@ void TestSlog::StartInNewThreads() {
   if (sequencer_) {
     sequencer_->StartInNewThread();
   }
+  if (interleaver_) {
+    interleaver_->StartInNewThread();
+  }
   if (scheduler_) {
     scheduler_->StartInNewThread();
   }
@@ -202,15 +210,16 @@ void TestSlog::SendTxn(Transaction* txn) {
 }
 
 Transaction TestSlog::RecvTxnResult() {
-    MMessage msg(client_socket_);
-    api::Response res;
-    if (!msg.GetProto(res)) {
-      LOG(FATAL) << "Malformed response to client transaction.";
-      return Transaction();
-    } else {
-      const auto& txn = res.txn().txn();
-      LOG(INFO) << "Received response. Stream id: " << res.stream_id();
-      return txn;
-    }
+  MMessage msg(client_socket_);
+  api::Response res;
+  if (!msg.GetProto(res)) {
+    LOG(FATAL) << "Malformed response to client transaction.";
+    return Transaction();
+  } else {
+    const auto& txn = res.txn().txn();
+    LOG(INFO) << "Received response. Stream id: " << res.stream_id();
+    return txn;
   }
+}
+
 } // namespace slog

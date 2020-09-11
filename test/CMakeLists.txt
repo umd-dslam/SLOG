@@ -10,6 +10,7 @@ set(ALL_TESTS
   deterministic_lock_manager_test
   deterministic_lock_manager_deprecated_test
   e2e_test
+  interleaver_test
   forwarder_test
   mem_only_storage_test
   mmessage_test
@@ -48,6 +49,9 @@ target_link_libraries(deterministic_lock_manager_deprecated_test test_utils)
 
 add_executable(e2e_test e2e/e2e_test.cpp)
 target_link_libraries(e2e_test test_utils)
+
+add_executable(interleaver_test module/interleaver_test.cpp)
+target_link_libraries(interleaver_test test_utils)
 
 add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)
