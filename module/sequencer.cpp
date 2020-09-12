@@ -113,7 +113,7 @@ void Sequencer::HandleCustomSocketMessage(
       auto machine_id = MakeMachineIdAsString(rep, part);
       Send(
           batch_req,
-          SCHEDULER_CHANNEL,
+          INTERLEAVER_CHANNEL,
           machine_id);
     }
   }
@@ -196,7 +196,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
 }
 
 void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
-  CHECK(
+  DCHECK(
       txn->internal().type() == TransactionType::SINGLE_HOME
       || txn->internal().type() == TransactionType::LOCK_ONLY)
       << "Sequencer batch can only contain single-home or lock-only txn. "
@@ -213,14 +213,14 @@ BatchId Sequencer::NextBatchId() {
 void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   delayed_batches_.push_back(request);
 
-  // Send the batch to schedulers in the local replica only
+  // Send the batch to interleavers in the local replica only
   auto local_rep = config_->GetLocalReplica();
   auto num_partitions = config_->GetNumPartitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
       auto machine_id = MakeMachineIdAsString(local_rep, part);
       Send(
           request,
-          SCHEDULER_CHANNEL,
+          INTERLEAVER_CHANNEL,
           machine_id);
   }
 }
@@ -245,7 +245,7 @@ void Sequencer::MaybeSendDelayedBatches() {
           auto machine_id = MakeMachineIdAsString(rep, part);
           Send(
               request,
-              SCHEDULER_CHANNEL,
+              INTERLEAVER_CHANNEL,
               machine_id);
         }
       }

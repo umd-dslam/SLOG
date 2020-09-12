@@ -163,6 +163,7 @@ string LockModeStr(LockMode mode) {
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
+/*
   Header("Local Log");
   cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
   cout << "Buffered batches per queue:\n";
@@ -194,7 +195,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         << setw(20) << slots_per_region[num_regions].GetArray()[1].GetUint()
         << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << "\n";
   }
-
+*/
   Header("Transactions");
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {

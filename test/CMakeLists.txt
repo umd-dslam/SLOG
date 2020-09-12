@@ -3,7 +3,6 @@ project(test)
 # Don't forget to add all tests here so that they are linked properly
 set(ALL_TESTS
   batch_log_test
-  batch_interleaver_test
   broker_and_sender_test
   commands_test
   concurrent_hash_map_test
@@ -26,10 +25,6 @@ set(ALL_TESTS
 
 add_executable(batch_log_test data_structure/batch_log_test.cpp)
 target_link_libraries(batch_log_test batch_log proto)
-  
-add_executable(batch_interleaver_test
-  module/scheduler_components/batch_interleaver_test.cpp)
-target_link_libraries(batch_interleaver_test scheduler_components proto)
 
 add_executable(broker_and_sender_test connection/broker_and_sender_test.cpp)
 target_link_libraries(broker_and_sender_test test_utils)

@@ -30,6 +30,7 @@ protected:
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
       test_slogs[i]->AddSequencer();
+      test_slogs[i]->AddInterleaver();
       test_slogs[i]->AddScheduler();
       test_slogs[i]->AddLocalPaxos();
 

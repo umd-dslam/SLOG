@@ -16,6 +16,7 @@ public:
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
+    slog_->AddOutputChannel(INTERLEAVER_CHANNEL);
     slog_->AddOutputChannel(SCHEDULER_CHANNEL);
     sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
@@ -25,9 +26,9 @@ public:
     sender_->Send(req, SEQUENCER_CHANNEL);
   }
 
-  internal::Batch* ReceiveBatch() {
+  internal::Batch* ReceiveBatch(const string& channel) {
     MMessage msg;
-    slog_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
+    slog_->ReceiveFromOutputChannel(msg, channel);
     Request req;
     if (!msg.GetProto(req)) {
       return nullptr;
@@ -47,32 +48,6 @@ public:
   unique_ptr<TestSlog> slog_;
 };
 
-#ifdef ENABLE_REPLICATION_DELAY
-class SequencerReplicationDelayTest : public SequencerTest {
-public:
-  void SetUp() {}
-  void CustomSetUp(uint32_t delay_percent, uint32_t delay_amount) {
-    internal::Configuration extra_config;
-    extra_config.mutable_replication_delay()->set_batch_delay_percent(delay_percent);
-    extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
-    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
-    slog_ = make_unique<TestSlog>(configs[0]);
-    slog_->AddSequencer();
-    slog_->AddOutputChannel(SCHEDULER_CHANNEL);
-    sender_ = slog_->GetSender();
-
-    // This machine has no sequencer, it only receives the messages in the SCHEDULER_CHANNEL
-    slog_2_ = make_unique<TestSlog>(configs[1]);
-    slog_2_->AddOutputChannel(SCHEDULER_CHANNEL);
-
-    slog_->StartInNewThreads();
-    slog_2_->StartInNewThreads();
-  }
-
-  unique_ptr<TestSlog> slog_2_;
-};
-#endif /* ENABLE_REPLICATION_DELAY */
-
 TEST_F(SequencerTest, SingleHomeTransaction) {
   auto txn = MakeTransaction(
       {"A", "B"},
@@ -85,7 +60,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
 
   SendToSequencer(req);
 
-  auto batch = ReceiveBatch();
+  auto batch = ReceiveBatch(INTERLEAVER_CHANNEL);
   ASSERT_NE(batch, nullptr);
   ASSERT_EQ(batch->transactions_size(), 1);
   ASSERT_EQ(batch->transactions().at(0), *txn);
@@ -114,47 +89,69 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
   mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
   SendToSequencer(req);
 
-  for (int i = 0; i < 2; i++) {
-    auto batch = ReceiveBatch();
+  {
+    auto batch = ReceiveBatch(INTERLEAVER_CHANNEL);
     ASSERT_NE(batch, nullptr);
+    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
 
-    switch (batch->transaction_type()) {
-      case TransactionType::SINGLE_HOME: {
-        ASSERT_EQ(batch->transactions_size(), 2);
+    ASSERT_EQ(batch->transactions_size(), 2);
 
-        auto sh_txn1 = batch->transactions().at(0);
-        ASSERT_EQ(sh_txn1.read_set_size(), 1);
-        ASSERT_TRUE(sh_txn1.read_set().contains("A"));
-        ASSERT_EQ(sh_txn1.write_set_size(), 0);
-        ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
+    auto sh_txn1 = batch->transactions().at(0);
+    ASSERT_EQ(sh_txn1.read_set_size(), 1);
+    ASSERT_TRUE(sh_txn1.read_set().contains("A"));
+    ASSERT_EQ(sh_txn1.write_set_size(), 0);
+    ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
 
-        auto sh_txn2 = batch->transactions().at(1);
-        ASSERT_EQ(sh_txn2.read_set_size(), 0);
-        ASSERT_EQ(sh_txn2.write_set_size(), 1);
-        ASSERT_TRUE(sh_txn2.write_set().contains("D"));
-        ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
-        break;
-      }
-      case TransactionType::MULTI_HOME: {
-        ASSERT_EQ(batch->transactions_size(), 2);
+    auto sh_txn2 = batch->transactions().at(1);
+    ASSERT_EQ(sh_txn2.read_set_size(), 0);
+    ASSERT_EQ(sh_txn2.write_set_size(), 1);
+    ASSERT_TRUE(sh_txn2.write_set().contains("D"));
+    ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
+    delete batch;
+  }
 
-        auto mh_txn1 = batch->transactions().at(0);
-        ASSERT_EQ(mh_txn1, *txn1);
-        
-        auto mh_txn2 = batch->transactions().at(1);
-        ASSERT_EQ(mh_txn2, *txn2);
-        break;
-      }
-      default:
-        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: " 
-               << ENUM_NAME(batch->transaction_type(), TransactionType);
-        break;
-    }
+  {
+    auto batch = ReceiveBatch(SCHEDULER_CHANNEL);
+    ASSERT_NE(batch, nullptr);
+    ASSERT_EQ(batch->transaction_type(), TransactionType::MULTI_HOME);
+      
+    ASSERT_EQ(batch->transactions_size(), 2);
+
+    auto mh_txn1 = batch->transactions().at(0);
+    ASSERT_EQ(mh_txn1, *txn1);
+    
+    auto mh_txn2 = batch->transactions().at(1);
+    ASSERT_EQ(mh_txn2, *txn2);
     delete batch;
   }
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
+
+class SequencerReplicationDelayTest : public SequencerTest {
+public:
+  void SetUp() {}
+  void CustomSetUp(uint32_t delay_percent, uint32_t delay_amount) {
+    internal::Configuration extra_config;
+    extra_config.mutable_replication_delay()->set_batch_delay_percent(delay_percent);
+    extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
+    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
+    slog_ = make_unique<TestSlog>(configs[0]);
+    slog_->AddSequencer();
+    slog_->AddOutputChannel(INTERLEAVER_CHANNEL);
+    sender_ = slog_->GetSender();
+
+    // This machine has no sequencer, it only receives the messages in the INTERLEAVER_CHANNEL
+    slog_2_ = make_unique<TestSlog>(configs[1]);
+    slog_2_->AddOutputChannel(INTERLEAVER_CHANNEL);
+
+    slog_->StartInNewThreads();
+    slog_2_->StartInNewThreads();
+  }
+
+  unique_ptr<TestSlog> slog_2_;
+};
+
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   CustomSetUp(100, 3);
   auto txn = MakeTransaction(
@@ -170,7 +167,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
 
   {
     MMessage msg;
-    slog_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
+    slog_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
@@ -183,7 +180,7 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   }
   {
     MMessage msg;
-    slog_2_->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
+    slog_2_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
     ASSERT_TRUE(msg.GetProto(req));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);

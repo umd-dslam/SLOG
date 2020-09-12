@@ -22,10 +22,10 @@ internal::Request MakeBatch(
   return req;
 }
 
-internal::Request MakeLocalQueueOrder(uint32_t slot, uint32_t queue_id) {
+internal::Request MakeBatchOrder(uint32_t slot, uint32_t batch_id) {
   internal::Request req;
-  req.mutable_local_queue_order()->set_slot(slot);
-  req.mutable_local_queue_order()->set_queue_id(queue_id);
+  req.mutable_forward_batch()->mutable_batch_order()->set_slot(slot);
+  req.mutable_forward_batch()->mutable_batch_order()->set_batch_id(batch_id);
   return req;
 }
 
@@ -87,9 +87,9 @@ protected:
       // This message is sent from machine 0:0, so it will be queued up in queue 0
       sender_[0]->Send(batch, SCHEDULER_CHANNEL, MakeMachineIdAsString(0, partition));
 
-      // Simulate a local paxos order message
+      // Simulate a batch order message
       sender_[0]->Send(
-          MakeLocalQueueOrder(batch_order_offset, 0 /* queue_id */),
+          MakeBatchOrder(batch_order_offset, batch_id),
           SCHEDULER_CHANNEL,
           MakeMachineIdAsString(0, partition));
     }

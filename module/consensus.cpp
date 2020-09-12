@@ -58,7 +58,7 @@ void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   auto order = req.mutable_local_queue_order();
   order->set_queue_id(value);
   order->set_slot(slot);
-  Send(req, SCHEDULER_CHANNEL);
+  Send(req, INTERLEAVER_CHANNEL);
 }
 
 } // namespace slog

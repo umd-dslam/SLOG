@@ -11,7 +11,6 @@
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "data_structure/batch_log.h"
-#include "module/scheduler_components/batch_interleaver.h"
 #include "module/scheduler_components/worker.h"
 #include "storage/storage.h"
 
@@ -48,22 +47,18 @@ private:
   // A marker for the special log containing only multi-home txn
   const uint32_t kMultiHomeTxnLogMarker;
 
-  void HandleInternalRequest(
-    internal::Request&& req,
-    const string& from_machine_id);
+  void HandleInternalRequest(internal::Request&& req);
   void HandleResponseFromWorker(const internal::WorkerResponse& response);
   void SendToCoordinatingServer(TxnId txn_id);
 
   bool HasMessageFromChannel() const;
   bool HasMessageFromWorker() const;
 
-  void ProcessForwardBatch(internal::ForwardBatch* forward_batch, const string& from_machine_id);
-  void ProcessLocalQueueOrder(const internal::LocalQueueOrder& order);
+  void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
   void ProcessRemoteReadResult(internal::Request&& request);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
-  void MaybeUpdateLocalLog();
-  void MaybeProcessNextBatchesFromGlobalLog();
+  void ProcessNextBatch(BatchPtr&& batch);
 
   // Check that remaster txn doesn't keep key at same master
   bool MaybeAbortRemasterTransaction(Transaction* txn);
@@ -128,8 +123,8 @@ private:
 
   Sender sender_;
 
-  std::unordered_map<uint32_t, BatchLog> all_logs_;
-  BatchInterleaver local_interleaver_;
+  BatchLog single_home_log_;
+  BatchLog multi_home_log_;
   
 #ifdef REMASTER_PROTOCOL_SIMPLE
   DeterministicLockManagerDeprecated lock_manager_;

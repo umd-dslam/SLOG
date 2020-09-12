@@ -10,6 +10,7 @@
 #include "connection/broker.h"
 #include "module/consensus.h"
 #include "module/forwarder.h"
+#include "module/interleaver.h"
 #include "module/multi_home_orderer.h"
 #include "module/scheduler.h"
 #include "module/server.h"
@@ -180,6 +181,8 @@ int main(int argc, char* argv[]) {
       MakeRunnerFor<slog::Forwarder>(config, broker));
   modules.push_back(
       MakeRunnerFor<slog::Sequencer>(config, broker));
+  modules.push_back(
+      MakeRunnerFor<slog::Interleaver>(config, broker));
   modules.push_back(
       MakeRunnerFor<slog::Scheduler>(config, broker, storage));
   
