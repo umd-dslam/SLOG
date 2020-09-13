@@ -55,6 +55,7 @@ uint64_t TimeElapsedSince(TimePoint tp) {
 }
 
 const uint32_t STATS_PRINT_EVERY_MS = 1000;
+const uint32_t ESTIMATED_OVERHEAD = 111;
 
 const string TXNS_FILE = "transactions.csv";
 const vector<string> TXN_COLUMNS = {
@@ -165,9 +166,11 @@ private:
     cout << "Responses received: " << resp_counter << "\n";
     cout << "Throughput: " << fixed << tp << " txns/s" << endl;
 
-    (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count()
-                         << tp
-                         << csvendl;
+    if (throughput_writer != nullptr) {
+      (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count()
+                          << tp
+                          << csvendl;
+    }
   }
 
 } stats;
@@ -181,7 +184,13 @@ void InitializeBenchmark() {
   std::ios_base::sync_with_stdio(false);
   
   // Create a ticker and subscribe to it
-  ticker = MakeRunnerFor<Ticker>(context, FLAGS_rate);
+  if (FLAGS_rate > 2000) {
+    LOG(WARNING) << "The maximum possible rate is 2000 txns/sec.";
+    FLAGS_rate = 2000;
+  }
+  // Compensate for the overhead of other computation
+  uint32_t rate = 1000000 / (1000000 / FLAGS_rate - ESTIMATED_OVERHEAD);
+  ticker = MakeRunnerFor<Ticker>(context, rate);
   ticker->StartInNewThread();
   ticker_socket = make_unique<zmq::socket_t>(
       Ticker::Subscribe(context));
@@ -230,10 +239,13 @@ void InitializeBenchmark() {
   } else {
     LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
   }
-
-  txn_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + TXNS_FILE, TXN_COLUMNS);
-  event_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENT_COLUMNS);
-  throughput_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + THROUGHPUT_FILE, THROUGHPUT_COLUMNS);
+  if (FLAGS_out_dir.empty()) {
+    LOG(WARNING) << "Results will not be written to files because output directory is not provided";
+  } else {
+    txn_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + TXNS_FILE, TXN_COLUMNS);
+    event_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENT_COLUMNS);
+    throughput_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + THROUGHPUT_FILE, THROUGHPUT_COLUMNS);
+  }
 }
 
 bool StopConditionMet();
@@ -248,7 +260,6 @@ void RunBenchmark() {
     if (zmq::poll(poll_items, 10)) {
       // Check if the ticker ticks
       if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
-
         // Receive the empty message then throw away
         zmq::message_t msg;
         ticker_socket->recv(msg);
@@ -360,21 +371,25 @@ void ReceiveResult(int from_socket) {
     LOG(INFO) << txn;
   }
 
-  (*txn_writer) << txn_info.profile.client_txn_id
-                << txn_internal.id()
-                << txn_info.profile.is_multi_home
-                << txn_info.profile.is_multi_partition
-                << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
-                << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
-                << duration_cast<microseconds>(recv_at - sent_at).count()
-                << csvendl;
+  if (txn_writer != nullptr) {
+    (*txn_writer) << txn_info.profile.client_txn_id
+                  << txn_internal.id()
+                  << txn_info.profile.is_multi_home
+                  << txn_info.profile.is_multi_partition
+                  << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
+                  << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
+                  << duration_cast<microseconds>(recv_at - sent_at).count()
+                  << csvendl;
+  }
 
-  for (int i = 0; i < txn_internal.events_size(); i++) {
-    (*event_writer) << txn_internal.id()
-                    << ENUM_NAME(txn_internal.events(i), TransactionEvent)
-                    << txn_internal.event_times(i)
-                    << txn_internal.event_machines(i)
-                    << csvendl;
+  if (event_writer != nullptr) {
+    for (int i = 0; i < txn_internal.events_size(); i++) {
+      (*event_writer) << txn_internal.id()
+                      << ENUM_NAME(txn_internal.events(i), TransactionEvent)
+                      << txn_internal.event_times(i)
+                      << txn_internal.event_machines(i)
+                      << csvendl;
+    }
   }
 
   outstanding_txns.erase(res.stream_id());

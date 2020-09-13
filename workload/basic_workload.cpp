@@ -80,7 +80,7 @@ BasicWorkload::BasicWorkload(
     client_txn_id_counter_(0) {
   auto num_replicas = config->GetNumReplicas();
   auto num_partitions = config->GetNumPartitions();
-  auto hot_keys_per_list = params_.GetUInt32(HOT) / (num_replicas * num_partitions);
+  auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / (num_replicas * num_partitions));
   auto simple_partitioning = config->GetSimplePartitioning();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
