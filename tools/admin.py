@@ -885,7 +885,7 @@ class BenchmarkCommand(Command):
                 f"--data-dir {CONTAINER_DATA_DIR} "
                 f"--out-dir {out_dir} "
                 f"--wl {args.workload} "
-                f'--params="{args.params}" '
+                f'--params "{args.params}" '
                 f"--rate {args.rate} "
             )
             if num_txns:
@@ -915,23 +915,20 @@ class BenchmarkCommand(Command):
             return container, addr
         
         num_procs = len(self.remote_procs)
-        batch_size = num_procs
-        num_txns = args.num_txns
         duration = args.duration
-        if duration:
-            batch_size = (num_procs + 1) // args.steps
-            step_duration = args.duration // args.steps
+        batch_size = (num_procs + 1) // args.steps if duration else num_procs
         
         containers = []
         COMPENSATE = 1 # compensation for the overhead at each step
         steps = range(0, num_procs, batch_size)
         remaining_steps = len(steps)
+        step_duration = duration // len(steps) if duration else 0
         for i in steps:
             remaining_steps -= 1
             batch = self.remote_procs[i:i + batch_size]
             proc_and_params = zip(
                 batch,
-                itertools.repeat(num_txns),
+                itertools.repeat(args.num_txns),
                 itertools.repeat(duration + remaining_steps * COMPENSATE),
             )
             with Pool(processes=len(batch)) as pool:
@@ -941,6 +938,8 @@ class BenchmarkCommand(Command):
             if duration:
                 time.sleep(step_duration)
                 duration -= step_duration
+                # Avoid duration reach 0, which makes the benchmark run forever
+                duration = max(duration, 1)
 
         wait_for_containers(containers)
 
