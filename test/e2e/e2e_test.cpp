@@ -123,6 +123,7 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
   }
 }
 
+#ifdef ENABLE_REMASTER
 TEST_F(E2ETest, RemasterTxn) {
   auto remaster_txn = MakeTransaction(
       {}, /* read_set */
@@ -153,6 +154,7 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ("valA", txn_resp.read_set().at("A"));
   ASSERT_EQ("valX", txn_resp.read_set().at("X"));
 }
+#endif
 
 TEST_F(E2ETest, AbortTxn) {
   // Multi-partition transaction where one of the partition will abort

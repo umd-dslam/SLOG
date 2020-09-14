@@ -13,22 +13,34 @@ option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF
 
 # Note: BUILD_TESTING is defined by CTest
 
+message(STATUS "Options:")
+message(STATUS "  BUILD_CLIENT = ${BUILD_CLIENT}")
+message(STATUS "  REMASTER_PROTOCOL = ${REMASTER_PROTOCOL}")
+message(STATUS "  ENABLE_REPLICATION_DELAY = ${ENABLE_REPLICATION_DELAY}")
+
 #========================================
 #               Macros
 #========================================
 
-if(REMASTER_PROTOCOL STREQUAL "SIMPLE")
+set(ENABLE_REMASTER TRUE)
+if (REMASTER_PROTOCOL STREQUAL "SIMPLE")
   add_compile_definitions(REMASTER_PROTOCOL_SIMPLE)
-elseif(REMASTER_PROTOCOL STREQUAL "PER_KEY")
+elseif (REMASTER_PROTOCOL STREQUAL "PER_KEY")
   add_compile_definitions(REMASTER_PROTOCOL_PER_KEY)
-elseif(REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
+elseif (REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
   add_compile_definitions(REMASTER_PROTOCOL_COUNTERLESS)
+elseif (REMASTER_PROTOCOL STREQUAL "NONE")
+  set(ENABLE_REMASTER FALSE)
 else()
-  message(FATAL_ERROR "Invalid REMASTER_PROTOCOL")
+  message(FATAL_ERROR "Invalid REMASTER_PROTOCOL. It must be one of: \"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", or \"NONE\"")
 endif()
 
-if(ENABLE_REPLICATION_DELAY)
-    add_compile_definitions(ENABLE_REPLICATION_DELAY)
+if (ENABLE_REMASTER)
+  add_compile_definitions(ENABLE_REMASTER)
+endif()
+
+if (ENABLE_REPLICATION_DELAY)
+  add_compile_definitions(ENABLE_REPLICATION_DELAY)
 endif()
 
 #========================================

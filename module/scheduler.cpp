@@ -343,7 +343,6 @@ void Scheduler::ProcessNextBatch(BatchPtr&& batch) {
     switch (txn_type) {
       case TransactionType::SINGLE_HOME: {
         VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
-        auto txn_holder = &all_txns_[txn_id];
 
         if (MaybeContinuePreDispatchAbort(txn_id)) {
           break;
@@ -355,32 +354,28 @@ void Scheduler::ProcessNextBatch(BatchPtr&& batch) {
             break;
           }
         }
-        SendToRemasterManager(txn_holder);
+        SendToRemasterManager(&all_txns_[txn_id]);
+#else
+        SendToLockManager(&all_txns_[txn_id]);
+#endif
         break;
-#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
-        SendToLockManager(txn_holder);
-        break;
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
-
       }
       case TransactionType::LOCK_ONLY: {
         auto txn_replica_id = TransactionHolder::GetTransactionIdReplicaIdPair(txn);
         VLOG(2) << "Accepted LOCK-ONLY transaction "
             << txn_replica_id.first <<", " << txn_replica_id.second;
-        auto txn_holder = &lock_only_txns_[txn_replica_id];
 
         if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
           break;
         }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-        SendToRemasterManager(txn_holder);
-        break;
-#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
-        SendToLockManager(txn_holder);
-        break;
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+        SendToRemasterManager(&lock_only_txns_[txn_replica_id]);
+#else
+        SendToLockManager(&lock_only_txns_[txn_replica_id]);
+#endif
 
+        break;
       }
       case TransactionType::MULTI_HOME: {
         VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
@@ -397,7 +392,7 @@ void Scheduler::ProcessNextBatch(BatchPtr&& batch) {
             break;
           }
         }
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+#endif
 
         SendToLockManager(txn_holder);
         break;

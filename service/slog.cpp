@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
 #elif defined REMASTER_PROTOCOL_COUNTERLESS
   LOG(INFO) << "Counterless remaster protocol";
 #else
-  #error "Remaster protocol not defined"
+  LOG(INFO) << "Remastering disabled";
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
 #ifdef ENABLE_REPLICATION_DELAY

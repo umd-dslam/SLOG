@@ -126,13 +126,13 @@ private:
   BatchLog single_home_log_;
   BatchLog multi_home_log_;
   
-#ifdef REMASTER_PROTOCOL_SIMPLE
+#if defined(REMASTER_PROTOCOL_SIMPLE)
   DeterministicLockManagerDeprecated lock_manager_;
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
   DeterministicLockManagerDeprecated lock_manager_;
   PerKeyRemasterManager remaster_manager_;
-#elif defined(REMASTER_PROTOCOL_COUNTERLESS)
+#else
   DeterministicLockManager lock_manager_;
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
