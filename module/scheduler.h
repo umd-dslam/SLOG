@@ -51,9 +51,6 @@ private:
   void HandleResponseFromWorker(const internal::WorkerResponse& response);
   void SendToCoordinatingServer(TxnId txn_id);
 
-  bool HasMessageFromChannel() const;
-  bool HasMessageFromWorker() const;
-
   void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
   void ProcessRemoteReadResult(internal::Request&& request);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);

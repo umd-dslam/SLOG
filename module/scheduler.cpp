@@ -81,7 +81,8 @@ void Scheduler::SetUp() {
 void Scheduler::Loop() {
   zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
 
-  if (HasMessageFromChannel()) {
+  // Got message from channel
+  if (poll_items_[0].revents & ZMQ_POLLIN) {
     MMessage msg(pull_socket_);
     Request req;
     if (msg.GetProto(req)) {
@@ -89,7 +90,8 @@ void Scheduler::Loop() {
     }
   }
 
-  if (HasMessageFromWorker()) {
+  // Got messages from workers
+  if (poll_items_[1].revents & ZMQ_POLLIN) {
     // Receive from worker socket
     MMessage msg(worker_socket_);
     if (msg.IsProto<Request>()) {
@@ -115,14 +117,6 @@ void Scheduler::Loop() {
   }
 
   VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Scheduler is alive";
-}
-
-bool Scheduler::HasMessageFromChannel() const {
-  return poll_items_[0].revents & ZMQ_POLLIN;
-}
-
-bool Scheduler::HasMessageFromWorker() const {
-  return poll_items_[1].revents & ZMQ_POLLIN;
 }
 
 /***********************************************
@@ -530,7 +524,7 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
     DispatchTransaction(txn_id);
   }
 #else
-  switch(lock_manager_.AcquireLocks(*txn_holder)) {
+  switch (lock_manager_.AcquireLocks(*txn_holder)) {
     case AcquireLocksResult::ACQUIRED:
       DispatchTransaction(txn_id);
       break;

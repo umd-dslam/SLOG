@@ -49,7 +49,7 @@ void Worker::SetUp() {
 }
 
 void Worker::Loop() {
-  if (zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS)) {
+  if (zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS) > 0) {
     MMessage msg(scheduler_socket_);
     Request req;
     if (!msg.GetProto(req)) {
@@ -253,20 +253,22 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
     }
   }
 
-  // Send abort result and local reads to all remote active partitions
-  Request request;
   auto local_partition = config_->GetLocalPartition();
-  auto rrr = request.mutable_remote_read_result();
-  rrr->set_txn_id(txn_id);
-  rrr->set_partition(local_partition);
-  rrr->set_will_abort(will_abort);
-  if (!will_abort) {
-    auto reads_to_be_sent = rrr->mutable_reads();
-    for (auto& key_value : txn->read_set()) {
-      (*reads_to_be_sent)[key_value.first] = key_value.second;
+  // Send abort result and local reads to all remote active partitions
+  if (!txn_holder->ActivePartitions().empty()) {
+    Request request;
+    auto rrr = request.mutable_remote_read_result();
+    rrr->set_txn_id(txn_id);
+    rrr->set_partition(local_partition);
+    rrr->set_will_abort(will_abort);
+    if (!will_abort) {
+      auto reads_to_be_sent = rrr->mutable_reads();
+      for (auto& key_value : txn->read_set()) {
+        (*reads_to_be_sent)[key_value.first] = key_value.second;
+      }
     }
+    SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
   }
-  SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
 
   // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
   //       To do this, we need to removing the CHECK at the start of ProcessRemoteReadResult
