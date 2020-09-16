@@ -64,15 +64,20 @@ const vector<string> TXN_COLUMNS = {
     "is_mh",
     "is_mp",
     "sent_at",      // microseconds since epoch
-    "received_at",  // microseconds since epoch
-    "rtt"};
+    "received_at"};  // microseconds since epoch
+
 
 const string EVENTS_FILE = "events.csv";
-const vector<string> EVENT_COLUMNS = {
+const vector<string> EVENTS_COLUMNS = {
     "txn_id",
-    "event",
+    "event_id",
     "time",     // microseconds since epoch
     "machine"};
+
+const string EVENT_NAMES_FILE = "event_names.csv";
+const vector<string> EVENT_NAMES_COLUMNS = {
+    "id",
+    "event"};
 
 const string THROUGHPUT_FILE = "throughput.csv";
 const vector<string> THROUGHPUT_COLUMNS = {
@@ -118,8 +123,10 @@ struct TransactionInfo {
   TimePoint sent_at;
 };
 unordered_map<uint64_t, TransactionInfo> outstanding_txns;
+unordered_map<int, string> event_names;
 std::unique_ptr<CSVWriter> txn_writer;
-std::unique_ptr<CSVWriter> event_writer;
+std::unique_ptr<CSVWriter> events_writer;
+std::unique_ptr<CSVWriter> event_names_writer;
 std::unique_ptr<CSVWriter> throughput_writer;
 
 /**
@@ -243,7 +250,8 @@ void InitializeBenchmark() {
     LOG(WARNING) << "Results will not be written to files because output directory is not provided";
   } else {
     txn_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + TXNS_FILE, TXN_COLUMNS);
-    event_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENT_COLUMNS);
+    events_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENTS_COLUMNS);
+    event_names_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENT_NAMES_FILE, EVENT_NAMES_COLUMNS);
     throughput_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + THROUGHPUT_FILE, THROUGHPUT_COLUMNS);
   }
 }
@@ -276,6 +284,10 @@ void RunBenchmark() {
     stats.MaybePrint();
   }
   stats.FinalPrint();
+
+  for (auto e : event_names) {
+    (*event_names_writer) << e.first << e.second << csvendl;
+  }
 }
 
 bool StopConditionMet() {
@@ -378,14 +390,15 @@ void ReceiveResult(int from_socket) {
                   << txn_info.profile.is_multi_partition
                   << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
                   << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
-                  << duration_cast<microseconds>(recv_at - sent_at).count()
                   << csvendl;
   }
 
-  if (event_writer != nullptr) {
+  if (events_writer != nullptr) {
     for (int i = 0; i < txn_internal.events_size(); i++) {
-      (*event_writer) << txn_internal.id()
-                      << ENUM_NAME(txn_internal.events(i), TransactionEvent)
+      auto event = txn_internal.events(i);
+      event_names[event] = ENUM_NAME(event, TransactionEvent);
+      (*events_writer) << txn_internal.id()
+                      << static_cast<int>(event)
                       << txn_internal.event_times(i)
                       << txn_internal.event_machines(i)
                       << csvendl;
