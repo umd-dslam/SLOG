@@ -58,7 +58,7 @@ const RawParamMap DEFAULT_PARAMS = {
   { HOT, "1000" },
   { NUM_RECORDS, "10" },
   { NUM_HOT_RECORDS, "2" },
-  { NUM_WRITES, "4" },
+  { NUM_WRITES, "2" },
   { VALUE_SIZE, "100" },
   { SH_REGION, "-1" },
   { SP_PARTITION, "-1" }
