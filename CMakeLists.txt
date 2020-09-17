@@ -8,7 +8,7 @@ include(CTest)
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
-set(REMASTER_PROTOCOL SIMPLE CACHE STRING "Protocol for remastering")
+set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering")
 option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
 
 # Note: BUILD_TESTING is defined by CTest

@@ -190,7 +190,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
     auto machine_id = MakeMachineIdAsString(local_rep, part);
     Send(
         req,
-        SCHEDULER_CHANNEL,
+        INTERLEAVER_CHANNEL,
         machine_id);
   }
 }
@@ -217,11 +217,11 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   auto local_rep = config_->GetLocalReplica();
   auto num_partitions = config_->GetNumPartitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
-      auto machine_id = MakeMachineIdAsString(local_rep, part);
-      Send(
-          request,
-          INTERLEAVER_CHANNEL,
-          machine_id);
+    auto machine_id = MakeMachineIdAsString(local_rep, part);
+    Send(
+        request,
+        INTERLEAVER_CHANNEL,
+        machine_id);
   }
 }
 

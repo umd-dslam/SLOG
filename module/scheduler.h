@@ -51,11 +51,10 @@ private:
   void HandleResponseFromWorker(const internal::WorkerResponse& response);
   void SendToCoordinatingServer(TxnId txn_id);
 
-  void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
   void ProcessRemoteReadResult(internal::Request&& request);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
-  void ProcessNextBatch(BatchPtr&& batch);
+  void ProcessTransaction(Transaction* txn);
 
   // Check that remaster txn doesn't keep key at same master
   bool MaybeAbortRemasterTransaction(Transaction* txn);
@@ -119,9 +118,6 @@ private:
   size_t next_worker_;
 
   Sender sender_;
-
-  BatchLog single_home_log_;
-  BatchLog multi_home_log_;
   
 #if defined(REMASTER_PROTOCOL_SIMPLE)
   DeterministicLockManagerDeprecated lock_manager_;

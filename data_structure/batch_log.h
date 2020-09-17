@@ -16,12 +16,10 @@ public:
   BatchLog();
 
   void AddBatch(BatchPtr&& batch);
-  void AddBatch(BatchId batch_id);
   void AddSlot(SlotId slot_id, BatchId batch_id);
 
   bool HasNextBatch() const;
   std::pair<SlotId, BatchPtr> NextBatch();
-  std::pair<SlotId, BatchId> NextBatchId();
 
   /* For debugging */
   size_t NumBufferedSlots() const {

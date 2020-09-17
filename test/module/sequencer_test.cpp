@@ -17,7 +17,6 @@ public:
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(INTERLEAVER_CHANNEL);
-    slog_->AddOutputChannel(SCHEDULER_CHANNEL);
     sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
   }
@@ -26,9 +25,9 @@ public:
     sender_->Send(req, SEQUENCER_CHANNEL);
   }
 
-  internal::Batch* ReceiveBatch(const string& channel) {
+  internal::Batch* ReceiveBatch() {
     MMessage msg;
-    slog_->ReceiveFromOutputChannel(msg, channel);
+    slog_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
     if (!msg.GetProto(req)) {
       return nullptr;
@@ -60,7 +59,7 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
 
   SendToSequencer(req);
 
-  auto batch = ReceiveBatch(INTERLEAVER_CHANNEL);
+  auto batch = ReceiveBatch();
   ASSERT_NE(batch, nullptr);
   ASSERT_EQ(batch->transactions_size(), 1);
   ASSERT_EQ(batch->transactions().at(0), *txn);
@@ -89,39 +88,42 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
   mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
   SendToSequencer(req);
 
-  {
-    auto batch = ReceiveBatch(INTERLEAVER_CHANNEL);
+  for (int i = 0; i < 2; i++) {
+    auto batch = ReceiveBatch();
     ASSERT_NE(batch, nullptr);
-    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
 
-    ASSERT_EQ(batch->transactions_size(), 2);
+    switch (batch->transaction_type()) {
+      case TransactionType::SINGLE_HOME: {
+        ASSERT_EQ(batch->transactions_size(), 2);
 
-    auto sh_txn1 = batch->transactions().at(0);
-    ASSERT_EQ(sh_txn1.read_set_size(), 1);
-    ASSERT_TRUE(sh_txn1.read_set().contains("A"));
-    ASSERT_EQ(sh_txn1.write_set_size(), 0);
-    ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
+        auto sh_txn1 = batch->transactions().at(0);
+        ASSERT_EQ(sh_txn1.read_set_size(), 1);
+        ASSERT_TRUE(sh_txn1.read_set().contains("A"));
+        ASSERT_EQ(sh_txn1.write_set_size(), 0);
+        ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
 
-    auto sh_txn2 = batch->transactions().at(1);
-    ASSERT_EQ(sh_txn2.read_set_size(), 0);
-    ASSERT_EQ(sh_txn2.write_set_size(), 1);
-    ASSERT_TRUE(sh_txn2.write_set().contains("D"));
-    ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
-    delete batch;
-  }
+        auto sh_txn2 = batch->transactions().at(1);
+        ASSERT_EQ(sh_txn2.read_set_size(), 0);
+        ASSERT_EQ(sh_txn2.write_set_size(), 1);
+        ASSERT_TRUE(sh_txn2.write_set().contains("D"));
+        ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
+        break;
+      }
+      case TransactionType::MULTI_HOME: {
+        ASSERT_EQ(batch->transactions_size(), 2);
 
-  {
-    auto batch = ReceiveBatch(SCHEDULER_CHANNEL);
-    ASSERT_NE(batch, nullptr);
-    ASSERT_EQ(batch->transaction_type(), TransactionType::MULTI_HOME);
-      
-    ASSERT_EQ(batch->transactions_size(), 2);
-
-    auto mh_txn1 = batch->transactions().at(0);
-    ASSERT_EQ(mh_txn1, *txn1);
-    
-    auto mh_txn2 = batch->transactions().at(1);
-    ASSERT_EQ(mh_txn2, *txn2);
+        auto mh_txn1 = batch->transactions().at(0);
+        ASSERT_EQ(mh_txn1, *txn1);
+        
+        auto mh_txn2 = batch->transactions().at(1);
+        ASSERT_EQ(mh_txn2, *txn2);
+        break;
+      }
+      default:
+        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: " 
+               << ENUM_NAME(batch->transaction_type(), TransactionType);
+        break;
+    }
     delete batch;
   }
 }

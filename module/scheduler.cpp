@@ -1,7 +1,5 @@
 #include "module/scheduler.h"
 
-#include <stack>
-
 #include "common/json_utils.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
@@ -125,8 +123,8 @@ void Scheduler::Loop() {
 
 void Scheduler::HandleInternalRequest(Request&& req) {
   switch (req.type_case()) {
-    case Request::kForwardBatch: 
-      ProcessForwardBatch(req.mutable_forward_batch());
+    case Request::kForwardTxn: 
+      ProcessTransaction(req.mutable_forward_txn()->release_txn());
       break;
     case Request::kRemoteReadResult:
       ProcessRemoteReadResult(move(req));
@@ -138,46 +136,6 @@ void Scheduler::HandleInternalRequest(Request&& req) {
       LOG(ERROR) << "Unexpected request type received: \""
                  << CASE_NAME(req.type_case(), Request) << "\"";
       break;
-  }
-  while (single_home_log_.HasNextBatch()) {
-    ProcessNextBatch(single_home_log_.NextBatch().second);
-  }
-  while (multi_home_log_.HasNextBatch()) {
-    ProcessNextBatch(multi_home_log_.NextBatch().second);
-  }
-}
-
-void Scheduler::ProcessForwardBatch(internal::ForwardBatch* forward_batch) {
-  if (forward_batch->part_case() == internal::ForwardBatch::kBatchOrder) {
-    auto& batch_order = forward_batch->batch_order();
-    single_home_log_.AddSlot(batch_order.slot(), batch_order.batch_id());
-  } else if (forward_batch->part_case() == internal::ForwardBatch::kBatchData) {
-    auto batch = BatchPtr(forward_batch->release_batch_data());
-    RecordTxnEvent(
-        config_,
-        batch.get(),
-        TransactionEvent::ENTER_SCHEDULER_IN_BATCH);
-
-    switch (batch->transaction_type()) {
-      case TransactionType::SINGLE_HOME:
-        single_home_log_.AddBatch(move(batch));
-        break;
-      case TransactionType::MULTI_HOME: {
-        VLOG(1) << "Received data for MULTI-HOME batch " << batch->id()
-                << ". Number of txns: " << batch->transactions_size();
-        // MULTI-HOME txns are already ordered with respect to each other
-        // and their IDs have been replaced with slot id in the orderer module
-        // so here their id and slot id are the same
-        multi_home_log_.AddSlot(batch->id(), batch->id());
-        multi_home_log_.AddBatch(move(batch));
-        break;
-      }
-      default:
-        LOG(ERROR) << "Received batch with invalid transaction type. "
-                    << "Only SINGLE_HOME and MULTI_HOME are accepted. Received "
-                    << ENUM_NAME(batch->transaction_type(), TransactionType);
-        break;
-    }
   }
 }
 
@@ -305,96 +263,80 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
               Transaction Processing
 ***********************************************/
 
-void Scheduler::ProcessNextBatch(BatchPtr&& batch) {
-  auto transactions = batch->mutable_transactions();
+void Scheduler::ProcessTransaction(Transaction* txn) {
+  auto txn_internal = txn->mutable_internal();
+  
+  RecordTxnEvent(
+      config_,
+      txn_internal,
+      TransactionEvent::ENTER_SCHEDULER);
 
-  VLOG(1) << "Processing batch " << batch->id() << " from global log";
-
-  // Calling ReleaseLast creates an incorrect order of transactions in a batch; thus,
-  // buffering them in a stack to reverse the order.
-  std::stack<Transaction*> buffer;
-  while (!transactions->empty()) {
-    buffer.push(transactions->ReleaseLast());
+  if (!AcceptTransaction(txn)) {
+    return;
   }
 
-  while (!buffer.empty()) {
-    auto txn = buffer.top();
-    buffer.pop();
+  auto txn_id = txn_internal->id();
+  auto txn_type = txn_internal->type();
+  switch (txn_type) {
+    case TransactionType::SINGLE_HOME: {
+      VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
 
-    auto txn_internal = txn->mutable_internal();
+      if (MaybeContinuePreDispatchAbort(txn_id)) {
+        break;
+      }
 
-    // Transfer recorded events from batch to each txn in the batch
-    txn_internal->mutable_events()->MergeFrom(batch->events());
-    txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
-    txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
-
-    if (!AcceptTransaction(txn)) {
-      continue;
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+      if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+        if (MaybeAbortRemasterTransaction(txn)) {
+          break;
+        }
+      }
+      SendToRemasterManager(&all_txns_[txn_id]);
+#else
+      SendToLockManager(&all_txns_[txn_id]);
+#endif
+      break;
     }
+    case TransactionType::LOCK_ONLY: {
+      auto txn_replica_id = TransactionHolder::GetTransactionIdReplicaIdPair(txn);
+      VLOG(2) << "Accepted LOCK-ONLY transaction "
+          << txn_replica_id.first <<", " << txn_replica_id.second;
 
-    auto txn_id = txn_internal->id();
-    auto txn_type = txn_internal->type();
-    switch (txn_type) {
-      case TransactionType::SINGLE_HOME: {
-        VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
-
-        if (MaybeContinuePreDispatchAbort(txn_id)) {
-          break;
-        }
-
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-        if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-          if (MaybeAbortRemasterTransaction(txn)) {
-            break;
-          }
-        }
-        SendToRemasterManager(&all_txns_[txn_id]);
-#else
-        SendToLockManager(&all_txns_[txn_id]);
-#endif
+      if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
         break;
       }
-      case TransactionType::LOCK_ONLY: {
-        auto txn_replica_id = TransactionHolder::GetTransactionIdReplicaIdPair(txn);
-        VLOG(2) << "Accepted LOCK-ONLY transaction "
-            << txn_replica_id.first <<", " << txn_replica_id.second;
-
-        if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
-          break;
-        }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-        SendToRemasterManager(&lock_only_txns_[txn_replica_id]);
+      SendToRemasterManager(&lock_only_txns_[txn_replica_id]);
 #else
-        SendToLockManager(&lock_only_txns_[txn_replica_id]);
+      SendToLockManager(&lock_only_txns_[txn_replica_id]);
 #endif
 
+      break;
+    }
+    case TransactionType::MULTI_HOME: {
+      VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
+      auto txn_holder = &all_txns_[txn_id];
+
+      if (aborting_txns_.count(txn_id)) {
+        MaybeContinuePreDispatchAbort(txn_id);
         break;
       }
-      case TransactionType::MULTI_HOME: {
-        VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
-        auto txn_holder = &all_txns_[txn_id];
-
-        if (aborting_txns_.count(txn_id)) {
-          MaybeContinuePreDispatchAbort(txn_id);
-          break;
-        }
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
-        if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-          if (MaybeAbortRemasterTransaction(txn)) {
-            break;
-          }
+      if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+        if (MaybeAbortRemasterTransaction(txn)) {
+          break;
         }
+      }
 #endif
 
-        SendToLockManager(txn_holder);
-        break;
-      }
-      default:
-        LOG(ERROR) << "Unknown transaction type";
-        break;
+      SendToLockManager(txn_holder);
+      break;
     }
+    default:
+      LOG(ERROR) << "Unknown transaction type";
+      break;
   }
 }
 

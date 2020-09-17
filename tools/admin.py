@@ -923,7 +923,7 @@ class BenchmarkCommand(Command):
         steps = range(0, num_procs, batch_size)
         remaining_steps = len(steps)
         step_duration = duration // len(steps) if duration else 0
-        for i in steps:
+        for s, i in enumerate(steps):
             remaining_steps -= 1
             batch = self.remote_procs[i:i + batch_size]
             proc_and_params = zip(
@@ -933,7 +933,7 @@ class BenchmarkCommand(Command):
             )
             with Pool(processes=len(batch)) as pool:
                 containers += pool.map(run_benchmark, proc_and_params)
-            LOG.info("Started %d clients", len(batch))
+            LOG.info("Step %d: started %d clients", s, len(batch))
 
             if duration:
                 time.sleep(step_duration)

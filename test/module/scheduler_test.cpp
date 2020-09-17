@@ -76,36 +76,12 @@ protected:
     }
   }
 
-  void SendSingleHomeBatch(
-      BatchId batch_id,
-      const vector<Transaction*>& txns,
-      const vector<size_t>& partitions,
-      // Use this when sending multiple batches
-      size_t batch_order_offset = 0) {
-    auto batch = MakeBatch(batch_id, txns, SINGLE_HOME);
+  void SendTransaction(Transaction* txn, const vector<size_t>& partitions) {
+    internal::Request req;
+    req.mutable_forward_txn()->set_allocated_txn(txn);
     for (auto partition : partitions) {
       // This message is sent from machine 0:0, so it will be queued up in queue 0
-      sender_[0]->Send(batch, SCHEDULER_CHANNEL, MakeMachineIdAsString(0, partition));
-
-      // Simulate a batch order message
-      sender_[0]->Send(
-          MakeBatchOrder(batch_order_offset, batch_id),
-          SCHEDULER_CHANNEL,
-          MakeMachineIdAsString(0, partition));
-    }
-  }
-
-  void SendMultiHomeBatch(
-      BatchId batch_id,
-      const vector<Transaction*>& txns,
-      const vector<size_t>& partitions) {
-    auto batch = MakeBatch(batch_id, txns, MULTI_HOME);
-    for (auto partition : partitions) {
-      // Simulate a message containing a batch. It doesn't matter where
-      // this message comes from.
-      sender_[partition]->Send(batch, SCHEDULER_CHANNEL);
-      // Unlike single-home batch, multi-home batches are pre-ordered
-      // and this order follows batch_id
+      sender_[0]->Send(req, SCHEDULER_CHANNEL, MakeMachineIdAsString(0, partition));
     }
   }
 
@@ -148,7 +124,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       MakeMachineId("0:1") /* coordinating server */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0});
+  SendTransaction(txn, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -166,7 +142,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
       "COPY A C" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -185,7 +161,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
       "COPY B C\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -207,7 +183,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
       "SET C newC\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -228,7 +204,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
       "GET F\n" /* code */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -265,8 +241,9 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
       ""/* code */), 1, 1);
   lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
-  SendMultiHomeBatch(0, {txn}, {0, 1, 2});
-  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(lo_txn_0, {0, 1, 2});
+  SendTransaction(lo_txn_1, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
@@ -291,7 +268,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0});
+  SendTransaction(txn, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -323,7 +300,8 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   remaster_txn->mutable_internal()->set_id(11);
 
-  SendSingleHomeBatch(100, {txn, remaster_txn}, {0});
+  SendTransaction(txn, {0});
+  SendTransaction(remaster_txn, {0});
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
@@ -383,8 +361,10 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   txn->mutable_internal()->set_id(12);
 
-  SendMultiHomeBatch(0, {remaster_txn}, {0});
-  SendSingleHomeBatch(200, {remaster_txn_lo_1, remaster_txn_lo_0, txn}, {0});
+  SendTransaction(remaster_txn, {0});
+  SendTransaction(remaster_txn_lo_1, {0});
+  SendTransaction(remaster_txn_lo_0, {0});
+  SendTransaction(txn, {0});
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
@@ -409,7 +389,7 @@ TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0});
+  SendTransaction(txn, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -438,8 +418,9 @@ TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
       {{"Y", {1,1}}, {"D", {1,0}}}); // low counter
   lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
-  SendMultiHomeBatch(0, {txn}, {0});
-  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0});
+  SendTransaction(txn, {0});
+  SendTransaction(lo_txn_0, {0});
+  SendTransaction(lo_txn_1, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
@@ -456,7 +437,7 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1});
+  SendTransaction(txn, {0, 1});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 2);
   LOG(INFO) << output_txn;
@@ -474,7 +455,7 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
       MakeMachineId("0:1") /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendSingleHomeBatch(100, {txn}, {0, 1, 2});
+  SendTransaction(txn, {0, 1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(1, 3);
   LOG(INFO) << output_txn;
@@ -503,8 +484,9 @@ TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
       {{"Y", {1,1}}, {"D", {1,0}}}); // low counter
   lo_txn_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
-  SendMultiHomeBatch(0, {txn}, {0, 1});
-  SendSingleHomeBatch(100, {lo_txn_0, lo_txn_1}, {0, 1});
+  SendTransaction(txn, {0, 1});
+  SendTransaction(lo_txn_0, {0, 1});
+  SendTransaction(lo_txn_1, {0, 1});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
