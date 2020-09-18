@@ -54,11 +54,12 @@ message TransactionInternal {
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
     internal.MachineId coordinating_server = 4;
+    repeated uint32 partitions = 5;
 
     // for recording time of different events of txn
-    repeated TransactionEvent events = 5;
-    repeated int64 event_times = 6;    // when the events took place
-    repeated uint32 event_machines = 7; // where the events took place
+    repeated TransactionEvent events = 6;
+    repeated int64 event_times = 7;    // when the events took place
+    repeated uint32 event_machines = 8; // where the events took place
 }
 
 message RemasterProcedure {

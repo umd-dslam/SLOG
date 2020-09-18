@@ -111,32 +111,7 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   ASSERT_EQ(0U, master_metadata.at("A").counter());
   ASSERT_EQ(0U, master_metadata.at("B").master());
   ASSERT_EQ(1U, master_metadata.at("B").counter());
-}
 
-TEST_F(ForwarderTest, ForwardToSameRegionKnownMaster) {
-  auto txn = MakeTransaction(
-      {"A"},            /* read_set*/
-      {"B"},            /* write_set */
-      "",               /* code */
-      {{"A", {0, 0}},   /* master_metadata */
-       {"B", {0, 1}}});
-  // Send to partition 0 of replica 0
-  test_slogs[0]->SendTxn(txn);
-
-  auto forwarded_txn = ReceiveOnSequencerChannel({0});
-  // The txn should be forwarded to the scheduler of the same machine
-  if (forwarded_txn == nullptr) {
-    FAIL() << "Message was not received before timing out";
-  }
-  ASSERT_EQ(
-      TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-  const auto& master_metadata =
-      forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2U, master_metadata.size());
-  ASSERT_EQ(0U, master_metadata.at("A").master());
-  ASSERT_EQ(0U, master_metadata.at("A").counter());
-  ASSERT_EQ(0U, master_metadata.at("B").master());
-  ASSERT_EQ(1U, master_metadata.at("B").counter());
 }
 
 TEST_F(ForwarderTest, ForwardToAnotherRegion) {

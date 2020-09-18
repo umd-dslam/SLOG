@@ -10,19 +10,19 @@
 namespace slog {
 
 /**
- * A Sequencer batches transactions before sending to the Scheduler.
+ * A Sequencer batches transactions before sending to the Interleaver.
  * 
  * INPUT:  ForwardTxn or ForwardBatch
  * 
  * OUTPUT: For ForwardTxn, it has to contains a SINGLE_HOME txn, which is put 
  *         into a batch. The ID of this batch is sent to the local paxos
  *         process for ordering, and simultaneously, this batch is sent to the 
- *         Scheduler of all machines across all regions.
+ *         Interleaver of all machines across all regions.
  * 
  *         For ForwardBatch, MULTI_HOME txns are extracted from the batch. 
  *         For each MULTI_HOME txn, a corresponding LockOnly txn is created
  *         and put into the same batch as the SINGLE_HOME txn above. The 
- *         MULTI_HOME txn is sent to all Schedulers in the SAME region.
+ *         MULTI_HOME txn is sent to all Interleavers in the SAME region.
  */
 class Sequencer : public NetworkedModule {
 public:

@@ -11,11 +11,9 @@ namespace slog {
 
 Server::Server(
     const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker,
-    const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index)
+    const shared_ptr<Broker>& broker)
   : NetworkedModule(broker, SERVER_CHANNEL),
     config_(config),
-    lookup_master_index_(lookup_master_index),
     txn_id_counter_(0) {}
 
 /***********************************************
@@ -125,52 +123,13 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
 
 void Server::HandleInternalRequest(
     internal::Request&& req,
-    string&& from_machine_id) {
-  switch (req.type_case()) {
-    case internal::Request::kLookupMaster: 
-      ProcessLookUpMasterRequest(
-          req.mutable_lookup_master(),
-          move(from_machine_id));
-      break;
-    case internal::Request::kCompletedSubtxn:
-      ProcessCompletedSubtxn(req.mutable_completed_subtxn());
-      break;
-    default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.type_case(), internal::Request) << "\"";
-      break;
+    string&& /* from_machine_id */) {
+  if (req.type_case() != internal::Request::kCompletedSubtxn) {
+    LOG(ERROR) << "Unexpected request type received: \""
+              << CASE_NAME(req.type_case(), internal::Request) << "\"";
+    return;
   }
-}
-
-void Server::ProcessLookUpMasterRequest(
-    internal::LookupMasterRequest* lookup_master,
-    string&& from_machine_id) {
-  internal::Response response;
-  auto lookup_response = response.mutable_lookup_master();
-  lookup_response->set_txn_id(lookup_master->txn_id());
-  auto metadata_map = lookup_response->mutable_master_metadata();
-  auto new_keys = lookup_response->mutable_new_keys();
-  while (!lookup_master->keys().empty()) {
-    auto key = lookup_master->mutable_keys()->ReleaseLast();
-
-    if (!config_->KeyIsInLocalPartition(*key)) {
-      // Ignore keys that the current partition does not have
-      delete key;
-    } else {
-      Metadata metadata;
-      if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
-        // If key exists, add the metadata of current key to the response
-        auto& response_metadata = (*metadata_map)[*key];
-        response_metadata.set_master(metadata.master);
-        response_metadata.set_counter(metadata.counter);
-        delete key;
-      } else {
-        // Otherwise, add it to the list indicating this is a new key
-        new_keys->AddAllocated(key);
-      }
-    }
-  }
-  Send(response, FORWARDER_CHANNEL, from_machine_id);
+  ProcessCompletedSubtxn(req.mutable_completed_subtxn());
 }
 
 void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {

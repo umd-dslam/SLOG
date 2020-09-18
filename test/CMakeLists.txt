@@ -17,7 +17,6 @@ set(ALL_TESTS
   per_key_remaster_manager_test
   proto_utils_test
   scheduler_test
-  server_test
   sequencer_test
   simple_remaster_manager_test
   string_utils_test
@@ -69,9 +68,6 @@ target_link_libraries(proto_utils_test common proto)
 
 add_executable(scheduler_test module/scheduler_test.cpp)
 target_link_libraries(scheduler_test test_utils)
-
-add_executable(server_test module/server_test.cpp)
-target_link_libraries(server_test test_utils)
 
 add_executable(sequencer_test module/sequencer_test.cpp)
 target_link_libraries(sequencer_test test_utils)
