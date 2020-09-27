@@ -53,13 +53,24 @@ TEST(MMessageTest, SendAndReceive) {
   MMessage message;
   message.Set(MM_DATA, MakeEchoRequest(TEST_STRING));
   message.SendTo(dealer);
-  MMessage recv_msg(router);
+  MMessage recv_msg;
+  ASSERT_TRUE(recv_msg.ReceiveFrom(router));
 
   Request request;
   ASSERT_TRUE(recv_msg.GetProto(request));
   ASSERT_TRUE(request.has_echo());
   auto echo = request.echo();
   ASSERT_EQ(TEST_STRING, echo.data());
+}
+
+TEST(MMessageTest, ReceiveDontWait) {
+  zmq::context_t context(1);
+
+  zmq::socket_t router(context, ZMQ_ROUTER);
+  router.bind("ipc:///tmp/test_mmessage");
+
+  MMessage message;
+  ASSERT_FALSE(message.ReceiveFrom(router, true));
 }
 
 TEST(MMessageTest, IsProto) {

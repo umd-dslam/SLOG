@@ -6,7 +6,7 @@ namespace slog {
 
 namespace {
 
-void SendSingleMessage(
+inline void SendSingleMessage(
     zmq::socket_t& socket, 
     const string& msg_str,
     bool send_more) {
@@ -18,12 +18,14 @@ void SendSingleMessage(
 }
 
 // Returns true if there is more
-bool ReceiveSingleMessage(
+inline bool ReceiveSingleMessage(
     string& str,
-    zmq::socket_t& socket) {
+    zmq::socket_t& socket,
+    bool dont_wait) {
   zmq::message_t message;
-  if (!socket.recv(message)) {
-    throw std::runtime_error("Malformed multi-part message");
+  auto flag = dont_wait ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
+  if (!socket.recv(message, flag)) {
+    return false;
   }
   str = string(
       static_cast<char*>(message.data()),
@@ -120,26 +122,27 @@ void MMessage::SendTo(zmq::socket_t& socket) const {
   }
 }
 
-void MMessage::ReceiveFrom(zmq::socket_t& socket, bool dont_wait) {
+bool MMessage::ReceiveFrom(zmq::socket_t& socket, bool dont_wait) {
   Clear();
 
   string tmp;
 
-  if (!ReceiveSingleMessage(identity_, socket)) {
-    return;
+  if (!ReceiveSingleMessage(identity_, socket, dont_wait)) {
+    return false;
   }
   if (!identity_.empty()) {
     // Empty delimiter
-    if (!ReceiveSingleMessage(tmp, socket)) {
-      return;
+    if (!ReceiveSingleMessage(tmp, socket, dont_wait)) {
+      return false;
     }
   }
 
   bool more;
   do {
-    more = ReceiveSingleMessage(tmp, socket);
+    more = ReceiveSingleMessage(tmp, socket, dont_wait);
     Push(tmp);
   } while (more);
+  return true;
 }
 
 void MMessage::Clear() {

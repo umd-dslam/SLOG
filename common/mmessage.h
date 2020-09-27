@@ -148,8 +148,10 @@ public:
    * Populates the current mmessage with data received from
    * a given socket. All previous data in this mmessage will 
    * be overwritten.
+   * If dont_wait is true, this function returns true when it receives
+   * data from the socket and false otherwise.
    */
-  void ReceiveFrom(zmq::socket_t& socket, bool dont_wait = false);
+  bool ReceiveFrom(zmq::socket_t& socket, bool dont_wait = false);
 
   /**
    * Clears all data in this mmessage.
