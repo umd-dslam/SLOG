@@ -120,7 +120,7 @@ void MMessage::SendTo(zmq::socket_t& socket) const {
   }
 }
 
-void MMessage::ReceiveFrom(zmq::socket_t& socket) {
+void MMessage::ReceiveFrom(zmq::socket_t& socket, bool dont_wait) {
   Clear();
 
   string tmp;

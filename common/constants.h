@@ -22,7 +22,7 @@ const std::string GLOBAL_PAXOS("paxos_global");
 
 const uint32_t MAX_NUM_MACHINES = 1000;
 
-const size_t MM_PROTO = 0;
+const size_t MM_DATA = 0;
 const size_t MM_FROM_CHANNEL = 1;
 const size_t MM_TO_CHANNEL = 2;
 

@@ -400,10 +400,10 @@ void Worker::SendToScheduler(
     const google::protobuf::Message& req_or_res,
     string&& forward_to_machine) {
   MMessage msg;
-  msg.Set(MM_PROTO, req_or_res);
-  // MM_PROTO + 1 is a convention between the Scheduler and
+  msg.Set(MM_DATA, req_or_res);
+  // MM_DATA + 1 is a convention between the Scheduler and
   // Worker to specify the destination of this message
-  msg.Set(MM_PROTO + 1, std::move(forward_to_machine));
+  msg.Set(MM_DATA + 1, std::move(forward_to_machine));
   msg.SendTo(scheduler_socket_);
 }
 

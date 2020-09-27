@@ -248,7 +248,7 @@ void Server::HandleInternalResponse(
 void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
   auto& pr = pending_responses_.at(txn_id);
   res.set_stream_id(pr.stream_id);
-  pr.response.Set(MM_PROTO, res);
+  pr.response.Set(MM_DATA, res);
   pr.response.SendTo(GetCustomSocket(0));
   pending_responses_.erase(txn_id);
 }

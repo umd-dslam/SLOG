@@ -98,9 +98,9 @@ void Scheduler::Loop() {
       Request forwarded_req;
       msg.GetProto(forwarded_req);
       string destination;
-      // MM_PROTO + 1 is a convention between the Scheduler and
+      // MM_DATA + 1 is a convention between the Scheduler and
       // Worker to specify the destination of this message
-      msg.GetString(destination, MM_PROTO + 1);
+      msg.GetString(destination, MM_DATA + 1);
       // Send to the Scheduler of the remote machine
       sender_.Send(forwarded_req, SCHEDULER_CHANNEL, destination);
     } else if (msg.IsProto<Response>()) {
@@ -682,7 +682,7 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
 void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {
   MMessage msg;
   msg.SetIdentity(worker);
-  msg.Set(MM_PROTO, req);
+  msg.Set(MM_DATA, req);
   msg.SendTo(worker_socket_);
 }
 

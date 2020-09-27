@@ -114,7 +114,7 @@ bool Broker::InitializeConnection() {
   ready->mutable_machine_id()->CopyFrom(
       config_->GetLocalMachineIdAsProto());
   MMessage ready_msg;
-  ready_msg.Set(MM_PROTO, request);
+  ready_msg.Set(MM_DATA, request);
 
   // Connect to all other machines and send the READY message
   auto local_machine_id = GetLocalMachineId();

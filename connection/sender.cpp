@@ -40,7 +40,7 @@ void Sender::Send(
     }
   }
   MMessage message;
-  message.Set(MM_PROTO, request_or_response);
+  message.Set(MM_DATA, request_or_response);
   message.Set(MM_TO_CHANNEL, to_channel);
   message.SendTo(machine_id_to_socket_[to_machine_id]);
 }
@@ -62,7 +62,7 @@ void Sender::Send(
     }
   }
   MMessage message;
-  message.Set(MM_PROTO, request_or_response);
+  message.Set(MM_DATA, request_or_response);
   message.SendTo(local_channel_to_socket_[to_channel]);
 }
 

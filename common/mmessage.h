@@ -109,7 +109,7 @@ public:
    *         false otherwise.
    */
   template<typename T>
-  bool GetProto(T& out, size_t index = MM_PROTO) const {
+  bool GetProto(T& out, size_t index = MM_DATA) const {
     if (IsProto<T>(index)) {
       const auto any = GetAny(index);
       return (*any).UnpackTo(&out);
@@ -124,7 +124,7 @@ public:
    *         and false otherwise.
    */
   template<typename T>
-  bool IsProto(size_t index = MM_PROTO) const {
+  bool IsProto(size_t index = MM_DATA) const {
     CHECK(index < body_.size()) 
         << "Index out of bound. Size: " << body_.size() << ". Index: " << index;
     const auto any = GetAny(index);
@@ -149,7 +149,7 @@ public:
    * a given socket. All previous data in this mmessage will 
    * be overwritten.
    */
-  void ReceiveFrom(zmq::socket_t& socket);
+  void ReceiveFrom(zmq::socket_t& socket, bool dont_wait = false);
 
   /**
    * Clears all data in this mmessage.
