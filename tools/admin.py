@@ -1004,14 +1004,15 @@ class CollectCommand(Command):
                     out_addr_path = os.path.join(out_path, addr)
 
                     os.makedirs(out_addr_path, exist_ok=True)
-                    commands.append(
+                    cmd = (
                         f'ssh {args.user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
-                        f'scp {args.user}@{addr}:{data_tar_path} {out_path} && '
+                        f'rsync -vh --inplace {args.user}@{addr}:{data_tar_path} {out_path} && '
                         f'tar -xzf {out_tar_path} -C {out_addr_path}'
                     )
+                    commands.append(f'({cmd}) & ')
         
         LOG.info("Executing commands:\n%s", '\n'.join(commands))
-        os.system(';'.join(commands))
+        os.system(''.join(commands) + ' wait')
 
 
 if __name__ == "__main__":
