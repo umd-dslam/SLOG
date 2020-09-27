@@ -33,6 +33,8 @@ Worker::Worker(
     commands_(new KeyValueCommands()) {
   scheduler_socket_.setsockopt(ZMQ_IDENTITY, identity);
   scheduler_socket_.setsockopt(ZMQ_LINGER, 0);
+  scheduler_socket_.setsockopt(ZMQ_SNDHWM, 0);
+  scheduler_socket_.setsockopt(ZMQ_RCVHWM, 0);
   poll_item_ = {
     static_cast<void*>(scheduler_socket_),
     0, /* fd */
