@@ -933,7 +933,7 @@ class BenchmarkCommand(Command):
             )
             with Pool(processes=len(batch)) as pool:
                 containers += pool.map(run_benchmark, proc_and_params)
-            LOG.info("Step %d: started %d clients", s, len(batch))
+            LOG.info("Step %d: started %d clients", s + 1, len(batch))
 
             if duration:
                 time.sleep(step_duration)
@@ -1036,4 +1036,6 @@ if __name__ == "__main__":
         command().create_subparser(subparsers)
 
     args = parser.parse_args()
+    start_time = time.time()
     args.run(args)
+    LOG.info("Elapsed time: %.1f sec", time.time() - start_time)
