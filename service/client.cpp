@@ -14,6 +14,8 @@
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
 DEFINE_uint32(level, 0, "Level of details for the \"stats\" command");
+DEFINE_uint32(repeat, 1, "Used with \"txn\" command. Send the txn multiple times");
+DEFINE_bool(no_wait, false, "Used with \"txn\" command. Don't wait for reply");
 
 using namespace slog;
 using namespace std;
@@ -84,22 +86,23 @@ void ExecuteTxn(const char* txn_file) {
   req.mutable_txn()->set_allocated_txn(txn);
 
   // 3. Send to the server
-  {
-    MMessage msg;
-    msg.Push(req);
-    msg.SendTo(server_socket);
-    LOG(INFO) << "Transaction sent";
+  MMessage request_msg;
+  request_msg.Push(req);
+  for (uint32_t i = 0; i < FLAGS_repeat; i++) {
+    request_msg.SendTo(server_socket);
   }
 
   // 4. Wait and print response
-  {
-    MMessage msg(server_socket);
-    api::Response res;
-    if (!msg.GetProto(res)) {
-      LOG(FATAL) << "Malformed response";
-    } else {
-      const auto& txn = res.txn().txn();
-      cout << txn;
+  if (!FLAGS_no_wait) {
+    for (uint32_t i = 0; i < FLAGS_repeat; i++) {
+      MMessage msg(server_socket);
+      api::Response res;
+      if (!msg.GetProto(res)) {
+        LOG(FATAL) << "Malformed response";
+      } else {
+        const auto& txn = res.txn().txn();
+        cout << txn;
+      }
     }
   }
 }

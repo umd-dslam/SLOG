@@ -62,6 +62,8 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
 
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 find_package(ZeroMQ REQUIRED)
 include_directories(${ZeroMQ_INCLUDE_DIR})
 find_package(cppzmq REQUIRED)
