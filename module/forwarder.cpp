@@ -22,22 +22,18 @@ Forwarder::Forwarder(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker,
     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index)
-  : NetworkedModule(broker, FORWARDER_CHANNEL),
+  : NetworkedModule(broker, kForwarderChannel),
     config_(config),
     lookup_master_index_(lookup_master_index),
     rg_(std::random_device()()) {}
 
-void Forwarder::HandleInternalRequest(
-    Request&& req,
-    string&& from_machine_id) {
+void Forwarder::HandleInternalRequest(Request&& req, MachineIdNum from) {
   switch (req.type_case()) {
     case internal::Request::kForwardTxn:
       ProcessForwardTxn(req.mutable_forward_txn());
       break;
     case internal::Request::kLookupMaster:
-      ProcessLookUpMasterRequest(
-          req.mutable_lookup_master(),
-          move(from_machine_id));
+      ProcessLookUpMasterRequest(req.mutable_lookup_master(), from);
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
@@ -113,15 +109,15 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
     if (part != local_partition) {
       Send(
           lookup_master_request,
-          FORWARDER_CHANNEL,
-          MakeMachineIdAsString(local_rep, part));
+          kForwarderChannel,
+          config_->MakeMachineIdNum(local_rep, part));
     }
   }
 }
 
 void Forwarder::ProcessLookUpMasterRequest(
     internal::LookupMasterRequest* lookup_master,
-    string&& from_machine_id) {
+    MachineIdNum from) {
   internal::Response response;
   auto lookup_response = response.mutable_lookup_master();
   lookup_response->set_txn_id(lookup_master->txn_id());
@@ -147,12 +143,10 @@ void Forwarder::ProcessLookUpMasterRequest(
       }
     }
   }
-  Send(response, FORWARDER_CHANNEL, from_machine_id);
+  Send(response, kForwarderChannel, from);
 }
 
-void Forwarder::HandleInternalResponse(
-    Response&& res,
-    string&& /* from_machine_id */) {
+void Forwarder::HandleInternalResponse(Response&& res, MachineIdNum /* from */) {
   // The forwarder only cares about lookup master responses
   if (res.type_case() != Response::kLookupMaster) {
     LOG(ERROR) << "Unexpected response type received: \""
@@ -212,11 +206,11 @@ void Forwarder::Forward(Transaction* txn) {
           config_,
           txn_internal,
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
-      Send(forward_txn, SEQUENCER_CHANNEL);
+      Send(forward_txn, kSequencerChannel);
     } else {
       std::uniform_int_distribution<> RandomPartition(0, config_->GetNumPartitions() - 1);
       auto partition = RandomPartition(rg_);
-      auto random_machine_in_home_replica = MakeMachineIdAsString(home_replica, partition);
+      auto random_machine_in_home_replica = config_->MakeMachineIdNum(home_replica, partition);
 
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: "
               << home_replica << ", part: " << partition << ")";
@@ -227,11 +221,11 @@ void Forwarder::Forward(Transaction* txn) {
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(
           forward_txn,
-          SEQUENCER_CHANNEL,
+          kSequencerChannel,
           random_machine_in_home_replica);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    auto destination = MakeMachineIdAsString(
+    auto destination = config_->MakeMachineIdNum(
         config_->GetLocalReplica(),
         config_->GetLeaderPartitionForMultiHomeOrdering());
 
@@ -243,7 +237,7 @@ void Forwarder::Forward(Transaction* txn) {
         TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
     Send(
         forward_txn,
-        MULTI_HOME_ORDERER_CHANNEL,
+        kMultiHomeOrdererChannel,
         destination);
   }
 }

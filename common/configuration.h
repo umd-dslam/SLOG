@@ -47,6 +47,8 @@ public:
   string GetLocalMachineIdAsString() const;
   internal::MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;
+  MachineIdNum MakeMachineIdNum(uint32_t replica, uint32_t partition) const;
+  std::pair<uint32_t, uint32_t> UnpackMachineId(MachineIdNum machine_id) const;
 
   uint32_t GetLeaderPartitionForMultiHomeOrdering() const;
 

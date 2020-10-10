@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "common/types.h"
+
 namespace slog {
 
 const long BROKER_POLL_TIMEOUT_MS = 100;
@@ -10,15 +12,14 @@ const long MODULE_POLL_TIMEOUT_MS = 100;
 const int SERVER_RCVHWM = 0;
 const int SERVER_SNDHWM = 0;
 
-const std::string SERVER_CHANNEL("server");
-const std::string FORWARDER_CHANNEL("forwarder");
-const std::string SEQUENCER_CHANNEL("sequencer");
-const std::string MULTI_HOME_ORDERER_CHANNEL("multi_home_orderer");
-const std::string INTERLEAVER_CHANNEL("interleaver");
-const std::string SCHEDULER_CHANNEL("scheduler");
-
-const std::string LOCAL_PAXOS("paxos_local");
-const std::string GLOBAL_PAXOS("paxos_global");
+const Channel kServerChannel = 1;
+const Channel kForwarderChannel = 2;
+const Channel kSequencerChannel = 3;
+const Channel kMultiHomeOrdererChannel = 4;
+const Channel kInterleaverChannel = 5;
+const Channel kSchedulerChannel = 6;
+const Channel kLocalPaxos = 7;
+const Channel kGlobalPaxos = 8;
 
 const uint32_t MAX_NUM_MACHINES = 1000;
 
@@ -26,7 +27,6 @@ const size_t MM_DATA = 0;
 const size_t MM_FROM_CHANNEL = 1;
 const size_t MM_TO_CHANNEL = 2;
 
-const uint32_t DEFAULT_MASTER_REGION_OF_NEW_KEY = 0;
 const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
 
 const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;

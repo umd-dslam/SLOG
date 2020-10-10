@@ -11,7 +11,7 @@ Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 
 void Acceptor::HandleRequest(
     const Request& req,
-    const string& from_machine_id) {
+    MachineIdNum from_machine_id) {
   switch (req.type_case()) {
     case Request::TypeCase::kPaxosAccept:
       ProcessAcceptRequest(req.paxos_accept(), from_machine_id); break;
@@ -24,7 +24,7 @@ void Acceptor::HandleRequest(
 
 void Acceptor::ProcessAcceptRequest(
     const internal::PaxosAcceptRequest& req,
-    const string& from_machine_id) {
+    MachineIdNum from_machine_id) {
   if (req.ballot() < ballot_) {
     return;
   }
@@ -38,7 +38,7 @@ void Acceptor::ProcessAcceptRequest(
 
 void Acceptor::ProcessCommitRequest(
     const internal::PaxosCommitRequest& req,
-    const string& from_machine_id) {
+    MachineIdNum from_machine_id) {
   // TODO: If leader election is implemented, this is where we erase
   //       memory about an accepted value
   Response res;

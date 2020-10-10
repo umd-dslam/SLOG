@@ -14,28 +14,28 @@ class SimpleMultiPaxos : public NetworkedModule {
 public:
 
   /**
-   * @param group_name  Name of the current paxos group. Used to differentiate messages 
-   *                    from other paxos groups
-   * @param broker      The broker for sending and receiving messages
-   * @param members     Machine Id of all members participating in this Paxos process
-   * @param me          Machine Id of the current machine
+   * @param group_channel Channel of the current paxos group. Used to differentiate messages 
+   *                      from other paxos groups
+   * @param broker        The broker for sending and receiving messages
+   * @param members       Machine Id of all members participating in this Paxos process
+   * @param me            Machine Id of the current machine
    */
   SimpleMultiPaxos(
-      const string& group_name,
+      Channel group_channel,
       const shared_ptr<Broker>& broker,
-      const vector<string>& group_members,
-      const string& me);
+      const vector<MachineIdNum>& group_members,
+      MachineIdNum me);
 
   bool IsMember() const;
 
 protected:
   void HandleInternalRequest(
       internal::Request&& req,
-      string&& from_machine_id) final;
+      MachineIdNum from_machine_id) final;
 
   void HandleInternalResponse(
       internal::Response&& res,
-      string&& from_machine_id) final;
+      MachineIdNum from_machine_id) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
 
@@ -45,7 +45,7 @@ private:
 
   void SendSameChannel(
       const google::protobuf::Message& request_or_response,
-      const std::string& to_machine_id);
+      MachineIdNum to_machine_id);
 
   friend class Leader;
   friend class Acceptor;

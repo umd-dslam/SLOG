@@ -11,8 +11,8 @@ using internal::Response;
 
 Leader::Leader(
     SimpleMultiPaxos& paxos,
-    const vector<string>& members,
-    const string& me)
+    const vector<MachineIdNum>& members,
+    MachineIdNum me)
   : paxos_(paxos), 
     members_(members),
     me_(me),
@@ -87,15 +87,13 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest commit) {
   }
 }
 
-void Leader::HandleResponse(
-    const Response& res,
-    const string& from_machine_id) {
+void Leader::HandleResponse(const Response& res, MachineIdNum from) {
   // Iterate using indices instead of iterator because we may add new trackers to
   // this list, which would validate the iterator.
   auto num_quorum_trackers = quorum_trackers_.size();
   for (size_t i = 0; i < num_quorum_trackers; i++) {
     auto& tracker = quorum_trackers_[i];
-    bool state_changed = tracker->HandleResponse(res, from_machine_id);
+    bool state_changed = tracker->HandleResponse(res, from);
     if (state_changed) {
       const auto raw_tracker = tracker.get();
 

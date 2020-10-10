@@ -53,13 +53,9 @@ protected:
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void HandleInternalRequest(
-      internal::Request&& req,
-      std::string&& from_machine_id) final;
+  void HandleInternalRequest(internal::Request&& req, MachineIdNum from) final;
 
-  void HandleInternalResponse(
-      internal::Response&& /* res */,
-      std::string&& /* from_machine_id */) final;
+  void HandleInternalResponse(internal::Response&& res, MachineIdNum /* from */) final;
 
   void HandleCustomSocketMessage(
       const MMessage& /* msg */,

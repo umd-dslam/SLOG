@@ -4,7 +4,7 @@
 
 #include <zmq.hpp>
 
-#include "common/mmessage.h"
+#include "common/types.h"
 #include "connection/broker.h"
 
 namespace slog {
@@ -24,8 +24,8 @@ public:
    */
   void Send(
       const google::protobuf::Message& request_or_response,
-      const std::string& to_channel,
-      const std::string& to_machine_id);
+      Channel to_channel,
+      MachineIdNum to_machine_id);
 
   /**
    * Send a request or response to the same machine given a channel
@@ -34,7 +34,7 @@ public:
    */
   void Send(
       const google::protobuf::Message& request_or_response,
-      const std::string& to_channel);
+      Channel to_channel);
 
 private:
   // To make a unique identity for a Sender
@@ -46,11 +46,10 @@ private:
 
   std::weak_ptr<Broker> broker_;
 
-  std::string local_machine_id_;
-  std::string identity_;
+  MachineIdNum local_machine_id_;
 
-  std::unordered_map<std::string, zmq::socket_t> machine_id_to_socket_;
-  std::unordered_map<std::string, zmq::socket_t> local_channel_to_socket_;
+  std::unordered_map<MachineIdNum, zmq::socket_t> machine_id_to_socket_;
+  std::unordered_map<Channel, zmq::socket_t> local_channel_to_socket_;
 };
 
 } // namespace slog

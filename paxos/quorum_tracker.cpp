@@ -8,9 +8,7 @@ QuorumTracker::QuorumTracker(uint32_t num_members)
   : num_members_(num_members),
     state_(QuorumState::INCOMPLETE) {}
 
-bool QuorumTracker::HandleResponse(
-    const Response& res,
-    const string& from_machine_id) {
+bool QuorumTracker::HandleResponse(const Response& res, MachineIdNum from) {
   if (state_ == QuorumState::COMPLETE || state_ == QuorumState::ABORTED) {
     return false;
   }
@@ -18,7 +16,7 @@ bool QuorumTracker::HandleResponse(
     return false;
   }
 
-  machine_responded_.insert(from_machine_id);
+  machine_responded_.insert(from);
 
   auto sz = machine_responded_.size();
   if (sz == num_members_) {

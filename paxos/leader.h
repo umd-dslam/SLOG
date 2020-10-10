@@ -38,14 +38,14 @@ public:
    */
   Leader(
       SimpleMultiPaxos& paxos,
-      const vector<string>& members,
-      const string& me);
+      const vector<MachineIdNum>& members,
+      MachineIdNum me);
 
   void HandleRequest(const internal::Request& req);
 
   void HandleResponse(
       const internal::Response& res,
-      const string& from_machine_id);
+      MachineIdNum from_machine_id);
   
   bool IsMember() const;
 
@@ -62,11 +62,11 @@ private:
 
   SimpleMultiPaxos& paxos_;
 
-  const vector<string> members_;
-  const string me_;
+  const vector<MachineIdNum> members_;
+  const MachineIdNum me_;
   bool is_elected_;
   bool is_member_;
-  string elected_leader_;
+  MachineIdNum elected_leader_;
 
   SlotId min_uncommitted_slot_;
   SlotId next_empty_slot_;

@@ -6,7 +6,7 @@ set(ALL_TESTS
   broker_and_sender_test
   commands_test
   concurrent_hash_map_test
-  conn_proto_utils_test
+  zmq_utils_test
   deterministic_lock_manager_test
   deterministic_lock_manager_deprecated_test
   e2e_test
@@ -34,8 +34,8 @@ target_link_libraries(commands_test scheduler_components test_utils)
 
 add_executable(concurrent_hash_map_test data_structure/concurrent_hash_map_test.cpp)
 
-add_executable(conn_proto_utils_test connection/proto_utils_test.cpp)
-target_link_libraries(conn_proto_utils_test proto)
+add_executable(zmq_utils_test connection/zmq_utils_test.cpp)
+target_link_libraries(zmq_utils_test proto)
 
 add_executable(deterministic_lock_manager_test 
   module/scheduler_components/deterministic_lock_manager_test.cpp)

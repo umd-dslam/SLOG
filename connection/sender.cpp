@@ -1,5 +1,7 @@
 #include "sender.h"
 
+#include "connection/zmq_utils.h"
+
 using std::move;
 
 namespace slog {
@@ -10,26 +12,21 @@ std::atomic<uint8_t> Sender::counter(1);
 Sender::Sender(const std::shared_ptr<Broker>& broker)
   : context_(broker->GetContext()),
     broker_(broker),
-    local_machine_id_(broker->GetLocalMachineId()) {
-  identity_ = static_cast<char>(counter.fetch_add(1)) + local_machine_id_;
-}
+    local_machine_id_(broker->GetLocalMachineId()) {}
 
 void Sender::Send(
     const google::protobuf::Message& request_or_response,
-    const std::string& to_channel,
-    const std::string& to_machine_id) {
+    Channel to_channel,
+    MachineIdNum to_machine_id) {
   // If sending to local module, use the other function to bypass the local broker
-  if (to_machine_id.empty() || to_machine_id == local_machine_id_) {
+  if (to_machine_id == local_machine_id_) {
     Send(request_or_response, to_channel);
     return;
   }
   // Lazily establish a new connection when necessary
   if (machine_id_to_socket_.count(to_machine_id) == 0) {
     if (auto br = broker_.lock()) {
-      zmq::socket_t new_socket(*context_, ZMQ_DEALER);
-      // The identity must be set before calling ``connect''
-      new_socket.setsockopt(
-          ZMQ_IDENTITY, identity_.c_str(), identity_.length());
+      zmq::socket_t new_socket(*context_, ZMQ_PUSH);
       new_socket.setsockopt(ZMQ_LINGER, 0);
       new_socket.setsockopt(ZMQ_SNDHWM, 0);
       new_socket.connect(br->GetEndpointByMachineId(to_machine_id));
@@ -39,20 +36,18 @@ void Sender::Send(
       return;
     }
   }
-  MMessage message;
-  message.Set(MM_DATA, request_or_response);
-  message.Set(MM_TO_CHANNEL, to_channel);
-  message.SendTo(machine_id_to_socket_[to_machine_id]);
+  
+  SendProto(machine_id_to_socket_[to_machine_id], request_or_response, to_channel);
 }
 
 void Sender::Send(
     const google::protobuf::Message& request_or_response,
-    const std::string& to_channel) {
+    Channel to_channel) {
   // Lazily establish a new connection when necessary
   if (local_channel_to_socket_.count(to_channel) == 0) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
-      new_socket.connect("inproc://" + to_channel);
+      new_socket.connect("inproc://channel_" + std::to_string(to_channel));
       new_socket.setsockopt(ZMQ_LINGER, 0);
       new_socket.setsockopt(ZMQ_SNDHWM, 0);
       local_channel_to_socket_[to_channel] = move(new_socket);
@@ -61,9 +56,8 @@ void Sender::Send(
       return;
     }
   }
-  MMessage message;
-  message.Set(MM_DATA, request_or_response);
-  message.SendTo(local_channel_to_socket_[to_channel]);
+
+  SendProto(local_channel_to_socket_[to_channel], request_or_response);
 }
 
 } // namespace slog

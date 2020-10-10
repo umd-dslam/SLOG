@@ -13,7 +13,7 @@ using internal::Response;
 Sequencer::Sequencer(
     const ConfigurationPtr& config,
     const std::shared_ptr<Broker>& broker)
-  : NetworkedModule(broker, SEQUENCER_CHANNEL),
+  : NetworkedModule(broker, kSequencerChannel),
     config_(config),
     batch_id_counter_(0) {
   NewBatch();
@@ -30,9 +30,7 @@ void Sequencer::NewBatch() {
   batch_->set_transaction_type(TransactionType::SINGLE_HOME);
 }
 
-void Sequencer::HandleInternalRequest(
-    Request&& req,
-    string&& /* from_machine_id */) {
+void Sequencer::HandleInternalRequest(Request&& req, MachineIdNum /* from */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
       // Received a single-home txn
@@ -82,7 +80,7 @@ void Sequencer::HandleCustomSocketMessage(
   Request paxos_req;
   auto paxos_propose = paxos_req.mutable_paxos_propose();
   paxos_propose->set_value(config_->GetLocalPartition());
-  Send(paxos_req, LOCAL_PAXOS);
+  Send(paxos_req, kLocalPaxos);
 
   Request batch_req;
   auto forward_batch = batch_req.mutable_forward_batch();
@@ -110,11 +108,8 @@ void Sequencer::HandleCustomSocketMessage(
   auto num_replicas = config_->GetNumReplicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      auto machine_id = MakeMachineIdAsString(rep, part);
-      Send(
-          batch_req,
-          INTERLEAVER_CHANNEL,
-          machine_id);
+      auto machine_id = config_->MakeMachineIdNum(rep, part);
+      Send(batch_req, kInterleaverChannel, machine_id);
     }
   }
 
@@ -187,11 +182,8 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
 
   auto num_partitions = config_->GetNumPartitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
-    auto machine_id = MakeMachineIdAsString(local_rep, part);
-    Send(
-        req,
-        INTERLEAVER_CHANNEL,
-        machine_id);
+    auto machine_id = config_->MakeMachineIdNum(local_rep, part);
+    Send(req, kInterleaverChannel, machine_id);
   }
 }
 

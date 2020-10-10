@@ -8,7 +8,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "common/mmessage.h"
+#include "common/types.h"
 
 using std::shared_ptr;
 using std::string;
@@ -70,13 +70,13 @@ public:
 
   void StartInNewThread();
 
-  string AddChannel(const string& name);
+  void AddChannel(Channel chan);
 
   const std::shared_ptr<zmq::context_t>& GetContext() const;
 
-  std::string GetEndpointByMachineId(const std::string& machine_id);
+  std::string GetEndpointByMachineId(MachineIdNum machine_id);
 
-  std::string GetLocalMachineId() const;
+  MachineIdNum GetLocalMachineId() const;
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -93,14 +93,14 @@ private:
   
   void Run();
 
-  void HandleIncomingMessage(MMessage&& msg);
+  void HandleIncomingMessage(zmq::message_t&& msg);
 
-  zmq::pollitem_t GetRouterPollItem();
+  zmq::pollitem_t GetSocketPollItem();
 
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   long poll_timeout_ms_;
-  zmq::socket_t router_;
+  zmq::socket_t socket_;
 
   // Thread stuff
   std::atomic<bool> running_;
@@ -112,13 +112,13 @@ private:
   std::mutex mutex_;
 
   // Messages that are sent to this broker when it is not READY yet
-  vector<MMessage> unhandled_incoming_messages_;
+  vector<zmq::message_t> unhandled_incoming_messages_;
   // Map from channel name to the channel
-  unordered_map<string, zmq::socket_t> channels_;
+  unordered_map<Channel, zmq::socket_t> channels_;
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages
-  std::unordered_map<std::string, std::string> machine_id_to_endpoint_;
+  std::unordered_map<MachineIdNum, std::string> machine_id_to_endpoint_;
 
   // This is a hack so that tests behave correctly. Ideally, these sockets
   // should be scoped within InitializeConnection(). However, if we let them

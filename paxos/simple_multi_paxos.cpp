@@ -9,25 +9,21 @@ using internal::Request;
 using internal::Response;
 
 SimpleMultiPaxos::SimpleMultiPaxos(
-    const string& group_name,
+    Channel group_channel,
     const shared_ptr<Broker>& broker,
-    const vector<string>& members,
-    const string& me)
-  : NetworkedModule(broker, group_name),
+    const vector<MachineIdNum>& members,
+    MachineIdNum me)
+  : NetworkedModule(broker, group_channel),
     leader_(*this, members, me),
     acceptor_(*this) {}
 
-void SimpleMultiPaxos::HandleInternalRequest(
-    Request&& req,
-    string&& from_machine_id) {
+void SimpleMultiPaxos::HandleInternalRequest(Request&& req, MachineIdNum from) {
   leader_.HandleRequest(req);
-  acceptor_.HandleRequest(req, from_machine_id);
+  acceptor_.HandleRequest(req, from);
 }
 
-void SimpleMultiPaxos::HandleInternalResponse(
-    Response&& res,
-    string&& from_machine_id) {
-  leader_.HandleResponse(res, from_machine_id);
+void SimpleMultiPaxos::HandleInternalResponse(Response&& res, MachineIdNum from) {
+  leader_.HandleResponse(res, from);
 }
 
 bool SimpleMultiPaxos::IsMember() const {
@@ -36,8 +32,8 @@ bool SimpleMultiPaxos::IsMember() const {
 
 void SimpleMultiPaxos::SendSameChannel(
     const google::protobuf::Message& msg,
-    const std::string& to_machine_id) {
-  Send(msg, GetName(), to_machine_id);
+    MachineIdNum to_machine_id) {
+  Send(msg, channel(), to_machine_id);
 }
 
 } // namespace slog

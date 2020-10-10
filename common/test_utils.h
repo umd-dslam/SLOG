@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/configuration.h"
+#include "common/mmessage.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "module/base/module.h"

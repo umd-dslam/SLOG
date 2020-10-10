@@ -141,7 +141,8 @@ void TestSlog::AddMultiHomeOrderer() {
 }
 
 void TestSlog::AddOutputChannel(const string& name) {
-  broker_->AddChannel(name);
+  // TODO: Fix this
+  broker_->AddChannel(0);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
   socket.setsockopt(ZMQ_LINGER, 0);

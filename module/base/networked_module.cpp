@@ -3,6 +3,7 @@
 #include "common/constants.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
+#include "connection/zmq_utils.h"
 
 using std::move;
 using std::unique_ptr;
@@ -15,13 +16,13 @@ using internal::Response;
 
 NetworkedModule::NetworkedModule(
     const std::shared_ptr<Broker>& broker,
-    const std::string& name)
+    Channel channel)
   : context_(broker->GetContext()),
-    name_(name),
     pull_socket_(*context_, ZMQ_PULL),
-    sender_(broker) {
-  broker->AddChannel(name);
-  pull_socket_.bind("inproc://" + name);
+    sender_(broker),
+    channel_(channel) {
+  broker->AddChannel(channel);
+  pull_socket_.bind("inproc://channel_" + std::to_string(channel));
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
   // Remove limit on the zmq message queues
   pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
@@ -46,10 +47,6 @@ const std::shared_ptr<zmq::context_t> NetworkedModule::GetContext() const {
   return context_;
 }
 
-const std::string& NetworkedModule::GetName() const {
-  return name_;
-}
-
 void NetworkedModule::SetUp() {
   custom_sockets_ = InitializeCustomSockets();
   for (auto& socket : custom_sockets_) {
@@ -69,24 +66,15 @@ void NetworkedModule::Loop() {
 
   // Message from pull socket
   if (poll_items_[0].revents & ZMQ_POLLIN) {
-    MMessage message(pull_socket_);
-    auto from_machine_id = message.GetIdentity();
-
-    if (message.IsProto<Request>()) {
-      Request req;
-      message.GetProto(req);
-
-      HandleInternalRequest(
-          move(req),
-          move(from_machine_id));
-
-    } else if (message.IsProto<Response>()) {
-      Response res;
-      message.GetProto(res);
-
-      HandleInternalResponse(
-          move(res),
-          move(from_machine_id));
+    zmq::message_t msg;
+    if (pull_socket_.recv(msg) > 0) {
+      if (MachineIdNum from; ParseMachineId(from, msg)) {
+        if (Request req; ParseProto(req, msg)) {
+          HandleInternalRequest(move(req), from);
+        } else if (Response res; ParseProto(res, msg)) {
+          HandleInternalResponse(move(res), from);
+        }
+      }
     }
   }
 
@@ -103,14 +91,14 @@ void NetworkedModule::Loop() {
 
 void NetworkedModule::Send(
     const google::protobuf::Message& request_or_response,
-    const std::string& to_channel,
-    const std::string& to_machine_id) {
+    Channel to_channel,
+    MachineIdNum to_machine_id) {
   sender_.Send(request_or_response, to_channel, to_machine_id);
 }
 
 void NetworkedModule::Send(
     const google::protobuf::Message& request_or_response,
-    const std::string& to_channel) {
+    Channel to_channel) {
   sender_.Send(request_or_response, to_channel);
 }
 

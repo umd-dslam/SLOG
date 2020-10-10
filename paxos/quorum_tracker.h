@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/types.h"
 #include "proto/internal.pb.h"
 
 using std::string;
@@ -24,9 +25,7 @@ class QuorumTracker {
 public:
   QuorumTracker(uint32_t num_members);
 
-  bool HandleResponse(
-      const internal::Response& res,
-      const string& from_machine_id);
+  bool HandleResponse(const internal::Response& res, MachineIdNum from);
     
   QuorumState GetState() const;
  
@@ -37,7 +36,7 @@ protected:
 
 private:
   uint32_t num_members_;
-  unordered_set<string> machine_responded_;
+  unordered_set<MachineIdNum> machine_responded_;
   QuorumState state_;
 };
 

@@ -137,7 +137,16 @@ MachineId Configuration::GetLocalMachineIdAsProto() const {
 }
 
 uint32_t Configuration::GetLocalMachineIdAsNumber() const {
-  return local_replica_ * GetNumPartitions() + local_partition_;
+  return MakeMachineIdNum(local_replica_, local_partition_);
+}
+
+MachineIdNum Configuration::MakeMachineIdNum(uint32_t replica, uint32_t partition) const {
+  return replica * GetNumPartitions() + partition;
+}
+
+std::pair<uint32_t, uint32_t> Configuration::UnpackMachineId(MachineIdNum machine_id) const {
+  auto num_partitions = GetNumPartitions();
+  return std::make_pair(machine_id / num_partitions, machine_id % num_partitions);
 }
 
 string Configuration::GetLocalMachineIdAsString() const {

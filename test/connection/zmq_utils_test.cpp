@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <iostream>
-#include "connection/proto_utils.h"
+#include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
 using namespace std;
@@ -9,7 +9,7 @@ using namespace slog;
 using internal::Request;
 using internal::Response;
 
-TEST(ProtoUtilsTest, SendAndReceiveProto) {
+TEST(ZmqUtilsTest, SendAndReceiveProto) {
   zmq::context_t context(1);
 
   zmq::socket_t push(context, ZMQ_PUSH);
@@ -26,7 +26,7 @@ TEST(ProtoUtilsTest, SendAndReceiveProto) {
   ASSERT_EQ(req2.echo().data(), "test");
 }
 
-TEST(ProtoUtilsTest, SendAndReceiveWrongProto) {
+TEST(ZmqUtilsTest, SendAndReceiveWrongProto) {
   zmq::context_t context(1);
 
   zmq::socket_t push(context, ZMQ_PUSH);
@@ -42,7 +42,7 @@ TEST(ProtoUtilsTest, SendAndReceiveWrongProto) {
   ASSERT_FALSE(ReceiveProto(pull, res));
 }
 
-TEST(ProtoUtilsTest, ReceiveProtoDontWait) {
+TEST(ZmqUtilsTest, ReceiveProtoDontWait) {
   zmq::context_t context(1);
 
   zmq::socket_t push(context, ZMQ_PUSH);
@@ -54,7 +54,7 @@ TEST(ProtoUtilsTest, ReceiveProtoDontWait) {
   ASSERT_FALSE(ReceiveProto(pull, res, true));
 }
 
-TEST(ProtoUtilsTest, SendWithChannel) {
+TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
   zmq::context_t context(1);
 
   zmq::socket_t push(context, ZMQ_PUSH);
@@ -64,10 +64,25 @@ TEST(ProtoUtilsTest, SendWithChannel) {
 
   Request req;
   req.mutable_echo()->set_data("test");
-  SendProto(push, req, 9);
+  SendProto(push, req, 9, 1);
 
   zmq::message_t msg;
-  pull.recv(msg, zmq::recv_flags::none);
-  auto chan = *msg.data<Channel>();
-  ASSERT_EQ(chan, 9);
+  pull.recv(msg);
+  MachineIdNum machineId;
+  ASSERT_TRUE(ParseMachineId(machineId, msg));
+  ASSERT_EQ(machineId, 1);
+
+  Channel channel;
+  ASSERT_TRUE(ParseChannel(channel, msg));
+  ASSERT_EQ(channel, 9);
+}
+
+TEST(ZmqUtilsTest, FailedParsing) {
+  zmq::message_t msg;
+  MachineIdNum id;
+  ASSERT_FALSE(ParseMachineId(id, msg));
+  Channel chan;
+  ASSERT_FALSE(ParseChannel(chan, msg));
+  Request req;
+  ASSERT_FALSE(ParseProto(req, msg));
 }

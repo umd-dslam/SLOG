@@ -28,13 +28,9 @@ public:
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(
-      internal::Request&& req,
-      string&& from_machine_id) final;
+  void HandleInternalRequest(internal::Request&& req, MachineIdNum from_machine_id) final;
 
-  void HandleCustomSocketMessage(
-      const MMessage& msg,
-      size_t socket_index) final;
+  void HandleCustomSocketMessage(const MMessage& msg, size_t socket_index) final;
 
 private:
   void NewBatch();

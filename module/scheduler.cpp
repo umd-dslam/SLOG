@@ -26,8 +26,8 @@ Scheduler::Scheduler(
     pull_socket_(*broker->GetContext(), ZMQ_PULL),
     worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
     sender_(broker) {
-  broker->AddChannel(SCHEDULER_CHANNEL);
-  pull_socket_.bind("inproc://" + SCHEDULER_CHANNEL);
+  broker->AddChannel(kSchedulerChannel);
+  pull_socket_.bind("inproc://channel_" + kSchedulerChannel);
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
   pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
   poll_items_.push_back({
@@ -102,7 +102,8 @@ void Scheduler::Loop() {
       // Worker to specify the destination of this message
       msg.GetString(destination, MM_DATA + 1);
       // Send to the Scheduler of the remote machine
-      sender_.Send(forwarded_req, SCHEDULER_CHANNEL, destination);
+      // TODO: Fix this
+      sender_.Send(forwarded_req, kSchedulerChannel, 0);
     } else if (msg.IsProto<Response>()) {
       Response res;
       msg.GetProto(res);
@@ -197,7 +198,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  sender_.Send(res, SERVER_CHANNEL);
+  sender_.Send(res, kServerChannel);
 }
 
 /***********************************************
@@ -252,9 +253,9 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
       txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
 
-  auto coordinating_server = MakeMachineIdAsString(
-      txn->internal().coordinating_server());
-  sender_.Send(req, SERVER_CHANNEL, coordinating_server);
+  auto& coord_server = txn->internal().coordinating_server();
+  auto coordinating_server = config_->MakeMachineIdNum(coord_server.replica(), coord_server.partition());
+  sender_.Send(req, kServerChannel, coordinating_server);
   
   txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
@@ -588,8 +589,8 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   auto local_replica = config_->GetLocalReplica();
   for (auto p : txn_holder.ActivePartitions()) {
     if (p != config_->GetLocalPartition()) {
-      auto machine_id = MakeMachineIdAsString(local_replica, p);
-      sender_.Send(request, SCHEDULER_CHANNEL, machine_id);
+      auto machine_id = config_->MakeMachineIdNum(local_replica, p);
+      sender_.Send(request, kSchedulerChannel, machine_id);
     }
   }
 }

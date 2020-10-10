@@ -13,7 +13,7 @@ using internal::Request;
 MultiHomeOrderer::MultiHomeOrderer(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker) 
-  : NetworkedModule(broker, MULTI_HOME_ORDERER_CHANNEL),
+  : NetworkedModule(broker, kMultiHomeOrdererChannel),
     config_(config),
     batch_id_counter_(0) {
   NewBatch();
@@ -30,9 +30,7 @@ void MultiHomeOrderer::NewBatch() {
   batch_->set_transaction_type(TransactionType::MULTI_HOME);
 }
 
-void MultiHomeOrderer::HandleInternalRequest(
-    Request&& req,
-    string&& /* from_machine_id */) {
+void MultiHomeOrderer::HandleInternalRequest(Request&& req, MachineIdNum /* from */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
       // Received a new multi-home txn
@@ -72,7 +70,7 @@ void MultiHomeOrderer::HandleCustomSocketMessage(
   Request paxos_req;
   auto paxos_propose = paxos_req.mutable_paxos_propose();
   paxos_propose->set_value(batch_id);
-  Send(paxos_req, GLOBAL_PAXOS);
+  Send(paxos_req, kGlobalPaxos);
 
   Request batch_req;
   auto forward_batch = batch_req.mutable_forward_batch();
@@ -82,11 +80,8 @@ void MultiHomeOrderer::HandleCustomSocketMessage(
   auto part = config_->GetLeaderPartitionForMultiHomeOrdering();
   auto num_replicas = config_->GetNumReplicas();
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
-    auto machine_id = MakeMachineIdAsString(rep, part);
-    Send(
-        batch_req,
-        MULTI_HOME_ORDERER_CHANNEL,
-        machine_id);
+    auto machine_id = config_->MakeMachineIdNum(rep, part);
+    Send(batch_req, kMultiHomeOrdererChannel, machine_id);
   }
 
   NewBatch();
@@ -133,7 +128,7 @@ void MultiHomeOrderer::ProcessForwardBatch(
         TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
 
     // Send the newly ordered multi-home batch to the sequencer
-    Send(req, SEQUENCER_CHANNEL);
+    Send(req, kSequencerChannel);
   }
 }
 

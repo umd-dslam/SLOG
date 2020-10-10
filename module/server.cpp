@@ -12,7 +12,7 @@ namespace slog {
 Server::Server(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker)
-  : NetworkedModule(broker, SERVER_CHANNEL),
+  : NetworkedModule(broker, kServerChannel),
     config_(config),
     txn_id_counter_(0) {}
 
@@ -74,7 +74,7 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
         internal::Request forward_request;
         forward_request.mutable_forward_txn()->set_allocated_txn(txn);
         RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
-        Send(forward_request, FORWARDER_CHANNEL);
+        Send(forward_request, kForwarderChannel);
       } else {
         // Return abort to client
         txn->set_status(TransactionStatus::ABORTED);
@@ -101,7 +101,7 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
           ProcessStatsRequest(stats_request.stats());
           break;
         case api::StatsModule::SCHEDULER:
-          Send(stats_request, SCHEDULER_CHANNEL);
+          Send(stats_request, kSchedulerChannel);
           break;
         default:
           LOG(ERROR) << "Invalid module for stats request";
@@ -121,9 +121,7 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
               Internal Requests
 ***********************************************/
 
-void Server::HandleInternalRequest(
-    internal::Request&& req,
-    string&& /* from_machine_id */) {
+void Server::HandleInternalRequest(internal::Request&& req, MachineIdNum /* from */) {
   if (req.type_case() != internal::Request::kCompletedSubtxn) {
     LOG(ERROR) << "Unexpected request type received: \""
               << CASE_NAME(req.type_case(), internal::Request) << "\"";
@@ -218,7 +216,7 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  HandleInternalResponse(std::move(res), "");
+  HandleInternalResponse(std::move(res), 0);
 }
 
 
@@ -228,7 +226,7 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
 
 void Server::HandleInternalResponse(
     internal::Response&& res,
-    std::string&&) {
+    MachineIdNum) {
   if (res.type_case() != internal::Response::kStats) {
     LOG(ERROR) << "Unexpected response type received: \""
                << CASE_NAME(res.type_case(), internal::Response) << "\"";
