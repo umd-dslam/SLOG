@@ -15,6 +15,7 @@ using Value = std::string;
 using TxnId = uint64_t;
 using BatchId = uint32_t;
 using SlotId = uint32_t;
+using Channel = uint32_t;
 
 struct Metadata {
   Metadata() = default;
