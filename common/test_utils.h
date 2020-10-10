@@ -1,11 +1,12 @@
 #pragma once
 
 #include <vector>
+#include <glog/logging.h>
 
 #include "common/configuration.h"
-#include "common/mmessage.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
+#include "connection/zmq_utils.h"
 #include "module/base/module.h"
 #include "storage/mem_only_storage.h"
 #include "proto/internal.pb.h"
@@ -49,9 +50,15 @@ public:
   void AddGlobalPaxos();
   void AddMultiHomeOrderer();
 
-  void AddOutputChannel(const string& name);
-  zmq::pollitem_t GetPollItemForChannel(const string& name);
-  void ReceiveFromOutputChannel(MMessage& msg, const string& name);
+  void AddOutputChannel(Channel channel);
+  zmq::pollitem_t GetPollItemForChannel(Channel channel);
+
+  template<typename T>
+  bool ReceiveFromOutputChannel(T& out, Channel channel) {
+    CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
+    return ReceiveProto(channels_[channel], out);
+  }
+
   unique_ptr<Sender> GetSender();
 
   void StartInNewThreads();
@@ -73,7 +80,7 @@ private:
   ModuleRunnerPtr global_paxos_;
   ModuleRunnerPtr multi_home_orderer_;
 
-  unordered_map<string, zmq::socket_t> channels_;
+  unordered_map<Channel, zmq::socket_t> channels_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

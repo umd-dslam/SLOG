@@ -37,7 +37,11 @@ void Sender::Send(
     }
   }
   
-  SendProto(machine_id_to_socket_[to_machine_id], request_or_response, to_channel);
+  SendProto(
+      machine_id_to_socket_[to_machine_id],
+      request_or_response,
+      to_channel,
+      local_machine_id_);
 }
 
 void Sender::Send(

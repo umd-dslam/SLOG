@@ -53,9 +53,11 @@ void MultiHomeOrderer::HandleInternalRequest(Request&& req, MachineIdNum /* from
   }
 }
 
-void MultiHomeOrderer::HandleCustomSocketMessage(
-    const MMessage& /* msg */,
-    size_t /* socket_index */) {
+void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
+  // Remove the dummy message out of the queue
+  zmq::message_t msg;
+  (void)socket.recv(msg);
+
   if (batch_->transactions().empty()) {
     return;
   }

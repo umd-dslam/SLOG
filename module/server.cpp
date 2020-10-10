@@ -3,6 +3,7 @@
 #include "common/constants.h"
 #include "common/json_utils.h"
 #include "common/proto_utils.h"
+#include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
 using std::move;
@@ -40,10 +41,19 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
                   API Requests
 ***********************************************/
 
-void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
+void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
+  zmq::message_t identity;
+  if (!socket.recv(identity) || !identity.more()) {
+    LOG(ERROR) << "Invalid message from client: Only identity part is found";
+    return;
+  }
+  if (zmq::message_t empty; !socket.recv(empty) || !empty.more()) {
+    LOG(ERROR) << "Invalid message from client: Message has no body";
+    return;
+  }
   api::Request request;
-  if (!msg.GetProto(request)) {
-    LOG(ERROR) << "Invalid request from client";
+  if (!ReceiveProto(socket, request)) {
+    LOG(ERROR) << "Invalid message from client: Body is not a proto";
     return;
   }
 
@@ -51,12 +61,13 @@ void Server::HandleCustomSocketMessage(const MMessage& msg, size_t) {
   auto txn_id = NextTxnId();
   CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
 
-  // The message object holds the address of the client so we keep it here
-  // to response to the client later
-  pending_responses_[txn_id].response = msg;
-  // Stream id is used by a client to match up request-response on its side.
-  // The server does not use this and just echos it back to the client.
-  pending_responses_[txn_id].stream_id = request.stream_id();
+  pending_responses_[txn_id] = {
+    // Save the identity of the client to response later
+    .identity = std::move(identity),
+    // Stream id is used by a client to match up request-response on its side.
+    // The server does not use this and just echos it back to the client.
+    .stream_id = request.stream_id()
+  };
   
   switch (request.type_case()) {
     case api::Request::kTxn: {
@@ -244,10 +255,18 @@ void Server::HandleInternalResponse(
 ***********************************************/
 
 void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
-  auto& pr = pending_responses_.at(txn_id);
+  if (pending_responses_.count(txn_id) == 0) {
+    LOG(ERROR) << "Cannot find info to response back to client for txn: " << txn_id;
+    return;
+  }
+  auto& pr = pending_responses_[txn_id];
+  auto& socket = GetCustomSocket(0);
+
+  socket.send(pr.identity, zmq::send_flags::sndmore);
+  socket.send(zmq::message_t{}, zmq::send_flags::sndmore);
   res.set_stream_id(pr.stream_id);
-  pr.response.Set(MM_DATA, res);
-  pr.response.SendTo(GetCustomSocket(0));
+  SendProto(socket, res);
+
   pending_responses_.erase(txn_id);
 }
 

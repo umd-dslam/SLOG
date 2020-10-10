@@ -58,9 +58,10 @@ void Sequencer::HandleInternalRequest(Request&& req, MachineIdNum /* from */) {
   }
 }
 
-void Sequencer::HandleCustomSocketMessage(
-    const MMessage& /* msg */,
-    size_t /* socket_index */) {
+void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
+  // Remove the dummy message out of the queue
+  zmq::message_t msg;
+  (void)socket.recv(msg);
 
 #ifdef ENABLE_REPLICATION_DELAY
   MaybeSendDelayedBatches();

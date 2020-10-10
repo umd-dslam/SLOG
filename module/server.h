@@ -17,7 +17,7 @@
 namespace slog {
 
 struct PendingResponse {
-  MMessage response;
+  zmq::message_t identity;
   uint32_t stream_id;
 };
 
@@ -57,9 +57,7 @@ protected:
 
   void HandleInternalResponse(internal::Response&& res, MachineIdNum /* from */) final;
 
-  void HandleCustomSocketMessage(
-      const MMessage& /* msg */,
-      size_t /* socket_index */) final;
+  void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
 private:
   void ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn);

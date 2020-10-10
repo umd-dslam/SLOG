@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include "common/proto_utils.h"
+#include "connection/zmq_utils.h"
 #include "module/consensus.h"
 #include "module/interleaver.h"
 #include "module/forwarder.h"
@@ -140,28 +141,22 @@ void TestSlog::AddMultiHomeOrderer() {
   multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_);
 }
 
-void TestSlog::AddOutputChannel(const string& name) {
-  // TODO: Fix this
-  broker_->AddChannel(0);
+void TestSlog::AddOutputChannel(Channel channel) {
+  broker_->AddChannel(channel);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
   socket.setsockopt(ZMQ_LINGER, 0);
-  socket.bind("inproc://" + name);
-  channels_[name] = std::move(socket);
+  socket.bind("inproc://channel_" + to_string(channel));
+  channels_[channel] = std::move(socket);
 }
 
-zmq::pollitem_t TestSlog::GetPollItemForChannel(const string& name) {
-  CHECK(channels_.count(name) > 0) << "Channel " << name << " does not exist";
+zmq::pollitem_t TestSlog::GetPollItemForChannel(Channel channel) {
+  CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
   return {
-      static_cast<void*>(channels_[name]),
+      static_cast<void*>(channels_[channel]),
       0, /* fd */
       ZMQ_POLLIN,
       0 /* revent */};
-}
-
-void TestSlog::ReceiveFromOutputChannel(MMessage& msg, const string& name) {
-  CHECK(channels_.count(name) > 0) << "Channel " << name << " does not exist";
-  msg.ReceiveFrom(channels_[name]);
 }
 
 unique_ptr<Sender> TestSlog::GetSender() {
@@ -202,25 +197,22 @@ void TestSlog::StartInNewThreads() {
 
 void TestSlog::SendTxn(Transaction* txn) {
   CHECK(server_ != nullptr) << "TestSlog does not have a server";
+  client_socket_.send(zmq::message_t{}, zmq::send_flags::sndmore);
   api::Request request;
   auto txn_req = request.mutable_txn();
   txn_req->set_allocated_txn(txn);
-  MMessage msg;
-  msg.Push(request);
-  msg.SendTo(client_socket_);
+  SendProto(client_socket_, request);
 }
 
 Transaction TestSlog::RecvTxnResult() {
-  MMessage msg(client_socket_);
   api::Response res;
-  if (!msg.GetProto(res)) {
+  if (!ReceiveProto(client_socket_, res)) {
     LOG(FATAL) << "Malformed response to client transaction.";
     return Transaction();
-  } else {
-    const auto& txn = res.txn().txn();
-    LOG(INFO) << "Received response. Stream id: " << res.stream_id();
-    return txn;
   }
+  const auto& txn = res.txn().txn();
+  LOG(INFO) << "Received response. Stream id: " << res.stream_id();
+  return txn;
 }
 
 } // namespace slog

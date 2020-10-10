@@ -34,8 +34,8 @@ protected:
       internal::Response&& /* res */,
       MachineIdNum /* from_machine_id */) {};
 
-  virtual void HandleCustomSocketMessage(
-      const MMessage& /* msg */,
+  virtual void HandleCustomSocket(
+      zmq::socket_t& /* socket */,
       size_t /* socket_index */) {};
 
   zmq::socket_t& GetCustomSocket(size_t i);

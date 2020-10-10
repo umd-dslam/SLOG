@@ -122,6 +122,7 @@ bool Broker::InitializeConnection() {
 
     SendProto(tmp_socket, request);
 
+    // See comment in class declaration
     tmp_sockets_.push_back(move(tmp_socket));
     LOG(INFO) << "Sent READY message to " << endpoint;
   }
@@ -141,7 +142,9 @@ bool Broker::InitializeConnection() {
   while (running_) {
     if (zmq::poll(&item, 1, poll_timeout_ms_)) {
       zmq::message_t msg;
-      socket_.recv(msg);
+      if (!socket_.recv(msg)) {
+        continue;
+      }
 
       if (!ParseProto(request, msg) || !request.has_broker_ready()) {
         LOG(INFO) << "Received a message while broker is not READY. "
@@ -192,29 +195,20 @@ void Broker::Run() {
   cv_.notify_all();
 
   // Handle the unhandled messages received during initializing
-  while (running_ && !unhandled_incoming_messages_.empty()) {
-    HandleIncomingMessage(
-        move(unhandled_incoming_messages_.back()));
-    unhandled_incoming_messages_.pop_back();
+  for (size_t i = 0; i < unhandled_incoming_messages_.size(); i++) {
+    HandleIncomingMessage(move(unhandled_incoming_messages_[i]));
   }
+  unhandled_incoming_messages_.clear();
 
-  // Set up poll items
-  vector<zmq::pollitem_t> items;
-  // NOTE: always push this item at the end 
-  // so that the channel indices start from 0
-  items.push_back(GetSocketPollItem());
-
+  auto poll_item = GetSocketPollItem();
   while (running_) {
     // Wait until a message arrived at one of the sockets
-    zmq::poll(items, poll_timeout_ms_);
-
-    // Socket just received a message
-    if (items.back().revents & ZMQ_POLLIN) {
-      zmq::message_t msg;
-      socket_.recv(msg);
-      HandleIncomingMessage(move(msg));
+    if (zmq::poll(&poll_item, 1, poll_timeout_ms_)) {
+      // Socket just received a message
+      if (zmq::message_t msg; socket_.recv(msg)) {
+        HandleIncomingMessage(move(msg));
+      }
     }
-
    VLOG_EVERY_N(4, 5000/poll_timeout_ms_) << "Broker is alive";
   } // while-loop
 }

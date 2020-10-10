@@ -39,7 +39,6 @@ TEST(BrokerAndSenderTest, PingPong) {
     broker->StartInNewThread();
 
     Sender sender(broker);
-
     // Send ping
     sender.Send(MakeEchoRequest("ping"), PONG, configs[0]->MakeMachineIdNum(0, 1));
 

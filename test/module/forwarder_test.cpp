@@ -28,8 +28,8 @@ protected:
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
-      test_slogs[i]->AddOutputChannel(SEQUENCER_CHANNEL);
-      test_slogs[i]->AddOutputChannel(MULTI_HOME_ORDERER_CHANNEL);
+      test_slogs[i]->AddOutputChannel(kSequencerChannel);
+      test_slogs[i]->AddOutputChannel(kMultiHomeOrdererChannel);
     }
     // Replica 0
     test_slogs[0]->Data("A", {"xxxxx", 0, 0});
@@ -52,25 +52,29 @@ protected:
     vector<zmq::pollitem_t> poll_items;
     for (auto i : indices) {
       poll_items.push_back(
-          test_slogs[i]->GetPollItemForChannel(SEQUENCER_CHANNEL));
+          test_slogs[i]->GetPollItemForChannel(kSequencerChannel));
     }
     auto rc = zmq::poll(poll_items, 1000);
     if (rc == 0) return nullptr;
 
-    MMessage msg;
     for (size_t i = 0; i < poll_items.size(); i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        test_slogs[indices[i]]->ReceiveFromOutputChannel(msg, SEQUENCER_CHANNEL);
-        break;
+        internal::Request req;
+        if (!test_slogs[indices[i]]->ReceiveFromOutputChannel(req, kSequencerChannel)) {
+          return nullptr;
+        }
+        return ExtractTxn(req);
       }
     }
-    return ExtractTxn(msg);
+    return nullptr;
   }
 
   Transaction* ReceiveOnOrdererChannel(size_t index) {
-    MMessage msg;
-    test_slogs[index]->ReceiveFromOutputChannel(msg, MULTI_HOME_ORDERER_CHANNEL);
-    return ExtractTxn(msg);
+    internal::Request req;
+    if (!test_slogs[index]->ReceiveFromOutputChannel(req, kMultiHomeOrdererChannel)) {
+      return nullptr;
+    }
+    return ExtractTxn(req);
   }
 
   unique_ptr<TestSlog> test_slogs[NUM_MACHINES];
@@ -78,11 +82,7 @@ protected:
 
 private:
 
-  Transaction* ExtractTxn(MMessage& msg) {
-    internal::Request req;
-    if (!msg.GetProto(req)) {
-      return nullptr;
-    }
+  Transaction* ExtractTxn(internal::Request& req) {
     if (req.type_case() != internal::Request::kForwardTxn) {
       return nullptr;
     }
@@ -95,7 +95,6 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   auto txn = MakeTransaction({"A"} /* read_set */, {"B"}  /* write_set */);
   // Send to partition 0 of replica 0
   test_slogs[0]->SendTxn(txn);
-
   auto forwarded_txn = ReceiveOnSequencerChannel({0});
   // The txn should be forwarded to the sequencer of the same machine
   if (forwarded_txn == nullptr) {
@@ -111,7 +110,6 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   ASSERT_EQ(0U, master_metadata.at("A").counter());
   ASSERT_EQ(0U, master_metadata.at("B").master());
   ASSERT_EQ(1U, master_metadata.at("B").counter());
-
 }
 
 TEST_F(ForwarderTest, ForwardToAnotherRegion) {

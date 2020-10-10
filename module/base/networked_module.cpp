@@ -83,8 +83,7 @@ void NetworkedModule::Loop() {
   // belongs to the channel socket.
   for (size_t i = 1; i < poll_items_.size(); i++) {
     if (poll_items_[i].revents & ZMQ_POLLIN) {
-      MMessage msg(custom_sockets_[i - 1]);
-      HandleCustomSocketMessage(msg, i - 1 /* socket_index */);
+      HandleCustomSocket(custom_sockets_[i - 1], i - 1);
     }
   }
 }
