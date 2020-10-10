@@ -5,7 +5,6 @@
 #include <zmq.hpp>
 
 #include "common/constants.h"
-#include "common/mmessage.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "connection/sender.h"

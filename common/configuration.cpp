@@ -107,14 +107,14 @@ long Configuration::GetBatchDuration() const {
   return config_.batch_duration();
 }
 
-vector<string> Configuration::GetAllMachineIds() const {
+vector<MachineIdNum> Configuration::GetAllMachineIds() const {
   auto num_reps = GetNumReplicas();
   auto num_parts = GetNumPartitions();
-  vector<string> ret;
+  vector<MachineIdNum> ret;
   ret.reserve(num_reps * num_parts);
   for (size_t rep = 0; rep < num_reps; rep++) {
     for (size_t part = 0; part < num_parts; part++) {
-      ret.push_back(MakeMachineIdAsString(rep, part));
+      ret.push_back(MakeMachineIdNum(rep, part));
     }
   }
   return ret;

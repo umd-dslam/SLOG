@@ -12,13 +12,15 @@ using namespace std;
 
 using Pair = pair<uint32_t, uint32_t>;
 
+const Channel kTestChannel = 100;
+
 class TestSimpleMultiPaxos : public SimpleMultiPaxos {
 public:
   TestSimpleMultiPaxos(
       const shared_ptr<Broker>& broker,
-      const vector<string>& group_members,
-      const string& me)
-    : SimpleMultiPaxos("test", broker, group_members, me) {}
+      const vector<MachineIdNum>& group_members,
+      const MachineIdNum& me)
+    : SimpleMultiPaxos(kTestChannel, broker, group_members, me) {}
 
   Pair Poll() {
     unique_lock<mutex> lock(m_);
@@ -56,13 +58,13 @@ protected:
     AddAndStartNewPaxos(
         config,
         config->GetAllMachineIds(),
-        config->GetLocalMachineIdAsString());
+        config->GetLocalMachineIdAsNumber());
   }
 
   void AddAndStartNewPaxos(
       const ConfigurationPtr& config,
-      const vector<string>& members,
-      const string& me) {
+      const vector<MachineIdNum>& members,
+      MachineIdNum me) {
     auto context = make_shared<zmq::context_t>(1);
     auto broker = make_shared<Broker>(config, context, 5 /* timeout_ms */);
     auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
@@ -84,7 +86,7 @@ protected:
     internal::Request paxos_req;
     auto paxos_propose = paxos_req.mutable_paxos_propose();
     paxos_propose->set_value(value);
-    senders_[index]->Send(paxos_req, "test");
+    senders_[index]->Send(paxos_req, kTestChannel);
   }
 
   vector<shared_ptr<TestSimpleMultiPaxos>> paxi;
@@ -154,13 +156,13 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
 
 TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   auto configs = MakeTestConfigurations("paxos", 2, 2);
-  vector<string> members;
+  vector<MachineIdNum> members;
   auto member_part = configs.front()->GetLeaderPartitionForMultiHomeOrdering();
   for (uint32_t rep = 0; rep < configs.front()->GetNumReplicas(); rep++) {
-    members.emplace_back(MakeMachineIdAsString(rep, member_part));
+    members.emplace_back(configs.front()->MakeMachineIdNum(rep, member_part));
   }
   for (auto config : configs) {
-    AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsString());
+    AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsNumber());
   }
 
   auto non_member = (member_part + 1) % configs.front()->GetNumPartitions(); 

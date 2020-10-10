@@ -16,20 +16,18 @@ public:
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    slog_->AddOutputChannel(INTERLEAVER_CHANNEL);
+    slog_->AddOutputChannel(kInterleaverChannel);
     sender_ = slog_->GetSender();
     slog_->StartInNewThreads();
   }
 
   void SendToSequencer(internal::Request req) {
-    sender_->Send(req, SEQUENCER_CHANNEL);
+    sender_->Send(req, kSequencerChannel);
   }
 
   internal::Batch* ReceiveBatch() {
-    MMessage msg;
-    slog_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
-    if (!msg.GetProto(req)) {
+    if (!slog_->ReceiveFromOutputChannel(req, kInterleaverChannel)) {
       return nullptr;
     }
     if (req.type_case() != Request::kForwardBatch) {
@@ -140,12 +138,12 @@ public:
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
-    slog_->AddOutputChannel(INTERLEAVER_CHANNEL);
+    slog_->AddOutputChannel(kInterleaverChannel);
     sender_ = slog_->GetSender();
 
-    // This machine has no sequencer, it only receives the messages in the INTERLEAVER_CHANNEL
+    // This machine has no sequencer, it only receives the messages in the kInterleaverChannel
     slog_2_ = make_unique<TestSlog>(configs[1]);
-    slog_2_->AddOutputChannel(INTERLEAVER_CHANNEL);
+    slog_2_->AddOutputChannel(kInterleaverChannel);
 
     slog_->StartInNewThreads();
     slog_2_->StartInNewThreads();
@@ -168,10 +166,8 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   SendToSequencer(req);
 
   {
-    MMessage msg;
-    slog_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
-    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_TRUE(slog_->ReceiveFromOutputChannel(req, kInterleaverChannel));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
     auto forward_batch = req.mutable_forward_batch();
     ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);
@@ -181,10 +177,8 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
     ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
   }
   {
-    MMessage msg;
-    slog_2_->ReceiveFromOutputChannel(msg, INTERLEAVER_CHANNEL);
     Request req;
-    ASSERT_TRUE(msg.GetProto(req));
+    ASSERT_TRUE(slog_2_->ReceiveFromOutputChannel(req, kInterleaverChannel));
     ASSERT_EQ(req.type_case(), Request::kForwardBatch);
     auto forward_batch = req.mutable_forward_batch();
     ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);

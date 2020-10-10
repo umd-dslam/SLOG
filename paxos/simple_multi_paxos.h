@@ -14,14 +14,14 @@ class SimpleMultiPaxos : public NetworkedModule {
 public:
 
   /**
-   * @param group_channel Channel of the current paxos group. Used to differentiate messages 
+   * @param group_number  Number of the current paxos group. Used to differentiate messages 
    *                      from other paxos groups
    * @param broker        The broker for sending and receiving messages
    * @param members       Machine Id of all members participating in this Paxos process
    * @param me            Machine Id of the current machine
    */
   SimpleMultiPaxos(
-      Channel group_channel,
+      Channel group_number,
       const shared_ptr<Broker>& broker,
       const vector<MachineIdNum>& group_members,
       MachineIdNum me);

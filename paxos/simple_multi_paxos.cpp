@@ -9,11 +9,11 @@ using internal::Request;
 using internal::Response;
 
 SimpleMultiPaxos::SimpleMultiPaxos(
-    Channel group_channel,
+    Channel group_number,
     const shared_ptr<Broker>& broker,
     const vector<MachineIdNum>& members,
     MachineIdNum me)
-  : NetworkedModule(broker, group_channel),
+  : NetworkedModule(broker, group_number),
     leader_(*this, members, me),
     acceptor_(*this) {}
 

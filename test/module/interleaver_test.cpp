@@ -131,22 +131,19 @@ public:
     for (int i = 0; i < 4; i++) {
       slogs_[i] = make_unique<TestSlog>(configs[i]);
       slogs_[i]->AddInterleaver();
-      slogs_[i]->AddOutputChannel(SCHEDULER_CHANNEL);
+      slogs_[i]->AddOutputChannel(kSchedulerChannel);
       senders_[i] = slogs_[i]->GetSender();
       slogs_[i]->StartInNewThreads();
     }
   }
 
   void SendToInterleaver(int from, int to, const internal::Request& req) {
-    auto to_machine = MakeMachineIdAsString(to / NUM_PARTITIONS, to % NUM_PARTITIONS);
-    senders_[from]->Send(req, INTERLEAVER_CHANNEL, to_machine);
+    senders_[from]->Send(req, kInterleaverChannel, to);
   }
 
   Transaction* ReceiveTxn(int i) {
-    MMessage msg;
-    slogs_[i]->ReceiveFromOutputChannel(msg, SCHEDULER_CHANNEL);
     Request req;
-    if (!msg.GetProto(req)) {
+    if (!slogs_[i]->ReceiveFromOutputChannel(req, kSchedulerChannel)) {
       return nullptr;
     }
     if (req.type_case() != Request::kForwardTxn) {

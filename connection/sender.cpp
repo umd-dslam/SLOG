@@ -61,7 +61,11 @@ void Sender::Send(
     }
   }
 
-  SendProto(local_channel_to_socket_[to_channel], request_or_response);
+  SendProto(
+      local_channel_to_socket_[to_channel],
+      request_or_response,
+      to_channel,
+      local_machine_id_);
 }
 
 } // namespace slog
