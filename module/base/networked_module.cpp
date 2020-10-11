@@ -58,7 +58,7 @@ void NetworkedModule::SetUp() {
 }
 
 void NetworkedModule::Loop() {
-  if (!zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS)) {
+  if (!zmq::poll(poll_items_, kModulePollTimeoutMs)) {
     return;
   }
 

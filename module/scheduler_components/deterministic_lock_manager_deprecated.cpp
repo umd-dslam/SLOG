@@ -180,7 +180,7 @@ DeterministicLockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_ho
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }
-      if (lock_table_.size() > LOCK_TABLE_SIZE_LIMIT) {
+      if (lock_table_.size() > kLockTableSizeLimit) {
         lock_table_.erase(key);
       }
     }

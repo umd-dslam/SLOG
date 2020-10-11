@@ -201,7 +201,7 @@ void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
 
 BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
-  return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
+  return batch_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
 }
 
 #ifdef ENABLE_REPLICATION_DELAY

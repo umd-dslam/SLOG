@@ -65,7 +65,7 @@ public:
   Broker(
       const ConfigurationPtr& config, 
       const shared_ptr<zmq::context_t>& context,
-      long poll_timeout_ms = BROKER_POLL_TIMEOUT_MS);
+      long poll_timeout_ms = kBrokerPollTimeoutMs);
   ~Broker();
 
   void StartInNewThread();

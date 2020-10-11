@@ -6,11 +6,11 @@
 
 namespace slog {
 
-const long BROKER_POLL_TIMEOUT_MS = 100;
-const long MODULE_POLL_TIMEOUT_MS = 100;
+const long kBrokerPollTimeoutMs = 100;
+const long kModulePollTimeoutMs = 100;
 
-const int SERVER_RCVHWM = 0;
-const int SERVER_SNDHWM = 0;
+const int kServerRcvHwm = 0;
+const int kServerSndHwm = 0;
 
 const Channel kServerChannel = 1;
 const Channel kForwarderChannel = 2;
@@ -23,11 +23,11 @@ const Channel kGlobalPaxos = 8;
 
 const Channel kWorkerChannelOffset = 100;
 
-const uint32_t MAX_NUM_MACHINES = 1000;
+const uint32_t kMaxNumMachines = 1000;
 
-const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
+const uint32_t kPaxosDefaultLeaderPosition = 0;
 
-const size_t LOCK_TABLE_SIZE_LIMIT = 1000000;
+const size_t kLockTableSizeLimit = 1000000;
 
 /****************************
  *      Statistic Keys

@@ -28,8 +28,8 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
       "tcp://*:" + std::to_string(config_->GetServerPort());
   zmq::socket_t client_socket(*GetContext(), ZMQ_ROUTER);
   client_socket.setsockopt(ZMQ_LINGER, 0);
-  client_socket.setsockopt(ZMQ_RCVHWM, SERVER_RCVHWM);
-  client_socket.setsockopt(ZMQ_SNDHWM, SERVER_SNDHWM);
+  client_socket.setsockopt(ZMQ_RCVHWM, kServerRcvHwm);
+  client_socket.setsockopt(ZMQ_SNDHWM, kServerSndHwm);
   client_socket.bind(endpoint);
 
   LOG(INFO) << "Bound Server to: " << endpoint;
@@ -284,7 +284,7 @@ bool Server::ValidateTransaction(const Transaction* txn) {
 
 TxnId Server::NextTxnId() {
   txn_id_counter_++;
-  return txn_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
+  return txn_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
 }
 
 } // namespace slog

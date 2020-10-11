@@ -138,7 +138,7 @@ void MultiHomeOrderer::ProcessForwardBatch(
 
 BatchId MultiHomeOrderer::NextBatchId() {
   batch_id_counter_++;
-  return batch_id_counter_ * MAX_NUM_MACHINES + config_->GetLocalMachineIdAsNumber();
+  return batch_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
 }
 
 } // namespace slog

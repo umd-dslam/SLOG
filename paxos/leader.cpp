@@ -24,7 +24,7 @@ Leader::Leader(
   is_member_ = it != members.end();
   if (is_member_) {
     auto position_in_members = it - members.begin();
-    is_elected_ = position_in_members == PAXOS_DEFAULT_LEADER_POSITION;
+    is_elected_ = position_in_members == kPaxosDefaultLeaderPosition;
     ballot_ = position_in_members;
   } else {
     // When the current machine is not a member of this paxos group, it
@@ -33,7 +33,7 @@ Leader::Leader(
     // of paxos)
     is_elected_ = false;
   }
-  elected_leader_ = members[PAXOS_DEFAULT_LEADER_POSITION];
+  elected_leader_ = members[kPaxosDefaultLeaderPosition];
 }
 
 void Leader::HandleRequest(const Request& req) {
