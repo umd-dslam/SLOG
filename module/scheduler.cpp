@@ -51,7 +51,7 @@ void Scheduler::Initialize() {
         Internal Requests & Responses
 ***********************************************/
 
-void Scheduler::HandleInternalRequest(internal::Request&& req, MachineIdNum) {
+void Scheduler::HandleInternalRequest(internal::Request&& req, MachineId) {
   switch (req.type_case()) {
     case Request::kForwardTxn: 
       ProcessTransaction(req.mutable_forward_txn()->release_txn());
@@ -129,7 +129,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   Send(res, kServerChannel);
 }
 
-void Scheduler::HandleInternalResponse(internal::Response&& res, MachineIdNum) {
+void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   auto txn_id = res.worker().txn_id();
   auto txn_holder = &all_txns_[txn_id];
   auto txn = txn_holder->GetTransaction();
@@ -176,11 +176,8 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
       config_,
       txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
-
-  auto& coord_server = txn->internal().coordinating_server();
-  auto coordinating_server = config_->MakeMachineIdNum(coord_server.replica(), coord_server.partition());
   
-  Send(req, kServerChannel, coordinating_server);
+  Send(req, kServerChannel,  txn->internal().coordinating_server());
   
   txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
@@ -418,7 +415,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   VLOG(2) << "Triggering abort of txn: " << txn_id;
 
   auto& txn_holder = all_txns_[txn_id];
-  CHECK(txn_holder.worker())
+  CHECK(!txn_holder.worker())
       << "Dispatched transactions are handled by the worker, txn " << txn_id;
 
   aborting_txns_.insert(txn_id);
@@ -514,7 +511,7 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   auto local_replica = config_->local_replica();
   for (auto p : txn_holder.ActivePartitions()) {
     if (p != config_->local_partition()) {
-      auto machine_id = config_->MakeMachineIdNum(local_replica, p);
+      auto machine_id = config_->MakeMachineId(local_replica, p);
       Send(request, kSchedulerChannel, machine_id);
     }
   }

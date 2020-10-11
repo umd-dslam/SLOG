@@ -63,7 +63,7 @@ const std::shared_ptr<zmq::context_t>& Broker::GetContext() const {
   return context_;
 }
 
-std::string Broker::GetEndpointByMachineId(MachineIdNum machine_id) {
+std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   std::unique_lock<std::mutex> lock(mutex_);
   while (!is_synchronized_) {
     cv_.wait(lock);
@@ -76,8 +76,8 @@ std::string Broker::GetEndpointByMachineId(MachineIdNum machine_id) {
   return machine_id_to_endpoint_[machine_id];
 }
 
-MachineIdNum Broker::GetLocalMachineId() const {
-  return config_->GetLocalMachineIdAsNumber();
+MachineId Broker::GetLocalMachineId() const {
+  return config_->local_machine_id();
 }
 
 string Broker::MakeEndpoint(const string& addr) const {
@@ -109,8 +109,7 @@ bool Broker::InitializeConnection() {
   Request request;
   auto ready = request.mutable_broker_ready();
   ready->set_ip_address(config_->local_address());
-  ready->mutable_machine_id()->CopyFrom(
-      config_->GetLocalMachineIdAsProto());
+  ready->set_machine_id(config_->local_machine_id());
 
   // Connect to all other machines and send the READY message
   for (const auto& addr : config_->all_addresses()) {
@@ -130,10 +129,10 @@ bool Broker::InitializeConnection() {
   // This set represents the membership of all machines in the network.
   // Each machine is identified with its replica and partition. Each broker
   // needs to receive the READY message from all other machines to start working.
-  unordered_set<MachineIdNum> needed_machine_ids;
+  unordered_set<MachineId> needed_machine_ids;
   for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
     for (uint32_t part = 0; part < config_->num_partitions(); part++) {
-      needed_machine_ids.insert(config_->MakeMachineIdNum(rep, part));
+      needed_machine_ids.insert(config_->MakeMachineId(rep, part));
     }
   }
 
@@ -156,20 +155,19 @@ bool Broker::InitializeConnection() {
       // Use the information in each READY message to build up the translation maps
       const auto& ready = request.broker_ready();
       const auto& addr = ready.ip_address();
-      const auto& machine_id = ready.machine_id();
-      auto machine_id_num = config_->MakeMachineIdNum(
-          machine_id.replica(), machine_id.partition());
+      const auto machine_id = ready.machine_id();
+      const auto [replica, partition] = config_->UnpackMachineId(machine_id);
 
-      if (needed_machine_ids.count(machine_id_num) == 0) {
+      if (needed_machine_ids.count(machine_id) == 0) {
         continue;
       }
 
       LOG(INFO) << "Received READY message from " << addr 
-                << " (rep: " << machine_id.replica() 
-                << ", part: " << machine_id.partition() << ")";
+                << " (rep: " << replica 
+                << ", part: " << partition << ")";
 
-      machine_id_to_endpoint_[machine_id_num] = MakeEndpoint(addr);
-      needed_machine_ids.erase(machine_id_num);
+      machine_id_to_endpoint_[machine_id] = MakeEndpoint(addr);
+      needed_machine_ids.erase(machine_id);
     }
 
     if (needed_machine_ids.empty()) {

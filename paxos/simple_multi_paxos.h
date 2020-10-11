@@ -23,19 +23,19 @@ public:
   SimpleMultiPaxos(
       Channel group_number,
       const shared_ptr<Broker>& broker,
-      const vector<MachineIdNum>& group_members,
-      MachineIdNum me);
+      const vector<MachineId>& group_members,
+      MachineId me);
 
   bool IsMember() const;
 
 protected:
   void HandleInternalRequest(
       internal::Request&& req,
-      MachineIdNum from_machine_id) final;
+      MachineId from_machine_id) final;
 
   void HandleInternalResponse(
       internal::Response&& res,
-      MachineIdNum from_machine_id) final;
+      MachineId from_machine_id) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
 
@@ -45,7 +45,7 @@ private:
 
   void SendSameChannel(
       const google::protobuf::Message& request_or_response,
-      MachineIdNum to_machine_id);
+      MachineId to_machine_id);
 
   friend class Leader;
   friend class Acceptor;

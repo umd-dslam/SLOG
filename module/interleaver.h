@@ -60,7 +60,7 @@ public:
 protected:
   void HandleInternalRequest(
       internal::Request&& req,
-      MachineIdNum from_machine_id) final;
+      MachineId from_machine_id) final;
 
 private:
   void AdvanceLogs();

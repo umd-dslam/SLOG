@@ -31,11 +31,11 @@ protected:
 
   virtual void HandleInternalRequest(
       internal::Request&& req,
-      MachineIdNum from_machine_id) = 0;
+      MachineId from_machine_id) = 0;
 
   virtual void HandleInternalResponse(
       internal::Response&& /* res */,
-      MachineIdNum /* from_machine_id */) {};
+      MachineId /* from_machine_id */) {};
 
   virtual void HandleCustomSocket(
       zmq::socket_t& /* socket */,
@@ -46,7 +46,7 @@ protected:
   void Send(
       const google::protobuf::Message& request_or_response,
       Channel to_channel,
-      MachineIdNum to_machine_id);
+      MachineId to_machine_id);
 
   void Send(
       const google::protobuf::Message& request_or_response,

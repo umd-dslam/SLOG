@@ -16,16 +16,16 @@ inline void SendProto(
     zmq::socket_t& socket,
     const google::protobuf::Message& proto,
     Channel chan = 0,
-    MachineIdNum machineId = -1) {
+    MachineId machineId = -1) {
   google::protobuf::Any any;
   any.PackFrom(proto);
   
-  size_t sz = sizeof(MachineIdNum) + sizeof(Channel) + any.ByteSizeLong();
+  size_t sz = sizeof(MachineId) + sizeof(Channel) + any.ByteSizeLong();
   zmq::message_t msg(sz);
 
   auto data = msg.data<char>();
-  memcpy(data, &machineId, sizeof(MachineIdNum));
-  data += sizeof(MachineIdNum);
+  memcpy(data, &machineId, sizeof(MachineId));
+  data += sizeof(MachineId);
   memcpy(data, &chan, sizeof(Channel));
   data += sizeof(Channel);
   any.SerializeToArray(data, any.ByteSizeLong());
@@ -40,25 +40,25 @@ inline void SendProtoWithEmptyDelimiter(
   SendProto(socket, proto);
 }
 
-inline bool ParseMachineId(MachineIdNum& id, const zmq::message_t& msg) {
-  if (msg.size() < sizeof(MachineIdNum)) {
+inline bool ParseMachineId(MachineId& id, const zmq::message_t& msg) {
+  if (msg.size() < sizeof(MachineId)) {
     return false;
   }
-  id = *msg.data<MachineIdNum>();
+  id = *msg.data<MachineId>();
   return true;
 }
 
 inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
-  if (msg.size() < sizeof(MachineIdNum) + sizeof(Channel)) {
+  if (msg.size() < sizeof(MachineId) + sizeof(Channel)) {
     return false;
   }
-  chan = *reinterpret_cast<const Channel*>(msg.data<char>() + sizeof(MachineIdNum));
+  chan = *reinterpret_cast<const Channel*>(msg.data<char>() + sizeof(MachineId));
   return true;
 }
 
 template<typename T>
 inline bool ParseProto(T& out, const zmq::message_t& msg) {
-  auto header_sz = sizeof(MachineIdNum) + sizeof(Channel);
+  auto header_sz = sizeof(MachineId) + sizeof(Channel);
   google::protobuf::Any any;
   if (msg.size() < header_sz) {
     return false;

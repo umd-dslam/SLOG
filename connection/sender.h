@@ -25,7 +25,7 @@ public:
   void Send(
       const google::protobuf::Message& request_or_response,
       Channel to_channel,
-      MachineIdNum to_machine_id);
+      MachineId to_machine_id);
 
   /**
    * Send a request or response to the same machine given a channel
@@ -46,9 +46,9 @@ private:
 
   std::weak_ptr<Broker> broker_;
 
-  MachineIdNum local_machine_id_;
+  MachineId local_machine_id_;
 
-  std::unordered_map<MachineIdNum, zmq::socket_t> machine_id_to_socket_;
+  std::unordered_map<MachineId, zmq::socket_t> machine_id_to_socket_;
   std::unordered_map<Channel, zmq::socket_t> local_channel_to_socket_;
 };
 

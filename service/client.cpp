@@ -80,9 +80,8 @@ void ExecuteTxn(const char* txn_file) {
     write_set,
     d["code"].GetString(),
     metadata,
-    MakeMachineId("0:0"),
-    new_master
-    );
+    0,
+    new_master);
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);

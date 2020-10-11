@@ -12,7 +12,7 @@ protected:
   void OnCommit(uint32_t slot, uint32_t value) final;
 
 private:
-  static vector<MachineIdNum> GetMembers(const ConfigurationPtr& config);
+  static vector<MachineId> GetMembers(const ConfigurationPtr& config);
 };
 
 class LocalPaxos : public SimpleMultiPaxos {
@@ -23,7 +23,7 @@ protected:
   void OnCommit(uint32_t slot, uint32_t value) final;
 
 private:
-  static vector<MachineIdNum> GetMembers(const ConfigurationPtr& config);
+  static vector<MachineId> GetMembers(const ConfigurationPtr& config);
 };
 
 } // namespace slog

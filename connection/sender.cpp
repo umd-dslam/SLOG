@@ -17,7 +17,7 @@ Sender::Sender(const std::shared_ptr<Broker>& broker)
 void Sender::Send(
     const google::protobuf::Message& request_or_response,
     Channel to_channel,
-    MachineIdNum to_machine_id) {
+    MachineId to_machine_id) {
   // If sending to local module, use the other function to bypass the local broker
   if (to_machine_id == local_machine_id_) {
     Send(request_or_response, to_channel);

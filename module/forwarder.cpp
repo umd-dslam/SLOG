@@ -27,7 +27,7 @@ Forwarder::Forwarder(
     lookup_master_index_(lookup_master_index),
     rg_(std::random_device()()) {}
 
-void Forwarder::HandleInternalRequest(Request&& req, MachineIdNum from) {
+void Forwarder::HandleInternalRequest(Request&& req, MachineId from) {
   switch (req.type_case()) {
     case internal::Request::kForwardTxn:
       ProcessForwardTxn(req.mutable_forward_txn());
@@ -110,14 +110,14 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
       Send(
           lookup_master_request,
           kForwarderChannel,
-          config_->MakeMachineIdNum(local_rep, part));
+          config_->MakeMachineId(local_rep, part));
     }
   }
 }
 
 void Forwarder::ProcessLookUpMasterRequest(
     internal::LookupMasterRequest* lookup_master,
-    MachineIdNum from) {
+    MachineId from) {
   internal::Response response;
   auto lookup_response = response.mutable_lookup_master();
   lookup_response->set_txn_id(lookup_master->txn_id());
@@ -146,7 +146,7 @@ void Forwarder::ProcessLookUpMasterRequest(
   Send(response, kForwarderChannel, from);
 }
 
-void Forwarder::HandleInternalResponse(Response&& res, MachineIdNum /* from */) {
+void Forwarder::HandleInternalResponse(Response&& res, MachineId /* from */) {
   // The forwarder only cares about lookup master responses
   if (res.type_case() != Response::kLookupMaster) {
     LOG(ERROR) << "Unexpected response type received: \""
@@ -210,7 +210,7 @@ void Forwarder::Forward(Transaction* txn) {
     } else {
       std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
       auto partition = RandomPartition(rg_);
-      auto random_machine_in_home_replica = config_->MakeMachineIdNum(home_replica, partition);
+      auto random_machine_in_home_replica = config_->MakeMachineId(home_replica, partition);
 
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: "
               << home_replica << ", part: " << partition << ")";
@@ -225,7 +225,7 @@ void Forwarder::Forward(Transaction* txn) {
           random_machine_in_home_replica);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    auto destination = config_->MakeMachineIdNum(
+    auto destination = config_->MakeMachineId(
         config_->local_replica(),
         config_->leader_partition_for_multi_home_ordering());
 

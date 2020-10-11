@@ -15,7 +15,6 @@ set(ALL_TESTS
   mem_only_storage_test
   paxos_test
   per_key_remaster_manager_test
-  proto_utils_test
   scheduler_test
   sequencer_test
   simple_remaster_manager_test
@@ -62,9 +61,6 @@ target_link_libraries(paxos_test test_utils paxos)
 add_executable(per_key_remaster_manager_test
   module/scheduler_components/per_key_remaster_manager_test.cpp)
 target_link_libraries(per_key_remaster_manager_test test_utils)
-
-add_executable(proto_utils_test common/proto_utils_test.cpp)
-target_link_libraries(proto_utils_test common proto)
 
 add_executable(scheduler_test module/scheduler_test.cpp)
 target_link_libraries(scheduler_test test_utils)

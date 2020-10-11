@@ -36,46 +36,12 @@ bool operator==(Map<K, V> map1, Map<K, V> map2) {
 
 } // namespace
 
-
-MachineId MakeMachineId(uint32_t replica, uint32_t partition) {
-  MachineId machine_id;  
-  machine_id.set_replica(replica);
-  machine_id.set_partition(partition);
-  return machine_id;
-}
-
-MachineId MakeMachineId(const string& machine_id_str) {
-  auto split = machine_id_str.find(':');
-  if (split == string::npos) {
-    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
-  }
-  try {
-    auto replica_str = machine_id_str.substr(0, split);
-    auto partition_str = machine_id_str.substr(split + 1);
-
-    MachineId machine_id;
-    machine_id.set_replica(std::stoul(replica_str));
-    machine_id.set_partition(std::stoul(partition_str));
-    return machine_id;
-  } catch (...) {
-    throw std::invalid_argument("Invalid machine id: " + machine_id_str);
-  }
-}
-
-string MakeMachineIdAsString(uint32_t replica, uint32_t partition) {
-  return std::to_string(replica) + ":" + std::to_string(partition);
-}
-
-string MakeMachineIdAsString(const MachineId& machine_id) {
-  return MakeMachineIdAsString(machine_id.replica(), machine_id.partition());
-}
-
 Transaction* MakeTransaction(
     const unordered_set<Key>& read_set,
     const unordered_set<Key>& write_set,
     const string& code,
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
-    const internal::MachineId coordinating_server,
+    const MachineId coordinating_server,
     const int32_t new_master) {
   Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
@@ -103,8 +69,7 @@ Transaction* MakeTransaction(
     }
   }
   txn->mutable_internal()
-      ->mutable_coordinating_server()
-      ->CopyFrom(coordinating_server);
+      ->set_coordinating_server(coordinating_server);
 
   SetTransactionType(*txn);
   return txn;

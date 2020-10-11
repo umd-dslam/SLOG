@@ -40,7 +40,7 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     Sender sender(broker);
     // Send ping
-    sender.Send(MakeEchoRequest("ping"), PONG, configs[0]->MakeMachineIdNum(0, 1));
+    sender.Send(MakeEchoRequest("ping"), PONG, configs[0]->MakeMachineId(0, 1));
 
     // Wait for pong
     Response res;
@@ -65,7 +65,7 @@ TEST(BrokerAndSenderTest, PingPong) {
     ASSERT_EQ("ping", req.echo().data());
 
     // Send pong
-    sender.Send(MakeEchoResponse("pong"), PING, configs[1]->MakeMachineIdNum(0, 0));
+    sender.Send(MakeEchoResponse("pong"), PING, configs[1]->MakeMachineId(0, 0));
 
     this_thread::sleep_for(200ms);
   });

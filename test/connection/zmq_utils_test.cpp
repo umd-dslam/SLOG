@@ -96,7 +96,7 @@ TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
 
   zmq::message_t msg;
   (void)pull.recv(msg);
-  MachineIdNum machineId;
+  MachineId machineId;
   ASSERT_TRUE(ParseMachineId(machineId, msg));
   ASSERT_EQ(machineId, 1);
 
@@ -107,7 +107,7 @@ TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
 
 TEST(ZmqUtilsTest, FailedParsing) {
   zmq::message_t msg;
-  MachineIdNum id;
+  MachineId id;
   ASSERT_FALSE(ParseMachineId(id, msg));
   Channel chan;
   ASSERT_FALSE(ParseChannel(chan, msg));

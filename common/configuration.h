@@ -38,16 +38,15 @@ public:
   uint32_t num_replicas() const;
   uint32_t num_partitions() const;
   uint32_t num_workers() const;
-  vector<MachineIdNum> all_machine_ids() const;
+  vector<MachineId> all_machine_ids() const;
   long batch_duration() const;
 
   const string& local_address() const;
   uint32_t local_replica() const;
   uint32_t local_partition() const;
-  internal::MachineId GetLocalMachineIdAsProto() const;
-  uint32_t GetLocalMachineIdAsNumber() const;
-  MachineIdNum MakeMachineIdNum(uint32_t replica, uint32_t partition) const;
-  std::pair<uint32_t, uint32_t> UnpackMachineId(MachineIdNum machine_id) const;
+  uint32_t local_machine_id() const;
+  MachineId MakeMachineId(uint32_t replica, uint32_t partition) const;
+  std::pair<uint32_t, uint32_t> UnpackMachineId(MachineId machine_id) const;
 
   uint32_t leader_partition_for_multi_home_ordering() const;
 

@@ -32,7 +32,7 @@ void MultiHomeOrderer::NewBatch() {
   batch_->set_transaction_type(TransactionType::MULTI_HOME);
 }
 
-void MultiHomeOrderer::HandleInternalRequest(Request&& req, MachineIdNum /* from */) {
+void MultiHomeOrderer::HandleInternalRequest(Request&& req, MachineId /* from */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
       // Received a new multi-home txn
@@ -84,7 +84,7 @@ void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
   auto part = config_->leader_partition_for_multi_home_ordering();
   auto num_replicas = config_->num_replicas();
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
-    auto machine_id = config_->MakeMachineIdNum(rep, part);
+    auto machine_id = config_->MakeMachineId(rep, part);
     Send(batch_req, kMultiHomeOrdererChannel, machine_id);
   }
 
@@ -138,7 +138,7 @@ void MultiHomeOrderer::ProcessForwardBatch(
 
 BatchId MultiHomeOrderer::NextBatchId() {
   batch_id_counter_++;
-  return batch_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
+  return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
 } // namespace slog

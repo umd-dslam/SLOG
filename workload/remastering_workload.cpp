@@ -65,7 +65,7 @@ RemasteringWorkload::NextRemasterTransaction() {
     write_set,
     "",
     metadata,
-    MakeMachineId("0:0"),
+    0,
     new_master);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 

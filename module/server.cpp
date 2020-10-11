@@ -72,10 +72,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       auto txn_internal = txn->mutable_internal();
       RecordTxnEvent(config_, txn_internal, TransactionEvent::ENTER_SERVER);
       txn_internal->set_id(txn_id);
-      txn_internal
-          ->mutable_coordinating_server()
-          ->CopyFrom(
-              config_->GetLocalMachineIdAsProto());
+      txn_internal->set_coordinating_server(config_->local_machine_id());
 
       if(ValidateTransaction(txn)) {
         // Send to forwarder
@@ -129,7 +126,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
               Internal Requests
 ***********************************************/
 
-void Server::HandleInternalRequest(internal::Request&& req, MachineIdNum /* from */) {
+void Server::HandleInternalRequest(internal::Request&& req, MachineId /* from */) {
   if (req.type_case() != internal::Request::kCompletedSubtxn) {
     LOG(ERROR) << "Unexpected request type received: \""
               << CASE_NAME(req.type_case(), internal::Request) << "\"";
@@ -234,7 +231,7 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
 
 void Server::HandleInternalResponse(
     internal::Response&& res,
-    MachineIdNum) {
+    MachineId) {
   if (res.type_case() != internal::Response::kStats) {
     LOG(ERROR) << "Unexpected response type received: \""
                << CASE_NAME(res.type_case(), internal::Response) << "\"";
@@ -283,7 +280,7 @@ bool Server::ValidateTransaction(const Transaction* txn) {
 
 TxnId Server::NextTxnId() {
   txn_id_counter_++;
-  return txn_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
+  return txn_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
 } // namespace slog

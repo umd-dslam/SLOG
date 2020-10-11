@@ -130,7 +130,7 @@ TEST_F(E2ETest, RemasterTxn) {
       {"A"},  /* write_set */
       "", /* code */
       {}, /* master metadata */
-      MakeMachineId("0:0") /* coordinating server */,
+      0,
       1 /* new master */);
 
   test_slogs[1]->SendTxn(remaster_txn);
@@ -162,8 +162,7 @@ TEST_F(E2ETest, AbortTxn) {
       {"A"}, /* read_set */
       {"B"},  /* write_set */
       "SET B notB EQ A notA", /* code */
-      {}, /* master metadata */
-      MakeMachineId("0:0") /* coordinating server */);
+      {} /* master metadata */);
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();

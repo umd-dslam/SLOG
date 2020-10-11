@@ -15,7 +15,7 @@ using TxnId = uint64_t;
 using BatchId = uint32_t;
 using SlotId = uint32_t;
 using Channel = uint32_t;
-using MachineIdNum = int;
+using MachineId = int;
 
 const uint32_t DEFAULT_MASTER_REGION_OF_NEW_KEY = 0;
 

@@ -53,7 +53,7 @@ message TransactionInternal {
     uint32 id = 1;
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
-    internal.MachineId coordinating_server = 4;
+    uint32 coordinating_server = 4;
     repeated uint32 partitions = 5;
 
     // for recording time of different events of txn

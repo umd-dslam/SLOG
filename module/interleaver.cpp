@@ -63,7 +63,7 @@ Interleaver::Interleaver(
     NetworkedModule(broker, kInterleaverChannel),
     config_(config) {}
 
-void Interleaver::HandleInternalRequest(internal::Request&& req, MachineIdNum from) {
+void Interleaver::HandleInternalRequest(internal::Request&& req, MachineId from) {
   if (req.type_case() == Request::kLocalQueueOrder) {
     auto& order = req.local_queue_order();
     VLOG(1) << "Received local queue order. Slot id: "
@@ -159,7 +159,7 @@ void Interleaver::AdvanceLogs() {
         Send(
             request,
             kInterleaverChannel,
-            config_->MakeMachineIdNum(rep, local_partition));
+            config_->MakeMachineId(rep, local_partition));
       }
     }
     single_home_logs_[local_replica].AddSlot(slot_id, batch_id);

@@ -74,9 +74,9 @@ public:
 
   const std::shared_ptr<zmq::context_t>& GetContext() const;
 
-  std::string GetEndpointByMachineId(MachineIdNum machine_id);
+  std::string GetEndpointByMachineId(MachineId machine_id);
 
-  MachineIdNum GetLocalMachineId() const;
+  MachineId GetLocalMachineId() const;
 
 private:
   string MakeEndpoint(const string& addr = "") const;
@@ -118,7 +118,7 @@ private:
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages
-  std::unordered_map<MachineIdNum, std::string> machine_id_to_endpoint_;
+  std::unordered_map<MachineId, std::string> machine_id_to_endpoint_;
 
   // This is a hack so that tests behave correctly. Ideally, these sockets
   // should be scoped within InitializeConnection(). However, if we let them

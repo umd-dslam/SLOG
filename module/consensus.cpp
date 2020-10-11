@@ -6,12 +6,12 @@ namespace slog {
 
 using internal::Request;
 
-vector<MachineIdNum> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
+vector<MachineId> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
   auto part = config->leader_partition_for_multi_home_ordering();
-  vector<MachineIdNum> members;
+  vector<MachineId> members;
   // Enlist a fixed machine at each region as members
   for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
-    auto machine_id = config->MakeMachineIdNum(rep, part);
+    auto machine_id = config->MakeMachineId(rep, part);
     members.push_back(machine_id);
   }
   return members;
@@ -24,7 +24,7 @@ GlobalPaxos::GlobalPaxos(
       kGlobalPaxos,
       broker,
       GetMembers(config),
-      config->GetLocalMachineIdAsNumber()) {}
+      config->local_machine_id()) {}
 
 void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
@@ -34,12 +34,12 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Send(req, kMultiHomeOrdererChannel);
 }
 
-vector<MachineIdNum> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
+vector<MachineId> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
   auto local_rep = config->local_replica();
-  vector<MachineIdNum> members;
+  vector<MachineId> members;
   // Enlist all machines in the same region as members
   for (uint32_t part = 0; part < config->num_partitions(); part++) {
-    members.push_back(config->MakeMachineIdNum(local_rep, part));
+    members.push_back(config->MakeMachineId(local_rep, part));
   }
   return members;
 }
@@ -51,7 +51,7 @@ LocalPaxos::LocalPaxos(
       kLocalPaxos,
       broker,
       GetMembers(config),
-      config->GetLocalMachineIdAsNumber()) {}
+      config->local_machine_id()) {}
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;

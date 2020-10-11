@@ -28,7 +28,7 @@ public:
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(internal::Request&& req, MachineIdNum from_machine_id) final;
+  void HandleInternalRequest(internal::Request&& req, MachineId from_machine_id) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 

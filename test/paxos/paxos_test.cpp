@@ -18,8 +18,8 @@ class TestSimpleMultiPaxos : public SimpleMultiPaxos {
 public:
   TestSimpleMultiPaxos(
       const shared_ptr<Broker>& broker,
-      const vector<MachineIdNum>& group_members,
-      const MachineIdNum& me)
+      const vector<MachineId>& group_members,
+      const MachineId& me)
     : SimpleMultiPaxos(kTestChannel, broker, group_members, me) {}
 
   Pair Poll() {
@@ -58,13 +58,13 @@ protected:
     AddAndStartNewPaxos(
         config,
         config->all_machine_ids(),
-        config->GetLocalMachineIdAsNumber());
+        config->local_machine_id());
   }
 
   void AddAndStartNewPaxos(
       const ConfigurationPtr& config,
-      const vector<MachineIdNum>& members,
-      MachineIdNum me) {
+      const vector<MachineId>& members,
+      MachineId me) {
     auto context = make_shared<zmq::context_t>(1);
     auto broker = make_shared<Broker>(config, context, 5 /* timeout_ms */);
     auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
@@ -156,13 +156,13 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
 
 TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   auto configs = MakeTestConfigurations("paxos", 2, 2);
-  vector<MachineIdNum> members;
+  vector<MachineId> members;
   auto member_part = configs.front()->leader_partition_for_multi_home_ordering();
   for (uint32_t rep = 0; rep < configs.front()->num_replicas(); rep++) {
-    members.emplace_back(configs.front()->MakeMachineIdNum(rep, member_part));
+    members.emplace_back(configs.front()->MakeMachineId(rep, member_part));
   }
   for (auto config : configs) {
-    AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsNumber());
+    AddAndStartNewPaxos(config, members, config->local_machine_id());
   }
 
   auto non_member = (member_part + 1) % configs.front()->num_partitions(); 

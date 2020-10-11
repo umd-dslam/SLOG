@@ -26,7 +26,7 @@ Worker::Worker(
     // TODO: change this dynamically based on selected experiment
     commands_(new KeyValueCommands()) {}
 
-void Worker::HandleInternalRequest(internal::Request&& req, MachineIdNum) {
+void Worker::HandleInternalRequest(internal::Request&& req, MachineId) {
   TxnId txn_id = 0;
   bool valid_request = true;
   switch (req.type_case()) {
@@ -360,7 +360,7 @@ void Worker::SendToOtherPartitions(
   auto local_partition = config_->local_partition();
   for (auto p : partitions) {
     if (p != local_partition) {
-      auto machine_id = config_->MakeMachineIdNum(local_replica, p);
+      auto machine_id = config_->MakeMachineId(local_replica, p);
       Send(request, kSchedulerChannel, std::move(machine_id));
     }
   }

@@ -31,15 +31,14 @@ internal::Request MakeBatchOrder(uint32_t slot, uint32_t batch_id) {
 
 class SchedulerTest : public ::testing::Test {
 protected:
-  static const size_t NUM_MACHINES = 6;
+  static const size_t kNumMachines = 6;
+  static const uint32_t kNumReplicas = 2;
+  static const uint32_t kNumPartitions = 3;
 
   void SetUp() {
-    ConfigVec configs = MakeTestConfigurations(
-        "scheduler",
-        2 /* num_replicas */,
-        3 /* num_partitions */);
+    ConfigVec configs = MakeTestConfigurations("scheduler", kNumReplicas, kNumPartitions);
 
-    for (size_t i = 0; i < NUM_MACHINES; i++) {
+    for (size_t i = 0; i < kNumMachines; i++) {
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddScheduler();
       sender_[i] = test_slogs_[i]->GetSender();
@@ -108,9 +107,13 @@ protected:
     return txn;
   }
 
+  MachineId MakeMachineId(int replica, int partition) {
+    return replica * kNumPartitions + partition;
+  }
+
 private:
-  unique_ptr<TestSlog> test_slogs_[NUM_MACHINES];
-  unique_ptr<Sender> sender_[NUM_MACHINES];
+  unique_ptr<TestSlog> test_slogs_[kNumMachines];
+  unique_ptr<Sender> sender_[kNumMachines];
 };
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {
@@ -120,7 +123,7 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
       "GET A     \n"
       "SET D newD\n", /* code */
       {},
-      MakeMachineId("0:1") /* coordinating server */), 0, 1);
+      MakeMachineId(0, 1) /* coordinating server */), 0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendTransaction(txn, {0});
@@ -264,7 +267,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
       "GET A     \n"
       "SET D newD\n", /* code */
       {{"A", {0,1}}, {"D", {0,1}}},
-      MakeMachineId("0:1") /* coordinating server */);
+      MakeMachineId(0, 1) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendTransaction(txn, {0});
@@ -285,7 +288,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {},  /* write_set */
       "GET A     \n", /* code */
       {{"A", {1,2}}},
-      MakeMachineId("0:0") /* coordinating server */);
+      MakeMachineId(0, 0) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   txn->mutable_internal()->set_id(10);
 
@@ -294,7 +297,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {"A"},  /* write_set */
       "", /* code */
       {{"A", {0,1}}}, /* master metadata */
-      MakeMachineId("0:1"), /* coordinating server */
+      MakeMachineId(0, 1), /* coordinating server */
       1 /* new master */);
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   remaster_txn->mutable_internal()->set_id(11);
@@ -324,7 +327,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {"A"},  /* write_set */
       "", /* code */
       {{"A", {0,0}}}, /* master metadata */
-      MakeMachineId("0:1"), /* coordinating server */
+      MakeMachineId(0, 1), /* coordinating server */
       1 /* new master */);
   remaster_txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
   remaster_txn->mutable_internal()->set_id(11);
@@ -334,7 +337,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
     {"A"},  /* write_set */
     "", /* code */
     {{"A", {0,0}}}, /* master metadata */
-    MakeMachineId("0:1"), /* coordinating server */
+    MakeMachineId(0, 1), /* coordinating server */
     1 /* new master */);
   remaster_txn_lo_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
   remaster_txn_lo_0->mutable_internal()->set_id(11);
@@ -344,7 +347,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
     {"A"},  /* write_set */
     "", /* code */
     {{"A", {0,0}}}, /* master metadata */
-    MakeMachineId("0:1"), /* coordinating server */
+    MakeMachineId(0, 1), /* coordinating server */
     1 /* new master */);
     
   remaster_txn_lo_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
@@ -356,7 +359,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
       {},  /* write_set */
       "GET A     \n", /* code */
       {{"A", {1,0}}},
-      MakeMachineId("0:0") /* coordinating server */);
+      MakeMachineId(0, 0) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   txn->mutable_internal()->set_id(12);
 
@@ -385,7 +388,7 @@ TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
       {},  /* write_set */
       "GET A     \n", /* code */
       {{"A", {1,0}}}, /* metadata */
-      MakeMachineId("0:1") /* coordinating server */);
+      MakeMachineId(0, 1) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendTransaction(txn, {0});
@@ -433,7 +436,7 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
       "GET A     \n"
       "SET X newC    \n", /* code */
       {{"A", {1,0}}, {"X", {1,1}}}, /* metadata */
-      MakeMachineId("0:1") /* coordinating server */);
+      MakeMachineId(0, 1) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendTransaction(txn, {0, 1});
@@ -451,7 +454,7 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
       "SET C newC    \n"
       "SET B newB    \n", /* code */
       {{"Y", {1,1}}, {"C", {1,0}}, {"B", {1,0}}}, /* metadata */
-      MakeMachineId("0:1") /* coordinating server */);
+      MakeMachineId(0, 1) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
   SendTransaction(txn, {0, 1, 2});

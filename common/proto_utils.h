@@ -17,12 +17,6 @@ using std::unordered_set;
 
 namespace slog {
 
-internal::MachineId MakeMachineId(uint32_t replica, uint32_t partition);
-internal::MachineId MakeMachineId(const string& machine_id_str);
-
-string MakeMachineIdAsString(uint32_t replica, uint32_t partition);
-string MakeMachineIdAsString(const internal::MachineId& machine_id);
-
 /**
  * Creates a new transaction
  * @param read_set            Read set of the transaction
@@ -39,7 +33,7 @@ Transaction* MakeTransaction(
     const unordered_set<Key>& write_set,
     const string& code = "",
     const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-    const internal::MachineId coordinating_server = MakeMachineId("0:0"),
+    const MachineId coordinating_server = 0,
     const int32_t new_master = -1); // TODO: make this a union wtih code
 
 /**
@@ -76,7 +70,7 @@ inline void RecordTxnEvent(const ConfigurationPtr& config, TxnOrBatch txn, Trans
               .time_since_epoch()).count()
   );
   txn->mutable_event_machines()->Add(
-      config->GetLocalMachineIdAsNumber());
+      config->local_machine_id());
 }
 
 } // namespace slog

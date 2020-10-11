@@ -25,7 +25,7 @@ class QuorumTracker {
 public:
   QuorumTracker(uint32_t num_members);
 
-  bool HandleResponse(const internal::Response& res, MachineIdNum from);
+  bool HandleResponse(const internal::Response& res, MachineId from);
     
   QuorumState GetState() const;
  
@@ -36,7 +36,7 @@ protected:
 
 private:
   uint32_t num_members_;
-  unordered_set<MachineIdNum> machine_responded_;
+  unordered_set<MachineId> machine_responded_;
   QuorumState state_;
 };
 

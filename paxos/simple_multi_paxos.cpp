@@ -11,18 +11,18 @@ using internal::Response;
 SimpleMultiPaxos::SimpleMultiPaxos(
     Channel group_number,
     const shared_ptr<Broker>& broker,
-    const vector<MachineIdNum>& members,
-    MachineIdNum me)
+    const vector<MachineId>& members,
+    MachineId me)
   : NetworkedModule(broker, group_number),
     leader_(*this, members, me),
     acceptor_(*this) {}
 
-void SimpleMultiPaxos::HandleInternalRequest(Request&& req, MachineIdNum from) {
+void SimpleMultiPaxos::HandleInternalRequest(Request&& req, MachineId from) {
   leader_.HandleRequest(req);
   acceptor_.HandleRequest(req, from);
 }
 
-void SimpleMultiPaxos::HandleInternalResponse(Response&& res, MachineIdNum from) {
+void SimpleMultiPaxos::HandleInternalResponse(Response&& res, MachineId from) {
   leader_.HandleResponse(res, from);
 }
 
@@ -32,7 +32,7 @@ bool SimpleMultiPaxos::IsMember() const {
 
 void SimpleMultiPaxos::SendSameChannel(
     const google::protobuf::Message& msg,
-    MachineIdNum to_machine_id) {
+    MachineId to_machine_id) {
   Send(msg, channel(), to_machine_id);
 }
 

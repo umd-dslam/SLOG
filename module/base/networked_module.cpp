@@ -66,7 +66,7 @@ void NetworkedModule::Loop() {
   if (poll_items_[0].revents & ZMQ_POLLIN) {
     zmq::message_t msg;
     if (pull_socket_.recv(msg) > 0) {
-      if (MachineIdNum from; ParseMachineId(from, msg)) {
+      if (MachineId from; ParseMachineId(from, msg)) {
         if (Request req; ParseProto(req, msg)) {
           HandleInternalRequest(move(req), from);
         } else if (Response res; ParseProto(res, msg)) {
@@ -89,7 +89,7 @@ void NetworkedModule::Loop() {
 void NetworkedModule::Send(
     const google::protobuf::Message& request_or_response,
     Channel to_channel,
-    MachineIdNum to_machine_id) {
+    MachineId to_machine_id) {
   sender_.Send(request_or_response, to_channel, to_machine_id);
 }
 

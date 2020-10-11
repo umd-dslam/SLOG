@@ -18,16 +18,16 @@ public:
 
   void HandleRequest(
       const internal::Request& req,
-      MachineIdNum from_machine_id);
+      MachineId from_machine_id);
 
 private:
   void ProcessAcceptRequest(
       const internal::PaxosAcceptRequest& req,
-      MachineIdNum from_machine_id);
+      MachineId from_machine_id);
   
   void ProcessCommitRequest(
       const internal::PaxosCommitRequest& req,
-      MachineIdNum from_machine_id);
+      MachineId from_machine_id);
 
   SimpleMultiPaxos& sender_;
 

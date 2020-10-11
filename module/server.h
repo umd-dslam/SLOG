@@ -53,9 +53,9 @@ protected:
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void HandleInternalRequest(internal::Request&& req, MachineIdNum from) final;
+  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
 
-  void HandleInternalResponse(internal::Response&& res, MachineIdNum /* from */) final;
+  void HandleInternalResponse(internal::Response&& res, MachineId /* from */) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 

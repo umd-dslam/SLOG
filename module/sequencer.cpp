@@ -32,7 +32,7 @@ void Sequencer::NewBatch() {
   batch_->set_transaction_type(TransactionType::SINGLE_HOME);
 }
 
-void Sequencer::HandleInternalRequest(Request&& req, MachineIdNum /* from */) {
+void Sequencer::HandleInternalRequest(Request&& req, MachineId /* from */) {
   switch (req.type_case()) {
     case Request::kForwardTxn: {
       // Received a single-home txn
@@ -111,7 +111,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   auto num_replicas = config_->num_replicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      auto machine_id = config_->MakeMachineIdNum(rep, part);
+      auto machine_id = config_->MakeMachineId(rep, part);
       Send(batch_req, kInterleaverChannel, machine_id);
     }
   }
@@ -185,7 +185,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
 
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
-    auto machine_id = config_->MakeMachineIdNum(local_rep, part);
+    auto machine_id = config_->MakeMachineId(local_rep, part);
     Send(req, kInterleaverChannel, machine_id);
   }
 }
@@ -201,7 +201,7 @@ void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
 
 BatchId Sequencer::NextBatchId() {
   batch_id_counter_++;
-  return batch_id_counter_ * kMaxNumMachines + config_->GetLocalMachineIdAsNumber();
+  return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
@@ -212,7 +212,7 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   auto local_rep = config_->local_replica();
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
-    auto machine_id = config_->MakeMachineIdNum(local_rep, part);
+    auto machine_id = config_->MakeMachineId(local_rep, part);
     Send(
         request,
         kInterleaverChannel,
@@ -237,7 +237,7 @@ void Sequencer::MaybeSendDelayedBatches() {
           continue;
         }
         for (uint32_t part = 0; part < num_partitions; part++) {
-          auto machine_id = config_->MakeMachineIdNum(rep, part);
+          auto machine_id = config_->MakeMachineId(rep, part);
           Send(
               request,
               kInterleaverChannel,

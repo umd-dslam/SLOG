@@ -35,16 +35,16 @@ public:
       const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index);
 
 protected:
-  void HandleInternalRequest(internal::Request&& req, MachineIdNum from) final;
+  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
 
-  void HandleInternalResponse(internal::Response&& res, MachineIdNum from) final;
+  void HandleInternalResponse(internal::Response&& res, MachineId from) final;
 
 private:
   void ProcessForwardTxn(internal::ForwardTransaction* forward_txn);
 
   void ProcessLookUpMasterRequest(
       internal::LookupMasterRequest* lookup_master,
-      MachineIdNum from);
+      MachineId from);
 
   /**
    * Pre-condition: transaction type is not UNKNOWN

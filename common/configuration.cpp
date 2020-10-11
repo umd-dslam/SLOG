@@ -107,14 +107,14 @@ long Configuration::batch_duration() const {
   return config_.batch_duration();
 }
 
-vector<MachineIdNum> Configuration::all_machine_ids() const {
+vector<MachineId> Configuration::all_machine_ids() const {
   auto num_reps = num_replicas();
   auto num_parts = num_partitions();
-  vector<MachineIdNum> ret;
+  vector<MachineId> ret;
   ret.reserve(num_reps * num_parts);
   for (size_t rep = 0; rep < num_reps; rep++) {
     for (size_t part = 0; part < num_parts; part++) {
-      ret.push_back(MakeMachineIdNum(rep, part));
+      ret.push_back(MakeMachineId(rep, part));
     }
   }
   return ret;
@@ -132,19 +132,15 @@ uint32_t Configuration::local_partition() const {
   return local_partition_;
 }
 
-MachineId Configuration::GetLocalMachineIdAsProto() const {
+uint32_t Configuration::local_machine_id() const {
   return MakeMachineId(local_replica_, local_partition_);
 }
 
-uint32_t Configuration::GetLocalMachineIdAsNumber() const {
-  return MakeMachineIdNum(local_replica_, local_partition_);
-}
-
-MachineIdNum Configuration::MakeMachineIdNum(uint32_t replica, uint32_t partition) const {
+MachineId Configuration::MakeMachineId(uint32_t replica, uint32_t partition) const {
   return replica * num_partitions() + partition;
 }
 
-std::pair<uint32_t, uint32_t> Configuration::UnpackMachineId(MachineIdNum machine_id) const {
+std::pair<uint32_t, uint32_t> Configuration::UnpackMachineId(MachineId machine_id) const {
   auto np = num_partitions();
   return std::make_pair(machine_id / np, machine_id % np);
 }

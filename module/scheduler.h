@@ -36,8 +36,8 @@ public:
 protected:
   void Initialize() final;
 
-  void HandleInternalRequest(internal::Request&& req, MachineIdNum) final;
-  void HandleInternalResponse(internal::Response&& res, MachineIdNum) final;
+  void HandleInternalRequest(internal::Request&& req, MachineId) final;
+  void HandleInternalResponse(internal::Response&& res, MachineId) final;
 
 private:
   void HandleInternalRequest(internal::Request&& req);
