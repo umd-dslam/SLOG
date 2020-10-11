@@ -180,8 +180,8 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
 TEST_F(ForwarderTest, ForwardMultiHome) {
   // This txn involves data mastered by two regions
   auto txn = MakeTransaction({"A"} /* read_set */, {"C"}  /* write_set */);
-  auto leader = configs[0]->GetLeaderPartitionForMultiHomeOrdering();
-  auto non_leader = (1 + leader) % configs[0]->GetNumPartitions();  
+  auto leader = configs[0]->leader_partition_for_multi_home_ordering();
+  auto non_leader = (1 + leader) % configs[0]->num_partitions();  
 
   // In replica 0, send to the partition that is not in charge of ordering multi-home txns
   test_slogs[non_leader]->SendTxn(txn);

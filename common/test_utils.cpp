@@ -100,12 +100,12 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
     broker_(new Broker(config, context_, 5)),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {
-  ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->GetBatchDuration()));
+  ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {
-  CHECK(config_->KeyIsInLocalPartition(key)) 
-      << "Key \"" << key << "\" belongs to partition " << config_->GetPartitionOfKey(key);
+  CHECK(config_->key_is_in_local_partition(key)) 
+      << "Key \"" << key << "\" belongs to partition " << config_->partition_of_key(key);
   storage_->Write(key, record);
 }
 
@@ -169,7 +169,7 @@ void TestSlog::StartInNewThreads() {
   if (server_) {
     server_->StartInNewThread();
     string endpoint = 
-        "tcp://localhost:" + to_string(config_->GetServerPort());
+        "tcp://localhost:" + to_string(config_->server_port());
     client_socket_.connect(endpoint);
   }
   if (forwarder_) {

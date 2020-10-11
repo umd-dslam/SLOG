@@ -75,13 +75,13 @@ BasicWorkload::BasicWorkload(
         MergeParams(extra_default_params, DEFAULT_PARAMS),
         params_str),
     config_(config),
-    partition_to_key_lists_(config->GetNumPartitions()),
+    partition_to_key_lists_(config->num_partitions()),
     rg_(std::random_device()()),
     client_txn_id_counter_(0) {
-  auto num_replicas = config->GetNumReplicas();
-  auto num_partitions = config->GetNumPartitions();
+  auto num_replicas = config->num_replicas();
+  auto num_partitions = config->num_partitions();
   auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / (num_replicas * num_partitions));
-  auto simple_partitioning = config->GetSimplePartitioning();
+  auto simple_partitioning = config->simple_partitioning();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       // Initialize hot keys limit for each key list. When keys are added to a list, 
@@ -125,7 +125,7 @@ BasicWorkload::NextTransaction() {
   pro.client_txn_id = client_txn_id_counter_;
 
   // Decide if this is a multi-partition txn or not
-  auto num_partitions = config_->GetNumPartitions();
+  auto num_partitions = config_->num_partitions();
   auto multi_partition_pct = params_.GetDouble(MP_PCT);
   discrete_distribution<> spmp({100 - multi_partition_pct, multi_partition_pct});
   pro.is_multi_partition = spmp(rg_);
@@ -147,7 +147,7 @@ BasicWorkload::NextTransaction() {
   }
 
   // Decide if this is a multi-home txn or not
-  auto num_replicas = config_->GetNumReplicas();
+  auto num_replicas = config_->num_replicas();
   auto multi_home_pct = params_.GetDouble(MH_PCT);
   discrete_distribution<> shmh({100 - multi_home_pct, multi_home_pct});
   pro.is_multi_home = shmh(rg_);

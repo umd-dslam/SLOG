@@ -45,7 +45,7 @@ void LoadData(
   }
 
   auto data_file = data_dir + "/" + 
-      std::to_string(config->GetLocalPartition()) + ".dat";
+      std::to_string(config->local_partition()) + ".dat";
 
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
@@ -67,11 +67,11 @@ void LoadData(
       c--;
     }
 
-    CHECK(config->KeyIsInLocalPartition(datum.key()))
+    CHECK(config->key_is_in_local_partition(datum.key()))
         << "Key " << datum.key()
-        << " does not belong to partition " << config->GetLocalPartition();
+        << " does not belong to partition " << config->local_partition();
 
-    CHECK_LT(datum.master(), config->GetNumReplicas())
+    CHECK_LT(datum.master(), config->num_replicas())
         << "Master number exceeds number of replicas";
 
     // Write to storage
@@ -82,11 +82,11 @@ void LoadData(
 }
 
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
-  auto simple_partitioning = config->GetSimplePartitioning();
+  auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
-  auto num_threads = config->GetNumWorkers();
-  auto num_partitions = config->GetNumPartitions();
-  auto partition = config->GetLocalPartition();
+  auto num_threads = config->num_workers();
+  auto num_partitions = config->num_partitions();
+  auto partition = config->local_partition();
   
   // Create a value of specified size by repeating the character 'a'
   string value(simple_partitioning->record_size_bytes(), 'a');
@@ -99,7 +99,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
     uint64_t end_key = std::min(to_key, num_records);
     uint64_t counter = 0;
     for (uint64_t key = start_key; key < end_key; key += num_partitions) {
-      int master = config->GetMasterOfKey(key);
+      int master = config->master_of_key(key);
       Record record(value, master);
       storage.Write(std::to_string(key), record);
       counter++;
@@ -143,16 +143,16 @@ int main(int argc, char* argv[]) {
       FLAGS_address,
       FLAGS_replica,
       FLAGS_partition);
-  const auto& all_addresses = config->GetAllAddresses();
+  const auto& all_addresses = config->all_addresses();
   CHECK(std::find(
       all_addresses.begin(),
       all_addresses.end(),
-      config->GetLocalAddress()) != all_addresses.end())
+      config->local_address()) != all_addresses.end())
       << "The configuration does not contain the provided "
-      << "local machine ID: \"" << config->GetLocalAddress() << "\"";
-  CHECK_LT(config->GetLocalReplica(), config->GetNumReplicas())
+      << "local machine ID: \"" << config->local_address() << "\"";
+  CHECK_LT(config->local_replica(), config->num_replicas())
       << "Replica numbers must be within number of replicas";
-  CHECK_LT(config->GetLocalPartition(), config->GetNumPartitions())
+  CHECK_LT(config->local_partition(), config->num_partitions())
       << "Partition number must be within number of partitions";
 
   auto context = make_shared<zmq::context_t>(1);
@@ -162,7 +162,7 @@ int main(int argc, char* argv[]) {
   auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
   // If simple partitioning is used, generate the data;
   // otherwise, load data from an external file
-  if (config->GetSimplePartitioning()) {
+  if (config->simple_partitioning()) {
     GenerateData(*storage, config);
   } else {
     LoadData(*storage, config, FLAGS_data_dir);
@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(
-      MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->GetBatchDuration())));
+      MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->batch_duration())));
   modules.push_back(
       MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(
@@ -187,8 +187,8 @@ int main(int argc, char* argv[]) {
       MakeRunnerFor<slog::Scheduler>(config, broker, storage));
   
   // Only one partition per replica participates in the global paxos process
-  if (config->GetLeaderPartitionForMultiHomeOrdering() 
-      == config->GetLocalPartition()) {
+  if (config->leader_partition_for_multi_home_ordering() 
+      == config->local_partition()) {
     modules.push_back(
         MakeRunnerFor<slog::GlobalPaxos>(config, broker));
     modules.push_back(

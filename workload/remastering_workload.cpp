@@ -49,10 +49,10 @@ RemasteringWorkload::NextRemasterTransaction() {
   unordered_set<Key> write_set;
   unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
 
-  auto home = Choose(config_->GetNumReplicas(), 1, rg_)[0];
-  auto partition = Choose(config_->GetNumPartitions(), 1, rg_)[0];
+  auto home = Choose(config_->num_replicas(), 1, rg_)[0];
+  auto partition = Choose(config_->num_partitions(), 1, rg_)[0];
 
-  auto new_master = (home + 1) % config_->GetNumReplicas();
+  auto new_master = (home + 1) % config_->num_replicas();
 
   auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
   write_set.insert(key);

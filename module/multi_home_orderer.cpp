@@ -81,8 +81,8 @@ void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
   forward_batch->set_allocated_batch_data(batch_.release());
 
   // Replicate new batch to other regions
-  auto part = config_->GetLeaderPartitionForMultiHomeOrdering();
-  auto num_replicas = config_->GetNumReplicas();
+  auto part = config_->leader_partition_for_multi_home_ordering();
+  auto num_replicas = config_->num_replicas();
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
     auto machine_id = config_->MakeMachineIdNum(rep, part);
     Send(batch_req, kMultiHomeOrdererChannel, machine_id);

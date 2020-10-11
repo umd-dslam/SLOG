@@ -30,38 +30,37 @@ public:
       uint32_t local_replica,
       uint32_t local_partition);
 
-  const string& GetProtocol() const;
-  const vector<string>& GetAllAddresses() const;
-  const string& GetAddress(uint32_t replica, uint32_t partition) const;
-  uint32_t GetBrokerPort() const;
-  uint32_t GetServerPort() const;
-  uint32_t GetNumReplicas() const;
-  uint32_t GetNumPartitions() const;
-  uint32_t GetNumWorkers() const;
-  vector<MachineIdNum> GetAllMachineIds() const;
-  long GetBatchDuration() const;
+  const string& protocol() const;
+  const vector<string>& all_addresses() const;
+  const string& address(uint32_t replica, uint32_t partition) const;
+  uint32_t broker_port() const;
+  uint32_t server_port() const;
+  uint32_t num_replicas() const;
+  uint32_t num_partitions() const;
+  uint32_t num_workers() const;
+  vector<MachineIdNum> all_machine_ids() const;
+  long batch_duration() const;
 
-  const string& GetLocalAddress() const;
-  uint32_t GetLocalReplica() const;
-  uint32_t GetLocalPartition() const;
-  string GetLocalMachineIdAsString() const;
+  const string& local_address() const;
+  uint32_t local_replica() const;
+  uint32_t local_partition() const;
   internal::MachineId GetLocalMachineIdAsProto() const;
   uint32_t GetLocalMachineIdAsNumber() const;
   MachineIdNum MakeMachineIdNum(uint32_t replica, uint32_t partition) const;
   std::pair<uint32_t, uint32_t> UnpackMachineId(MachineIdNum machine_id) const;
 
-  uint32_t GetLeaderPartitionForMultiHomeOrdering() const;
+  uint32_t leader_partition_for_multi_home_ordering() const;
 
-  uint32_t GetPartitionOfKey(const Key& key) const;
-  bool KeyIsInLocalPartition(const Key& key) const;
+  uint32_t partition_of_key(const Key& key) const;
+  bool key_is_in_local_partition(const Key& key) const;
   // Only work with simple partitioning
-  uint32_t GetPartitionOfKey(uint32_t key) const;
-  uint32_t GetMasterOfKey(uint32_t key) const;
-  const internal::SimplePartitioning* GetSimplePartitioning() const;
+  uint32_t partition_of_key(uint32_t key) const;
+  uint32_t master_of_key(uint32_t key) const;
+  const internal::SimplePartitioning* simple_partitioning() const;
 
 #ifdef ENABLE_REPLICATION_DELAY
-  uint32_t GetReplicationDelayPercent() const;
-  uint32_t GetReplicationDelayAmount() const;
+  uint32_t replication_delay_percent() const;
+  uint32_t replication_delay_amount() const;
 #endif /* ENABLE_REPLICATION_DELAY */
 
 private:

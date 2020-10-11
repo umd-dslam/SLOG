@@ -71,45 +71,45 @@ Configuration::Configuration(
   }
 }
 
-const string& Configuration::GetProtocol() const {
+const string& Configuration::protocol() const {
   return config_.protocol();
 }
 
-const vector<string>& Configuration::GetAllAddresses() const {
+const vector<string>& Configuration::all_addresses() const {
   return all_addresses_;
 }
 
-const string& Configuration::GetAddress(uint32_t replica, uint32_t partition) const {
+const string& Configuration::address(uint32_t replica, uint32_t partition) const {
   return config_.replicas(replica).addresses(partition);
 }
 
-uint32_t Configuration::GetNumReplicas() const {
+uint32_t Configuration::num_replicas() const {
   return config_.replicas_size();
 }
 
-uint32_t Configuration::GetNumPartitions() const {
+uint32_t Configuration::num_partitions() const {
   return config_.num_partitions();
 }
 
-uint32_t Configuration::GetNumWorkers() const {
+uint32_t Configuration::num_workers() const {
   return std::max(config_.num_workers(), 1U);
 }
 
-uint32_t Configuration::GetBrokerPort() const {
+uint32_t Configuration::broker_port() const {
   return config_.broker_port();
 }
 
-uint32_t Configuration::GetServerPort() const {
+uint32_t Configuration::server_port() const {
   return config_.server_port();
 }
 
-long Configuration::GetBatchDuration() const {
+long Configuration::batch_duration() const {
   return config_.batch_duration();
 }
 
-vector<MachineIdNum> Configuration::GetAllMachineIds() const {
-  auto num_reps = GetNumReplicas();
-  auto num_parts = GetNumPartitions();
+vector<MachineIdNum> Configuration::all_machine_ids() const {
+  auto num_reps = num_replicas();
+  auto num_parts = num_partitions();
   vector<MachineIdNum> ret;
   ret.reserve(num_reps * num_parts);
   for (size_t rep = 0; rep < num_reps; rep++) {
@@ -120,15 +120,15 @@ vector<MachineIdNum> Configuration::GetAllMachineIds() const {
   return ret;
 }
 
-const string& Configuration::GetLocalAddress() const {
+const string& Configuration::local_address() const {
   return local_address_;
 }
 
-uint32_t Configuration::GetLocalReplica() const {
+uint32_t Configuration::local_replica() const {
   return local_replica_;
 }
 
-uint32_t Configuration::GetLocalPartition() const {
+uint32_t Configuration::local_partition() const {
   return local_partition_;
 }
 
@@ -141,57 +141,53 @@ uint32_t Configuration::GetLocalMachineIdAsNumber() const {
 }
 
 MachineIdNum Configuration::MakeMachineIdNum(uint32_t replica, uint32_t partition) const {
-  return replica * GetNumPartitions() + partition;
+  return replica * num_partitions() + partition;
 }
 
 std::pair<uint32_t, uint32_t> Configuration::UnpackMachineId(MachineIdNum machine_id) const {
-  auto num_partitions = GetNumPartitions();
-  return std::make_pair(machine_id / num_partitions, machine_id % num_partitions);
+  auto np = num_partitions();
+  return std::make_pair(machine_id / np, machine_id % np);
 }
 
-string Configuration::GetLocalMachineIdAsString() const {
-  return MakeMachineIdAsString(local_replica_, local_partition_);
-}
-
-uint32_t Configuration::GetLeaderPartitionForMultiHomeOrdering() const {
+uint32_t Configuration::leader_partition_for_multi_home_ordering() const {
   // Avoid using partition 0 here since it usually works as the
   // leader of the local paxos process
-  return GetNumPartitions() - 1;
+  return num_partitions() - 1;
 }
 
-uint32_t Configuration::GetPartitionOfKey(const Key& key) const {
+uint32_t Configuration::partition_of_key(const Key& key) const {
   if (config_.has_hash_partitioning()) {
     auto end = config_.hash_partitioning().partition_key_num_bytes() >= key.length() 
         ? key.end() 
         : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
-    return FNVHash(key.begin(), end) % GetNumPartitions();
+    return FNVHash(key.begin(), end) % num_partitions();
   } else {
-    return GetPartitionOfKey(std::stoll(key));
+    return partition_of_key(std::stoll(key));
   }
 }
 
-bool Configuration::KeyIsInLocalPartition(const Key& key) const {
-  return GetPartitionOfKey(key) == local_partition_;
+bool Configuration::key_is_in_local_partition(const Key& key) const {
+  return partition_of_key(key) == local_partition_;
 }
 
-uint32_t Configuration::GetPartitionOfKey(uint32_t key) const {
-  return key % GetNumPartitions();
+uint32_t Configuration::partition_of_key(uint32_t key) const {
+  return key % num_partitions();
 }
 
-uint32_t Configuration::GetMasterOfKey(uint32_t key) const {
-  return (key / GetNumPartitions()) % GetNumReplicas();
+uint32_t Configuration::master_of_key(uint32_t key) const {
+  return (key / num_partitions()) % num_replicas();
 }
 
-const internal::SimplePartitioning* Configuration::GetSimplePartitioning() const {
+const internal::SimplePartitioning* Configuration::simple_partitioning() const {
   return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
-uint32_t Configuration::GetReplicationDelayPercent() const {
+uint32_t Configuration::replication_delay_percent() const {
   return config_.replication_delay().batch_delay_percent();
 }
 
-uint32_t Configuration::GetReplicationDelayAmount() const {
+uint32_t Configuration::replication_delay_amount() const {
   return config_.replication_delay().batch_delay_amount();
 }
 #endif /* ENABLE_REPLICATION_DELAY */

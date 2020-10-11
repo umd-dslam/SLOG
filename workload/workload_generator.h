@@ -197,10 +197,10 @@ public:
       master_(master),
       num_hot_keys_(num_hot_keys),
       rg_(std::random_device()()) {
-    auto simple_partitioning = config->GetSimplePartitioning();
+    auto simple_partitioning = config->simple_partitioning();
     auto num_records = simple_partitioning->num_records();
-    num_partitions_ = config->GetNumPartitions();
-    num_replicas_ = config->GetNumReplicas();
+    num_partitions_ = config->num_partitions();
+    num_replicas_ = config->num_replicas();
     num_keys_ =  ((num_records - partition) / num_partitions_ - master) / num_replicas_;
   }
 

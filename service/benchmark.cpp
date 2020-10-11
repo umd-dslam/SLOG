@@ -211,18 +211,18 @@ void InitializeBenchmark() {
 
   config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
 
-  if (FLAGS_p >= 0 && static_cast<uint32_t>(FLAGS_p) >= config->GetNumPartitions()) {
+  if (FLAGS_p >= 0 && static_cast<uint32_t>(FLAGS_p) >= config->num_partitions()) {
     LOG(FATAL) << "Invalid partition: " << FLAGS_p
-               << ". Number of partition is: " << config->GetNumPartitions();
+               << ". Number of partition is: " << config->num_partitions();
   }
 
   // Connect to all server in the same region
-  for (uint32_t p = 0; p < config->GetNumPartitions(); p++) {
+  for (uint32_t p = 0; p < config->num_partitions(); p++) {
     std::ostringstream endpoint_s;
-    if (config->GetProtocol() == "ipc") {
-      endpoint_s << "tcp://localhost:"  << config->GetServerPort();
+    if (config->protocol() == "ipc") {
+      endpoint_s << "tcp://localhost:"  << config->server_port();
     } else {
-      endpoint_s << "tcp://" << config->GetAddress(FLAGS_r, p) << ":" << config->GetServerPort();
+      endpoint_s << "tcp://" << config->address(FLAGS_r, p) << ":" << config->server_port();
     }
     auto endpoint = endpoint_s.str();
 
@@ -341,7 +341,7 @@ void SendNextTransaction() {
   req.set_stream_id(stats.txn_counter);
 
   if (FLAGS_p < 0) {
-    std::uniform_int_distribution<> dis(0, config->GetNumPartitions() - 1);
+    std::uniform_int_distribution<> dis(0, config->num_partitions() - 1);
     SendProtoWithEmptyDelimiter(*server_sockets[dis(gen)], req);
   } else {
     SendProtoWithEmptyDelimiter(*server_sockets[FLAGS_p], req);

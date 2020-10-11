@@ -57,7 +57,7 @@ protected:
   void AddAndStartNewPaxos(const ConfigurationPtr& config) {
     AddAndStartNewPaxos(
         config,
-        config->GetAllMachineIds(),
+        config->all_machine_ids(),
         config->GetLocalMachineIdAsNumber());
   }
 
@@ -157,15 +157,15 @@ TEST_F(PaxosTest, ProposeMultipleValues) {
 TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
   auto configs = MakeTestConfigurations("paxos", 2, 2);
   vector<MachineIdNum> members;
-  auto member_part = configs.front()->GetLeaderPartitionForMultiHomeOrdering();
-  for (uint32_t rep = 0; rep < configs.front()->GetNumReplicas(); rep++) {
+  auto member_part = configs.front()->leader_partition_for_multi_home_ordering();
+  for (uint32_t rep = 0; rep < configs.front()->num_replicas(); rep++) {
     members.emplace_back(configs.front()->MakeMachineIdNum(rep, member_part));
   }
   for (auto config : configs) {
     AddAndStartNewPaxos(config, members, config->GetLocalMachineIdAsNumber());
   }
 
-  auto non_member = (member_part + 1) % configs.front()->GetNumPartitions(); 
+  auto non_member = (member_part + 1) % configs.front()->num_partitions(); 
   Propose(non_member, 111);
   for (auto& paxos : paxi) {
     if (paxos->IsMember()) {

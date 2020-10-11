@@ -7,10 +7,10 @@ namespace slog {
 using internal::Request;
 
 vector<MachineIdNum> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
-  auto part = config->GetLeaderPartitionForMultiHomeOrdering();
+  auto part = config->leader_partition_for_multi_home_ordering();
   vector<MachineIdNum> members;
   // Enlist a fixed machine at each region as members
-  for (uint32_t rep = 0; rep < config->GetNumReplicas(); rep++) {
+  for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
     auto machine_id = config->MakeMachineIdNum(rep, part);
     members.push_back(machine_id);
   }
@@ -35,10 +35,10 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
 }
 
 vector<MachineIdNum> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
-  auto local_rep = config->GetLocalReplica();
+  auto local_rep = config->local_replica();
   vector<MachineIdNum> members;
   // Enlist all machines in the same region as members
-  for (uint32_t part = 0; part < config->GetNumPartitions(); part++) {
+  for (uint32_t part = 0; part < config->num_partitions(); part++) {
     members.push_back(config->MakeMachineIdNum(local_rep, part));
   }
   return members;

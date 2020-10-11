@@ -53,7 +53,7 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
   auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
   auto txn = txn_holder->GetTransaction();
   auto txn_id = txn->internal().id();
-  auto local_partition = config_->GetLocalPartition();
+  auto local_partition = config_->local_partition();
 
   RecordTxnEvent(
       config_,
@@ -66,7 +66,7 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
   auto itr = txn->mutable_read_set()->begin();
   while (itr != txn->mutable_read_set()->end()) {
     const auto& key = itr->first;
-    auto partition = config_->GetPartitionOfKey(key);
+    auto partition = config_->partition_of_key(key);
     if (partition != local_partition) {
       itr = txn->mutable_read_set()->erase(itr);
     } else {
@@ -76,7 +76,7 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
   itr = txn->mutable_write_set()->begin();
   while (itr != txn->mutable_write_set()->end()) {
     const auto& key = itr->first;
-    auto partition = config_->GetPartitionOfKey(key);
+    auto partition = config_->partition_of_key(key);
     if (partition != local_partition) {
       itr = txn->mutable_write_set()->erase(itr);
     } else {
@@ -223,7 +223,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
     }
   }
 
-  auto local_partition = config_->GetLocalPartition();
+  auto local_partition = config_->local_partition();
   // Send abort result and local reads to all remote active partitions
   if (!txn_holder->ActivePartitions().empty()) {
     Request request;
@@ -293,7 +293,7 @@ void Worker::Commit(TxnId txn_id) {
       auto& master_metadata = txn->internal().master_metadata();
       for (const auto& key_value : txn->write_set()) {
         const auto& key = key_value.first;
-        if (config_->KeyIsInLocalPartition(key)) {
+        if (config_->key_is_in_local_partition(key)) {
           const auto& value = key_value.second;
           Record record;
           bool found = storage_->Read(key_value.first, record);
@@ -307,7 +307,7 @@ void Worker::Commit(TxnId txn_id) {
         }
       }
       for (const auto& key : txn->delete_set()) {
-        if (config_->KeyIsInLocalPartition(key)) {
+        if (config_->key_is_in_local_partition(key)) {
           storage_->Delete(key);
         }
       }
@@ -315,7 +315,7 @@ void Worker::Commit(TxnId txn_id) {
     }
     case Transaction::ProcedureCase::kRemaster: {
       const auto& key = txn->write_set().begin()->first;
-      if (config_->KeyIsInLocalPartition(key)) {
+      if (config_->key_is_in_local_partition(key)) {
         auto txn_key_metadata = txn->internal().master_metadata().at(key);
         Record record;
         bool found = storage_->Read(key, record);
@@ -356,8 +356,8 @@ void Worker::Finish(TxnId txn_id) {
 void Worker::SendToOtherPartitions(
     internal::Request&& request,
     const std::unordered_set<uint32_t>& partitions) {
-  auto local_replica = config_->GetLocalReplica();
-  auto local_partition = config_->GetLocalPartition();
+  auto local_replica = config_->local_replica();
+  auto local_partition = config_->local_partition();
   for (auto p : partitions) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineIdNum(local_replica, p);

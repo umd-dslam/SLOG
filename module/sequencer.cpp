@@ -82,7 +82,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 
   Request paxos_req;
   auto paxos_propose = paxos_req.mutable_paxos_propose();
-  paxos_propose->set_value(config_->GetLocalPartition());
+  paxos_propose->set_value(config_->local_partition());
   Send(paxos_req, kLocalPaxos);
 
   Request batch_req;
@@ -99,7 +99,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 
 #ifdef ENABLE_REPLICATION_DELAY
   // Maybe delay current batch
-  if ((uint32_t)(rand() % 100) < config_->GetReplicationDelayPercent()) {
+  if ((uint32_t)(rand() % 100) < config_->replication_delay_percent()) {
     DelaySingleHomeBatch(std::move(batch_req));
     NewBatch();
     return;
@@ -107,8 +107,8 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 #endif /* GetReplicationDelayEnabled */
 
   // Replicate batch to all machines
-  auto num_partitions = config_->GetNumPartitions();
-  auto num_replicas = config_->GetNumReplicas();
+  auto num_partitions = config_->num_partitions();
+  auto num_replicas = config_->num_replicas();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       auto machine_id = config_->MakeMachineIdNum(rep, part);
@@ -131,7 +131,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
       batch,
       TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
 
-  auto local_rep = config_->GetLocalReplica();
+  auto local_rep = config_->local_replica();
   // For each multi-home txn, create a lock-only txn and put into
   // the single-home batch to be sent to the local log
   for (auto& txn : batch->transactions()) {
@@ -183,7 +183,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
       batch,
       TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
-  auto num_partitions = config_->GetNumPartitions();
+  auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineIdNum(local_rep, part);
     Send(req, kInterleaverChannel, machine_id);
@@ -209,8 +209,8 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   delayed_batches_.push_back(request);
 
   // Send the batch to interleavers in the local replica only
-  auto local_rep = config_->GetLocalReplica();
-  auto num_partitions = config_->GetNumPartitions();
+  auto local_rep = config_->local_replica();
+  auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineIdNum(local_rep, part);
     Send(
@@ -224,15 +224,15 @@ void Sequencer::MaybeSendDelayedBatches() {
   for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
     // Create a geometric distribution of delay. Each batch has 1 / DelayAmount chance
     // of being sent at every tick
-    if (rand() % config_->GetReplicationDelayAmount() == 0) {
+    if (rand() % config_->replication_delay_amount() == 0) {
       VLOG(4) << "Sending delayed batch";
       auto request = *itr;
 
       // Replicate batch to all machines EXCEPT local replica
-      auto num_replicas = config_->GetNumReplicas();
-      auto num_partitions = config_->GetNumPartitions();
+      auto num_replicas = config_->num_replicas();
+      auto num_partitions = config_->num_partitions();
       for (uint32_t rep = 0; rep < num_replicas; rep++) {
-        if (rep == config_->GetLocalReplica()) {
+        if (rep == config_->local_replica()) {
           // Already sent to local replica
           continue;
         }

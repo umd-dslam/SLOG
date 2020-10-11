@@ -24,8 +24,7 @@ Server::Server(
 ***********************************************/
 
 std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
-  string endpoint = 
-      "tcp://*:" + std::to_string(config_->GetServerPort());
+  string endpoint = "tcp://*:" + std::to_string(config_->server_port());
   zmq::socket_t client_socket(*GetContext(), ZMQ_ROUTER);
   client_socket.setsockopt(ZMQ_LINGER, 0);
   client_socket.setsockopt(ZMQ_RCVHWM, kServerRcvHwm);

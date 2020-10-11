@@ -35,8 +35,8 @@ protected:
       test_slogs[i]->AddLocalPaxos();
 
       // Only one partition per replica participates in the global paxos process
-      if (configs[i]->GetLeaderPartitionForMultiHomeOrdering() 
-          == configs[i]->GetLocalPartition()) {
+      if (configs[i]->leader_partition_for_multi_home_ordering() 
+          == configs[i]->local_partition()) {
         test_slogs[i]->AddGlobalPaxos();
         test_slogs[i]->AddMultiHomeOrderer();
       }

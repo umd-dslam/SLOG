@@ -28,7 +28,7 @@ Scheduler::Scheduler(
     const shared_ptr<Storage<Key, Record>>& storage)
   : NetworkedModule(broker, kSchedulerChannel),
     config_(config) {
-  for (size_t i = 0; i < config->GetNumWorkers(); i++) {
+  for (size_t i = 0; i < config->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(
         config,
         broker,
@@ -167,7 +167,7 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
-  completed_sub_txn->set_partition(config_->GetLocalPartition());
+  completed_sub_txn->set_partition(config_->local_partition());
   for (auto p : txn_holder.InvolvedPartitions()) {
     completed_sub_txn->add_involved_partitions(p);
   }
@@ -509,11 +509,11 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   Request request;
   auto rrr = request.mutable_remote_read_result();
   rrr->set_txn_id(txn_id);
-  rrr->set_partition(config_->GetLocalPartition());
+  rrr->set_partition(config_->local_partition());
   rrr->set_will_abort(true);
-  auto local_replica = config_->GetLocalReplica();
+  auto local_replica = config_->local_replica();
   for (auto p : txn_holder.ActivePartitions()) {
-    if (p != config_->GetLocalPartition()) {
+    if (p != config_->local_partition()) {
       auto machine_id = config_->MakeMachineIdNum(local_replica, p);
       Send(request, kSchedulerChannel, machine_id);
     }
@@ -533,7 +533,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 
   // Active partitions must receive remote reads from all other partitions
   auto num_remote_partitions = txn_holder.InvolvedPartitions().size() - 1;
-  auto local_partition = config_->GetLocalPartition();
+  auto local_partition = config_->local_partition();
   auto local_partition_active =
       (txn_holder.ActivePartitions().count(local_partition) > 0);
   if (num_remote_partitions > 0 && local_partition_active) {
@@ -576,7 +576,7 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   }
 
   // Select a worker for this transaction
-  txn_holder.SetWorker(SelectWorkerForTxn(txn_id, config_->GetNumWorkers()));
+  txn_holder.SetWorker(SelectWorkerForTxn(txn_id, config_->num_workers()));
 
   RecordTxnEvent(
       config_,

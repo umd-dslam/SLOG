@@ -82,18 +82,18 @@ MachineIdNum Broker::GetLocalMachineId() const {
 
 string Broker::MakeEndpoint(const string& addr) const {
   std::stringstream endpoint;
-  const auto& protocol = config_->GetProtocol();
+  const auto& protocol = config_->protocol();
   endpoint << protocol << "://";
   if (addr.empty()) {
     if (protocol == "ipc") {
-      endpoint << config_->GetLocalAddress();
+      endpoint << config_->local_address();
     } else {
       endpoint << "*";
     }
   } else {
     endpoint << addr;
   }
-  auto port = config_->GetBrokerPort();
+  auto port = config_->broker_port();
   if (port > 0) {
     endpoint << ":" << port;
   }
@@ -108,12 +108,12 @@ bool Broker::InitializeConnection() {
   // Prepare a READY message
   Request request;
   auto ready = request.mutable_broker_ready();
-  ready->set_ip_address(config_->GetLocalAddress());
+  ready->set_ip_address(config_->local_address());
   ready->mutable_machine_id()->CopyFrom(
       config_->GetLocalMachineIdAsProto());
 
   // Connect to all other machines and send the READY message
-  for (const auto& addr : config_->GetAllAddresses()) {
+  for (const auto& addr : config_->all_addresses()) {
     zmq::socket_t tmp_socket(*context_, ZMQ_PUSH);
     tmp_socket.setsockopt(ZMQ_LINGER, 0);
     
@@ -131,8 +131,8 @@ bool Broker::InitializeConnection() {
   // Each machine is identified with its replica and partition. Each broker
   // needs to receive the READY message from all other machines to start working.
   unordered_set<MachineIdNum> needed_machine_ids;
-  for (uint32_t rep = 0; rep < config_->GetNumReplicas(); rep++) {
-    for (uint32_t part = 0; part < config_->GetNumPartitions(); part++) {
+  for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
+    for (uint32_t part = 0; part < config_->num_partitions(); part++) {
       needed_machine_ids.insert(config_->MakeMachineIdNum(rep, part));
     }
   }

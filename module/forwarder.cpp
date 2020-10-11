@@ -48,7 +48,7 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
       txn->mutable_internal(),
       TransactionEvent::ENTER_FORWARDER);
 
-  auto local_partition = config_->GetLocalPartition();
+  auto local_partition = config_->local_partition();
 
   // Prepare a lookup master request just in case
   Request lookup_master_request;
@@ -62,7 +62,7 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
       const auto& key = pair.first;
-      auto partition = config_->GetPartitionOfKey(key);
+      auto partition = config_->partition_of_key(key);
 
       // Add the partition of this key to the partition list of current txn if not exist
       if (std::find(partitions->begin(), partitions->end(), partition) == partitions->end()) {
@@ -103,8 +103,8 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
   pending_transaction_[txn->internal().id()] = txn;
 
   // Send a look up master request to each partition in the same region
-  auto local_rep = config_->GetLocalReplica();
-  auto num_partitions = config_->GetNumPartitions();
+  auto local_rep = config_->local_replica();
+  auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     if (part != local_partition) {
       Send(
@@ -126,7 +126,7 @@ void Forwarder::ProcessLookUpMasterRequest(
   while (!lookup_master->keys().empty()) {
     auto key = lookup_master->mutable_keys()->ReleaseLast();
 
-    if (!config_->KeyIsInLocalPartition(*key)) {
+    if (!config_->key_is_in_local_partition(*key)) {
       // Ignore keys that the current partition does not have
       delete key;
     } else {
@@ -200,7 +200,7 @@ void Forwarder::Forward(Transaction* txn) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
     auto home_replica = master_metadata.begin()->second.master();
-    if (home_replica == config_->GetLocalReplica()) {
+    if (home_replica == config_->local_replica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
       RecordTxnEvent(
           config_,
@@ -208,7 +208,7 @@ void Forwarder::Forward(Transaction* txn) {
           TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(forward_txn, kSequencerChannel);
     } else {
-      std::uniform_int_distribution<> RandomPartition(0, config_->GetNumPartitions() - 1);
+      std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
       auto partition = RandomPartition(rg_);
       auto random_machine_in_home_replica = config_->MakeMachineIdNum(home_replica, partition);
 
@@ -226,8 +226,8 @@ void Forwarder::Forward(Transaction* txn) {
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
     auto destination = config_->MakeMachineIdNum(
-        config_->GetLocalReplica(),
-        config_->GetLeaderPartitionForMultiHomeOrdering());
+        config_->local_replica(),
+        config_->leader_partition_for_multi_home_ordering());
 
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 

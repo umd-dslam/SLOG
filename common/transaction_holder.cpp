@@ -27,17 +27,17 @@ void TransactionHolder::SetTransaction(const ConfigurationPtr& config, Transacti
 
   // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
   for (const auto& kv : txn->read_set()) {
-    involved_partitions_.insert(config->GetPartitionOfKey(kv.first));
+    involved_partitions_.insert(config->partition_of_key(kv.first));
     // If this key is also in write_set, give it write lock instead
-    if (config->KeyIsInLocalPartition(kv.first) 
+    if (config->key_is_in_local_partition(kv.first) 
         && !txn->write_set().contains(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::READ);
     }
   }
   for (const auto& kv : txn->write_set()) {
-    involved_partitions_.insert(config->GetPartitionOfKey(kv.first));
-    active_partitions_.insert(config->GetPartitionOfKey(kv.first));
-    if (config->KeyIsInLocalPartition(kv.first)) {
+    involved_partitions_.insert(config->partition_of_key(kv.first));
+    active_partitions_.insert(config->partition_of_key(kv.first));
+    if (config->key_is_in_local_partition(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::WRITE);
     }
   }
