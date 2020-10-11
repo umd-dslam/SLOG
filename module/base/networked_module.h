@@ -23,7 +23,11 @@ public:
       Channel channel);
 
 protected:
-  virtual std::vector<zmq::socket_t> InitializeCustomSockets();
+  virtual std::vector<zmq::socket_t> InitializeCustomSockets() {
+    return {};
+  }
+
+  virtual void Initialize() {};
 
   virtual void HandleInternalRequest(
       internal::Request&& req,

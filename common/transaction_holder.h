@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "common/configuration.h"
@@ -21,8 +22,13 @@ public:
   Transaction* GetTransaction() const;
   Transaction* ReleaseTransaction();
 
-  void SetWorker(const std::string& worker);
-  const std::string& GetWorker() const;
+  void SetWorker(uint32_t worker) {
+    worker_ = worker;
+  }
+
+  std::optional<uint32_t> worker() const {
+    return worker_;
+  }
 
   const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
   const std::unordered_set<uint32_t>& InvolvedPartitions() const;
@@ -46,7 +52,7 @@ public:
 
 private:
   Transaction* txn_;
-  string worker_;
+  std::optional<uint32_t> worker_;
   std::vector<internal::Request> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   std::unordered_set<uint32_t> involved_partitions_;

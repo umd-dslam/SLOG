@@ -26,34 +26,25 @@
 
 namespace slog {
 
-// TODO: extend Scheduler from NetworkedModule to simply the code
-class Scheduler : public Module {
+class Scheduler : public NetworkedModule {
 public:
-  static const string WORKERS_ENDPOINT;
-  static const uint32_t WORKER_LOAD_THRESHOLD;
-
   Scheduler(
       const ConfigurationPtr& config,
       const std::shared_ptr<Broker>& broker,
       const std::shared_ptr<Storage<Key, Record>>& storage);
 
-  void SetUp() final;
+protected:
+  void Initialize() final;
 
-  void Loop() final;
+  void HandleInternalRequest(internal::Request&& req, MachineIdNum) final;
+  void HandleInternalResponse(internal::Response&& res, MachineIdNum) final;
 
 private:
-  friend class Worker;
-
-  // A marker for the special log containing only multi-home txn
-  const uint32_t kMultiHomeTxnLogMarker;
-
   void HandleInternalRequest(internal::Request&& req);
-  void HandleResponseFromWorker(const internal::WorkerResponse& response);
   void SendToCoordinatingServer(TxnId txn_id);
 
-  void ProcessRemoteReadResult(internal::Request&& request);
+  void ProcessRemoteReadResult(internal::Request&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
-
   void ProcessTransaction(Transaction* txn);
 
   // Check that remaster txn doesn't keep key at same master
@@ -75,7 +66,6 @@ private:
 
   // Prepare transaction to be sent to worker
   void DispatchTransaction(TxnId txn_id);
-  void SendToWorker(internal::Request&& req, const string& worker);
 
   /**
    * Aborts
@@ -110,14 +100,8 @@ private:
   void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
-  zmq::socket_t pull_socket_;
-  zmq::socket_t worker_socket_;
-  std::vector<zmq::pollitem_t> poll_items_;
   std::vector<string> worker_identities_;
   std::vector<unique_ptr<ModuleRunner>> workers_;
-  size_t next_worker_;
-
-  Sender sender_;
   
 #if defined(REMASTER_PROTOCOL_SIMPLE)
   DeterministicLockManagerDeprecated lock_manager_;

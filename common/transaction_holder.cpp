@@ -10,8 +10,8 @@ using std::string;
 
 namespace slog {
 
-TransactionHolder::TransactionHolder() : txn_(nullptr), worker_("") {}
-TransactionHolder::TransactionHolder(const ConfigurationPtr& config, Transaction* txn) : worker_("") {
+TransactionHolder::TransactionHolder() : txn_(nullptr) {}
+TransactionHolder::TransactionHolder(const ConfigurationPtr& config, Transaction* txn) {
   SetTransaction(config, txn);
 }
 
@@ -62,14 +62,6 @@ Transaction* TransactionHolder::ReleaseTransaction() {
   auto tmp = txn_;
   txn_ = nullptr;
   return tmp;
-}
-
-void TransactionHolder::SetWorker(const string& worker) {
-  worker_ = worker;
-}
-
-const string& TransactionHolder::GetWorker() const {
-  return worker_;
 }
 
 const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {

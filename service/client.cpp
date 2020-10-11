@@ -3,8 +3,10 @@
 #include <iostream>
 #include <iomanip>
 
+#include "common/constants.h"
 #include "common/service_utils.h"
 #include "common/proto_utils.h"
+#include "connection/zmq_utils.h"
 #include "proto/api.pb.h"
 #include "third_party/rapidjson/document.h"
 #include "third_party/rapidjson/istreamwrapper.h"
@@ -86,18 +88,15 @@ void ExecuteTxn(const char* txn_file) {
   req.mutable_txn()->set_allocated_txn(txn);
 
   // 3. Send to the server
-  MMessage request_msg;
-  request_msg.Push(req);
   for (uint32_t i = 0; i < FLAGS_repeat; i++) {
-    request_msg.SendTo(server_socket);
+    SendProtoWithEmptyDelimiter(server_socket, req);
   }
 
   // 4. Wait and print response
   if (!FLAGS_no_wait) {
     for (uint32_t i = 0; i < FLAGS_repeat; i++) {
-      MMessage msg(server_socket);
       api::Response res;
-      if (!msg.GetProto(res)) {
+      if (!ReceiveProtoWithEmptyDelimiter(server_socket, res)) {
         LOG(FATAL) << "Malformed response";
       } else {
         const auto& txn = res.txn().txn();
@@ -281,23 +280,16 @@ void ExecuteStats(const char* module, uint32_t level) {
   req.mutable_stats()->set_level(level);
 
   // 2. Send to the server
-  {
-    MMessage msg;
-    msg.Push(req);
-    msg.SendTo(server_socket);
-  }
+  SendProtoWithEmptyDelimiter(server_socket, req);
 
   // 3. Wait and print response
-  {
-    MMessage msg(server_socket);
-    api::Response res;
-    if (!msg.GetProto(res)) {
-      LOG(FATAL) << "Malformed response";
-    } else {
-      rapidjson::Document stats;
-      stats.Parse(res.stats().stats_json().c_str());
-      stats_module.print_func(stats, level);
-    }
+  api::Response res;
+  if (!ReceiveProtoWithEmptyDelimiter(server_socket, res)) {
+    LOG(FATAL) << "Malformed response";
+  } else {
+    rapidjson::Document stats;
+    stats.Parse(res.stats().stats_json().c_str());
+    stats_module.print_func(stats, level);
   }
 }
 

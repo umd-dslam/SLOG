@@ -5,15 +5,10 @@
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 #include <thread>
+#include <glog/logging.h>
 
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
-
-#ifdef __GNUC__
-#define FALLTHROUGH [[gnu::fallthrough]]
-#else
-#define FALLTHROUGH
-#endif
 
 namespace slog {
 
@@ -21,64 +16,37 @@ using internal::Request;
 using internal::Response;
 
 Worker::Worker(
-    const string& identity,
     const ConfigurationPtr& config,
-    zmq::context_t& context,
+    const std::shared_ptr<Broker>& broker,
+    Channel channel,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : identity_(identity),
+  : NetworkedModule(broker, channel),
     config_(config),
-    scheduler_socket_(context, ZMQ_DEALER),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment
-    commands_(new KeyValueCommands()) {
-  scheduler_socket_.setsockopt(ZMQ_IDENTITY, identity);
-  scheduler_socket_.setsockopt(ZMQ_LINGER, 0);
-  scheduler_socket_.setsockopt(ZMQ_SNDHWM, 0);
-  scheduler_socket_.setsockopt(ZMQ_RCVHWM, 0);
-  poll_item_ = {
-    static_cast<void*>(scheduler_socket_),
-    0, /* fd */
-    ZMQ_POLLIN,
-    0 /* revent */
-  };
-}
+    commands_(new KeyValueCommands()) {}
 
-void Worker::SetUp() {
-  scheduler_socket_.connect(Scheduler::WORKERS_ENDPOINT);
-  // Send an empty message to the scheduler to indicate
-  // this worker is live
-  SendToScheduler(Response());
-}
-
-void Worker::Loop() {
-  if (zmq::poll(&poll_item_, 1, MODULE_POLL_TIMEOUT_MS) > 0) {
-    MMessage msg(scheduler_socket_);
-    Request req;
-    if (!msg.GetProto(req)) {
-      return;
+void Worker::HandleInternalRequest(internal::Request&& req, MachineIdNum) {
+  TxnId txn_id = 0;
+  bool valid_request = true;
+  switch (req.type_case()) {
+    case Request::kWorker: {
+      txn_id = ProcessWorkerRequest(req.worker());
+      break;
     }
-    TxnId txn_id = 0;
-    bool valid_request = true;
-    switch (req.type_case()) {
-      case Request::kWorker: {
-        txn_id = ProcessWorkerRequest(req.worker());
-        break;
-      }
-      case Request::kRemoteReadResult: {
-        txn_id = ProcessRemoteReadResult(req.remote_read_result());
-        break;
-      }
-      default:
-        valid_request = false;
-        break;
+    case Request::kRemoteReadResult: {
+      txn_id = ProcessRemoteReadResult(req.remote_read_result());
+      break;
     }
-    if (valid_request) {
-      AdvanceTransaction(txn_id);
-    } else {
-      LOG(FATAL) << "Invalid request for worker";
-    }
+    default:
+      valid_request = false;
+      break;
   }
-  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Worker " << identity_ << " is alive.";
+  if (valid_request) {
+    AdvanceTransaction(txn_id);
+  } else {
+    LOG(FATAL) << "Invalid request for worker";
+  }
 }
 
 TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
@@ -114,7 +82,7 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
     } else {
       itr++;
     }
-  }
+  } 
 
   // Create a state for the new transaction
   auto state = txn_states_.emplace(
@@ -171,23 +139,23 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
   switch (state.phase) {
     case TransactionState::Phase::READ_LOCAL_STORAGE:
       ReadLocalStorage(txn_id);
-      FALLTHROUGH;
+      [[fallthrough]];
     case TransactionState::Phase::WAIT_REMOTE_READ:
       if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
         // The only way to get out of this phase is through remote messages
         break;
       }
-      FALLTHROUGH;
+      [[fallthrough]];
     case TransactionState::Phase::EXECUTE:
       if (state.phase == TransactionState::Phase::EXECUTE) {
         Execute(txn_id);
       }
-      FALLTHROUGH;
+      [[fallthrough]];
     case TransactionState::Phase::COMMIT:
       if (state.phase == TransactionState::Phase::COMMIT) {
         Commit(txn_id);
       }
-      FALLTHROUGH;
+      [[fallthrough]];
     case TransactionState::Phase::FINISH:
       if (state.phase == TransactionState::Phase::FINISH) {
         Finish(txn_id);
@@ -377,7 +345,7 @@ void Worker::Finish(TxnId txn_id) {
       txn->mutable_internal(),
       TransactionEvent::EXIT_WORKER);
 
-  SendToScheduler(res);
+  Send(res, kSchedulerChannel);
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
@@ -392,21 +360,10 @@ void Worker::SendToOtherPartitions(
   auto local_partition = config_->GetLocalPartition();
   for (auto p : partitions) {
     if (p != local_partition) {
-      auto machine_id = MakeMachineIdAsString(local_replica, p);
-      SendToScheduler(request, std::move(machine_id));
+      auto machine_id = config_->MakeMachineIdNum(local_replica, p);
+      Send(request, kSchedulerChannel, std::move(machine_id));
     }
   }
-}
-
-void Worker::SendToScheduler(
-    const google::protobuf::Message& req_or_res,
-    string&& forward_to_machine) {
-  MMessage msg;
-  msg.Set(MM_DATA, req_or_res);
-  // MM_DATA + 1 is a convention between the Scheduler and
-  // Worker to specify the destination of this message
-  msg.Set(MM_DATA + 1, std::move(forward_to_machine));
-  msg.SendTo(scheduler_socket_);
 }
 
 } // namespace slog

@@ -1,5 +1,7 @@
 #include "module/sequencer.h"
 
+#include <glog/logging.h>
+
 #include "common/proto_utils.h"
 #include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"

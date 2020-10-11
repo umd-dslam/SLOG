@@ -8,7 +8,7 @@
 #include "common/configuration.h"
 #include "common/types.h"
 #include "common/transaction_holder.h"
-#include "module/base/module.h"
+#include "module/base/networked_module.h"
 #include "module/scheduler_components/commands.h"
 #include "proto/transaction.pb.h"
 #include "proto/internal.pb.h"
@@ -42,15 +42,16 @@ struct TransactionState {
  * initializes the state for X if X is a new transaction or try to advance
  * X to the subsequent phases as much as possible.
  */
-class Worker : public Module {
+class Worker : public NetworkedModule {
 public:
   Worker(
-      const string& identity,
       const ConfigurationPtr& config,
-      zmq::context_t& context,
+      const std::shared_ptr<Broker>& broker,
+      Channel channel,
       const shared_ptr<Storage<Key, Record>>& storage);
-  void SetUp() final;
-  void Loop() final;
+
+protected:
+  void HandleInternalRequest(internal::Request&& req, MachineIdNum from) final;
 
 private:
   /**
@@ -94,13 +95,7 @@ private:
       internal::Request&& request,
       const std::unordered_set<uint32_t>& partitions);
 
-  void SendToScheduler(
-      const google::protobuf::Message& req_or_res,
-      string&& forward_to_machine = "");
-
-  std::string identity_;
   ConfigurationPtr config_;
-  zmq::socket_t scheduler_socket_;
   shared_ptr<Storage<Key, Record>> storage_;
   unique_ptr<Commands> commands_;
   zmq::pollitem_t poll_item_;

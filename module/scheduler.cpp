@@ -1,7 +1,10 @@
 #include "module/scheduler.h"
 
+#include <glog/logging.h>
+
 #include "common/json_utils.h"
 #include "common/proto_utils.h"
+#include "common/types.h"
 #include "proto/internal.pb.h"
 
 using std::make_shared;
@@ -9,120 +12,46 @@ using std::move;
 
 namespace slog {
 
+namespace {
+uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) {
+  // TODO: Use a hash function
+  return txn_id % num_workers;
+}
+} // namespace
+
 using internal::Request;
 using internal::Response;
-
-const string Scheduler::WORKERS_ENDPOINT("inproc://workers");
-const uint32_t Scheduler::WORKER_LOAD_THRESHOLD = 5;
 
 Scheduler::Scheduler(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : // All SINGLE-HOME txn logs take indices in the [0, num_replicas - 1]
-    // range, num_replicas can be used as the marker for MULTI-HOME txn log
-    kMultiHomeTxnLogMarker(config->GetNumReplicas()),
-    config_(config),
-    pull_socket_(*broker->GetContext(), ZMQ_PULL),
-    worker_socket_(*broker->GetContext(), ZMQ_ROUTER),
-    sender_(broker) {
-  broker->AddChannel(kSchedulerChannel);
-  pull_socket_.bind("inproc://channel_" + kSchedulerChannel);
-  pull_socket_.setsockopt(ZMQ_LINGER, 0);
-  pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
-  poll_items_.push_back({
-      static_cast<void*>(pull_socket_),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */});
-
-  worker_socket_.setsockopt(ZMQ_LINGER, 0);
-  worker_socket_.setsockopt(ZMQ_RCVHWM, 0);
-  worker_socket_.setsockopt(ZMQ_SNDHWM, 0);
-  poll_items_.push_back({
-      static_cast<void*>(worker_socket_),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */});
-
+  : NetworkedModule(broker, kSchedulerChannel),
+    config_(config) {
   for (size_t i = 0; i < config->GetNumWorkers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(
-        std::to_string(i), /* identity */
         config,
-        *broker->GetContext(),
+        broker,
+        kWorkerChannelOffset + i,
         storage));
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   remaster_manager_.SetStorage(storage);
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
-
 }
 
-/***********************************************
-                SetUp and Loop
-***********************************************/
-
-void Scheduler::SetUp() {
-  worker_socket_.bind(WORKERS_ENDPOINT);
+void Scheduler::Initialize() {
   for (auto& worker : workers_) {
     worker->StartInNewThread();
   }
-  // Wait for confirmations from all workers
-  for (size_t i = 0; i < workers_.size(); i++) {
-    MMessage msg(worker_socket_);
-    worker_identities_.push_back(msg.GetIdentity());
-  }
-  next_worker_ = 0;
-}
-
-void Scheduler::Loop() {
-  zmq::poll(poll_items_, MODULE_POLL_TIMEOUT_MS);
-
-  // Got message from channel
-  if (poll_items_[0].revents & ZMQ_POLLIN) {
-    MMessage msg(pull_socket_);
-    Request req;
-    if (msg.GetProto(req)) {
-      HandleInternalRequest(move(req));
-    }
-  }
-
-  // Got messages from workers
-  if (poll_items_[1].revents & ZMQ_POLLIN) {
-    // Receive from worker socket
-    MMessage msg(worker_socket_);
-    if (msg.IsProto<Request>()) {
-      // A worker wants to send a request to worker on another 
-      // machine, so forwarding the request on its behalf
-      Request forwarded_req;
-      msg.GetProto(forwarded_req);
-      string destination;
-      // MM_DATA + 1 is a convention between the Scheduler and
-      // Worker to specify the destination of this message
-      msg.GetString(destination, MM_DATA + 1);
-      // Send to the Scheduler of the remote machine
-      // TODO: Fix this
-      sender_.Send(forwarded_req, kSchedulerChannel, 0);
-    } else if (msg.IsProto<Response>()) {
-      Response res;
-      msg.GetProto(res);
-      if (res.type_case() != Response::kWorker) {
-        return;
-      }
-      // Handle the results produced by the worker
-      HandleResponseFromWorker(res.worker());
-    }
-  }
-
-  VLOG_EVERY_N(4, 5000/MODULE_POLL_TIMEOUT_MS) << "Scheduler is alive";
 }
 
 /***********************************************
-              Internal Requests
+        Internal Requests & Responses
 ***********************************************/
 
-void Scheduler::HandleInternalRequest(Request&& req) {
+void Scheduler::HandleInternalRequest(internal::Request&& req, MachineIdNum) {
   switch (req.type_case()) {
     case Request::kForwardTxn: 
       ProcessTransaction(req.mutable_forward_txn()->release_txn());
@@ -140,13 +69,12 @@ void Scheduler::HandleInternalRequest(Request&& req) {
   }
 }
 
-void Scheduler::ProcessRemoteReadResult(
-    internal::Request&& req) {
+void Scheduler::ProcessRemoteReadResult(internal::Request&& req) {
   auto txn_id = req.remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
-  if (holder.GetTransaction() != nullptr && !holder.GetWorker().empty()) {
+  if (holder.GetTransaction() != nullptr && holder.worker()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
-    SendToWorker(move(req), holder.GetWorker());
+    Send(move(req), kWorkerChannelOffset + *holder.worker());
   } else {
     // Save the remote reads that come before the txn
     // is processed by this partition
@@ -198,15 +126,11 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   internal::Response res;
   res.mutable_stats()->set_id(stats_request.id());
   res.mutable_stats()->set_stats_json(buf.GetString());
-  sender_.Send(res, kServerChannel);
+  Send(res, kServerChannel);
 }
 
-/***********************************************
-              Worker Responses
-***********************************************/
-
-void Scheduler::HandleResponseFromWorker(const internal::WorkerResponse& res) {
-  auto txn_id = res.txn_id();
+void Scheduler::HandleInternalResponse(internal::Response&& res, MachineIdNum) {
+  auto txn_id = res.worker().txn_id();
   auto txn_holder = &all_txns_[txn_id];
   auto txn = txn_holder->GetTransaction();
 
@@ -255,7 +179,8 @@ void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
 
   auto& coord_server = txn->internal().coordinating_server();
   auto coordinating_server = config_->MakeMachineIdNum(coord_server.replica(), coord_server.partition());
-  sender_.Send(req, kServerChannel, coordinating_server);
+  
+  Send(req, kServerChannel, coordinating_server);
   
   txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
@@ -493,7 +418,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   VLOG(2) << "Triggering abort of txn: " << txn_id;
 
   auto& txn_holder = all_txns_[txn_id];
-  CHECK(txn_holder.GetWorker() == "")
+  CHECK(txn_holder.worker())
       << "Dispatched transactions are handled by the worker, txn " << txn_id;
 
   aborting_txns_.insert(txn_id);
@@ -590,7 +515,7 @@ void Scheduler::SendAbortToPartitions(TxnId txn_id) {
   for (auto p : txn_holder.ActivePartitions()) {
     if (p != config_->GetLocalPartition()) {
       auto machine_id = config_->MakeMachineIdNum(local_replica, p);
-      sender_.Send(request, kSchedulerChannel, machine_id);
+      Send(request, kSchedulerChannel, machine_id);
     }
   }
 }
@@ -650,9 +575,13 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
     }
   }
 
-  // Select next worker in a round-robin manner
-  txn_holder.SetWorker(worker_identities_[next_worker_]);
-  next_worker_ = (next_worker_ + 1) % worker_identities_.size();
+  // Select a worker for this transaction
+  txn_holder.SetWorker(SelectWorkerForTxn(txn_id, config_->GetNumWorkers()));
+
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
   Request req;
@@ -665,26 +594,17 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
       txn->mutable_internal(),
       TransactionEvent::DISPATCHED);
 
+  Channel worker_channel = kWorkerChannelOffset + *txn_holder.worker();
+
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
-  // TODO: pretty sure that the order of messages follow the order of these
-  // function calls but should look a bit more into ZMQ ordering to be sure
-  SendToWorker(move(req), txn_holder.GetWorker());
+  Send(move(req), worker_channel);
   while (!txn_holder.EarlyRemoteReads().empty()) {
-    SendToWorker(
-        move(txn_holder.EarlyRemoteReads().back()),
-        txn_holder.GetWorker());
+    Send(move(txn_holder.EarlyRemoteReads().back()), worker_channel);
     txn_holder.EarlyRemoteReads().pop_back();
   }
 
   VLOG(2) << "Dispatched txn " << txn_id;
-}
-
-void Scheduler::SendToWorker(internal::Request&& req, const string& worker) {
-  MMessage msg;
-  msg.SetIdentity(worker);
-  msg.Set(MM_DATA, req);
-  msg.SendTo(worker_socket_);
 }
 
 } // namespace slog

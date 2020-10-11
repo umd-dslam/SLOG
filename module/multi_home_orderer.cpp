@@ -1,5 +1,7 @@
 #include "module/multi_home_orderer.h"
 
+#include <glog/logging.h>
+
 #include "common/constants.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"

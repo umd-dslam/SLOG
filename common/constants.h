@@ -21,11 +21,9 @@ const Channel kSchedulerChannel = 6;
 const Channel kLocalPaxos = 7;
 const Channel kGlobalPaxos = 8;
 
-const uint32_t MAX_NUM_MACHINES = 1000;
+const Channel kWorkerChannelOffset = 100;
 
-const size_t MM_DATA = 0;
-const size_t MM_FROM_CHANNEL = 1;
-const size_t MM_TO_CHANNEL = 2;
+const uint32_t MAX_NUM_MACHINES = 1000;
 
 const uint32_t PAXOS_DEFAULT_LEADER_POSITION = 0;
 

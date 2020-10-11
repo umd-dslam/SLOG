@@ -43,7 +43,7 @@ protected:
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddScheduler();
       sender_[i] = test_slogs_[i]->GetSender();
-      test_slogs_[i]->AddOutputChannel(SERVER_CHANNEL);
+      test_slogs_[i]->AddOutputChannel(kServerChannel);
     }
     // Relica 0
     test_slogs_[0]->Data("A", {"valueA", 0, 1});
@@ -80,8 +80,9 @@ protected:
     internal::Request req;
     req.mutable_forward_txn()->set_allocated_txn(txn);
     for (auto partition : partitions) {
-      // This message is sent from machine 0:0, so it will be queued up in queue 0
-      sender_[0]->Send(req, SCHEDULER_CHANNEL, MakeMachineIdAsString(0, partition));
+      // This message is sent from machine 0:0, so it will be queued up in queue 0.
+      // 'partition' just happens to be the same as machine id here.
+      sender_[0]->Send(req, kSchedulerChannel, partition);
     }
   }
 
@@ -89,10 +90,8 @@ protected:
     Transaction txn;
     bool first_time = true;
     for (uint32_t i = 0; i < num_partitions; i++) {
-      MMessage msg;
-      test_slogs_[receiver]->ReceiveFromOutputChannel(msg, SERVER_CHANNEL);
       internal::Request req;
-      CHECK(msg.GetProto(req));
+      CHECK(test_slogs_[receiver]->ReceiveFromOutputChannel(req, kServerChannel));
       CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);
       auto completed_subtxn = req.completed_subtxn();
       CHECK_EQ((uint32_t)completed_subtxn.involved_partitions_size(), num_partitions);

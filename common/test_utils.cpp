@@ -197,16 +197,15 @@ void TestSlog::StartInNewThreads() {
 
 void TestSlog::SendTxn(Transaction* txn) {
   CHECK(server_ != nullptr) << "TestSlog does not have a server";
-  client_socket_.send(zmq::message_t{}, zmq::send_flags::sndmore);
   api::Request request;
   auto txn_req = request.mutable_txn();
   txn_req->set_allocated_txn(txn);
-  SendProto(client_socket_, request);
+  SendProtoWithEmptyDelimiter(client_socket_, request);
 }
 
 Transaction TestSlog::RecvTxnResult() {
   api::Response res;
-  if (!ReceiveProto(client_socket_, res)) {
+  if (!ReceiveProtoWithEmptyDelimiter(client_socket_, res)) {
     LOG(FATAL) << "Malformed response to client transaction.";
     return Transaction();
   }

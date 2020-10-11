@@ -2,7 +2,6 @@ project(common)
 
 add_library(common
   configuration.cpp
-  mmessage.cpp
   proto_utils.cpp
   service_utils.cpp
   transaction_holder.cpp

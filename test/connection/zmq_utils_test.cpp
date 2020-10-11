@@ -26,6 +26,34 @@ TEST(ZmqUtilsTest, SendAndReceiveProto) {
   ASSERT_EQ(req2.echo().data(), "test");
 }
 
+TEST(ZmqUtilsTest, SendAndReceiveProtoDealerRouter) {
+  zmq::context_t context(1);
+
+  zmq::socket_t router(context, ZMQ_ROUTER);
+  router.bind("inproc://test");
+  zmq::socket_t dealer(context, ZMQ_DEALER);
+  dealer.connect("inproc://test");
+
+  // First send from dealer and receive at router
+  Request req;
+  req.mutable_echo()->set_data("test");
+  SendProtoWithEmptyDelimiter(dealer, req);
+
+  zmq::message_t identity;
+  (void)router.recv(identity);
+  Request req2;
+  ASSERT_TRUE(ReceiveProtoWithEmptyDelimiter(router, req2));
+  ASSERT_EQ(req2.echo().data(), "test");
+
+  // Then send from router and receive at dealer
+  req2.mutable_echo()->set_data("test2");
+  router.send(identity, zmq::send_flags::sndmore);
+  SendProtoWithEmptyDelimiter(router, req2);
+
+  ASSERT_TRUE(ReceiveProtoWithEmptyDelimiter(dealer, req));
+  ASSERT_EQ(req.echo().data(), "test2");
+}
+
 TEST(ZmqUtilsTest, SendAndReceiveWrongProto) {
   zmq::context_t context(1);
 
@@ -67,7 +95,7 @@ TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
   SendProto(push, req, 9, 1);
 
   zmq::message_t msg;
-  pull.recv(msg);
+  (void)pull.recv(msg);
   MachineIdNum machineId;
   ASSERT_TRUE(ParseMachineId(machineId, msg));
   ASSERT_EQ(machineId, 1);

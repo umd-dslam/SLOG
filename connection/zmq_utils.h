@@ -33,6 +33,13 @@ inline void SendProto(
   socket.send(msg, zmq::send_flags::none);
 }
 
+inline void SendProtoWithEmptyDelimiter(
+    zmq::socket_t& socket,
+    const google::protobuf::Message& proto) {
+  socket.send(zmq::message_t{}, zmq::send_flags::sndmore);
+  SendProto(socket, proto);
+}
+
 inline bool ParseMachineId(MachineIdNum& id, const zmq::message_t& msg) {
   if (msg.size() < sizeof(MachineIdNum)) {
     return false;
@@ -73,6 +80,14 @@ inline bool ReceiveProto(zmq::socket_t& socket, T& out, bool dont_wait = false) 
     return false;
   }
   return ParseProto(out, msg);
+}
+
+template<typename T>
+inline bool ReceiveProtoWithEmptyDelimiter(zmq::socket_t& socket, T& out, bool dont_wait = false) {
+  if (zmq::message_t empty; !socket.recv(empty) || !empty.more()) {
+    return false;
+  }
+  return ReceiveProto(socket, out, dont_wait);
 }
 
 } // namespace slog

@@ -1,5 +1,7 @@
 #include "paxos/leader.h"
 
+#include <glog/logging.h>
+
 #include "common/proto_utils.h"
 #include "connection/sender.h"
 #include "paxos/simple_multi_paxos.h"

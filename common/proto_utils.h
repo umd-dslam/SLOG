@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "common/configuration.h"
-#include "common/mmessage.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
 

@@ -1,5 +1,7 @@
 #include "module/server.h"
 
+#include <glog/logging.h>
+
 #include "common/constants.h"
 #include "common/json_utils.h"
 #include "common/proto_utils.h"
@@ -47,12 +49,8 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
     LOG(ERROR) << "Invalid message from client: Only identity part is found";
     return;
   }
-  if (zmq::message_t empty; !socket.recv(empty) || !empty.more()) {
-    LOG(ERROR) << "Invalid message from client: Message has no body";
-    return;
-  }
   api::Request request;
-  if (!ReceiveProto(socket, request)) {
+  if (!ReceiveProtoWithEmptyDelimiter(socket, request)) {
     LOG(ERROR) << "Invalid message from client: Body is not a proto";
     return;
   }
@@ -262,10 +260,10 @@ void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
   auto& pr = pending_responses_[txn_id];
   auto& socket = GetCustomSocket(0);
 
-  socket.send(pr.identity, zmq::send_flags::sndmore);
-  socket.send(zmq::message_t{}, zmq::send_flags::sndmore);
   res.set_stream_id(pr.stream_id);
-  SendProto(socket, res);
+
+  socket.send(pr.identity, zmq::send_flags::sndmore);
+  SendProtoWithEmptyDelimiter(socket, res);
 
   pending_responses_.erase(txn_id);
 }

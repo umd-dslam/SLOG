@@ -35,10 +35,6 @@ NetworkedModule::NetworkedModule(
   });
 }
 
-vector<zmq::socket_t> NetworkedModule::InitializeCustomSockets() {
-  return {};
-}
-
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) {
   return custom_sockets_[i];
 }
@@ -57,6 +53,8 @@ void NetworkedModule::SetUp() {
       0 /* revent */
     });
   }
+
+  Initialize();
 }
 
 void NetworkedModule::Loop() {

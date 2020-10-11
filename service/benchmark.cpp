@@ -8,6 +8,7 @@
 #include "common/proto_utils.h"
 #include "common/service_utils.h"
 #include "common/types.h"
+#include "connection/zmq_utils.h"
 #include "module/ticker.h"
 #include "proto/api.pb.h"
 #include "workload/basic_workload.h"
@@ -270,7 +271,7 @@ void RunBenchmark() {
       if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
         // Receive the empty message then throw away
         zmq::message_t msg;
-        ticker_socket->recv(msg);
+        (void)ticker_socket->recv(msg);
 
         SendNextTransaction();
       }
@@ -338,14 +339,12 @@ void SendNextTransaction() {
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);
   req.set_stream_id(stats.txn_counter);
-  MMessage msg;
-  msg.Push(req);
 
   if (FLAGS_p < 0) {
     std::uniform_int_distribution<> dis(0, config->GetNumPartitions() - 1);
-    msg.SendTo(*server_sockets[dis(gen)]);
+    SendProtoWithEmptyDelimiter(*server_sockets[dis(gen)], req);
   } else {
-    msg.SendTo(*server_sockets[FLAGS_p]);
+    SendProtoWithEmptyDelimiter(*server_sockets[FLAGS_p], req);
   }
 
   auto& txn_info = outstanding_txns[stats.txn_counter];
@@ -354,12 +353,10 @@ void SendNextTransaction() {
 }
 
 void ReceiveResult(int from_socket) {
-  MMessage msg(*server_sockets[from_socket]);
   const auto& recv_at = Clock::now();
 
   api::Response res;
-
-  if (!msg.GetProto(res)) {
+  if (!ReceiveProtoWithEmptyDelimiter(*server_sockets[from_socket], res)) {
     LOG(ERROR) << "Malformed response";
     return;
   }
