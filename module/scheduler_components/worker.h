@@ -91,9 +91,9 @@ private:
    */
   void Finish(TxnId txn_id);
 
-  void SendToOtherPartitions(
-      internal::Request&& request,
-      const std::unordered_set<uint32_t>& partitions);
+  void NotifyOtherPartitions(TxnId txn_id);
+
+  void SendToCoordinatingServer(TxnId txn_id);
 
   ConfigurationPtr config_;
   shared_ptr<Storage<Key, Record>> storage_;

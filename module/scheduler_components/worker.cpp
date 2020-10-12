@@ -223,22 +223,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
     }
   }
 
-  auto local_partition = config_->local_partition();
-  // Send abort result and local reads to all remote active partitions
-  if (!txn_holder->active_partitions().empty()) {
-    Request request;
-    auto rrr = request.mutable_remote_read_result();
-    rrr->set_txn_id(txn_id);
-    rrr->set_partition(local_partition);
-    rrr->set_will_abort(will_abort);
-    if (!will_abort) {
-      auto reads_to_be_sent = rrr->mutable_reads();
-      for (auto& key_value : txn->read_set()) {
-        (*reads_to_be_sent)[key_value.first] = key_value.second;
-      }
-    }
-    SendToOtherPartitions(std::move(request), txn_holder->active_partitions());
-  }
+  NotifyOtherPartitions(txn_id);
 
   // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
   //       To do this, we need to removing the CHECK at the start of ProcessRemoteReadResult
@@ -246,7 +231,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   //       before moving on.
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
-  if (txn_holder->active_partitions().count(local_partition) > 0) {
+  if (txn_holder->active_partitions().count(config_->local_partition()) > 0) {
     // Active partition needs remote reads from all partitions
     state.remote_reads_waiting_on = txn_holder->involved_partitions().size() - 1;
   }
@@ -345,7 +330,13 @@ void Worker::Finish(TxnId txn_id) {
       txn->mutable_internal(),
       TransactionEvent::EXIT_WORKER);
 
+  // This must happen before the sending to scheduler below. Otherwise,
+  // the scheduler may destroy the transaction holder before we can
+  // send the transaction to the server.
+  SendToCoordinatingServer(txn_id);
+
   Send(res, kSchedulerChannel);
+
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
@@ -353,17 +344,60 @@ void Worker::Finish(TxnId txn_id) {
   VLOG(3) << "Finished with txn " << txn_id;
 }
 
-void Worker::SendToOtherPartitions(
-    internal::Request&& request,
-    const std::unordered_set<uint32_t>& partitions) {
-  auto local_replica = config_->local_replica();
+void Worker::NotifyOtherPartitions(TxnId txn_id) {
+  auto& state = txn_states_[txn_id];
+  auto txn_holder = state.txn_holder;
+
+  if (txn_holder->active_partitions().empty()) {
+    return;
+  }
+
+  auto txn = txn_holder->transaction();
   auto local_partition = config_->local_partition();
-  for (auto p : partitions) {
+  auto local_replica = config_->local_replica();
+  auto aborted = txn->status() == TransactionStatus::ABORTED;
+
+  // Send abort result and local reads to all remote active partitions
+  Request request;
+  auto rrr = request.mutable_remote_read_result();
+  rrr->set_txn_id(txn_id);
+  rrr->set_partition(local_partition);
+  rrr->set_will_abort(aborted);
+  if (!aborted) {
+    auto reads_to_be_sent = rrr->mutable_reads();
+    for (auto& key_value : txn->read_set()) {
+      (*reads_to_be_sent)[key_value.first] = key_value.second;
+    }
+  }
+
+  for (auto p : txn_holder->active_partitions()) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineId(local_replica, p);
       Send(request, kSchedulerChannel, std::move(machine_id));
     }
   }
+}
+
+void Worker::SendToCoordinatingServer(TxnId txn_id) {
+  auto& state = txn_states_[txn_id];
+  auto txn_holder = state.txn_holder;
+  auto txn = txn_holder->transaction();
+
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::EXIT_SCHEDULER);
+
+  // Send the txn back to the coordinating server
+  Request req;
+  auto completed_sub_txn = req.mutable_completed_subtxn();
+  completed_sub_txn->mutable_txn()->CopyFrom(*txn);
+  completed_sub_txn->set_partition(config_->local_partition());
+  for (auto p : txn_holder->involved_partitions()) {
+    completed_sub_txn->add_involved_partitions(p);
+  }
+  
+  Send(req, kServerChannel,  txn->internal().coordinating_server());
 }
 
 } // namespace slog

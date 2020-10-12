@@ -155,31 +155,28 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  SendToCoordinatingServer(txn_id);
   all_txns_.erase(txn_id);
 }
 
 void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
   auto& txn_holder = all_txns_[txn_id];
-  auto txn = txn_holder.ReleaseTransaction();
-
-  // Send the txn back to the coordinating server
-  Request req;
-  auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->set_allocated_txn(txn);
-  completed_sub_txn->set_partition(config_->local_partition());
-  for (auto p : txn_holder.involved_partitions()) {
-    completed_sub_txn->add_involved_partitions(p);
-  }
+  auto txn = txn_holder.transaction();
 
   RecordTxnEvent(
       config_,
       txn->mutable_internal(),
       TransactionEvent::EXIT_SCHEDULER);
+
+  // Send the txn back to the coordinating server
+  Request req;
+  auto completed_sub_txn = req.mutable_completed_subtxn();
+  completed_sub_txn->mutable_txn()->CopyFrom(*txn);
+  completed_sub_txn->set_partition(config_->local_partition());
+  for (auto p : txn_holder.involved_partitions()) {
+    completed_sub_txn->add_involved_partitions(p);
+  }
   
   Send(req, kServerChannel,  txn->internal().coordinating_server());
-  
-  txn_holder.SetTransactionNoProcessing(completed_sub_txn->release_txn());
 }
 
 /***********************************************

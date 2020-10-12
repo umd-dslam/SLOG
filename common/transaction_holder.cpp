@@ -50,10 +50,6 @@ void TransactionHolder::SetTransaction(const ConfigurationPtr& config, Transacti
   txn_ = txn;
 }
 
-void TransactionHolder::SetTransactionNoProcessing(Transaction* txn) {
-  txn_ = txn;
-}
-
 Transaction* TransactionHolder::transaction() const {
   return txn_;
 }

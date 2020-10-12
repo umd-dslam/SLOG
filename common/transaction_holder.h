@@ -18,7 +18,6 @@ public:
   ~TransactionHolder();
 
   void SetTransaction(const ConfigurationPtr& config, Transaction* txn);
-  void SetTransactionNoProcessing(Transaction* txn);
   Transaction* transaction() const;
   Transaction* ReleaseTransaction();
 
