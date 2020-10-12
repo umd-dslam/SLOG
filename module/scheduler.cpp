@@ -131,8 +131,6 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
 void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   auto txn_id = res.worker().txn_id();
-  auto txn_holder = &all_txns_[txn_id];
-  auto txn = txn_holder->transaction();
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -142,6 +140,8 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  auto txn_holder = &all_txns_[txn_id];
+  auto txn = txn_holder->transaction();
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
     auto& key = txn->write_set().begin()->first;
