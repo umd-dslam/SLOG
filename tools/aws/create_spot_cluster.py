@@ -173,14 +173,15 @@ if __name__ == "__main__":
         if err:
             message += f'\nSTDERR:\n\t{err}'
         LOG.info(message)
-    
+
     # Output IP addresses
     print("\n================== IP ADDRESSES ==================\n")
-    print(json.dumps(instance_ips))
+    print(json.dumps(instance_ips, indent=2))
+    ip_groups = instance_ips.values()
 
     print("\n================== SLOG CONFIG ==================\n")
     slog_configs = []
-    for ips in instance_ips.values():
+    for ips in ip_groups:
         addresses = [f'  addresses: "{ip}"' for ip in ips]
         slog_configs.append(
             'replicas: {\n' +
@@ -188,4 +189,12 @@ if __name__ == "__main__":
             '\n}'
         )
     print('\n'.join(slog_configs))
+
+    print("\n================== CLIENT CONFIG ==================\n")
+    client_configs = []
+    for ips in ip_groups:
+        client_configs.append({
+            ip: 0 for ip in ips
+        })
+    print(json.dumps(client_configs, indent=2))
     
