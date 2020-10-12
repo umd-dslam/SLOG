@@ -63,8 +63,9 @@ private:
   void SendToLockManager(const TransactionHolder* txn_holder);
   void AcquireLocksAndProcessResult(const TransactionHolder* txn_holder);
 
-  // Prepare transaction to be sent to worker
-  void DispatchTransaction(TxnId txn_id);
+  // Send txn to worker. If this is a one-way dispatch, a copy of the txn
+  // holder will be created and owned by the worker.
+  void Dispatch(TxnId txn_id, bool one_way = false);
 
   /**
    * Aborts

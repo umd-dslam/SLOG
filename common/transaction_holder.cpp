@@ -19,6 +19,27 @@ TransactionHolder::~TransactionHolder() {
   delete txn_;
 }
 
+TransactionHolder::TransactionHolder(const TransactionHolder& other) {
+  if (other.txn_ == nullptr) {
+    txn_ = nullptr;
+  } else {
+    txn_ = new Transaction();
+    txn_->CopyFrom(*other.txn_);
+  }
+  worker_ = other.worker_;
+  early_remote_reads_ = other.early_remote_reads_;
+  keys_in_partition_ = other.keys_in_partition_;
+  involved_partitions_ = other.involved_partitions_;
+  active_partitions_ = other.active_partitions_;
+  involved_replicas_ = other.involved_replicas_;
+}
+
+TransactionHolder& TransactionHolder::operator=(const TransactionHolder& other) {
+  TransactionHolder tmp(other);
+  std::swap(txn_, tmp.txn_);
+  return *this;
+}
+
 void TransactionHolder::SetTransaction(const ConfigurationPtr& config, Transaction* txn) {
   keys_in_partition_.clear();
   involved_partitions_.clear();

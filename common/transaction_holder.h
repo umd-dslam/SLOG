@@ -15,6 +15,8 @@ class TransactionHolder {
 public:
   TransactionHolder();
   TransactionHolder(const ConfigurationPtr& config, Transaction* txn);
+  TransactionHolder(const TransactionHolder& other);
+  TransactionHolder& operator=(const TransactionHolder& other);
   ~TransactionHolder();
 
   void SetTransaction(const ConfigurationPtr& config, Transaction* txn);

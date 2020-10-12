@@ -27,7 +27,7 @@ Worker::Worker(
     commands_(new KeyValueCommands()) {}
 
 void Worker::HandleInternalRequest(internal::Request&& req, MachineId) {
-  TxnId txn_id = 0;
+  std::optional<TxnId> txn_id = 0;
   bool valid_request = true;
   switch (req.type_case()) {
     case Request::kWorker: {
@@ -43,13 +43,15 @@ void Worker::HandleInternalRequest(internal::Request&& req, MachineId) {
       break;
   }
   if (valid_request) {
-    AdvanceTransaction(txn_id);
+    if (txn_id) {
+      AdvanceTransaction(*txn_id);
+    }
   } else {
     LOG(FATAL) << "Invalid request for worker";
   }
 }
 
-TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
+std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
   auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
   auto txn = txn_holder->transaction();
   auto txn_id = txn->internal().id();
@@ -102,24 +104,27 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
   return txn_id;
 }
 
-TxnId Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
+std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
   auto txn_id = read_result.txn_id();
-
-  CHECK(txn_states_.count(txn_id) > 0)
-      << "Transaction " << txn_id << " does not exist for remote read result";
+  if (txn_states_.count(txn_id) == 0) {
+    VLOG(1) << "Transaction " << txn_id << " does not exist for remote read result";
+    return {};
+  }
 
   auto& state = txn_states_[txn_id];
   auto txn = state.txn_holder->transaction();
 
-  if (read_result.will_abort()) {
-    // TODO: optimize by returning an aborting transaction to the scheduler immediately.
-    // later remote reads will need to be garbage collected.
-    txn->set_status(TransactionStatus::ABORTED);
-  } else {
-    // Apply remote reads. After this point, the transaction has all the data it needs to
-    // execute the code.
-    for (const auto& key_value : read_result.reads()) {
-      (*txn->mutable_read_set())[key_value.first] = key_value.second;
+  if (txn->status() != TransactionStatus::ABORTED) {
+    if (read_result.will_abort()) {
+      // TODO: optimize by returning an aborting transaction to the scheduler immediately.
+      // later remote reads will need to be garbage collected.
+      txn->set_status(TransactionStatus::ABORTED);
+    } else {
+      // Apply remote reads. After this point, the transaction has all the data it needs to
+      // execute the code.
+      for (const auto& key_value : read_result.reads()) {
+        (*txn->mutable_read_set())[key_value.first] = key_value.second;
+      }
     }
   }
 
@@ -356,7 +361,8 @@ void Worker::Finish(TxnId txn_id) {
 void Worker::PreAbort(TxnId txn_id) {
   NotifyOtherPartitions(txn_id);
 
-  auto txn = txn_states_[txn_id].txn_holder->transaction();
+  auto& state = txn_states_[txn_id];
+  auto txn = state.txn_holder->transaction();
 
   RecordTxnEvent(
       config_,
@@ -364,6 +370,11 @@ void Worker::PreAbort(TxnId txn_id) {
       TransactionEvent::EXIT_WORKER);
 
   SendToCoordinatingServer(txn_id);
+
+  // The worker owns this holder for the case of pre-
+  // aborted txn so it must delete it
+  delete state.txn_holder;
+  state.txn_holder = nullptr;
 
   txn_states_.erase(txn_id);
 

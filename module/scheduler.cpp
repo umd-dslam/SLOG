@@ -138,7 +138,7 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   // become ready thanks to this release.
   auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
   for (auto unblocked_txn : unblocked_txns) {
-    DispatchTransaction(unblocked_txn);
+    Dispatch(unblocked_txn);
   }
 
   RecordTxnEvent(
@@ -343,7 +343,7 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
             config_,
             txn_holder->transaction()->mutable_internal(),
             TransactionEvent::ACCEPTED);
-        DispatchTransaction(txn_id); 
+        Dispatch(txn_id); 
       }
       break;
     }
@@ -362,12 +362,12 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   if (lock_manager_.AcquireLocks(*txn_holder)) {
-    DispatchTransaction(txn_id);
+    Dispatch(txn_id);
   }
 #else
   switch (lock_manager_.AcquireLocks(*txn_holder)) {
     case AcquireLocksResult::ACQUIRED:
-      DispatchTransaction(txn_id);
+      Dispatch(txn_id);
       break;
     case AcquireLocksResult::ABORT:
       TriggerPreDispatchAbort(txn_id);
@@ -413,10 +413,11 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   auto txn_type = txn->internal().type();
   VLOG(3) << "Main txn of abort arrived: " << txn_id;
 
-  // Let the a worker handle notifying other partitions and
-  // send back to the server
+  // Let a worker handle notifying other partitions and
+  // send back to the server. Use one-way dispatching to avoid
+  // race condition between the scheduler and the worker.
   txn->set_status(TransactionStatus::ABORTED);
-  DispatchTransaction(txn_id);
+  Dispatch(txn_id, /* one-way */ true);
 
   // Release txn from remaster manager and lock manager.
   //
@@ -434,7 +435,7 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   // become ready thanks to this release.
   auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
   for (auto unblocked_txn : unblocked_txns) {
-    DispatchTransaction(unblocked_txn);
+    Dispatch(unblocked_txn);
   }
 
   if (txn_type == TransactionType::MULTI_HOME) {
@@ -517,21 +518,29 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
               Transaction Dispatch
 ***********************************************/
 
-void Scheduler::DispatchTransaction(TxnId txn_id) {
+void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   CHECK(all_txns_.count(txn_id) > 0) << "Txn not in all_txns_: " << txn_id;
 
-  auto& txn_holder = all_txns_[txn_id];
-  auto txn = txn_holder.transaction();
+  TransactionHolder* txn_holder;
+  if (one_way) {
+    txn_holder = new TransactionHolder(all_txns_[txn_id]);
+  } else {
+    txn_holder = &all_txns_[txn_id];
+  }
+
+  auto txn = txn_holder->transaction();
 
   // Delete lock-only transactions
-  if (txn->internal().type() == TransactionType::MULTI_HOME) {
-    for (auto replica : txn_holder.involved_replicas()) {
+  // TODO: Move this code out of this function since it causes a side effect
+  //       Only execise this code if this is not a one-way dispatch for now.
+  if (!one_way && txn->internal().type() == TransactionType::MULTI_HOME) {
+    for (auto replica : txn_holder->involved_replicas()) {
       lock_only_txns_.erase(std::make_pair(txn->internal().id(), replica));
     }
   }
 
   // Select a worker for this transaction
-  txn_holder.SetWorker(SelectWorkerForTxn(txn_id, config_->num_workers()));
+  txn_holder->SetWorker(SelectWorkerForTxn(txn_id, config_->num_workers()));
 
   RecordTxnEvent(
       config_,
@@ -541,22 +550,21 @@ void Scheduler::DispatchTransaction(TxnId txn_id) {
   // Prepare a request with the txn to be sent to the worker
   Request req;
   auto worker_request = req.mutable_worker();
-  worker_request->set_txn_holder_ptr(
-      reinterpret_cast<uint64_t>(&txn_holder));
+  worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
 
   RecordTxnEvent(
       config_,
       txn->mutable_internal(),
       TransactionEvent::DISPATCHED);
 
-  Channel worker_channel = kWorkerChannelOffset + *txn_holder.worker();
+  Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
   Send(move(req), worker_channel);
-  while (!txn_holder.early_remote_reads().empty()) {
-    Send(move(txn_holder.early_remote_reads().back()), worker_channel);
-    txn_holder.early_remote_reads().pop_back();
+  while (!txn_holder->early_remote_reads().empty()) {
+    Send(move(txn_holder->early_remote_reads().back()), worker_channel);
+    txn_holder->early_remote_reads().pop_back();
   }
 
   VLOG(2) << "Dispatched txn " << txn_id;

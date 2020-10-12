@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -58,13 +59,13 @@ private:
   /**
    * Initializes the state of a new transaction
    */
-  TxnId ProcessWorkerRequest(const internal::WorkerRequest& req);
+  std::optional<TxnId> ProcessWorkerRequest(const internal::WorkerRequest& req);
   
   /**
    * Applies remote read for transactions that are in the WAIT_REMOTE_READ phase.
    * When all remote reads are received, the transaction is moved to the EXECUTE phase.
    */
-  TxnId ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
+  std::optional<TxnId> ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
 
   /**
    * Drives most of the phase transition of a transaction
