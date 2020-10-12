@@ -62,10 +62,9 @@ void NetworkedModule::Loop() {
     return;
   }
 
-  // Message from pull socket
-  if (poll_items_[0].revents & ZMQ_POLLIN) {
-    zmq::message_t msg;
-    if (pull_socket_.recv(msg) > 0) {
+  for (int i = 0; i < kRecvMessageBatch; i++) { 
+    // Message from pull socket
+    if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
       if (MachineId from; ParseMachineId(from, msg)) {
         if (Request req; ParseProto(req, msg)) {
           HandleInternalRequest(move(req), from);
@@ -74,13 +73,11 @@ void NetworkedModule::Loop() {
         }
       }
     }
-  }
 
-  // Message from one of the custom sockets. These sockets
-  // are indexed from 1 in poll_items_. The first poll item
-  // belongs to the channel socket.
-  for (size_t i = 1; i < poll_items_.size(); i++) {
-    if (poll_items_[i].revents & ZMQ_POLLIN) {
+    // Message from one of the custom sockets. These sockets
+    // are indexed from 1 in poll_items_. The first poll item
+    // belongs to the channel socket.
+    for (size_t i = 1; i < poll_items_.size(); i++) {
       HandleCustomSocket(custom_sockets_[i - 1], i - 1);
     }
   }

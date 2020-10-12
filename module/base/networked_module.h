@@ -37,6 +37,7 @@ protected:
       internal::Response&& /* res */,
       MachineId /* from_machine_id */) {};
 
+  // The implementation of this function must never block
   virtual void HandleCustomSocket(
       zmq::socket_t& /* socket */,
       size_t /* socket_index */) {};

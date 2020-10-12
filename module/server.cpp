@@ -44,7 +44,10 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
 
 void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
   zmq::message_t identity;
-  if (!socket.recv(identity) || !identity.more()) {
+  if (!socket.recv(identity, zmq::recv_flags::dontwait)) {
+    return;
+  }
+  if (!identity.more()) {
     LOG(ERROR) << "Invalid message from client: Only identity part is found";
     return;
   }

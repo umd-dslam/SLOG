@@ -9,6 +9,8 @@ namespace slog {
 const long kBrokerPollTimeoutMs = 100;
 const long kModulePollTimeoutMs = 100;
 
+const int kRecvMessageBatch = 10000;
+
 const int kServerRcvHwm = 0;
 const int kServerSndHwm = 0;
 

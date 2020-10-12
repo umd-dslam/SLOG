@@ -202,9 +202,13 @@ void Broker::Run() {
   while (running_) {
     // Wait until a message arrived at one of the sockets
     if (zmq::poll(&poll_item, 1, poll_timeout_ms_)) {
-      // Socket just received a message
-      if (zmq::message_t msg; socket_.recv(msg)) {
-        HandleIncomingMessage(move(msg));
+      for (int i = 0; i < kRecvMessageBatch; i++) {
+        // Socket just received a message
+        if (zmq::message_t msg; socket_.recv(msg, zmq::recv_flags::dontwait)) {
+          HandleIncomingMessage(move(msg));
+        } else {
+          break;
+        }
       }
     }
    VLOG_EVERY_N(4, 5000/poll_timeout_ms_) << "Broker is alive";
