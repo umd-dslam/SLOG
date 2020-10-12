@@ -10,7 +10,7 @@ namespace slog {
 std::atomic<uint8_t> Sender::counter(1);
 
 Sender::Sender(const std::shared_ptr<Broker>& broker)
-  : context_(broker->GetContext()),
+  : context_(broker->context()),
     broker_(broker),
     local_machine_id_(broker->GetLocalMachineId()) {}
 

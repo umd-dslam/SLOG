@@ -72,7 +72,7 @@ public:
 
   void AddChannel(Channel chan);
 
-  const std::shared_ptr<zmq::context_t>& GetContext() const;
+  const std::shared_ptr<zmq::context_t>& context() const;
 
   std::string GetEndpointByMachineId(MachineId machine_id);
 

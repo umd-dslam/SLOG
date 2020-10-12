@@ -23,7 +23,7 @@ Sequencer::Sequencer(
 
 vector<zmq::socket_t> Sequencer::InitializeCustomSockets() {
   vector<zmq::socket_t> ticker_socket;
-  ticker_socket.push_back(Ticker::Subscribe(*GetContext()));
+  ticker_socket.push_back(Ticker::Subscribe(*context()));
   return ticker_socket;
 }
 

@@ -52,7 +52,7 @@ protected:
       const google::protobuf::Message& request_or_response,
       Channel to_channel);
 
-  const std::shared_ptr<zmq::context_t> GetContext() const;
+  const std::shared_ptr<zmq::context_t> context() const;
 
   Channel channel() const {
     return channel_;

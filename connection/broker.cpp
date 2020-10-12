@@ -59,7 +59,7 @@ void Broker::AddChannel(Channel chan) {
   channels_[chan] = move(new_channel);
 }
 
-const std::shared_ptr<zmq::context_t>& Broker::GetContext() const {
+const std::shared_ptr<zmq::context_t>& Broker::context() const {
   return context_;
 }
 

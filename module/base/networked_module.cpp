@@ -17,7 +17,7 @@ using internal::Response;
 NetworkedModule::NetworkedModule(
     const std::shared_ptr<Broker>& broker,
     Channel channel)
-  : context_(broker->GetContext()),
+  : context_(broker->context()),
     pull_socket_(*context_, ZMQ_PULL),
     sender_(broker),
     channel_(channel) {
@@ -39,7 +39,7 @@ zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) {
   return custom_sockets_[i];
 }
 
-const std::shared_ptr<zmq::context_t> NetworkedModule::GetContext() const {
+const std::shared_ptr<zmq::context_t> NetworkedModule::context() const {
   return context_;
 }
 
