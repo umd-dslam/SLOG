@@ -12,8 +12,6 @@
 
 namespace slog {
 
-using internal::MachineId;
-
 namespace {
 
 template<class It>

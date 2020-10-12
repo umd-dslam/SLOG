@@ -8,8 +8,6 @@ using std::string;
 
 namespace slog {
 
-using internal::MachineId;
-
 namespace {
 
 using google::protobuf::Map;

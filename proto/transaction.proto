@@ -1,8 +1,6 @@
 syntax = "proto3";
 package slog;
 
-import "proto/machine_id.proto";
-
 enum TransactionType {
     UNKNOWN = 0;
     SINGLE_HOME = 1;
@@ -41,10 +39,8 @@ enum TransactionEvent {
     DISPATCHED = 16;
     ENTER_WORKER = 17;
     EXIT_WORKER = 18;
-    RELEASE_LOCKS = 19;
-    EXIT_SCHEDULER = 20;
-    RETURN_TO_SERVER = 21;
-    EXIT_SERVER_TO_CLIENT = 22;
+    RETURN_TO_SERVER = 19;
+    EXIT_SERVER_TO_CLIENT = 20;
 }
 
 message TransactionInternal {

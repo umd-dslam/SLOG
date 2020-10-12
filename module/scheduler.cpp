@@ -141,11 +141,6 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
     Dispatch(unblocked_txn);
   }
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::RELEASE_LOCKS);
-
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
@@ -551,12 +546,6 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   Request req;
   auto worker_request = req.mutable_worker();
   worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
-
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::DISPATCHED);
-
   Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();
 
   // The transaction need always be sent to a worker before

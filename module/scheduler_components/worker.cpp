@@ -420,11 +420,6 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto txn_holder = state.txn_holder;
   auto txn = txn_holder->transaction();
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::EXIT_SCHEDULER);
-
   // Send the txn back to the coordinating server
   Request req;
   auto completed_sub_txn = req.mutable_completed_subtxn();
