@@ -69,11 +69,11 @@ public:
   static VerifyMasterResult CheckCounters(
       const TransactionHolder* txn_holder,
       const shared_ptr<const Storage<Key, Record>>& storage) {
-    auto& keys = txn_holder->KeysInPartition();
-    auto& txn_master_metadata = txn_holder->GetTransaction()->internal().master_metadata();
+    auto& keys = txn_holder->keys_in_partition();
+    auto& txn_master_metadata = txn_holder->transaction()->internal().master_metadata();
     
     if (txn_master_metadata.empty()) { // This should only be the case for testing
-      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->GetTransaction()->internal().id();
+      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->transaction()->internal().id();
       return VerifyMasterResult::VALID;
     }
 

@@ -19,7 +19,7 @@ public:
 
   void SetTransaction(const ConfigurationPtr& config, Transaction* txn);
   void SetTransactionNoProcessing(Transaction* txn);
-  Transaction* GetTransaction() const;
+  Transaction* transaction() const;
   Transaction* ReleaseTransaction();
 
   void SetWorker(uint32_t worker) {
@@ -30,25 +30,25 @@ public:
     return worker_;
   }
 
-  const std::vector<std::pair<Key, LockMode>>& KeysInPartition() const;
-  const std::unordered_set<uint32_t>& InvolvedPartitions() const;
-  const std::unordered_set<uint32_t>& ActivePartitions() const;
-  const std::unordered_set<uint32_t>& InvolvedReplicas() const;
+  const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
+  const std::unordered_set<uint32_t>& involved_partitions() const;
+  const std::unordered_set<uint32_t>& active_partitions() const;
+  const std::unordered_set<uint32_t>& involved_replicas() const;
 
-  std::vector<internal::Request>& EarlyRemoteReads();
+  std::vector<internal::Request>& early_remote_reads();
 
   /**
    * Get the id of the replica where this transaction was added to the local log.
    * Should only be used for single-home and lock-only transactions.
    */
-  uint32_t GetReplicaId() const;
-  static uint32_t GetReplicaId(Transaction* txn);
+  uint32_t replica_id() const;
+  static uint32_t replica_id(Transaction* txn);
 
   /**
    * Get a unique identifier for lock-only transactions
    */
-  const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair() const;
-  static const TxnIdReplicaIdPair GetTransactionIdReplicaIdPair(Transaction*);
+  const TxnIdReplicaIdPair transaction_id_replica_id() const;
+  static const TxnIdReplicaIdPair transaction_id_replica_id(Transaction*);
 
 private:
   Transaction* txn_;

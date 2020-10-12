@@ -11,8 +11,8 @@ PerKeyRemasterManager::PerKeyRemasterManager(
 
 VerifyMasterResult
 PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
-  auto txn = txn_holder->GetTransaction();
-  auto& keys = txn_holder->KeysInPartition();
+  auto txn = txn_holder->transaction();
+  auto& keys = txn_holder->keys_in_partition();
   if (keys.empty()) {
     // None of the keys in this txn are in this partition
     return VerifyMasterResult::VALID;
@@ -63,14 +63,14 @@ PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 }
 
 RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
-  auto txn = txn_holder->GetTransaction();
+  auto txn = txn_holder->transaction();
   auto txn_id = txn->internal().id();
-  for (auto& key_pair : txn_holder->KeysInPartition()) {
+  for (auto& key_pair : txn_holder->keys_in_partition()) {
     auto& key = key_pair.first;
     if (blocked_queue_.count(key) > 0) {
       auto& queue = blocked_queue_[key];
       for (auto itr = queue.begin(); itr != queue.end(); itr++) {
-        if ((*itr).first->GetTransaction()->internal().id() == txn_id) {
+        if ((*itr).first->transaction()->internal().id() == txn_id) {
           queue.erase(itr);
           break; // Txns should only occur in a queue once
         }
@@ -82,7 +82,7 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
   }
 
   RemasterOccurredResult result;
-  for (auto& key_pair : txn_holder->KeysInPartition()) {
+  for (auto& key_pair : txn_holder->keys_in_partition()) {
     auto& key = key_pair.first;
     TryToUnblock(key, result);
   }
@@ -134,7 +134,7 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
       return;
     }
     case VerifyMasterResult::VALID: {
-      for (auto& key_pair : txn_holder->KeysInPartition()) {
+      for (auto& key_pair : txn_holder->keys_in_partition()) {
         auto key = key_pair.first;
         CHECK(blocked_queue_.count(key) > 0) << "Transaction was not in correct blocked_queues";
         auto& front_txn_replica_id = blocked_queue_[key].front().first;
@@ -145,7 +145,7 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
       result.unblocked.push_back(txn_holder);
 
       // Garbage collect queue and counters
-      for (auto& key_pair : txn_holder->KeysInPartition()) {
+      for (auto& key_pair : txn_holder->keys_in_partition()) {
         auto key = key_pair.first;
         blocked_queue_[key].pop_front();
         if (blocked_queue_[key].size() == 0) {
@@ -154,7 +154,7 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
       }
 
       // Recurse on each updated queue
-      for (auto& key_pair : txn_holder->KeysInPartition()) {
+      for (auto& key_pair : txn_holder->keys_in_partition()) {
         auto key = key_pair.first;
         TryToUnblock(key, result);
       }

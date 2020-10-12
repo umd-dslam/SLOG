@@ -37,10 +37,10 @@ TEST_F(TransactionHolderTest, TxnReplicaId) {
   txn->mutable_internal()->set_id(100);
 
   auto holder = TransactionHolder(configs[0], txn);
-  ASSERT_EQ(holder.GetTransactionIdReplicaIdPair(), make_pair(100u, 1u));
+  ASSERT_EQ(holder.transaction_id_replica_id(), make_pair(100u, 1u));
 }
 
-TEST_F(TransactionHolderTest, KeysInPartition) {
+TEST_F(TransactionHolderTest, keys_in_partition) {
   auto txn = MakeTransaction(
       {"A"}, /* read_set */
       {"D"},  /* write_set */
@@ -49,14 +49,14 @@ TEST_F(TransactionHolderTest, KeysInPartition) {
   txn->mutable_internal()->set_id(100);
 
   auto holder1 = TransactionHolder(configs[0], txn);
-  ASSERT_THAT(holder1.KeysInPartition(),
+  ASSERT_THAT(holder1.keys_in_partition(),
     ElementsAre(make_pair("A", LockMode::READ), make_pair("D", LockMode::WRITE)));
 
   auto holder2 = TransactionHolder(configs[1], holder1.ReleaseTransaction());
-  ASSERT_TRUE(holder2.KeysInPartition().empty());
+  ASSERT_TRUE(holder2.keys_in_partition().empty());
 }
 
-TEST_F(TransactionHolderTest, InvolvedPartitions) {
+TEST_F(TransactionHolderTest, involved_partitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction(
       {"A"}, /* read_set */
@@ -66,7 +66,7 @@ TEST_F(TransactionHolderTest, InvolvedPartitions) {
     txn->mutable_internal()->set_id(100);
 
     auto holder = TransactionHolder(configs[i], txn);
-    auto partitions = holder.InvolvedPartitions();
+    auto partitions = holder.involved_partitions();
     ASSERT_EQ(partitions.size(), 2U);
     ASSERT_TRUE(partitions.count(0));
     ASSERT_TRUE(partitions.count(2));

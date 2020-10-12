@@ -10,12 +10,12 @@ SimpleRemasterManager::SimpleRemasterManager(
 
 VerifyMasterResult
 SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
-  auto& keys = txn_holder->KeysInPartition();
+  auto& keys = txn_holder->keys_in_partition();
   if (keys.empty()) {
     return VerifyMasterResult::VALID;
   }
 
-  auto txn = txn_holder->GetTransaction();
+  auto txn = txn_holder->transaction();
   auto& txn_master_metadata = txn->internal().master_metadata();
   if (txn_master_metadata.empty()) { // This should only be the case for testing
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
@@ -24,7 +24,7 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 
   // Determine which local log this txn is from. Since only single home or
   // lock only txns, all keys will have same master
-  auto local_log_machine_id = txn_holder->GetReplicaId();
+  auto local_log_machine_id = txn_holder->replica_id();
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
@@ -49,7 +49,7 @@ SimpleRemasterManager::RemasterOccured(const Key& remaster_key, uint32_t /* rema
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
       auto txn_holder = queue_pair.second.front();
-      auto& txn_keys = txn_holder->KeysInPartition();
+      auto& txn_keys = txn_holder->keys_in_partition();
       for (auto& key_pair : txn_keys) {
         auto& txn_key = key_pair.first;
         if (txn_key == remaster_key) {
@@ -65,14 +65,14 @@ SimpleRemasterManager::RemasterOccured(const Key& remaster_key, uint32_t /* rema
 
 RemasterOccurredResult
 SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
-  auto txn_id = txn_holder->GetTransaction()->internal().id();
-  for (auto replica : txn_holder->InvolvedReplicas()) {
+  auto txn_id = txn_holder->transaction()->internal().id();
+  for (auto replica : txn_holder->involved_replicas()) {
     if (blocked_queue_.count(replica) == 0 || blocked_queue_[replica].empty()) {
       continue;
     }
     auto& queue = blocked_queue_[replica];
     for (auto itr = queue.begin(); itr != queue.end(); itr++) {
-      if ((*itr)->GetTransaction()->internal().id() == txn_id) {
+      if ((*itr)->transaction()->internal().id() == txn_id) {
         queue.erase(itr);
         break; // Any transaction should only occur once per queue
       }
@@ -82,7 +82,7 @@ SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
   // Note: this must happen after the transaction is released, otherwise it could be returned in
   // the unblocked list
   RemasterOccurredResult result;
-  for (auto replica : txn_holder->InvolvedReplicas()) {
+  for (auto replica : txn_holder->involved_replicas()) {
     // TODO: only necessary if a removed txn was front of the queue
     TryToUnblock(replica, result);
   }

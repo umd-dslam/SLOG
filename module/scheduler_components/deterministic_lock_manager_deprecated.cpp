@@ -105,11 +105,11 @@ unordered_set<TxnId> LockStateDeprecated::Release(TxnId txn_id) {
 }
 
 bool DeterministicLockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holder) {
-  if (txn_holder.KeysInPartition().empty()) {
+  if (txn_holder.keys_in_partition().empty()) {
     return false;
   }
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
-  num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
+  auto txn_id = txn_holder.transaction()->internal().id();
+  num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
 
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
@@ -119,13 +119,13 @@ bool DeterministicLockManagerDeprecated::AcceptTransaction(const TransactionHold
 }
 
 bool DeterministicLockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
-  if (txn_holder.KeysInPartition().empty()) {
+  if (txn_holder.keys_in_partition().empty()) {
     return false;
   }
 
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
+  auto txn_id = txn_holder.transaction()->internal().id();
   int num_locks_acquired = 0;
-  for (auto pair : txn_holder.KeysInPartition()) {
+  for (auto pair : txn_holder.keys_in_partition()) {
     auto key = pair.first;
     auto mode = pair.second;
     CHECK(!lock_table_[key].Contains(txn_id))
@@ -169,9 +169,9 @@ bool DeterministicLockManagerDeprecated::AcceptTransactionAndAcquireLocks(const 
 unordered_set<TxnId>
 DeterministicLockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> ready_txns;
-  auto txn_id = txn_holder.GetTransaction()->internal().id();
+  auto txn_id = txn_holder.transaction()->internal().id();
 
-  for (const auto& pair : txn_holder.KeysInPartition()) {
+  for (const auto& pair : txn_holder.keys_in_partition()) {
     auto key = pair.first;
     auto old_mode = lock_table_[key].mode;
     auto new_grantees = lock_table_[key].Release(txn_id);

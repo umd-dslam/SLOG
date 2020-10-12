@@ -54,7 +54,7 @@ void TransactionHolder::SetTransactionNoProcessing(Transaction* txn) {
   txn_ = txn;
 }
 
-Transaction* TransactionHolder::GetTransaction() const {
+Transaction* TransactionHolder::transaction() const {
   return txn_;
 }
 
@@ -64,31 +64,31 @@ Transaction* TransactionHolder::ReleaseTransaction() {
   return tmp;
 }
 
-const vector<pair<Key, LockMode>>& TransactionHolder::KeysInPartition() const {
+const vector<pair<Key, LockMode>>& TransactionHolder::keys_in_partition() const {
   return keys_in_partition_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::InvolvedPartitions() const {
+const std::unordered_set<uint32_t>& TransactionHolder::involved_partitions() const {
   return involved_partitions_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::ActivePartitions() const {
+const std::unordered_set<uint32_t>& TransactionHolder::active_partitions() const {
   return active_partitions_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::InvolvedReplicas() const {
+const std::unordered_set<uint32_t>& TransactionHolder::involved_replicas() const {
   return involved_replicas_;
 }
 
-vector<internal::Request>& TransactionHolder::EarlyRemoteReads() {
+vector<internal::Request>& TransactionHolder::early_remote_reads() {
   return early_remote_reads_;
 }
 
-uint32_t TransactionHolder::GetReplicaId() const {
-  return GetReplicaId(txn_);
+uint32_t TransactionHolder::replica_id() const {
+  return replica_id(txn_);
 }
 
-uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
+uint32_t TransactionHolder::replica_id(Transaction* txn) {
   // This should only be empty for testing.
   // TODO: add metadata to test cases, make this an error
   //
@@ -103,13 +103,13 @@ uint32_t TransactionHolder::GetReplicaId(Transaction* txn) {
   return txn->internal().master_metadata().begin()->second.master();
 }
 
-const TxnIdReplicaIdPair TransactionHolder::GetTransactionIdReplicaIdPair() const {
-  return GetTransactionIdReplicaIdPair(txn_);
+const TxnIdReplicaIdPair TransactionHolder::transaction_id_replica_id() const {
+  return transaction_id_replica_id(txn_);
 }
 
-const TxnIdReplicaIdPair TransactionHolder::GetTransactionIdReplicaIdPair(Transaction* txn) {
+const TxnIdReplicaIdPair TransactionHolder::transaction_id_replica_id(Transaction* txn) {
   auto txn_id = txn->internal().id();
-  auto local_log_id = GetReplicaId(txn);
+  auto local_log_id = replica_id(txn);
   return make_pair(txn_id, local_log_id);
 }
 

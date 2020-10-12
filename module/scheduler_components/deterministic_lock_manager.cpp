@@ -105,16 +105,16 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
 }
 
 bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
-  if (txn_holder.KeysInPartition().empty()) {
+  if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
 
-  auto txn = txn_holder.GetTransaction();
+  auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   if (txn->procedure_case() == Transaction::kRemaster) {
     num_locks_waited_[txn_id] = 2;
   } else {
-    num_locks_waited_[txn_id] += txn_holder.KeysInPartition().size();
+    num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
   }
 
   if (num_locks_waited_[txn_id] == 0) {
@@ -125,16 +125,16 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
 }
 
 AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
-  if (txn_holder.KeysInPartition().empty()) {
+  if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
 
-  auto txn = txn_holder.GetTransaction();
+  auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
 
   vector<pair<KeyReplica, LockMode>> locks_to_request;
   if (txn->procedure_case() == Transaction::kRemaster) {
-    auto pair = *txn_holder.KeysInPartition().begin();
+    auto pair = *txn_holder.keys_in_partition().begin();
     auto& key = pair.first;
     auto mode = LockMode::WRITE;
     // Lock on old master if this is the first part of the remaster
@@ -146,7 +146,7 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
     auto key_replica = MakeKeyReplica(key, master);
     locks_to_request.emplace_back(key_replica, mode);
   } else {
-    for (auto& pair : txn_holder.KeysInPartition()) {
+    for (auto& pair : txn_holder.keys_in_partition()) {
       auto& key = pair.first;
       auto mode = pair.second;
       auto master = txn->internal().master_metadata().at(key).master();
@@ -199,13 +199,13 @@ AcquireLocksResult DeterministicLockManager::AcceptTransactionAndAcquireLocks(co
 
 unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> result;
-  auto txn = txn_holder.GetTransaction();
+  auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
 
   vector<KeyReplica> locks_to_release;
   if (txn->procedure_case() == Transaction::kRemaster) {
     // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
-    auto pair = *txn_holder.KeysInPartition().begin();
+    auto pair = *txn_holder.keys_in_partition().begin();
     auto& key = pair.first;
     auto old_master = txn->internal().master_metadata().at(key).master();
     auto old_key_replica = MakeKeyReplica(key, old_master);
@@ -214,7 +214,7 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
     auto new_key_replica = MakeKeyReplica(key, new_master);
     locks_to_release.push_back(new_key_replica);
   } else {
-    for (auto& pair : txn_holder.KeysInPartition()) {
+    for (auto& pair : txn_holder.keys_in_partition()) {
       auto& key = pair.first;
       auto master = txn->internal().master_metadata().at(key).master();
       auto key_replica = MakeKeyReplica(key, master);

@@ -51,7 +51,7 @@ void Worker::HandleInternalRequest(internal::Request&& req, MachineId) {
 
 TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
   auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
-  auto txn = txn_holder->GetTransaction();
+  auto txn = txn_holder->transaction();
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
 
@@ -104,7 +104,7 @@ TxnId Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_res
       << "Transaction " << txn_id << " does not exist for remote read result";
 
   auto& state = txn_states_[txn_id];
-  auto txn = state.txn_holder->GetTransaction();
+  auto txn = state.txn_holder->transaction();
 
   if (read_result.will_abort()) {
     // TODO: optimize by returning an aborting transaction to the scheduler immediately.
@@ -166,7 +166,7 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
 void Worker::ReadLocalStorage(TxnId txn_id) {
   auto& state = txn_states_[txn_id];
   auto txn_holder = state.txn_holder;
-  auto txn = txn_holder->GetTransaction();
+  auto txn = txn_holder->transaction();
 
   auto will_abort = false;
 
@@ -225,7 +225,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
   auto local_partition = config_->local_partition();
   // Send abort result and local reads to all remote active partitions
-  if (!txn_holder->ActivePartitions().empty()) {
+  if (!txn_holder->active_partitions().empty()) {
     Request request;
     auto rrr = request.mutable_remote_read_result();
     rrr->set_txn_id(txn_id);
@@ -237,7 +237,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
         (*reads_to_be_sent)[key_value.first] = key_value.second;
       }
     }
-    SendToOtherPartitions(std::move(request), txn_holder->ActivePartitions());
+    SendToOtherPartitions(std::move(request), txn_holder->active_partitions());
   }
 
   // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
@@ -246,9 +246,9 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   //       before moving on.
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
-  if (txn_holder->ActivePartitions().count(local_partition) > 0) {
+  if (txn_holder->active_partitions().count(local_partition) > 0) {
     // Active partition needs remote reads from all partitions
-    state.remote_reads_waiting_on = txn_holder->InvolvedPartitions().size() - 1;
+    state.remote_reads_waiting_on = txn_holder->involved_partitions().size() - 1;
   }
   if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
@@ -261,7 +261,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
 void Worker::Execute(TxnId txn_id) {
   auto& state = txn_states_[txn_id];
-  auto txn = state.txn_holder->GetTransaction();
+  auto txn = state.txn_holder->transaction();
 
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
@@ -283,7 +283,7 @@ void Worker::Execute(TxnId txn_id) {
 
 void Worker::Commit(TxnId txn_id) {
   auto& state = txn_states_[txn_id];
-  auto txn = state.txn_holder->GetTransaction();
+  auto txn = state.txn_holder->transaction();
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
       // Apply all writes to local storage if the transaction is not aborted
@@ -335,7 +335,7 @@ void Worker::Commit(TxnId txn_id) {
 }
 
 void Worker::Finish(TxnId txn_id) {
-  auto txn = txn_states_[txn_id].txn_holder->GetTransaction();
+  auto txn = txn_states_[txn_id].txn_holder->transaction();
   // Response back to the scheduler
   Response res;
   res.mutable_worker()->set_txn_id(txn_id);
