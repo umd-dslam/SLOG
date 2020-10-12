@@ -22,7 +22,7 @@ cache:
 
 install:
   - cd $TRAVIS_BUILD_DIR
-  - sudo ./install-deps.sh
+  - ./install-deps.sh
 
 script:
   - mkdir -p build
