@@ -60,37 +60,42 @@ TxnId Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request
       txn->mutable_internal(),
       TransactionEvent::ENTER_WORKER);
 
-  // Remove keys that will be filled in later by remote partitions.
-  // They are removed at this point so that the next phase will only
-  // read the local keys from local storage.
-  auto itr = txn->mutable_read_set()->begin();
-  while (itr != txn->mutable_read_set()->end()) {
-    const auto& key = itr->first;
-    auto partition = config_->partition_of_key(key);
-    if (partition != local_partition) {
-      itr = txn->mutable_read_set()->erase(itr);
-    } else {
-      itr++;
-    }
-  }
-  itr = txn->mutable_write_set()->begin();
-  while (itr != txn->mutable_write_set()->end()) {
-    const auto& key = itr->first;
-    auto partition = config_->partition_of_key(key);
-    if (partition != local_partition) {
-      itr = txn->mutable_write_set()->erase(itr);
-    } else {
-      itr++;
-    }
-  } 
-
   // Create a state for the new transaction
-  auto state = txn_states_.emplace(
+  auto [iter, ok] = txn_states_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(txn_id),
       std::forward_as_tuple(txn_holder));
 
-  CHECK(state.second) << "Transaction " << txn_id << " has already been dispatched to this worker";
+  CHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
+
+  if (txn->status() == TransactionStatus::ABORTED) {
+    iter->second.phase = TransactionState::Phase::PRE_ABORT;
+  } else {
+    iter->second.phase = TransactionState::Phase::READ_LOCAL_STORAGE;
+    // Remove keys that will be filled in later by remote partitions.
+    // They are removed at this point so that the next phase will only
+    // read the local keys from local storage.
+    auto itr = txn->mutable_read_set()->begin();
+    while (itr != txn->mutable_read_set()->end()) {
+      const auto& key = itr->first;
+      auto partition = config_->partition_of_key(key);
+      if (partition != local_partition) {
+        itr = txn->mutable_read_set()->erase(itr);
+      } else {
+        itr++;
+      }
+    }
+    itr = txn->mutable_write_set()->begin();
+    while (itr != txn->mutable_write_set()->end()) {
+      const auto& key = itr->first;
+      auto partition = config_->partition_of_key(key);
+      if (partition != local_partition) {
+        itr = txn->mutable_write_set()->erase(itr);
+      } else {
+        itr++;
+      }
+    }
+  }
 
   VLOG(3) << "Initialized state for txn " << txn_id;
 
@@ -159,6 +164,11 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
     case TransactionState::Phase::FINISH:
       if (state.phase == TransactionState::Phase::FINISH) {
         Finish(txn_id);
+      }
+      [[fallthrough]];
+    case TransactionState::Phase::PRE_ABORT:
+      if (state.phase == TransactionState::Phase::PRE_ABORT) {
+        PreAbort(txn_id);
       }
   }
 }
@@ -321,9 +331,6 @@ void Worker::Commit(TxnId txn_id) {
 
 void Worker::Finish(TxnId txn_id) {
   auto txn = txn_states_[txn_id].txn_holder->transaction();
-  // Response back to the scheduler
-  Response res;
-  res.mutable_worker()->set_txn_id(txn_id);
 
   RecordTxnEvent(
       config_,
@@ -335,10 +342,29 @@ void Worker::Finish(TxnId txn_id) {
   // send the transaction to the server.
   SendToCoordinatingServer(txn_id);
 
+  // Notify the scheduler that we're done
+  Response res;
+  res.mutable_worker()->set_txn_id(txn_id);
   Send(res, kSchedulerChannel);
 
-
   // Done with this txn. Remove it from the state map
+  txn_states_.erase(txn_id);
+
+  VLOG(3) << "Finished with txn " << txn_id;
+}
+
+void Worker::PreAbort(TxnId txn_id) {
+  NotifyOtherPartitions(txn_id);
+
+  auto txn = txn_states_[txn_id].txn_holder->transaction();
+
+  RecordTxnEvent(
+      config_,
+      txn->mutable_internal(),
+      TransactionEvent::EXIT_WORKER);
+
+  SendToCoordinatingServer(txn_id);
+
   txn_states_.erase(txn_id);
 
   VLOG(3) << "Finished with txn " << txn_id;

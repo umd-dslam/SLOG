@@ -27,13 +27,14 @@ struct TransactionState {
     EXECUTE,
     COMMIT,
     FINISH,
+    PRE_ABORT
   };
 
   TransactionState() = default;
   TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
   TransactionHolder* txn_holder = nullptr;
   uint32_t remote_reads_waiting_on = 0;
-  Phase phase = Phase::READ_LOCAL_STORAGE;
+  Phase phase;
 };
 
 /**
@@ -90,6 +91,11 @@ private:
    * Returns the result back to the scheduler and cleans up the transaction state
    */
   void Finish(TxnId txn_id);
+
+  /**
+   * The txn has already been aborted by the scheduler
+   */
+  void PreAbort(TxnId txn_id);
 
   void NotifyOtherPartitions(TxnId txn_id);
 

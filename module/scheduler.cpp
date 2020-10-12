@@ -158,27 +158,6 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
   all_txns_.erase(txn_id);
 }
 
-void Scheduler::SendToCoordinatingServer(TxnId txn_id) {
-  auto& txn_holder = all_txns_[txn_id];
-  auto txn = txn_holder.transaction();
-
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::EXIT_SCHEDULER);
-
-  // Send the txn back to the coordinating server
-  Request req;
-  auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->mutable_txn()->CopyFrom(*txn);
-  completed_sub_txn->set_partition(config_->local_partition());
-  for (auto p : txn_holder.involved_partitions()) {
-    completed_sub_txn->add_involved_partitions(p);
-  }
-  
-  Send(req, kServerChannel,  txn->internal().coordinating_server());
-}
-
 /***********************************************
               Transaction Processing
 ***********************************************/
@@ -434,12 +413,10 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   auto txn_type = txn->internal().type();
   VLOG(3) << "Main txn of abort arrived: " << txn_id;
 
+  // Let the a worker handle notifying other partitions and
+  // send back to the server
   txn->set_status(TransactionStatus::ABORTED);
-  SendToCoordinatingServer(txn_id);
-
-  if (txn_holder.involved_partitions().size() > 1) {
-    SendAbortToPartitions(txn_id);
-  }
+  DispatchTransaction(txn_id);
 
   // Release txn from remaster manager and lock manager.
   //
@@ -494,22 +471,6 @@ void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {
     if (lock_only_txns_.count(txn_replica_id)) {
       lock_only_txns_.erase(txn_replica_id);
       mh_abort_waiting_on_[txn_id] -= 1;
-    }
-  }
-}
-
-void Scheduler::SendAbortToPartitions(TxnId txn_id) {
-  auto& txn_holder = all_txns_[txn_id];
-  Request request;
-  auto rrr = request.mutable_remote_read_result();
-  rrr->set_txn_id(txn_id);
-  rrr->set_partition(config_->local_partition());
-  rrr->set_will_abort(true);
-  auto local_replica = config_->local_replica();
-  for (auto p : txn_holder.active_partitions()) {
-    if (p != config_->local_partition()) {
-      auto machine_id = config_->MakeMachineId(local_replica, p);
-      Send(request, kSchedulerChannel, machine_id);
     }
   }
 }

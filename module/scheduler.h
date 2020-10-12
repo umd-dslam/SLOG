@@ -41,7 +41,6 @@ protected:
 
 private:
   void HandleInternalRequest(internal::Request&& req);
-  void SendToCoordinatingServer(TxnId txn_id);
 
   void ProcessRemoteReadResult(internal::Request&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
@@ -93,8 +92,6 @@ private:
   bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
   // Abort lock-only transactions from the remaster manager and lock manager
   void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
-  // Multicast the remote read abort to active partitions
-  void SendAbortToPartitions(TxnId txn_id);
   // Return the transaction to the server if lock-only transactions and 
   // remote reads are received
   void MaybeFinishAbort(TxnId txn_id);
