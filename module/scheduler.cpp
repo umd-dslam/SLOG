@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "common/json_utils.h"
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
@@ -541,6 +542,8 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
       config_,
       txn->mutable_internal(),
       TransactionEvent::DISPATCHED);
+
+  MonitorThroughput();
 
   // Prepare a request with the txn to be sent to the worker
   Request req;

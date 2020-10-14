@@ -30,7 +30,7 @@ protected:
 
   void HandleInternalRequest(internal::Request&& req, MachineId from_machine_id) final;
 
-  void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
+  bool HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
 private:
   void NewBatch();

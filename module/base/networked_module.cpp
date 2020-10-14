@@ -63,6 +63,7 @@ void NetworkedModule::Loop() {
   }
 
   for (int i = 0; i < kRecvMessageBatch; i++) { 
+    bool has_message = false;
     // Message from pull socket
     if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
       if (MachineId from; ParseMachineId(from, msg)) {
@@ -71,6 +72,7 @@ void NetworkedModule::Loop() {
         } else if (Response res; ParseProto(res, msg)) {
           HandleInternalResponse(move(res), from);
         }
+	has_message = true;
       }
     }
 
@@ -78,8 +80,9 @@ void NetworkedModule::Loop() {
     // are indexed from 1 in poll_items_. The first poll item
     // belongs to the channel socket.
     for (size_t i = 1; i < poll_items_.size(); i++) {
-      HandleCustomSocket(custom_sockets_[i - 1], i - 1);
+      has_message |= HandleCustomSocket(custom_sockets_[i - 1], i - 1);
     }
+    if (!has_message) break;
   }
 }
 
