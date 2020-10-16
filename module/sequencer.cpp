@@ -60,10 +60,10 @@ void Sequencer::HandleInternalRequest(Request&& req, MachineId /* from */) {
   }
 }
 
-bool Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
+void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
   // Remove the dummy message out of the queue
   if (zmq::message_t msg; !socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return false;
+    return;
   }
 
 #ifdef ENABLE_REPLICATION_DELAY
@@ -72,7 +72,7 @@ bool Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
-    return true;
+    return;
   }
 
   auto batch_id = NextBatchId();
@@ -103,7 +103,7 @@ bool Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   if ((uint32_t)(rand() % 100) < config_->replication_delay_percent()) {
     DelaySingleHomeBatch(std::move(batch_req));
     NewBatch();
-    return true;
+    return;
   } // Otherwise send it normally
 #endif /* GetReplicationDelayEnabled */
 
@@ -118,7 +118,6 @@ bool Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   }
 
   NewBatch();
-  return true;
 }
 
 void Sequencer::ProcessMultiHomeBatch(Request&& req) {

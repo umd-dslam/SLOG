@@ -57,7 +57,7 @@ protected:
 
   void HandleInternalResponse(internal::Response&& res, MachineId /* from */) final;
 
-  bool HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
+  void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
 private:
   void ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn);

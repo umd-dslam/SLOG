@@ -55,14 +55,14 @@ void MultiHomeOrderer::HandleInternalRequest(Request&& req, MachineId /* from */
   }
 }
 
-bool MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
+void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
   // Remove the dummy message out of the queue
   if (zmq::message_t msg; !socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return false;
+    return;
   }
 
   if (batch_->transactions().empty()) {
-    return true;
+    return;
   }
 
   auto batch_id = NextBatchId();
@@ -90,7 +90,6 @@ bool MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
   }
 
   NewBatch();
-  return true;
 }
 
 void MultiHomeOrderer::ProcessForwardBatch(

@@ -38,9 +38,9 @@ protected:
       MachineId /* from_machine_id */) {};
 
   // The implementation of this function must never block
-  virtual bool HandleCustomSocket(
+  virtual void HandleCustomSocket(
       zmq::socket_t& /* socket */,
-      size_t /* socket_index */) { return false; };
+      size_t /* socket_index */) {};
 
   zmq::socket_t& GetCustomSocket(size_t i);
 
