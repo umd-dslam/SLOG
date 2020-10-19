@@ -12,6 +12,7 @@ set(ALL_TESTS
   e2e_test
   interleaver_test
   forwarder_test
+  message_pool_test
   mem_only_storage_test
   paxos_test
   per_key_remaster_manager_test
@@ -53,7 +54,8 @@ add_executable(forwarder_test module/forwarder_test.cpp)
 target_link_libraries(forwarder_test test_utils)
 
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
-target_link_libraries(mem_only_storage_test)
+
+add_executable(message_pool_test common/message_pool_test.cpp)
 
 add_executable(paxos_test paxos/paxos_test.cpp)
 target_link_libraries(paxos_test test_utils paxos)
