@@ -61,7 +61,12 @@ public:
     }
   }
 
-  ~ReusableMessage() { pool_->Return(msg_); msg_ = nullptr; }
+  ~ReusableMessage() {
+    if (pool_!= nullptr) {
+      pool_->Return(msg_);
+      msg_ = nullptr;
+    }
+  }
 
   ReusableMessage(const ReusableMessage<T>& other) : pool_(other.pool_) {
     msg_ = nullptr;

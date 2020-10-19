@@ -54,7 +54,7 @@ void Leader::HandleRequest(const Request& req) {
   }
 }
 
-void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest commit) {
+void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
   auto ballot = commit.ballot();
   auto slot = commit.slot();
   auto value = commit.value();

@@ -33,7 +33,7 @@ public:
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
@@ -41,7 +41,7 @@ private:
   void NewBatch();
   BatchId NextBatchId();
 
-  void ProcessMultiHomeBatch(internal::Request&& request);
+  void ProcessMultiHomeBatch(ReusableRequest&& request);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
   ConfigurationPtr config_;
@@ -49,10 +49,10 @@ private:
   BatchId batch_id_counter_;
 
 #ifdef ENABLE_REPLICATION_DELAY
-  void DelaySingleHomeBatch(internal::Request&& request);
+  void DelaySingleHomeBatch(ReusableRequest&& request);
   void MaybeSendDelayedBatches();
   
-  std::list<internal::Request> delayed_batches_;
+  std::list<ReusableRequest> delayed_batches_;
 #endif /* ENABLE_REPLICATION_DELAY */
 };
 

@@ -5,6 +5,7 @@
 #include <zmq.hpp>
 
 #include "common/constants.h"
+#include "common/message_pool.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
@@ -13,6 +14,9 @@
 
 namespace slog {
 
+using ReusableRequest = ReusableMessage<internal::Request>;
+using ReusableResponse = ReusableMessage<internal::Response>;
+
 /**
  * Base class for modules that can send and receive in internal messages.
  */
@@ -20,7 +24,9 @@ class NetworkedModule : public Module {
 public:
   NetworkedModule(
       const std::shared_ptr<Broker>& broker,
-      Channel channel);
+      Channel channel,
+      size_t request_pool_size = 5000,
+      size_t response_pool_size = 5000);
 
 protected:
   virtual std::vector<zmq::socket_t> InitializeCustomSockets() {
@@ -29,20 +35,26 @@ protected:
 
   virtual void Initialize() {};
 
-  virtual void HandleInternalRequest(
-      internal::Request&& req,
-      MachineId from_machine_id) = 0;
+  virtual void HandleInternalRequest(ReusableRequest&& req, MachineId from) = 0;
 
-  virtual void HandleInternalResponse(
-      internal::Response&& /* res */,
-      MachineId /* from_machine_id */) {};
+  virtual void HandleInternalResponse(ReusableResponse&& /* res */, MachineId /* from */) {}
 
   // The implementation of this function must never block
-  virtual void HandleCustomSocket(
-      zmq::socket_t& /* socket */,
-      size_t /* socket_index */) {};
+  virtual void HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */) {};
 
   zmq::socket_t& GetCustomSocket(size_t i);
+
+  ReusableRequest AcquireRequest() { 
+    ReusableMessage msg{&request_pool_};
+    msg.get()->Clear();
+    return msg;
+  }
+  
+  ReusableResponse AcquireResponse() {
+    ReusableMessage msg{&response_pool_};
+    msg.get()->Clear();
+    return msg;
+  }
 
   void Send(
       const google::protobuf::Message& request_or_response,
@@ -69,6 +81,8 @@ private:
   std::vector<zmq::socket_t> custom_sockets_;
   Sender sender_;
   Channel channel_;
+  MessagePool<internal::Request> request_pool_;
+  MessagePool<internal::Response> response_pool_;
 };
 
 } // namespace slog

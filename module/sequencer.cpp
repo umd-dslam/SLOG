@@ -6,6 +6,8 @@
 #include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"
 
+using std::move;
+
 namespace slog {
 
 using internal::Batch;
@@ -28,15 +30,18 @@ vector<zmq::socket_t> Sequencer::InitializeCustomSockets() {
 }
 
 void Sequencer::NewBatch() {
-  batch_.reset(new Batch());
+  if (batch_ == nullptr) {
+    batch_.reset(new Batch());
+  }
+  batch_->Clear();
   batch_->set_transaction_type(TransactionType::SINGLE_HOME);
 }
 
-void Sequencer::HandleInternalRequest(Request&& req, MachineId /* from */) {
-  switch (req.type_case()) {
+void Sequencer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) {
+  switch (req.get()->type_case()) {
     case Request::kForwardTxn: {
       // Received a single-home txn
-      auto txn = req.mutable_forward_txn()->release_txn();
+      auto txn = req.get()->mutable_forward_txn()->release_txn();
 
       RecordTxnEvent(
           config_,
@@ -48,14 +53,14 @@ void Sequencer::HandleInternalRequest(Request&& req, MachineId /* from */) {
     }
     case Request::kForwardBatch: {
       // Received a batch of multi-home txns
-      if (req.forward_batch().part_case() == internal::ForwardBatch::kBatchData) {
-        ProcessMultiHomeBatch(std::move(req));
+      if (req.get()->forward_batch().part_case() == internal::ForwardBatch::kBatchData) {
+        ProcessMultiHomeBatch(move(req));
       }
       break;
     }
     default:
       LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.type_case(), Request) << "\"";
+                 << CASE_NAME(req.get()->type_case(), Request) << "\"";
       break;
   }
 }
@@ -78,19 +83,20 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(3) << "Finished batch " << batch_id
+  VLOG(3) << "Finished batch " << batch_id << " of size " << batch_->transactions().size()
           << ". Sending out for ordering and replicating";
 
-  Request paxos_req;
-  auto paxos_propose = paxos_req.mutable_paxos_propose();
+  auto paxos_req = AcquireRequest();
+  auto paxos_propose = paxos_req.get()->mutable_paxos_propose();
   paxos_propose->set_value(config_->local_partition());
-  Send(paxos_req, kLocalPaxos);
+  Send(*paxos_req.get(), kLocalPaxos);
 
-  Request batch_req;
-  auto forward_batch = batch_req.mutable_forward_batch();
+  auto batch_req = AcquireRequest();
+  auto forward_batch = batch_req.get()->mutable_forward_batch();
   // minus 1 so that batch id counter starts from 0
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
-  forward_batch->set_allocated_batch_data(batch_.release());
+  // this is only temporary
+  forward_batch->set_allocated_batch_data(batch_.get());
 
   // Replicate batch to all machines
   RecordTxnEvent(
@@ -101,7 +107,10 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 #ifdef ENABLE_REPLICATION_DELAY
   // Maybe delay current batch
   if ((uint32_t)(rand() % 100) < config_->replication_delay_percent()) {
-    DelaySingleHomeBatch(std::move(batch_req));
+    // Completely release the batch because its lifetime is now tied with the
+    // delayed request
+    batch_.release();
+    DelaySingleHomeBatch(move(batch_req));
     NewBatch();
     return;
   } // Otherwise send it normally
@@ -113,15 +122,17 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       auto machine_id = config_->MakeMachineId(rep, part);
-      Send(batch_req, kInterleaverChannel, machine_id);
+      Send(*batch_req.get(), kInterleaverChannel, machine_id);
     }
   }
+  // Release the batch so that it won't die along with the request
+  forward_batch->release_batch_data();
 
   NewBatch();
 }
 
-void Sequencer::ProcessMultiHomeBatch(Request&& req) {
-  auto batch = req.mutable_forward_batch()->mutable_batch_data();
+void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
+  auto batch = req.get()->mutable_forward_batch()->mutable_batch_data();
   if (batch->transaction_type() != TransactionType::MULTI_HOME) {
     LOG(ERROR) << "Batch has to contain multi-home txns";
     return;
@@ -187,7 +198,7 @@ void Sequencer::ProcessMultiHomeBatch(Request&& req) {
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineId(local_rep, part);
-    Send(req, kInterleaverChannel, machine_id);
+    Send(*req.get(), kInterleaverChannel, machine_id);
   }
 }
 
@@ -206,8 +217,8 @@ BatchId Sequencer::NextBatchId() {
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
-void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
-  delayed_batches_.push_back(request);
+void Sequencer::DelaySingleHomeBatch(ReusableRequest&& request) {
+  delayed_batches_.emplace_back(request);
 
   // Send the batch to interleavers in the local replica only
   auto local_rep = config_->local_replica();
@@ -215,7 +226,7 @@ void Sequencer::DelaySingleHomeBatch(internal::Request&& request) {
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineId(local_rep, part);
     Send(
-        request,
+        *request.get(),
         kInterleaverChannel,
         machine_id);
   }
@@ -227,7 +238,7 @@ void Sequencer::MaybeSendDelayedBatches() {
     // of being sent at every tick
     if (rand() % config_->replication_delay_amount() == 0) {
       VLOG(4) << "Sending delayed batch";
-      auto request = *itr;
+      auto& request = *itr;
 
       // Replicate batch to all machines EXCEPT local replica
       auto num_replicas = config_->num_replicas();
@@ -240,7 +251,7 @@ void Sequencer::MaybeSendDelayedBatches() {
         for (uint32_t part = 0; part < num_partitions; part++) {
           auto machine_id = config_->MakeMachineId(rep, part);
           Send(
-              request,
+              *request.get(),
               kInterleaverChannel,
               machine_id);
         }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -36,21 +35,21 @@ public:
 protected:
   void Initialize() final;
 
-  void HandleInternalRequest(internal::Request&& req, MachineId) final;
-  void HandleInternalResponse(internal::Response&& res, MachineId) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId) final;
+  void HandleInternalResponse(ReusableResponse&& res, MachineId) final;
 
 private:
-  void HandleInternalRequest(internal::Request&& req);
-
-  void ProcessRemoteReadResult(internal::Request&& req);
+  void ProcessRemoteReadResult(ReusableRequest&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
-  void ProcessTransaction(Transaction* txn);
+  void ProcessTransaction(ReusableRequest&& txn);
 
+#ifdef ENABLE_REMASTER
   // Check that remaster txn doesn't keep key at same master
   bool MaybeAbortRemasterTransaction(Transaction* txn);
+#endif
 
   // Place a transaction in a holder if it has keys in this partition
-  bool AcceptTransaction(Transaction* txn);
+  bool AcceptTransaction(ReusableRequest&& req);
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking

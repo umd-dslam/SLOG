@@ -16,9 +16,7 @@ public:
    */
   Acceptor(SimpleMultiPaxos& sender);
 
-  void HandleRequest(
-      const internal::Request& req,
-      MachineId from_machine_id);
+  void HandleRequest(const internal::Request& req, MachineId from);
 
 private:
   void ProcessAcceptRequest(

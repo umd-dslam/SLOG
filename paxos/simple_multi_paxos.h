@@ -29,13 +29,9 @@ public:
   bool IsMember() const;
 
 protected:
-  void HandleInternalRequest(
-      internal::Request&& req,
-      MachineId from_machine_id) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
-  void HandleInternalResponse(
-      internal::Response&& res,
-      MachineId from_machine_id) final;
+  void HandleInternalResponse(ReusableResponse&& res, MachineId from) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
 

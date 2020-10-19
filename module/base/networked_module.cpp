@@ -16,11 +16,15 @@ using internal::Response;
 
 NetworkedModule::NetworkedModule(
     const std::shared_ptr<Broker>& broker,
-    Channel channel)
+    Channel channel,
+    size_t request_pool_size,
+    size_t response_pool_size)
   : context_(broker->context()),
     pull_socket_(*context_, ZMQ_PULL),
     sender_(broker),
-    channel_(channel) {
+    channel_(channel),
+    request_pool_(request_pool_size),
+    response_pool_(response_pool_size) {
   broker->AddChannel(channel);
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
@@ -65,11 +69,17 @@ void NetworkedModule::Loop() {
   for (int i = 0; i < kRecvMessageBatch; i++) { 
     // Message from pull socket
     if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-      if (MachineId from; ParseMachineId(from, msg)) {
-        if (Request req; ParseProto(req, msg)) {
-          HandleInternalRequest(move(req), from);
-        } else if (Response res; ParseProto(res, msg)) {
-          HandleInternalResponse(move(res), from);
+      if (google::protobuf::Any any; ParseAny(any, msg)) {
+        if (MachineId from; ParseMachineId(from, msg)) {
+          if (any.Is<Request>()) {
+            auto req = AcquireRequest();
+            any.UnpackTo(req.get());
+            HandleInternalRequest(move(req), from);
+          } else if (any.Is<Response>()) {
+            auto res = AcquireResponse();
+            any.UnpackTo(res.get());
+            HandleInternalResponse(move(res), from);
+          }
         }
       }
     }

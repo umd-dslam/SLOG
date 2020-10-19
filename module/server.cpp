@@ -86,13 +86,14 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       } else {
         // Return abort to client
         txn->set_status(TransactionStatus::ABORTED);
-        internal::Request r;
-        auto completed_subtxn = r.mutable_completed_subtxn();
+
+        auto r = AcquireRequest();
+        auto completed_subtxn = r.get()->mutable_completed_subtxn();
         completed_subtxn->set_allocated_txn(txn);
         // Txn only exists in single, local partition
         completed_subtxn->set_partition(0);
         completed_subtxn->add_involved_partitions(0);
-        ProcessCompletedSubtxn(completed_subtxn);
+        ProcessCompletedSubtxn(move(r));
       }
       break;
     }
@@ -129,16 +130,17 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
               Internal Requests
 ***********************************************/
 
-void Server::HandleInternalRequest(internal::Request&& req, MachineId /* from */) {
-  if (req.type_case() != internal::Request::kCompletedSubtxn) {
+void Server::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) {
+  if (req.get()->type_case() != internal::Request::kCompletedSubtxn) {
     LOG(ERROR) << "Unexpected request type received: \""
-              << CASE_NAME(req.type_case(), internal::Request) << "\"";
+              << CASE_NAME(req.get()->type_case(), internal::Request) << "\"";
     return;
   }
-  ProcessCompletedSubtxn(req.mutable_completed_subtxn());
+  ProcessCompletedSubtxn(move(req));
 }
 
-void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn) {
+void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
+  auto completed_subtxn = req.get()->mutable_completed_subtxn();
   RecordTxnEvent(
       config_,
       completed_subtxn->mutable_txn()->mutable_internal(),
@@ -148,7 +150,7 @@ void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed
   if (pending_responses_.count(txn_id) == 0) {
     return;
   }
-  auto& finished_txn = completed_txns_[txn_id];
+  auto& completed_txn = completed_txns_[txn_id];
   auto sub_txn_origin = completed_subtxn->partition();
   // If this is the first sub-transaction, initialize the
   // finished transaction with this sub-transaction as the starting
@@ -156,32 +158,35 @@ void Server::ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed
   // waiting for sub-transactions from. Otherwise, remove the
   // partition of this sub-transaction from the awaiting list and
   // merge the sub-txn to the current txn.
-  if (!finished_txn.initialized) {
-    finished_txn.txn = completed_subtxn->release_txn();
-    finished_txn.awaited_partitions.clear();
+  if (completed_txn.txn() == nullptr) {
+    completed_txn.req = move(req);
+    completed_txn.awaited_partitions.clear();
     for (auto p : completed_subtxn->involved_partitions()) {
       if (p != sub_txn_origin) {
-        finished_txn.awaited_partitions.insert(p);
+        completed_txn.awaited_partitions.insert(p);
       }
     }
-    finished_txn.initialized = true;
-  } else if (finished_txn.awaited_partitions.erase(sub_txn_origin)) {
-    MergeTransaction(*finished_txn.txn, completed_subtxn->txn());
+  } else if (completed_txn.awaited_partitions.erase(sub_txn_origin)) {
+    MergeTransaction(*completed_txn.txn(), completed_subtxn->txn());
   }
 
   // If all sub-txns are received, response back to the client and
   // clean up all tracking data for this txn.
-  if (finished_txn.awaited_partitions.empty()) {
+  if (completed_txn.awaited_partitions.empty()) {
     api::Response response;
     auto txn_response = response.mutable_txn();
-    txn_response->set_allocated_txn(finished_txn.txn);
+    auto txn = completed_txn.txn();
+    // This is ony temporary, "txn" is still owned by the request inside completed_txn
+    txn_response->set_allocated_txn(txn);
 
     RecordTxnEvent(
         config_,
-        finished_txn.txn->mutable_internal(),
+        txn->mutable_internal(),
         TransactionEvent::EXIT_SERVER_TO_CLIENT);
 
     SendAPIResponse(txn_id, move(response));
+    // Release the txn so that it won't be freed along with the Response object
+    txn_response->release_txn();
     completed_txns_.erase(txn_id);
   }
 }
@@ -221,10 +226,10 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
   stats.Accept(writer);
 
-  internal::Response res;
-  res.mutable_stats()->set_id(stats_request.id());
-  res.mutable_stats()->set_stats_json(buf.GetString());
-  HandleInternalResponse(std::move(res), 0);
+  auto res = AcquireResponse();
+  res.get()->mutable_stats()->set_id(stats_request.id());
+  res.get()->mutable_stats()->set_stats_json(buf.GetString());
+  HandleInternalResponse(move(res), 0);
 }
 
 
@@ -232,19 +237,16 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
               Internal Responses
 ***********************************************/
 
-void Server::HandleInternalResponse(
-    internal::Response&& res,
-    MachineId) {
-  if (res.type_case() != internal::Response::kStats) {
+void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
+  if (res.get()->type_case() != internal::Response::kStats) {
     LOG(ERROR) << "Unexpected response type received: \""
-               << CASE_NAME(res.type_case(), internal::Response) << "\"";
-    return;
+               << CASE_NAME(res.get()->type_case(), internal::Response) << "\"";
   }
   api::Response response;
   auto stats_response = response.mutable_stats();
   stats_response->set_allocated_stats_json(
-      res.mutable_stats()->release_stats_json());
-  SendAPIResponse(res.stats().id(), std::move(response));
+      res.get()->mutable_stats()->release_stats_json());
+  SendAPIResponse(res.get()->stats().id(), std::move(response));
 }
 
 /***********************************************

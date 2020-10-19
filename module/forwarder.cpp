@@ -5,6 +5,8 @@
 #include "common/constants.h"
 #include "common/proto_utils.h"
 
+using std::move;
+
 namespace slog {
 
 using internal::Request;
@@ -27,22 +29,22 @@ Forwarder::Forwarder(
     lookup_master_index_(lookup_master_index),
     rg_(std::random_device()()) {}
 
-void Forwarder::HandleInternalRequest(Request&& req, MachineId from) {
-  switch (req.type_case()) {
+void Forwarder::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
+  switch (req.get()->type_case()) {
     case internal::Request::kForwardTxn:
-      ProcessForwardTxn(req.mutable_forward_txn());
+      ProcessForwardTxn(move(req));
       break;
     case internal::Request::kLookupMaster:
-      ProcessLookUpMasterRequest(req.mutable_lookup_master(), from);
+      ProcessLookUpMasterRequest(move(req), from);
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
-                << CASE_NAME(req.type_case(), Request) << "\"";
+                << CASE_NAME(req.get()->type_case(), Request) << "\"";
     }
 }
 
-void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
-  auto txn = forward_txn->release_txn();
+void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
+  auto txn = req.get()->mutable_forward_txn()->mutable_txn();
   RecordTxnEvent(
       config_,
       txn->mutable_internal(),
@@ -51,8 +53,8 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
   auto local_partition = config_->local_partition();
 
   // Prepare a lookup master request just in case
-  Request lookup_master_request;
-  auto lookup_master = lookup_master_request.mutable_lookup_master();
+  auto lookup_master_request = AcquireRequest();
+  auto lookup_master = lookup_master_request.get()->mutable_lookup_master();
 
   // This function will be called on the read and write set of the current txn
   auto LocalMasterLookupFn = [this, txn, local_partition, lookup_master](
@@ -100,7 +102,7 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
     return;
   }
 
-  pending_transaction_[txn->internal().id()] = txn;
+  pending_transactions_[txn->internal().id()] = move(req);
 
   // Send a look up master request to each partition in the same region
   auto local_rep = config_->local_replica();
@@ -108,60 +110,54 @@ void Forwarder::ProcessForwardTxn(internal::ForwardTransaction* forward_txn) {
   for (uint32_t part = 0; part < num_partitions; part++) {
     if (part != local_partition) {
       Send(
-          lookup_master_request,
+          *lookup_master_request.get(),
           kForwarderChannel,
           config_->MakeMachineId(local_rep, part));
     }
   }
 }
 
-void Forwarder::ProcessLookUpMasterRequest(
-    internal::LookupMasterRequest* lookup_master,
-    MachineId from) {
+void Forwarder::ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from) {
+  const auto& lookup_master = req.get()->lookup_master();
   internal::Response response;
   auto lookup_response = response.mutable_lookup_master();
-  lookup_response->set_txn_id(lookup_master->txn_id());
   auto metadata_map = lookup_response->mutable_master_metadata();
-  auto new_keys = lookup_response->mutable_new_keys();
-  while (!lookup_master->keys().empty()) {
-    auto key = lookup_master->mutable_keys()->ReleaseLast();
 
-    if (!config_->key_is_in_local_partition(*key)) {
-      // Ignore keys that the current partition does not have
-      delete key;
-    } else {
+  lookup_response->set_txn_id(lookup_master.txn_id());
+  for (int i = 0; i < lookup_master.keys_size(); i++) {
+    const auto& key = lookup_master.keys(i);
+
+    if (config_->key_is_in_local_partition(key)) {
       Metadata metadata;
-      if (lookup_master_index_->GetMasterMetadata(*key, metadata)) {
+      if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
         // If key exists, add the metadata of current key to the response
-        auto& response_metadata = (*metadata_map)[*key];
+        auto& response_metadata = (*metadata_map)[key];
         response_metadata.set_master(metadata.master);
         response_metadata.set_counter(metadata.counter);
-        delete key;
       } else {
         // Otherwise, add it to the list indicating this is a new key
-        new_keys->AddAllocated(key);
+        lookup_response->add_new_keys(key);
       }
     }
   }
   Send(response, kForwarderChannel, from);
 }
 
-void Forwarder::HandleInternalResponse(Response&& res, MachineId /* from */) {
+void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from */) {
   // The forwarder only cares about lookup master responses
-  if (res.type_case() != Response::kLookupMaster) {
+  if (res.get()->type_case() != Response::kLookupMaster) {
     LOG(ERROR) << "Unexpected response type received: \""
-               << CASE_NAME(res.type_case(), Response) << "\"";
-    return;
+               << CASE_NAME(res.get()->type_case(), Response) << "\"";
   }
 
-  const auto& lookup_master = res.lookup_master();
+  const auto& lookup_master = res.get()->lookup_master();
   auto txn_id = lookup_master.txn_id();
-  if (pending_transaction_.count(txn_id) == 0) {
+  if (pending_transactions_.count(txn_id) == 0) {
     return;
   }
 
   // Transfer master info from the lookup response to its intended transaction
-  auto txn = pending_transaction_[txn_id];
+  auto txn = pending_transactions_[txn_id].get()->mutable_forward_txn()->mutable_txn();
   auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
   for (const auto& pair : lookup_master.master_metadata()) {
     if (TransactionContainsKey(*txn, pair.first)) {
@@ -182,7 +178,7 @@ void Forwarder::HandleInternalResponse(Response&& res, MachineId /* from */) {
   auto txn_type = SetTransactionType(*txn);
   if (txn_type != TransactionType::UNKNOWN) {
     Forward(txn);
-    pending_transaction_.erase(txn_id);
+    pending_transactions_.erase(txn_id);
   }
 }
 
@@ -194,6 +190,8 @@ void Forwarder::Forward(Transaction* txn) {
 
   // Prepare a request to be forwarded to a sequencer
   Request forward_txn;
+  // The transaction still belongs to the request. This is only temporary and will
+  // be released at the end
   forward_txn.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
@@ -240,6 +238,9 @@ void Forwarder::Forward(Transaction* txn) {
         kMultiHomeOrdererChannel,
         destination);
   }
+  // Release txn so that it won't be freed by forward_txn and later double-freed
+  // by the request
+  forward_txn.mutable_forward_txn()->release_txn();
 }
 
 } // namespace slog

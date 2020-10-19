@@ -35,16 +35,12 @@ public:
       const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index);
 
 protected:
-  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
-
-  void HandleInternalResponse(internal::Response&& res, MachineId from) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
+  void HandleInternalResponse(ReusableResponse&& res, MachineId from) final;
 
 private:
-  void ProcessForwardTxn(internal::ForwardTransaction* forward_txn);
-
-  void ProcessLookUpMasterRequest(
-      internal::LookupMasterRequest* lookup_master,
-      MachineId from);
+  void ProcessForwardTxn(ReusableRequest&& req);
+  void ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from);
 
   /**
    * Pre-condition: transaction type is not UNKNOWN
@@ -54,7 +50,7 @@ private:
   ConfigurationPtr config_;
   std::shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
 
-  std::unordered_map<TxnId, Transaction*> pending_transaction_;
+  std::unordered_map<TxnId, ReusableRequest> pending_transactions_;
 
   std::mt19937 rg_;
 };

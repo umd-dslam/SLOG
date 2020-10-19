@@ -22,9 +22,13 @@ struct PendingResponse {
 };
 
 struct CompletedTransaction {
-  Transaction* txn = nullptr;
+  ReusableRequest req;
   std::unordered_set<uint32_t> awaited_partitions;
-  bool initialized = false;
+
+  Transaction* txn() {
+    if (req.get() == nullptr) return nullptr;
+    return req.get()->mutable_completed_subtxn()->mutable_txn();
+  }
 };
 
 /**
@@ -53,14 +57,14 @@ protected:
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
-  void HandleInternalResponse(internal::Response&& res, MachineId /* from */) final;
+  void HandleInternalResponse(ReusableResponse&& res, MachineId /* from */) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
 private:
-  void ProcessCompletedSubtxn(internal::CompletedSubtransaction* completed_subtxn);
+  void ProcessCompletedSubtxn(ReusableRequest&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void SendAPIResponse(TxnId txn_id, api::Response&& res);

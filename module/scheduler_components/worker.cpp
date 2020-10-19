@@ -26,16 +26,16 @@ Worker::Worker(
     // TODO: change this dynamically based on selected experiment
     commands_(new KeyValueCommands()) {}
 
-void Worker::HandleInternalRequest(internal::Request&& req, MachineId) {
+void Worker::HandleInternalRequest(ReusableRequest&& req, MachineId) {
   std::optional<TxnId> txn_id = 0;
   bool valid_request = true;
-  switch (req.type_case()) {
+  switch (req.get()->type_case()) {
     case Request::kWorker: {
-      txn_id = ProcessWorkerRequest(req.worker());
+      txn_id = ProcessWorkerRequest(req.get()->worker());
       break;
     }
     case Request::kRemoteReadResult: {
-      txn_id = ProcessRemoteReadResult(req.remote_read_result());
+      txn_id = ProcessRemoteReadResult(req.get()->remote_read_result());
       break;
     }
     default:
@@ -348,9 +348,9 @@ void Worker::Finish(TxnId txn_id) {
   SendToCoordinatingServer(txn_id);
 
   // Notify the scheduler that we're done
-  Response res;
-  res.mutable_worker()->set_txn_id(txn_id);
-  Send(res, kSchedulerChannel);
+  auto res = AcquireResponse();
+  res.get()->mutable_worker()->set_txn_id(txn_id);
+  Send(*res.get(), kSchedulerChannel);
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
@@ -395,8 +395,8 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   auto aborted = txn->status() == TransactionStatus::ABORTED;
 
   // Send abort result and local reads to all remote active partitions
-  Request request;
-  auto rrr = request.mutable_remote_read_result();
+  auto request = AcquireRequest();
+  auto rrr = request.get()->mutable_remote_read_result();
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
   rrr->set_will_abort(aborted);
@@ -410,7 +410,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   for (auto p : txn_holder->active_partitions()) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineId(local_replica, p);
-      Send(request, kSchedulerChannel, std::move(machine_id));
+      Send(*request.get(), kSchedulerChannel, std::move(machine_id));
     }
   }
 }
@@ -421,15 +421,16 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto txn = txn_holder->transaction();
 
   // Send the txn back to the coordinating server
-  Request req;
-  auto completed_sub_txn = req.mutable_completed_subtxn();
-  completed_sub_txn->mutable_txn()->CopyFrom(*txn);
+  auto req = AcquireRequest();
+  auto completed_sub_txn = req.get()->mutable_completed_subtxn();
+  completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());
   for (auto p : txn_holder->involved_partitions()) {
     completed_sub_txn->add_involved_partitions(p);
   }
   
-  Send(req, kServerChannel,  txn->internal().coordinating_server());
+  Send(*req.get(), kServerChannel,  txn->internal().coordinating_server());
+  completed_sub_txn->release_txn();
 }
 
 } // namespace slog

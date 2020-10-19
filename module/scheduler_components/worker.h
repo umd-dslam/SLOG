@@ -53,7 +53,7 @@ public:
       const shared_ptr<Storage<Key, Record>>& storage);
 
 protected:
-  void HandleInternalRequest(internal::Request&& req, MachineId from) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
 private:
   /**

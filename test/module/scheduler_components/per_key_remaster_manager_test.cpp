@@ -21,10 +21,13 @@ protected:
   ConfigVec configs;
   shared_ptr<Storage<Key, Record>> storage;
   unique_ptr<RemasterManager> remaster_manager;
+  MessagePool<internal::Request> pool;
 
   TransactionHolder MakeHolder(Transaction* txn, uint32_t txn_id = 0) {
     txn->mutable_internal()->set_id(txn_id);
-    return TransactionHolder(configs[0], txn);
+    ReusableRequest req(&pool);
+    req.get()->mutable_forward_txn()->set_allocated_txn(txn);
+    return TransactionHolder{configs[0], move(req)};
   }
 };
 

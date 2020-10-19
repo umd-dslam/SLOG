@@ -56,10 +56,8 @@ inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
   return true;
 }
 
-template<typename T>
-inline bool ParseProto(T& out, const zmq::message_t& msg) {
+inline bool ParseAny(google::protobuf::Any& any, const zmq::message_t& msg) {
   auto header_sz = sizeof(MachineId) + sizeof(Channel);
-  google::protobuf::Any any;
   if (msg.size() < header_sz) {
     return false;
   }
@@ -69,7 +67,16 @@ inline bool ParseProto(T& out, const zmq::message_t& msg) {
   if (!any.ParseFromArray(proto_data, proto_size)) {
     return false;
   }
-  return any.UnpackTo(&out);  
+  return true;
+}
+
+template<typename T>
+inline bool ParseProto(T& out, const zmq::message_t& msg) {
+  google::protobuf::Any any;
+  if (!ParseAny(any, msg)) {
+    return false;
+  }
+  return any.UnpackTo(&out);
 }
 
 template<typename T>

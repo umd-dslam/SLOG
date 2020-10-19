@@ -28,7 +28,7 @@ public:
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(internal::Request&& req, MachineId from_machine_id) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from_machine_id) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
@@ -36,8 +36,7 @@ private:
   void NewBatch();
   BatchId NextBatchId();
 
-  void ProcessForwardBatch(
-      internal::ForwardBatch* forward_batch);
+  void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
 
   ConfigurationPtr config_;
   unique_ptr<internal::Batch> batch_;

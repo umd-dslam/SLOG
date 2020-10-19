@@ -51,30 +51,30 @@ void Scheduler::Initialize() {
         Internal Requests & Responses
 ***********************************************/
 
-void Scheduler::HandleInternalRequest(internal::Request&& req, MachineId) {
-  switch (req.type_case()) {
+void Scheduler::HandleInternalRequest(ReusableRequest&& req, MachineId) {
+  switch (req.get()->type_case()) {
     case Request::kForwardTxn: 
-      ProcessTransaction(req.mutable_forward_txn()->release_txn());
+      ProcessTransaction(move(req));
       break;
     case Request::kRemoteReadResult:
       ProcessRemoteReadResult(move(req));
       break;
     case Request::kStats:
-      ProcessStatsRequest(req.stats());
+      ProcessStatsRequest(req.get()->stats());
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.type_case(), Request) << "\"";
+                 << CASE_NAME(req.get()->type_case(), Request) << "\"";
       break;
   }
 }
 
-void Scheduler::ProcessRemoteReadResult(internal::Request&& req) {
-  auto txn_id = req.remote_read_result().txn_id();
+void Scheduler::ProcessRemoteReadResult(ReusableRequest&& req) {
+  auto txn_id = req.get()->remote_read_result().txn_id();
   auto& holder = all_txns_[txn_id];
   if (holder.transaction() != nullptr && holder.worker()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
-    Send(move(req), kWorkerChannelOffset + *holder.worker());
+    Send(*req.get(), kWorkerChannelOffset + *holder.worker());
   } else {
     // Save the remote reads that come before the txn
     // is processed by this partition
@@ -85,7 +85,7 @@ void Scheduler::ProcessRemoteReadResult(internal::Request&& req) {
     // Consider garbage collecting them if that happens.
     VLOG(2) << "Got early remote read result for txn " << txn_id;
 
-    auto remote_abort = req.remote_read_result().will_abort();
+    auto remote_abort = req.get()->remote_read_result().will_abort();
     holder.early_remote_reads().emplace_back(move(req));
 
     if (aborting_txns_.count(txn_id) > 0) {
@@ -129,8 +129,8 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   Send(res, kServerChannel);
 }
 
-void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
-  auto txn_id = res.worker().txn_id();
+void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
+  auto txn_id = res.get()->worker().txn_id();
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -157,7 +157,8 @@ void Scheduler::HandleInternalResponse(internal::Response&& res, MachineId) {
               Transaction Processing
 ***********************************************/
 
-void Scheduler::ProcessTransaction(Transaction* txn) {
+void Scheduler::ProcessTransaction(ReusableRequest&& req) {
+  auto txn = req.get()->mutable_forward_txn()->mutable_txn();
   auto txn_internal = txn->mutable_internal();
   
   RecordTxnEvent(
@@ -165,7 +166,7 @@ void Scheduler::ProcessTransaction(Transaction* txn) {
       txn_internal,
       TransactionEvent::ENTER_SCHEDULER);
 
-  if (!AcceptTransaction(txn)) {
+  if (!AcceptTransaction(move(req))) {
     return;
   }
 
@@ -234,6 +235,7 @@ void Scheduler::ProcessTransaction(Transaction* txn) {
   }
 }
 
+#ifdef ENABLE_REMASTER
 bool Scheduler::MaybeAbortRemasterTransaction(Transaction* txn) {
   // TODO: this check can be done as soon as metadata is assigned
   auto txn_id = txn->internal().id();
@@ -244,15 +246,17 @@ bool Scheduler::MaybeAbortRemasterTransaction(Transaction* txn) {
   }
   return false;
 }
+#endif
 
-bool Scheduler::AcceptTransaction(Transaction* txn) {
-  switch(txn->internal().type()) {
+bool Scheduler::AcceptTransaction(ReusableRequest&& req) {
+  auto& txn = req.get()->forward_txn().txn();
+  switch (txn.internal().type()) {
     case TransactionType::SINGLE_HOME:
     case TransactionType::MULTI_HOME: {
-      auto txn_id = txn->internal().id();
+      auto txn_id = txn.internal().id();
       auto& holder = all_txns_[txn_id];
       
-      holder.SetTransaction(config_, txn);
+      holder.SetTxnRequest(config_, move(req));
       if (holder.keys_in_partition().empty()) {
         all_txns_.erase(txn_id);
         return false;
@@ -260,10 +264,10 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
       break;
     }
     case TransactionType::LOCK_ONLY: {
-      auto txn_replica_id = TransactionHolder::transaction_id_replica_id(txn);
+      auto txn_replica_id = TransactionHolder::transaction_id_replica_id(&txn);
       auto& holder = lock_only_txns_[txn_replica_id];
 
-      holder.SetTransaction(config_, txn);
+      holder.SetTxnRequest(config_, move(req));
       if (holder.keys_in_partition().empty()) {
         lock_only_txns_.erase(txn_replica_id);
         return false;
@@ -272,7 +276,7 @@ bool Scheduler::AcceptTransaction(Transaction* txn) {
     }
     default:
       LOG(ERROR) << "Unknown transaction type";
-      break;
+      return false;
   }
   return true;
 }
@@ -543,16 +547,16 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
       TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
-  Request req;
-  auto worker_request = req.mutable_worker();
+  auto req = AcquireRequest();
+  auto worker_request = req.get()->mutable_worker();
   worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
   Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
-  Send(move(req), worker_channel);
+  Send(*req.get(), worker_channel);
   while (!txn_holder->early_remote_reads().empty()) {
-    Send(move(txn_holder->early_remote_reads().back()), worker_channel);
+    Send(*txn_holder->early_remote_reads().back().get(), worker_channel);
     txn_holder->early_remote_reads().pop_back();
   }
 

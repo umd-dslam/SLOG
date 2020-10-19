@@ -43,14 +43,12 @@ public:
 
   void HandleRequest(const internal::Request& req);
 
-  void HandleResponse(
-      const internal::Response& res,
-      MachineId from_machine_id);
+  void HandleResponse(const internal::Response& res, MachineId from);
   
   bool IsMember() const;
 
 private:
-  void ProcessCommitRequest(const internal::PaxosCommitRequest commit);
+  void ProcessCommitRequest(const internal::PaxosCommitRequest& commit);
 
   void StartNewAcceptance(uint32_t value);
   void AcceptanceStateChanged(const AcceptanceTracker* acceptance);

@@ -17,13 +17,13 @@ SimpleMultiPaxos::SimpleMultiPaxos(
     leader_(*this, members, me),
     acceptor_(*this) {}
 
-void SimpleMultiPaxos::HandleInternalRequest(Request&& req, MachineId from) {
-  leader_.HandleRequest(req);
-  acceptor_.HandleRequest(req, from);
+void SimpleMultiPaxos::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
+  leader_.HandleRequest(*req.get());
+  acceptor_.HandleRequest(*req.get(), from);
 }
 
-void SimpleMultiPaxos::HandleInternalResponse(Response&& res, MachineId from) {
-  leader_.HandleResponse(res, from);
+void SimpleMultiPaxos::HandleInternalResponse(ReusableResponse&& res, MachineId from) {
+  leader_.HandleResponse(*res.get(), from);
 }
 
 bool SimpleMultiPaxos::IsMember() const {

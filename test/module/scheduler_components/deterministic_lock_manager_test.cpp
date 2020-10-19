@@ -10,6 +10,13 @@ using namespace slog;
 class DeterministicLockManagerTest : public ::testing::Test {
 protected:
   DeterministicLockManager lock_manager;
+  MessagePool<internal::Request> pool;
+
+  TransactionHolder MakeHolder(const ConfigurationPtr& config, Transaction* txn) {
+    ReusableRequest req(&pool);
+    req.get()->mutable_forward_txn()->set_allocated_txn(txn);
+    return TransactionHolder{config, move(req)};
+  }
 };
 
 TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
@@ -17,7 +24,7 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   auto txn = FillMetadata(MakeTransaction(
     {"readA", "readB"},
     {"writeC"}));
-  TransactionHolder holder(configs[0], txn);
+  TransactionHolder holder = MakeHolder(configs[0], txn);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
   auto result = lock_manager.ReleaseLocks(holder);
   ASSERT_TRUE(result.empty());
@@ -27,11 +34,11 @@ TEST_F(DeterministicLockManagerTest, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"readA", "readB"}, {}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readB", "readC"}, {}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
@@ -43,11 +50,11 @@ TEST_F(DeterministicLockManagerTest, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
@@ -61,16 +68,16 @@ TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"B"}, {"A"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({"B"}, {}));
   txn3->mutable_internal()->set_id(300);
-  TransactionHolder holder3(configs[0], txn3);
+  TransactionHolder holder3 = MakeHolder(configs[0], txn3);
   auto txn4 = FillMetadata(MakeTransaction({"C"}, {}));
   txn4->mutable_internal()->set_id(400);
-  TransactionHolder holder4(configs[0], txn4);
+  TransactionHolder holder4 = MakeHolder(configs[0], txn4);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
@@ -91,13 +98,13 @@ TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({}, {"A", "C"}));
   txn3->mutable_internal()->set_id(300);
-  TransactionHolder holder3(configs[0], txn3);
+  TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
@@ -116,10 +123,10 @@ TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"A"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
  
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
@@ -133,16 +140,16 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
+  TransactionHolder holder2_lockonly1 = MakeHolder(configs[0], txn2_lockonly1);
   auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
+  TransactionHolder holder2_lockonly2 = MakeHolder(configs[0], txn2_lockonly2);
 
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder2));
@@ -159,16 +166,16 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
+  TransactionHolder holder2_lockonly1 = MakeHolder(configs[0], txn2_lockonly1);
   auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
+  TransactionHolder holder2_lockonly2 = MakeHolder(configs[0], txn2_lockonly2);
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder1), AcquireLocksResult::WAITING);
@@ -185,16 +192,16 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly1(configs[0], txn2_lockonly1);
+  TransactionHolder holder2_lockonly1 = MakeHolder(configs[0], txn2_lockonly1);
   auto txn2_lockonly2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly2->mutable_internal()->set_id(200);
-  TransactionHolder holder2_lockonly2(configs[0], txn2_lockonly2);
+  TransactionHolder holder2_lockonly2 = MakeHolder(configs[0], txn2_lockonly2);
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder2_lockonly1), AcquireLocksResult::WAITING);
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder2));
@@ -212,12 +219,12 @@ TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
 
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
 
   auto txn2 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2->mutable_internal()->set_id(101);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2), AcquireLocksResult::WAITING);
 }
 
@@ -225,11 +232,11 @@ TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
-  TransactionHolder holder1(configs[0], txn1);
+  TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}), 1);
   txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
@@ -240,16 +247,16 @@ TEST_F(DeterministicLockManagerTest, RemasterTxn) {
   auto txn = FillMetadata(MakeTransaction({}, {"A"}));
   txn->mutable_internal()->set_id(100);
   txn->mutable_remaster()->set_new_master(1);
-  TransactionHolder holder(configs[0], txn);
+  TransactionHolder holder = MakeHolder(configs[0], txn);
   auto txn_lockonly1 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly1->mutable_internal()->set_id(100);
   txn_lockonly1->mutable_remaster()->set_new_master(1);
-  TransactionHolder holder_lockonly1(configs[0], txn_lockonly1);
+  TransactionHolder holder_lockonly1 = MakeHolder(configs[0], txn_lockonly1);
   auto txn_lockonly2 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly2->mutable_internal()->set_id(100);
   txn_lockonly1->mutable_remaster()->set_new_master(1);
   txn_lockonly1->mutable_remaster()->set_is_new_master_lock_only(true);
-  TransactionHolder holder_lockonly2(configs[0], txn_lockonly2);
+  TransactionHolder holder_lockonly2 = MakeHolder(configs[0], txn_lockonly2);
 
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder));
   ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
@@ -259,11 +266,11 @@ TEST_F(DeterministicLockManagerTest, RemasterTxn) {
   // Check locks have been released
   auto txn2 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly1->mutable_internal()->set_id(200);
-  TransactionHolder holder2(configs[0], txn2);
+  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   auto txn3 = FillMetadata(MakeTransaction({}, {"A"}), 1);
   txn_lockonly1->mutable_internal()->set_id(200);
-  TransactionHolder holder3(configs[0], txn3);
+  TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);

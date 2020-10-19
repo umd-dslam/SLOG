@@ -58,9 +58,7 @@ public:
   Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker);
 
 protected:
-  void HandleInternalRequest(
-      internal::Request&& req,
-      MachineId from_machine_id) final;
+  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
 private:
   void AdvanceLogs();

@@ -9,14 +9,12 @@ using internal::Response;
 
 Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 
-void Acceptor::HandleRequest(
-    const Request& req,
-    MachineId from_machine_id) {
+void Acceptor::HandleRequest(const Request& req, MachineId from) {
   switch (req.type_case()) {
     case Request::TypeCase::kPaxosAccept:
-      ProcessAcceptRequest(req.paxos_accept(), from_machine_id); break;
+      ProcessAcceptRequest(req.paxos_accept(), from); break;
     case Request::TypeCase::kPaxosCommit:
-      ProcessCommitRequest(req.paxos_commit(), from_machine_id); break;
+      ProcessCommitRequest(req.paxos_commit(), from); break;
     default:
       break;
   }

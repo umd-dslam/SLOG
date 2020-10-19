@@ -63,16 +63,16 @@ Interleaver::Interleaver(
     NetworkedModule(broker, kInterleaverChannel),
     config_(config) {}
 
-void Interleaver::HandleInternalRequest(internal::Request&& req, MachineId from) {
-  if (req.type_case() == Request::kLocalQueueOrder) {
-    auto& order = req.local_queue_order();
+void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
+  if (req.get()->type_case() == Request::kLocalQueueOrder) {
+    auto& order = req.get()->local_queue_order();
     VLOG(1) << "Received local queue order. Slot id: "
             << order.slot() << ". Queue id: " << order.queue_id(); 
 
     local_log_.AddSlot(order.slot(), order.queue_id());
 
-  } else if (req.type_case() == Request::kForwardBatch) {
-    auto forward_batch = req.mutable_forward_batch();
+  } else if (req.get()->type_case() == Request::kForwardBatch) {
+    auto forward_batch = req.get()->mutable_forward_batch();
     auto [from_replica, from_partition] = config_->UnpackMachineId(from);
 
     switch (forward_batch->part_case()) {
@@ -205,10 +205,10 @@ void Interleaver::EmitBatch(BatchPtr&& batch) {
         txn->mutable_internal(),
         TransactionEvent::EXIT_INTERLEAVER);
 
-    Request request;
-    auto forward_txn = request.mutable_forward_txn();
+    auto request = AcquireRequest();
+    auto forward_txn = request.get()->mutable_forward_txn();
     forward_txn->set_allocated_txn(txn);
-    Send(request, kSchedulerChannel);
+    Send(*request.get(), kSchedulerChannel);
     buffer.pop();
   }
 }
