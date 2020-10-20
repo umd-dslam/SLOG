@@ -27,7 +27,7 @@ Worker::Worker(
     commands_(new KeyValueCommands()) {}
 
 void Worker::HandleInternalRequest(ReusableRequest&& req, MachineId) {
-  std::optional<TxnId> txn_id = 0;
+  std::optional<TxnId> txn_id = {};
   bool valid_request = true;
   switch (req.get()->type_case()) {
     case Request::kWorker: {
@@ -167,14 +167,15 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
       }
       [[fallthrough]];
     case TransactionState::Phase::FINISH:
+    case TransactionState::Phase::PRE_ABORT:
       if (state.phase == TransactionState::Phase::FINISH) {
         Finish(txn_id);
-      }
-      [[fallthrough]];
-    case TransactionState::Phase::PRE_ABORT:
-      if (state.phase == TransactionState::Phase::PRE_ABORT) {
+      } else if (state.phase == TransactionState::Phase::PRE_ABORT) {
         PreAbort(txn_id);
       }
+      // Never fallthrough after this point because Finish and PreAbort
+      // has already destroyed the state object
+      break;
   }
 }
 

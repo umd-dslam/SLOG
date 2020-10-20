@@ -44,7 +44,7 @@ inline bool ParseMachineId(MachineId& id, const zmq::message_t& msg) {
   if (msg.size() < sizeof(MachineId)) {
     return false;
   }
-  id = *msg.data<MachineId>();
+  memcpy(&id, msg.data<char>(), sizeof(MachineId));
   return true;
 }
 
@@ -52,7 +52,7 @@ inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
   if (msg.size() < sizeof(MachineId) + sizeof(Channel)) {
     return false;
   }
-  chan = *reinterpret_cast<const Channel*>(msg.data<char>() + sizeof(MachineId));
+  memcpy(&chan, msg.data<char>() + sizeof(MachineId), sizeof(Channel));
   return true;
 }
 

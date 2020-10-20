@@ -11,6 +11,7 @@ namespace slog {
 
 class Commands {
 public:
+  virtual ~Commands() = default;
   virtual void Execute(Transaction& txn) = 0;
 };
 

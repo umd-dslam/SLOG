@@ -24,6 +24,7 @@ enum class QuorumState {
 class QuorumTracker {
 public:
   QuorumTracker(uint32_t num_members);
+  virtual ~QuorumTracker() = default;
 
   bool HandleResponse(const internal::Response& res, MachineId from);
     
