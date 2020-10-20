@@ -58,6 +58,9 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS "-W -Wextra -Wall")
+set(CMAKE_CXX_FLAGS_ASAN "-g -fno-omit-frame-pointer -fsanitize=address")
+set(CMAKE_CXX_FLAGS_UBSAN "-g -fno-omit-frame-pointer -fsanitize=undefined")
+set(CMAKE_CXX_FLAGS_LSAN "-g -fno-omit-frame-pointer -fsanitize=leak")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -fno-omit-frame-pointer")
@@ -120,7 +123,6 @@ protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/api.proto
   ${PROTO_PREFIX}/configuration.proto
   ${PROTO_PREFIX}/internal.proto
-  ${PROTO_PREFIX}/machine_id.proto
   ${PROTO_PREFIX}/offline_data.proto
   ${PROTO_PREFIX}/transaction.proto)
 add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
