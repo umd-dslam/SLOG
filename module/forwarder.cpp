@@ -24,7 +24,7 @@ Forwarder::Forwarder(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker,
     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index)
-  : NetworkedModule(broker, kForwarderChannel),
+  : NetworkedModule("Forwarder", broker, kForwarderChannel),
     config_(config),
     lookup_master_index_(lookup_master_index),
     rg_(std::random_device()()) {}

@@ -15,11 +15,13 @@ using internal::Request;
 using internal::Response;
 
 NetworkedModule::NetworkedModule(
+    const std::string& name,
     const std::shared_ptr<Broker>& broker,
     Channel channel,
     size_t request_pool_size,
     size_t response_pool_size)
-  : context_(broker->context()),
+  : Module(name),
+    context_(broker->context()),
     pull_socket_(*context_, ZMQ_PULL),
     sender_(broker),
     channel_(channel),

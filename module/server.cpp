@@ -15,7 +15,7 @@ namespace slog {
 Server::Server(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker)
-  : NetworkedModule(broker, kServerChannel),
+  : NetworkedModule("Server", broker, kServerChannel),
     config_(config),
     txn_id_counter_(0) {}
 
@@ -68,7 +68,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
     // The server does not use this and just echos it back to the client.
     .stream_id = request.stream_id()
   };
-  
+
   switch (request.type_case()) {
     case api::Request::kTxn: {
       auto txn = request.mutable_txn()->release_txn();

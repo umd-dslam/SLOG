@@ -97,8 +97,6 @@ private:
   void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
-  std::vector<string> worker_identities_;
-  std::vector<unique_ptr<ModuleRunner>> workers_;
   
 #if defined(REMASTER_PROTOCOL_SIMPLE)
   DeterministicLockManagerDeprecated lock_manager_;
@@ -129,6 +127,11 @@ private:
    * Note: can be negative, if lock-onlys abort before the multi-home
    */
   std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
+
+  std::vector<string> worker_identities_;
+  // This must be defined at the end so that the workers exit before any resources
+  // in the scheduler is destroyed
+  std::vector<unique_ptr<ModuleRunner>> workers_;
 };
 
 } // namespace slog

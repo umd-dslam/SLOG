@@ -28,6 +28,7 @@ struct RemasterOccurredResult {
  */
 class RemasterManager {
 public:
+  virtual ~RemasterManager() = default;
 
   /**
    * Checks the counters of the transaction's master metadata.

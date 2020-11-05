@@ -23,6 +23,7 @@ using ReusableResponse = ReusableMessage<internal::Response>;
 class NetworkedModule : public Module {
 public:
   NetworkedModule(
+      const std::string& name,
       const std::shared_ptr<Broker>& broker,
       Channel channel,
       size_t request_pool_size = 5000,

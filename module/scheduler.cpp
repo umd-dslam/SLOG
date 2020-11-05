@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "proto/internal.pb.h"
 
+#include "common/monitor.h"
+
 using std::make_shared;
 using std::move;
 
@@ -26,7 +28,7 @@ Scheduler::Scheduler(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : NetworkedModule(broker, kSchedulerChannel),
+  : NetworkedModule("Scheduler", broker, kSchedulerChannel),
     config_(config) {
   for (size_t i = 0; i < config->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(

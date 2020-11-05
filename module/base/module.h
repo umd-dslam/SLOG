@@ -13,7 +13,7 @@ namespace slog {
  */
 class Module {
 public:
-  Module() {};
+  Module(const std::string& name) : name_(name) {};
   Module(const Module&) = delete;
   const Module& operator=(const Module&) = delete;
   virtual ~Module() {}
@@ -28,6 +28,11 @@ public:
    * Contains the actions to be perform in one iteration of the main loop
    */
   virtual void Loop() = 0;
+
+  const std::string& name() const { return name_; }
+
+private:
+  std::string name_;
 };
 
 /**

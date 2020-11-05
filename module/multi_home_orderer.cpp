@@ -15,7 +15,7 @@ using internal::Request;
 MultiHomeOrderer::MultiHomeOrderer(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker) 
-  : NetworkedModule(broker, kMultiHomeOrdererChannel),
+  : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel),
     config_(config),
     batch_id_counter_(0) {
   NewBatch();

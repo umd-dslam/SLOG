@@ -20,7 +20,7 @@ Worker::Worker(
     const std::shared_ptr<Broker>& broker,
     Channel channel,
     const shared_ptr<Storage<Key, Record>>& storage)
-  : NetworkedModule(broker, channel),
+  : NetworkedModule("Worker-" + std::to_string(channel), broker, channel),
     config_(config),
     storage_(storage),
     // TODO: change this dynamically based on selected experiment

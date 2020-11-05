@@ -60,7 +60,7 @@ void LocalLog::UpdateReadyBatches() {
 Interleaver::Interleaver(
     const ConfigurationPtr& config,
     const shared_ptr<Broker>& broker) :
-    NetworkedModule(broker, kInterleaverChannel),
+    NetworkedModule("Interleaver", broker, kInterleaverChannel),
     config_(config) {}
 
 void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {

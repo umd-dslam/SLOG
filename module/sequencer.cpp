@@ -17,7 +17,7 @@ using internal::Response;
 Sequencer::Sequencer(
     const ConfigurationPtr& config,
     const std::shared_ptr<Broker>& broker)
-  : NetworkedModule(broker, kSequencerChannel),
+  : NetworkedModule("Sequencer", broker, kSequencerChannel),
     config_(config),
     batch_id_counter_(0) {
   NewBatch();

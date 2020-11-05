@@ -13,7 +13,7 @@ SimpleMultiPaxos::SimpleMultiPaxos(
     const shared_ptr<Broker>& broker,
     const vector<MachineId>& members,
     MachineId me)
-  : NetworkedModule(broker, group_number),
+  : NetworkedModule("Paxos-" + std::to_string(group_number), broker, group_number),
     leader_(*this, members, me),
     acceptor_(*this) {}
 

@@ -15,13 +15,13 @@ zmq::socket_t Ticker::Subscribe(zmq::context_t& context) {
 }
 
 Ticker::Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms)
-    : socket_(context, ZMQ_PUB) {
+    : Module("Ticker"), socket_(context, ZMQ_PUB) {
   socket_.setsockopt(ZMQ_LINGER, 0);
   sleep_us_ = std::chrono::duration_cast<milliseconds>(tick_period_ms);
 }
 
 Ticker::Ticker(zmq::context_t& context, uint32_t ticks_per_sec)
-    : socket_(context, ZMQ_PUB) {
+    : Module("Ticker"), socket_(context, ZMQ_PUB) {
   socket_.setsockopt(ZMQ_LINGER, 0);
   sleep_us_ = std::chrono::microseconds(1000 * 1000 / ticks_per_sec);
 }

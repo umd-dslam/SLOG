@@ -2,6 +2,8 @@
 
 #include "common/constants.h"
 
+#include <glog/logging.h>
+
 using std::shared_ptr;
 using std::unique_ptr;
 
@@ -13,6 +15,7 @@ ModuleRunner::ModuleRunner(const shared_ptr<Module>& module)
 
 ModuleRunner::~ModuleRunner() {
   running_ = false;
+  LOG(INFO) << module_->name() << " exitting...";
   thread_.join();
 }
 

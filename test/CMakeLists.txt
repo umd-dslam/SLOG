@@ -56,6 +56,7 @@ target_link_libraries(forwarder_test test_utils)
 add_executable(mem_only_storage_test storage/mem_only_storage_test.cpp)
 
 add_executable(message_pool_test common/message_pool_test.cpp)
+target_link_libraries(message_pool_test proto)
 
 add_executable(paxos_test paxos/paxos_test.cpp)
 target_link_libraries(paxos_test test_utils paxos)
