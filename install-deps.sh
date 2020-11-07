@@ -33,7 +33,7 @@ done
 
 # Install toolings to compile dependencies
 $SUDO apt-get update
-$SUDO apt-get -y install cmake autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
+$SUDO apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
