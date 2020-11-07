@@ -20,7 +20,7 @@ public:
       const shared_ptr<Broker>& broker,
       const vector<MachineId>& group_members,
       const MachineId& me)
-    : SimpleMultiPaxos(kTestChannel, broker, group_members, me) {}
+    : SimpleMultiPaxos(kTestChannel, broker, group_members, me, 5) {}
 
   Pair Poll() {
     unique_lock<mutex> lock(m_);

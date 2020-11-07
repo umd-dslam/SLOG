@@ -12,8 +12,10 @@ SimpleMultiPaxos::SimpleMultiPaxos(
     Channel group_number,
     const shared_ptr<Broker>& broker,
     const vector<MachineId>& members,
-    MachineId me)
-  : NetworkedModule("Paxos-" + std::to_string(group_number), broker, group_number),
+    MachineId me,
+    int poll_timeout_ms)
+  : NetworkedModule(
+        "Paxos-" + std::to_string(group_number), broker, group_number, poll_timeout_ms),
     leader_(*this, members, me),
     acceptor_(*this) {}
 

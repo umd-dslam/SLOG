@@ -59,8 +59,10 @@ void LocalLog::UpdateReadyBatches() {
 
 Interleaver::Interleaver(
     const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker) :
-    NetworkedModule("Interleaver", broker, kInterleaverChannel),
+    const shared_ptr<Broker>& broker,
+    int poll_timeout_ms) :
+    NetworkedModule(
+        "Interleaver", broker, kInterleaverChannel, poll_timeout_ms),
     config_(config) {}
 
 void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {

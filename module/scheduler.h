@@ -30,7 +30,8 @@ public:
   Scheduler(
       const ConfigurationPtr& config,
       const std::shared_ptr<Broker>& broker,
-      const std::shared_ptr<Storage<Key, Record>>& storage);
+      const std::shared_ptr<Storage<Key, Record>>& storage,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void Initialize() final;

@@ -50,7 +50,8 @@ public:
       const ConfigurationPtr& config,
       const std::shared_ptr<Broker>& broker,
       Channel channel,
-      const shared_ptr<Storage<Key, Record>>& storage);
+      const shared_ptr<Storage<Key, Record>>& storage,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

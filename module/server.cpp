@@ -14,8 +14,9 @@ namespace slog {
 
 Server::Server(
     const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker)
-  : NetworkedModule("Server", broker, kServerChannel),
+    const shared_ptr<Broker>& broker,
+    int poll_timeout_ms)
+  : NetworkedModule("Server", broker, kServerChannel, poll_timeout_ms),
     config_(config),
     txn_id_counter_(0) {}
 
@@ -27,8 +28,8 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
   string endpoint = "tcp://*:" + std::to_string(config_->server_port());
   zmq::socket_t client_socket(*context(), ZMQ_ROUTER);
   client_socket.setsockopt(ZMQ_LINGER, 0);
-  client_socket.setsockopt(ZMQ_RCVHWM, kServerRcvHwm);
-  client_socket.setsockopt(ZMQ_SNDHWM, kServerSndHwm);
+  client_socket.setsockopt(ZMQ_RCVHWM, 0);
+  client_socket.setsockopt(ZMQ_SNDHWM, 0);
   client_socket.bind(endpoint);
 
   LOG(INFO) << "Bound Server to: " << endpoint;

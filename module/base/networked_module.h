@@ -26,6 +26,8 @@ public:
       const std::string& name,
       const std::shared_ptr<Broker>& broker,
       Channel channel,
+      int poll_timeout_ms,
+      int recv_batch = 100,
       size_t request_pool_size = 5000,
       size_t response_pool_size = 5000);
 
@@ -82,6 +84,8 @@ private:
   std::vector<zmq::socket_t> custom_sockets_;
   Sender sender_;
   Channel channel_;
+  int poll_timeout_ms_;
+  int recv_batch_;
   MessagePool<internal::Request> request_pool_;
   MessagePool<internal::Response> response_pool_;
 };

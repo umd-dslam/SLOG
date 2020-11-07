@@ -6,7 +6,10 @@ namespace slog {
 
 class GlobalPaxos : public SimpleMultiPaxos {
 public:
-  GlobalPaxos(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker);
+  GlobalPaxos(
+      const ConfigurationPtr& config,
+      const std::shared_ptr<Broker>& broker,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void OnCommit(uint32_t slot, uint32_t value) final;
@@ -17,7 +20,10 @@ private:
 
 class LocalPaxos : public SimpleMultiPaxos {
 public:
-  LocalPaxos(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker);
+  LocalPaxos(
+      const ConfigurationPtr& config,
+      const std::shared_ptr<Broker>& broker,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void OnCommit(uint32_t slot, uint32_t value) final;

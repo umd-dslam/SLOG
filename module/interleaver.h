@@ -55,7 +55,10 @@ private:
  */
 class Interleaver : public NetworkedModule {
 public:
-  Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker);
+  Interleaver(
+      const ConfigurationPtr& config,
+      const shared_ptr<Broker>& broker,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

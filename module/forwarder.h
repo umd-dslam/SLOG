@@ -32,7 +32,8 @@ public:
   Forwarder(
       const ConfigurationPtr& config,
       const shared_ptr<Broker>& broker,
-      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index);
+      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

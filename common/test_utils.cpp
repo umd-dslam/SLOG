@@ -20,6 +20,8 @@ using std::to_string;
 
 namespace slog {
 
+const int kTestModuleTimeoutMs = 5;
+
 internal::Request MakeEchoRequest(const std::string& data) {
   internal::Request request;
   auto echo = request.mutable_echo();
@@ -97,7 +99,7 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
   : config_(config),
     context_(new zmq::context_t(1)),
     storage_(new MemOnlyStorage<Key, Record, Metadata>()),
-    broker_(new Broker(config, context_, 5)),
+    broker_(new Broker(config, context_, kTestModuleTimeoutMs)),
     client_context_(1),
     client_socket_(client_context_, ZMQ_DEALER) {
   ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
@@ -110,35 +112,43 @@ void TestSlog::Data(Key&& key, Record&& record) {
 }
 
 void TestSlog::AddServerAndClient() {
-  server_ = MakeRunnerFor<Server>(config_, broker_);
+  server_ = MakeRunnerFor<Server>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddForwarder() {
-  forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_);
+  forwarder_ = MakeRunnerFor<Forwarder>(
+      config_, broker_, storage_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddSequencer() {
-  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_);
+  sequencer_ = MakeRunnerFor<Sequencer>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddInterleaver() {
-  interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_);
+  interleaver_ = MakeRunnerFor<Interleaver>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddScheduler() {
-  scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_);
+  scheduler_ = MakeRunnerFor<Scheduler>(
+      config_, broker_, storage_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddLocalPaxos() {
-  local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_);
+  local_paxos_ = MakeRunnerFor<LocalPaxos>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddGlobalPaxos() {
-  global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_);
+  global_paxos_ = MakeRunnerFor<GlobalPaxos>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_);
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(
+      config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {
