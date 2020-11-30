@@ -24,7 +24,8 @@ public:
       Channel group_number,
       const shared_ptr<Broker>& broker,
       const vector<MachineId>& group_members,
-      MachineId me);
+      MachineId me,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
   bool IsMember() const;
 

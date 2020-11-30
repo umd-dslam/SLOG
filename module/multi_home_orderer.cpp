@@ -14,8 +14,10 @@ using internal::Request;
 
 MultiHomeOrderer::MultiHomeOrderer(
     const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker) 
-  : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel),
+    const shared_ptr<Broker>& broker,
+    int poll_timeout_ms)
+  : NetworkedModule(
+        "MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout_ms),
     config_(config),
     batch_id_counter_(0) {
   NewBatch();

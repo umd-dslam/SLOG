@@ -18,6 +18,8 @@ NetworkedModule::NetworkedModule(
     const std::string& name,
     const std::shared_ptr<Broker>& broker,
     Channel channel,
+    int poll_timeout_ms,
+    int recv_batch,
     size_t request_pool_size,
     size_t response_pool_size)
   : Module(name),
@@ -25,6 +27,8 @@ NetworkedModule::NetworkedModule(
     pull_socket_(*context_, ZMQ_PULL),
     sender_(broker),
     channel_(channel),
+    poll_timeout_ms_(poll_timeout_ms),
+    recv_batch_(recv_batch),
     request_pool_(request_pool_size),
     response_pool_(response_pool_size) {
   broker->AddChannel(channel);
@@ -64,11 +68,11 @@ void NetworkedModule::SetUp() {
 }
 
 void NetworkedModule::Loop() {
-  if (!zmq::poll(poll_items_, kModulePollTimeoutMs)) {
+  if (!zmq::poll(poll_items_, poll_timeout_ms_)) {
     return;
   }
 
-  for (int i = 0; i < kRecvMessageBatch; i++) { 
+  for (int i = 0; i < recv_batch_; i++) { 
     // Message from pull socket
     if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
       if (google::protobuf::Any any; ParseAny(any, msg)) {

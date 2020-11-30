@@ -28,7 +28,8 @@ class Sequencer : public NetworkedModule {
 public:
   Sequencer(
       const ConfigurationPtr& config,
-      const std::shared_ptr<Broker>& broker);
+      const std::shared_ptr<Broker>& broker,
+      int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;

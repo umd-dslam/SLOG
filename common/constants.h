@@ -6,13 +6,7 @@
 
 namespace slog {
 
-const long kBrokerPollTimeoutMs = 100;
-const long kModulePollTimeoutMs = 100;
-
-const int kRecvMessageBatch = 10000;
-
-const int kServerRcvHwm = 0;
-const int kServerSndHwm = 0;
+const int kModuleTimeoutMs = 1000;
 
 const Channel kServerChannel = 1;
 const Channel kForwarderChannel = 2;

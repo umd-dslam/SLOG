@@ -202,7 +202,7 @@ void Broker::Run() {
   while (running_) {
     // Wait until a message arrived at one of the sockets
     if (zmq::poll(&poll_item, 1, poll_timeout_ms_)) {
-      for (int i = 0; i < kRecvMessageBatch; i++) {
+      for (int i = 0; i < 100; i++) {
         // Socket just received a message
         if (zmq::message_t msg; socket_.recv(msg, zmq::recv_flags::dontwait)) {
           HandleIncomingMessage(move(msg));
