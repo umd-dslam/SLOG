@@ -4,11 +4,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "third_party/rapidjson/allocators.h"
-#include "third_party/rapidjson/document.h"
-#include "third_party/rapidjson/rapidjson.h"
-#include "third_party/rapidjson/stringbuffer.h"
-#include "third_party/rapidjson/writer.h"
+#include "rapidjson/allocators.h"
+#include "rapidjson/document.h"
+#include "rapidjson/rapidjson.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 namespace slog {
 

@@ -8,10 +8,10 @@
 #include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/api.pb.h"
-#include "third_party/rapidjson/document.h"
-#include "third_party/rapidjson/istreamwrapper.h"
-#include "third_party/rapidjson/writer.h"
-#include "third_party/rapidjson/stringbuffer.h"
+#include "rapidjson/document.h"
+#include "rapidjson/istreamwrapper.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");

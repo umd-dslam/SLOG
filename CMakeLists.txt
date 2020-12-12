@@ -93,7 +93,7 @@ endif()
 # necessary for protobuf
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
-
+include_directories(third_party/rapidjson/include)
 
 #========================================
 #               Protobuf
