@@ -140,14 +140,13 @@ else
   mkdir -p $DOWNLOAD_DIR
   cd $DOWNLOAD_DIR
   echo "Downloading glog"
-  wget -nc https://github.com/google/glog/archive/v0.3.4.tar.gz
-  tar -xzf v0.3.4.tar.gz
-  rm -r v0.3.4.tar.gz
+  wget -nc https://github.com/google/glog/archive/v0.4.0.tar.gz
+  tar -xzf v0.4.0.tar.gz
+  rm -r v0.4.0.tar.gz
 
   echo "Installing glog"
-  cd glog-0.3.4
-  ./configure --prefix=$INSTALL_PREFIX
-  make -j$(nproc) install
+  cd glog-0.4.0
+  ./autogen.sh && ./configure --prefix=$INSTALL_PREFIX && make -j$(nproc) install
   cd ..
 
   cd ..

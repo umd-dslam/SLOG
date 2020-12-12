@@ -79,7 +79,7 @@ if (protobuf_VERBOSE)
 endif()
 
 find_package(Glog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
+include_directories(${GLOG_INCLUDE_DIRS})
 
 find_package(gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIRS})
@@ -174,7 +174,7 @@ set(EXTERNAL_LIBS
   ${Protobuf_LIBRARIES}
   ${ZeroMQ_STATIC_LIBRARY}
   ${cppzmq_STATIC_LIBRARY}
-  ${GLOG_STATIC_LIB}
+  ${GLOG_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${READLINE_LIBRARIES})
 message(STATUS "External libs: ${EXTERNAL_LIBS}")
