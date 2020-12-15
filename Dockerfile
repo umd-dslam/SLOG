@@ -1,20 +1,12 @@
-FROM ubuntu:bionic AS builder
+FROM ubuntu:focal AS builder
     ARG CMAKE_OPTIONS
 
+    # Avoid interactive installation
+    ENV DEBIAN_FRONTEND=noninteractive 
     RUN apt-get update
-    RUN apt-get -y install wget
-
-    WORKDIR /tmp
-    RUN wget https://github.com/Kitware/CMake/releases/download/v3.12.4/cmake-3.12.4-Linux-x86_64.sh \
-        -O cmake-install.sh \
-        && chmod u+x cmake-install.sh \
-        && ./cmake-install.sh --skip-license --prefix=/usr \
-        && rm cmake-install.sh
+    RUN apt-get -y install wget build-essential cmake git pkg-config
 
     WORKDIR /src
-
-    COPY install-deps.sh .
-    RUN ./install-deps.sh --docker
 
     COPY . .
     RUN rm -rf build \
@@ -24,7 +16,7 @@ FROM ubuntu:bionic AS builder
         && make -j$(nproc) \
         && cd ..
 
-FROM ubuntu:bionic AS runner
+FROM ubuntu:focal AS runner
     # If set (to anything), also create an image with tools (exclude the toolings)
     ARG INCLUDE_TOOLS
 
