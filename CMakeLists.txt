@@ -1,17 +1,14 @@
-cmake_minimum_required(VERSION 3.12.4)
+cmake_minimum_required(VERSION 3.16.3)
 project(slog)
-
-include(CTest)
 
 #========================================
 #               Options
 #========================================
 
 option(BUILD_CLIENT "Build the client" ON)
+option(BUILD_TESTING "Build the tests" ON)
 set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering")
 option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
-
-# Note: BUILD_TESTING is defined by CTest
 
 message(STATUS "Options:")
 message(STATUS "  BUILD_CLIENT = ${BUILD_CLIENT}")
@@ -19,7 +16,7 @@ message(STATUS "  REMASTER_PROTOCOL = ${REMASTER_PROTOCOL}")
 message(STATUS "  ENABLE_REPLICATION_DELAY = ${ENABLE_REPLICATION_DELAY}")
 
 #========================================
-#               Macros
+#               Definition
 #========================================
 
 set(ENABLE_REMASTER TRUE)
@@ -47,11 +44,12 @@ endif()
 #               Setup
 #========================================
 
+set(CMAKE_CXX_STANDARD 17)
+
 set(DEPENDENCIES_DIR ".deps")
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-set(CMAKE_CXX_STANDARD 17)
 
 if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE RelWithDebInfo)
@@ -84,15 +82,8 @@ include_directories(${GLOG_INCLUDE_DIRS})
 find_package(gflags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIRS})
 
-if (BUILD_CLIENT)
-  find_package(Readline REQUIRED)
-  include_directories(${READLINE_INCLUDE_DIR})
-endif()
-
 # Add root and build directory to include path. The build directory inclusion is
 # necessary for protobuf
-include_directories(${CMAKE_SOURCE_DIR})
-include_directories(${CMAKE_BINARY_DIR})
 include_directories(third_party/rapidjson/include)
 
 #========================================
@@ -125,7 +116,8 @@ protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/offline_data.proto
   ${PROTO_PREFIX}/transaction.proto)
 add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
-target_link_libraries(proto ${Protobuf_LIBRARIES})
+target_include_directories(proto PUBLIC ${CMAKE_BINARY_DIR})
+target_link_libraries(proto PUBLIC ${Protobuf_LIBRARIES})
 
 # Generate python code
 protobuf_generate_python(PROTO_PY_SRCS
@@ -159,25 +151,24 @@ endforeach(FULL_PATH)
 add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 
 #========================================
-#            Subdirectories
+#            Library
 #========================================
 
+add_library(libslog STATIC "")
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(data_structure)
 add_subdirectory(module)
 add_subdirectory(paxos)
-add_subdirectory(workload)
-
-# All libraries to be linked to executables
-set(EXTERNAL_LIBS
-  ${Protobuf_LIBRARIES}
-  ${ZeroMQ_STATIC_LIBRARY}
-  ${cppzmq_STATIC_LIBRARY}
-  ${GLOG_LIBRARIES}
-  ${GFLAGS_LIBRARIES}
-  ${READLINE_LIBRARIES})
-message(STATUS "External libs: ${EXTERNAL_LIBS}")
+target_include_directories(libslog PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(libslog
+  PRIVATE
+    ${GLOG_LIBRARIES}
+  PUBLIC
+    proto
+    ${ZeroMQ_STATIC_LIBRARY}
+    ${cppzmq_STATIC_LIBRARY}
+)
 
 #========================================
 #            Executables
@@ -185,32 +176,18 @@ message(STATUS "External libs: ${EXTERNAL_LIBS}")
 
 # Create an executable for each service
 add_executable(slog service/slog.cpp)
-target_link_libraries(slog 
-  batch_log
-  common
-  connection
-  module
-  offline_data_reader
-  paxos
-  proto
-  ${EXTERNAL_LIBS})
+target_link_libraries(slog PRIVATE libslog ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 
-add_executable(benchmark service/benchmark.cpp)
-target_link_libraries(benchmark 
-  common
-  csv_writer
-  ticker
-  workload
-  ${EXTERNAL_LIBS})
+add_executable(benchmark
+  service/benchmark.cpp
+  workload/basic_workload.cpp
+  workload/remastering_workload.cpp)
+target_link_libraries(benchmark PRIVATE libslog ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 
 if (BUILD_CLIENT)
   add_executable(client service/client.cpp)
-  target_link_libraries(client 
-    common
-    proto
-    ${EXTERNAL_LIBS})
+  target_link_libraries(client PRIVATE libslog ${GFLAGS_LIBRARIES}  ${GLOG_LIBRARIES})
 endif()
-
 
 #========================================
 #                Tests

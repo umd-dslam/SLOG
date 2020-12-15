@@ -26,7 +26,6 @@ ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
     int num_partitions,
-    uint32_t seed = 0,
     internal::Configuration common_config = {});
 
 Transaction* FillMetadata(Transaction* txn, uint32_t master = 0, uint32_t counter = 0);

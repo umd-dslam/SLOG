@@ -1,5 +1,1 @@
-project(connection)
-
-add_library(connection broker.cpp sender.cpp)
-
-target_link_libraries(connection common proto)
+target_sources(libslog PRIVATE broker.cpp sender.cpp)

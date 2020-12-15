@@ -2,7 +2,7 @@
 
 #include "common/transaction_holder.h"
 #include "common/proto_utils.h"
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;

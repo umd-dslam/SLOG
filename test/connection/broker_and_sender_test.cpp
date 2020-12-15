@@ -6,7 +6,7 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/proto_utils.h"
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "connection/zmq_utils.h"

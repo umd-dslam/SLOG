@@ -1,6 +1,6 @@
 #include <gmock/gmock.h>
 
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "common/proto_utils.h"
 
 #include "module/scheduler_components/simple_remaster_manager.h"

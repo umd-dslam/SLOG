@@ -5,7 +5,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "common/proto_utils.h"
 #include "connection/broker.h"
 #include "proto/api.pb.h"
@@ -22,7 +22,7 @@ protected:
 
   void SetUp() {
     configs = MakeTestConfigurations(
-        "e2e", 2 /* num_replicas */, 2 /* num_partitions */, 10 /* seed */);
+        "e2e", 2 /* num_replicas */, 2 /* num_partitions */);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);

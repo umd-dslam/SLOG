@@ -5,7 +5,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "common/proto_utils.h"
 #include "connection/broker.h"
 #include "proto/api.pb.h"

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "common/proto_utils.h"
 #include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
 

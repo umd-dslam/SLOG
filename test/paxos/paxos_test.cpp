@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "common/proto_utils.h"
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "paxos/simple_multi_paxos.h"
 
 using namespace slog;

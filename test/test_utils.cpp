@@ -1,4 +1,4 @@
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 
 #include <random>
 
@@ -40,9 +40,8 @@ ConfigVec MakeTestConfigurations(
     string&& prefix,
     int num_replicas, 
     int num_partitions,
-    uint32_t seed,
     internal::Configuration common_config) {
-  std::mt19937 re(seed);
+  std::mt19937 re;
   std::uniform_int_distribution<> dis(20000, 30000);
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;

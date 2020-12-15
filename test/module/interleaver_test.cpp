@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "common/test_utils.h"
+#include "test/test_utils.h"
 #include "common/proto_utils.h"
 #include "module/interleaver.h"
 
