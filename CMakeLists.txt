@@ -1,94 +1,117 @@
 cmake_minimum_required(VERSION 3.16.3)
 project(slog)
 
+set(CMAKE_CXX_STANDARD 17)
+
+if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 #========================================
 #               Options
 #========================================
 
-option(BUILD_CLIENT "Build the client" ON)
-option(BUILD_TESTING "Build the tests" ON)
+option(BUILD_SLOG_CLIENT "Build the client" ON)
+option(BUILD_SLOG_TESTS "Build the tests" ON)
 set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering")
 option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
 
 message(STATUS "Options:")
-message(STATUS "  BUILD_CLIENT = ${BUILD_CLIENT}")
+message(STATUS "  BUILD_SLOG_CLIENT = ${BUILD_SLOG_CLIENT}")
 message(STATUS "  REMASTER_PROTOCOL = ${REMASTER_PROTOCOL}")
 message(STATUS "  ENABLE_REPLICATION_DELAY = ${ENABLE_REPLICATION_DELAY}")
 
 #========================================
-#               Definition
+#               Dependencies
 #========================================
 
-set(ENABLE_REMASTER TRUE)
-if (REMASTER_PROTOCOL STREQUAL "SIMPLE")
-  add_compile_definitions(REMASTER_PROTOCOL_SIMPLE)
-elseif (REMASTER_PROTOCOL STREQUAL "PER_KEY")
-  add_compile_definitions(REMASTER_PROTOCOL_PER_KEY)
-elseif (REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
-  add_compile_definitions(REMASTER_PROTOCOL_COUNTERLESS)
-elseif (REMASTER_PROTOCOL STREQUAL "NONE")
-  set(ENABLE_REMASTER FALSE)
-else()
-  message(FATAL_ERROR "Invalid REMASTER_PROTOCOL. It must be one of: \"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", or \"NONE\"")
+include(FetchContent)
+
+FetchContent_Declare(libzmq
+  GIT_REPOSITORY  https://github.com/zeromq/libzmq.git
+  GIT_TAG         v4.3.3
+)
+FetchContent_GetProperties(libzmq)
+if(NOT libzmq_POPULATED)
+  message("Populating: ZeroMQ")
+  FetchContent_Populate(libzmq)
+  set(ZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for ZeroMQ" FORCE)
+  add_subdirectory(${libzmq_SOURCE_DIR} ${libzmq_BINARY_DIR})
 endif()
 
-if (ENABLE_REMASTER)
-  add_compile_definitions(ENABLE_REMASTER)
+FetchContent_Declare(cppzmq
+  GIT_REPOSITORY  https://github.com/zeromq/cppzmq.git
+  GIT_TAG         v4.7.1
+)
+FetchContent_GetProperties(cppzmq)
+if(NOT cppzmq_POPULATED)
+  message("Populating: cppzmq")
+  FetchContent_Populate(cppzmq)
+  set(CPPZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for cppzmq" FORCE)
+  add_subdirectory(${cppzmq_SOURCE_DIR} ${cppzmq_BINARY_DIR})
 endif()
 
-if (ENABLE_REPLICATION_DELAY)
-  add_compile_definitions(ENABLE_REPLICATION_DELAY)
+FetchContent_Declare(gflags
+  GIT_REPOSITORY  https://github.com/gflags/gflags.git
+  GIT_TAG         v2.2.2
+)
+FetchContent_GetProperties(gflags)
+if(NOT gflags_POPULATED)
+  message("Populating: gflags")
+  FetchContent_Populate(gflags)
+  set(GFLAGS_BUILD_TESTING OFF CACHE INTERNAL "Build tests")
+  # Needed to work with glog
+  set(GFLAGS_NAMESPACE "google" CACHE INTERNAL "Set namespace for gflags")
+  add_subdirectory(${gflags_SOURCE_DIR} ${gflags_BINARY_DIR})
 endif()
 
-#========================================
-#               Setup
-#========================================
-
-set(CMAKE_CXX_STANDARD 17)
-
-set(DEPENDENCIES_DIR ".deps")
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/${DEPENDENCIES_DIR})
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-
-
-if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-   set(CMAKE_BUILD_TYPE RelWithDebInfo)
+FetchContent_Declare(glog
+  GIT_REPOSITORY  https://github.com/google/glog.git
+  GIT_TAG         v0.4.0
+)
+FetchContent_GetProperties(glog)
+if(NOT glog_POPULATED)
+  message("Populating: glog")
+  FetchContent_Populate(glog)
+  set(WITH_GFLAGS FALSE CACHE INTERNAL "Build glog with gflags")
+  set(BUILD_TESTING FALSE CACHE INTERNAL "Build tests")
+  add_subdirectory(${glog_SOURCE_DIR} ${glog_BINARY_DIR})
 endif()
 
-set(CMAKE_CXX_FLAGS "-W -Wextra -Wall")
-set(CMAKE_CXX_FLAGS_ASAN "-g -fno-omit-frame-pointer -fsanitize=address")
-set(CMAKE_CXX_FLAGS_UBSAN "-g -fno-omit-frame-pointer -fsanitize=undefined")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -fno-omit-frame-pointer")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -fno-omit-frame-pointer")
-
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
-find_package(ZeroMQ REQUIRED)
-include_directories(${ZeroMQ_INCLUDE_DIR})
-find_package(cppzmq REQUIRED)
-include_directories(${cppzmq_INCLUDE_DIR})
-
-SET(Protobuf_USE_STATIC_LIBS ON)
-find_package(Protobuf REQUIRED)
-include_directories(${Protobuf_INCLUDE_DIRS})
-if (protobuf_VERBOSE)
-  message(STATUS "Using Protocol Buffers ${Protobuf_VERSION}")
+FetchContent_Declare(rapidjson
+  GIT_REPOSITORY  https://github.com/Tencent/rapidjson
+  GIT_TAG         v1.1.0
+  GIT_SHALLOW     TRUE
+)
+FetchContent_GetProperties(rapidjson)
+if (NOT rapidjson_POPULATED)
+  message("Populating: rapidjson")
+  FetchContent_Populate(rapidjson)
+  add_library(rapidjson INTERFACE)
+  target_include_directories(rapidjson INTERFACE "${rapidjson_SOURCE_DIR}/include")
 endif()
 
-find_package(Glog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIRS})
-
-find_package(gflags REQUIRED)
-include_directories(${GFLAGS_INCLUDE_DIRS})
-
-# Add root and build directory to include path. The build directory inclusion is
-# necessary for protobuf
-include_directories(third_party/rapidjson/include)
+FetchContent_Declare(protobuf
+  GIT_REPOSITORY  https://github.com/protocolbuffers/protobuf.git
+  GIT_TAG         v3.14.0
+)
+FetchContent_GetProperties(protobuf)
+if (NOT protobuf_POPULATED)
+  message("Populating: protobuf")
+  FetchContent_Populate(protobuf)
+  set(protobuf_BUILD_TESTS OFF CACHE INTERNAL "Build protobuf tests" FORCE)
+  add_subdirectory(${protobuf_SOURCE_DIR}/cmake ${protobuf_BINARY_DIR})
+endif()
 
 #========================================
 #               Protobuf
 #========================================
+
+# Call this so that we can use protobuf_generate_cpp and protobuf_generate_python
+# Other results are discarded
+find_package(Protobuf QUIET)
 
 # Generating code from protobuf files is done here because we want
 # to do absolute import in .proto files, consistent with the rest of
@@ -117,7 +140,7 @@ protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/transaction.proto)
 add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
 target_include_directories(proto PUBLIC ${CMAKE_BINARY_DIR})
-target_link_libraries(proto PUBLIC ${Protobuf_LIBRARIES})
+target_link_libraries(proto PUBLIC protobuf::libprotobuf)
 
 # Generate python code
 protobuf_generate_python(PROTO_PY_SRCS
@@ -151,24 +174,54 @@ endforeach(FULL_PATH)
 add_custom_target(proto_py ALL DEPENDS ${PROTO_PY_DEST_SRCS})
 
 #========================================
+#            Build flags
+#========================================
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_DEBUG  "-g -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_ASAN "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address")
+set(CMAKE_CXX_FLAGS_UBSAN "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
+
+#========================================
 #            Library
 #========================================
 
-add_library(libslog STATIC "")
+add_library(slog_core STATIC "")
 add_subdirectory(common)
 add_subdirectory(connection)
 add_subdirectory(data_structure)
 add_subdirectory(module)
 add_subdirectory(paxos)
-target_include_directories(libslog PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(libslog
-  PRIVATE
-    ${GLOG_LIBRARIES}
+target_include_directories(slog_core PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(slog_core
   PUBLIC
     proto
-    ${ZeroMQ_STATIC_LIBRARY}
-    ${cppzmq_STATIC_LIBRARY}
-)
+    glog::glog
+    cppzmq
+    rapidjson)
+
+set(ENABLE_REMASTER TRUE)
+if (REMASTER_PROTOCOL STREQUAL "SIMPLE")
+  target_compile_definitions(slog_core REMASTER_PROTOCOL_SIMPLE)
+elseif (REMASTER_PROTOCOL STREQUAL "PER_KEY")
+  target_compile_definitions(slog_core REMASTER_PROTOCOL_PER_KEY)
+elseif (REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
+  target_compile_definitions(slog_core REMASTER_PROTOCOL_COUNTERLESS)
+elseif (REMASTER_PROTOCOL STREQUAL "NONE")
+  set(ENABLE_REMASTER FALSE)
+else()
+  message(FATAL_ERROR "Invalid REMASTER_PROTOCOL. It must be one of: \"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", or \"NONE\"")
+endif()
+
+if (ENABLE_REMASTER)
+  target_compile_definitions(slog_core ENABLE_REMASTER)
+endif()
+
+if (ENABLE_REPLICATION_DELAY)
+  target_compile_definitions(ENABLE_REPLICATION_DELAY)
+endif()
 
 #========================================
 #            Executables
@@ -176,33 +229,34 @@ target_link_libraries(libslog
 
 # Create an executable for each service
 add_executable(slog service/slog.cpp)
-target_link_libraries(slog PRIVATE libslog ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
+target_link_libraries(slog PRIVATE slog_core gflags::gflags)
 
 add_executable(benchmark
   service/benchmark.cpp
   workload/basic_workload.cpp
   workload/remastering_workload.cpp)
-target_link_libraries(benchmark PRIVATE libslog ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
+target_link_libraries(benchmark
+  PRIVATE
+    slog_core
+    gflags::gflags
+)
 
-if (BUILD_CLIENT)
+if (BUILD_SLOG_CLIENT)
   add_executable(client service/client.cpp)
-  target_link_libraries(client PRIVATE libslog ${GFLAGS_LIBRARIES}  ${GLOG_LIBRARIES})
+  target_link_libraries(client
+    PRIVATE
+      slog_core
+      gflags::gflags
+  )
 endif()
 
 #========================================
 #                Tests
 #========================================
 
-if (BUILD_TESTING)
-  find_package(GTest)
-  if (GTEST_FOUND)
-    message(STATUS "GTest found. Tests will be built")
-    include_directories(${GTEST_INCLUDE_DIRS})
-    enable_testing()
-    add_subdirectory(test)
-  else()
-    message(STATUS "GTest not found. No test will be built")
-  endif()
+if (BUILD_SLOG_TESTS)
+  enable_testing()
+  add_subdirectory(test)
 else()
-  message(STATUS "BUILD_TESTING is off. No test will be built")
+  message(STATUS "BUILD_SLOG_TESTS is off. No test will be built")
 endif()

@@ -20,7 +20,7 @@ FROM ubuntu:bionic AS builder
     RUN rm -rf build \
         && mkdir build \
         && cd build \
-        && cmake .. -DCMAKE_BUILD_TYPE=release -DBUILD_TESTING=OFF ${CMAKE_OPTIONS}\
+        && cmake .. -DCMAKE_BUILD_TYPE=release -DBUILD_SLOG_TESTS=OFF ${CMAKE_OPTIONS}\
         && make -j$(nproc) \
         && cd ..
 

@@ -1,15 +1,27 @@
 include(GoogleTest)
 
+FetchContent_Declare(googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        release-1.10.0
+)
+FetchContent_GetProperties(googletest)
+if(NOT googletest_POPULATED)
+  message("Populating: googletest")
+  FetchContent_Populate(googletest)
+  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+endif()
+
 add_library(test_utils test_utils.cpp)
-target_link_libraries(test_utils PUBLIC libslog)
+target_link_libraries(test_utils PUBLIC slog_core)
 
 macro(add_slog_test TESTFILE)
   get_filename_component(TESTNAME ${TESTFILE} NAME_WE)
   add_executable(${TESTNAME} ${TESTFILE})
   target_link_libraries(${TESTNAME} 
     PRIVATE
-      GTest::GTest
-      GTest::Main
+      gmock
+      gtest
+      gtest_main
       test_utils)
   gtest_discover_tests(${TESTNAME}
     PROPERTIES RUN_SERIAL TRUE)

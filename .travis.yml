@@ -13,17 +13,9 @@ env:
     - REMASTER_PROTOCOL=PER_KEY
     - REMASTER_PROTOCOL=COUNTERLESS
 
-cache:
-  directories:
-    - .deps
-
-install:
-  - cd $TRAVIS_BUILD_DIR
-  - ./install-deps.sh
-
 script:
   - mkdir -p build
   - cd build
-  - cmake -DENABLE_REPLICATION_DELAY=${ENABLE_REPLICATION_DELAY} -DREMASTER_PROTOCOL=${REMASTER_PROTOCOL} -DBUILD_CLIENT=OFF -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release ..
+  - cmake -DENABLE_REPLICATION_DELAY=${ENABLE_REPLICATION_DELAY} -DREMASTER_PROTOCOL=${REMASTER_PROTOCOL} -DBUILD_SLOG_CLIENT=OFF -DBUILD_SLOG_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
   - make -j$(nproc)
   - ctest --output-on-failure

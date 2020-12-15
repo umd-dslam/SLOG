@@ -1,0 +1,84 @@
+{
+  "buildType": {
+    "default": "debug",
+    "choices": {
+      "asan": {
+        "short": "Asan",
+        "long": "Address sanitizer",
+        "buildType": "Asan"
+      },
+      "ubsan": {
+        "short": "Ubsan",
+        "long": "Undefined behaviour sanitizer",
+        "buildType": "Ubsan"
+      },
+      "debug": {
+        "short": "Debug",
+        "long": "Emit debug information",
+        "buildType": "Debug"
+      },
+      "relwithdebinfo": {
+        "short": "RelWithDebInfo",
+        "long": "Optimize generated code with debug info",
+        "buildType": "RelWithDebInfo"
+      },
+      "release": {
+        "short": "Release",
+        "long": "Optimize generated code",
+        "buildType": "Release"
+      }
+    }
+  },
+  "remasterProtocol": {
+    "default": "none",
+    "choices": {
+      "none": {
+        "short": "None",
+        "long": "No remaster protocol",
+        "settings": {
+          "REMASTER_PROTOCOL": "NONE"
+        }
+      },
+      "simple": {
+        "short": "Simple",
+        "long": "Simple remaster protocol",
+        "settings": {
+          "REMASTER_PROTOCOL": "SIMPLE"
+        }
+      },
+      "perkey": {
+        "short": "PerKey",
+        "long": "Per-key remaster protocol",
+        "settings": {
+          "REMASTER_PROTOCOL": "PER_KEY"
+        }
+      },
+      "counterless": {
+        "short": "Counterless",
+        "long": "Counterless remaster protocol",
+        "settings": {
+          "REMASTER_PROTOCOL": "COUNTERLESS"
+        }
+      }
+    }
+  },
+  "replicationDelay": {
+    "default": "no",
+    "choices": {
+      "yes": {
+        "short": "Replication delay",
+        "long": "Enable replication delay",
+        "settings": {
+          "ENABLE_REPLICATION_DELAY": "YES"
+        }
+      },
+      "no": {
+        "short": "No replication delay",
+        "long": "Disable replication delay",
+        "settings": {
+          "ENABLE_REPLICATION_DELAY": "NO"
+        }
+      }
+    }
+  }
+}

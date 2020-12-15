@@ -15,11 +15,8 @@ The following guide has been tested on Ubuntu 20.04 with GCC 9.3.0 and CMake 3.1
 
 ## Build SLOG
 
-- From the project root directory, run the `install_deps.sh` script to install dependencies to the `.deps` directory.
-```
-$ ./install_deps.sh
-```
-- Run the following commands to build the system.
+Run the following commands to build the system. The dependencies will be downloaded and built automatically.
+
 ```
 $ mkdir build
 $ cd build

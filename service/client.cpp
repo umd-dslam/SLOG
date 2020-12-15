@@ -4,10 +4,10 @@
 #include <iomanip>
 
 #include "common/constants.h"
-#include "common/service_utils.h"
 #include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/api.pb.h"
+#include "service/service_utils.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/writer.h"

@@ -1,4 +1,4 @@
-target_sources(libslog
+target_sources(slog_core
   PRIVATE
     base/networked_module.cpp
     base/module.cpp

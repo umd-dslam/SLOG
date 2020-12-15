@@ -1,1 +1,1 @@
-target_sources(libslog PRIVATE batch_log.cpp)
+target_sources(slog_core PRIVATE batch_log.cpp)

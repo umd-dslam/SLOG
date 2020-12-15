@@ -5,7 +5,6 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/offline_data_reader.h"
-#include "common/service_utils.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/consensus.h"
@@ -18,6 +17,7 @@
 #include "module/ticker.h"
 #include "proto/internal.pb.h"
 #include "proto/offline_data.pb.h"
+#include "service/service_utils.h"
 #include "storage/mem_only_storage.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");

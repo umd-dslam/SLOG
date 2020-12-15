@@ -6,11 +6,11 @@
 #include "common/configuration.h"
 #include "common/csv_writer.h"
 #include "common/proto_utils.h"
-#include "common/service_utils.h"
 #include "common/types.h"
 #include "connection/zmq_utils.h"
 #include "module/ticker.h"
 #include "proto/api.pb.h"
+#include "service/service_utils.h"
 #include "workload/basic_workload.h"
 #include "workload/remastering_workload.h"
 

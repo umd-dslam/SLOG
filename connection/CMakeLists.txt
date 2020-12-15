@@ -1,1 +1,1 @@
-target_sources(libslog PRIVATE broker.cpp sender.cpp)
+target_sources(slog_core PRIVATE broker.cpp sender.cpp)
