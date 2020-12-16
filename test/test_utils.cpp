@@ -41,7 +41,8 @@ ConfigVec MakeTestConfigurations(
     int num_replicas, 
     int num_partitions,
     internal::Configuration common_config) {
-  std::mt19937 re;
+  std::random_device rd;
+  std::mt19937 re(rd());
   std::uniform_int_distribution<> dis(20000, 30000);
   int num_machines = num_replicas * num_partitions;
   string addr = "/tmp/test_" + prefix;
