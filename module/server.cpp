@@ -88,7 +88,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
         // Return abort to client
         txn->set_status(TransactionStatus::ABORTED);
 
-        auto r = AcquireRequest();
+        auto r = NewRequest();
         auto completed_subtxn = r.get()->mutable_completed_subtxn();
         completed_subtxn->set_allocated_txn(txn);
         // Txn only exists in single, local partition
@@ -227,7 +227,7 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
   stats.Accept(writer);
 
-  auto res = AcquireResponse();
+  auto res = NewResponse();
   res.get()->mutable_stats()->set_id(stats_request.id());
   res.get()->mutable_stats()->set_stats_json(buf.GetString());
   HandleInternalResponse(move(res), 0);

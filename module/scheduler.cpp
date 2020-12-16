@@ -551,7 +551,7 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
       TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
-  auto req = AcquireRequest();
+  auto req = NewRequest();
   auto worker_request = req.get()->mutable_worker();
   worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
   Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();

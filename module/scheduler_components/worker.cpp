@@ -351,7 +351,7 @@ void Worker::Finish(TxnId txn_id) {
   SendToCoordinatingServer(txn_id);
 
   // Notify the scheduler that we're done
-  auto res = AcquireResponse();
+  auto res = NewResponse();
   res.get()->mutable_worker()->set_txn_id(txn_id);
   Send(*res.get(), kSchedulerChannel);
 
@@ -398,7 +398,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   auto aborted = txn->status() == TransactionStatus::ABORTED;
 
   // Send abort result and local reads to all remote active partitions
-  auto request = AcquireRequest();
+  auto request = NewRequest();
   auto rrr = request.get()->mutable_remote_read_result();
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
@@ -424,7 +424,7 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto txn = txn_holder->transaction();
 
   // Send the txn back to the coordinating server
-  auto req = AcquireRequest();
+  auto req = NewRequest();
   auto completed_sub_txn = req.get()->mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());

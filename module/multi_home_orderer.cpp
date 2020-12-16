@@ -77,12 +77,12 @@ void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
           << ". Sending out for ordering and replicating";
   
   // Make a proposal for multi-home batch ordering
-  auto paxos_req = AcquireRequest();
+  auto paxos_req = NewRequest();
   auto paxos_propose = paxos_req.get()->mutable_paxos_propose();
   paxos_propose->set_value(batch_id);
   Send(*paxos_req.get(), kGlobalPaxos);
 
-  auto batch_req = AcquireRequest();
+  auto batch_req = NewRequest();
   auto forward_batch = batch_req.get()->mutable_forward_batch();
   forward_batch->set_allocated_batch_data(batch_.release());
 
@@ -128,7 +128,7 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
     // easier to determine the batch order later on
     batch->set_id(slot);
 
-    auto req = AcquireRequest();
+    auto req = NewRequest();
     auto forward_batch = req.get()->mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());
 

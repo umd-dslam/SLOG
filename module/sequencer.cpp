@@ -87,12 +87,12 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   VLOG(3) << "Finished batch " << batch_id << " of size " << batch_->transactions().size()
           << ". Sending out for ordering and replicating";
 
-  auto paxos_req = AcquireRequest();
+  auto paxos_req = NewRequest();
   auto paxos_propose = paxos_req.get()->mutable_paxos_propose();
   paxos_propose->set_value(config_->local_partition());
   Send(*paxos_req.get(), kLocalPaxos);
 
-  auto batch_req = AcquireRequest();
+  auto batch_req = NewRequest();
   auto forward_batch = batch_req.get()->mutable_forward_batch();
   // minus 1 so that batch id counter starts from 0
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
@@ -108,6 +108,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 #ifdef ENABLE_REPLICATION_DELAY
   // Maybe delay current batch
   if ((uint32_t)(rand() % 100) < config_->replication_delay_percent()) {
+    VLOG(4) << "Delay batch " << batch_->id();
     // Completely release the batch because its lifetime is now tied with the
     // delayed request
     batch_.release();
@@ -115,7 +116,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
     NewBatch();
     return;
   } // Otherwise send it normally
-#endif /* GetReplicationDelayEnabled */
+#endif /* ENABLE_REPLICATION_DELAY */
 
   // Replicate batch to all machines
   auto num_partitions = config_->num_partitions();
@@ -219,8 +220,6 @@ BatchId Sequencer::NextBatchId() {
 
 #ifdef ENABLE_REPLICATION_DELAY
 void Sequencer::DelaySingleHomeBatch(ReusableRequest&& request) {
-  delayed_batches_.emplace_back(request);
-
   // Send the batch to interleavers in the local replica only
   auto local_rep = config_->local_replica();
   auto num_partitions = config_->num_partitions();
@@ -231,6 +230,7 @@ void Sequencer::DelaySingleHomeBatch(ReusableRequest&& request) {
         kInterleaverChannel,
         machine_id);
   }
+  delayed_batches_.emplace_back(std::move(request));
 }
 
 void Sequencer::MaybeSendDelayedBatches() {

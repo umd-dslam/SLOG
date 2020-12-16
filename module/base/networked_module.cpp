@@ -78,11 +78,11 @@ void NetworkedModule::Loop() {
       if (google::protobuf::Any any; ParseAny(any, msg)) {
         if (MachineId from; ParseMachineId(from, msg)) {
           if (any.Is<Request>()) {
-            auto req = AcquireRequest();
+            auto req = NewRequest();
             any.UnpackTo(req.get());
             HandleInternalRequest(move(req), from);
           } else if (any.Is<Response>()) {
-            auto res = AcquireResponse();
+            auto res = NewResponse();
             any.UnpackTo(res.get());
             HandleInternalResponse(move(res), from);
           }

@@ -54,7 +54,7 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   auto local_partition = config_->local_partition();
 
   // Prepare a lookup master request just in case
-  auto lookup_master_request = AcquireRequest();
+  auto lookup_master_request = NewRequest();
   auto lookup_master = lookup_master_request.get()->mutable_lookup_master();
 
   // This function will be called on the read and write set of the current txn

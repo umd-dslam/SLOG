@@ -135,7 +135,7 @@ public:
     internal::Configuration extra_config;
     extra_config.mutable_replication_delay()->set_batch_delay_percent(delay_percent);
     extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
-    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, 0, extra_config);
+    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(kInterleaverChannel);

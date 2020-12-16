@@ -207,7 +207,7 @@ void Interleaver::EmitBatch(BatchPtr&& batch) {
         txn->mutable_internal(),
         TransactionEvent::EXIT_INTERLEAVER);
 
-    auto request = AcquireRequest();
+    auto request = NewRequest();
     auto forward_txn = request.get()->mutable_forward_txn();
     forward_txn->set_allocated_txn(txn);
     Send(*request.get(), kSchedulerChannel);

@@ -47,13 +47,13 @@ protected:
 
   zmq::socket_t& GetCustomSocket(size_t i);
 
-  ReusableRequest AcquireRequest() { 
+  ReusableRequest NewRequest() { 
     ReusableMessage msg{&request_pool_};
     msg.get()->Clear();
     return msg;
   }
   
-  ReusableResponse AcquireResponse() {
+  ReusableResponse NewResponse() {
     ReusableMessage msg{&response_pool_};
     msg.get()->Clear();
     return msg;

@@ -204,11 +204,11 @@ target_link_libraries(slog_core
 
 set(ENABLE_REMASTER TRUE)
 if (REMASTER_PROTOCOL STREQUAL "SIMPLE")
-  target_compile_definitions(slog_core PRIVATE REMASTER_PROTOCOL_SIMPLE)
+  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_SIMPLE)
 elseif (REMASTER_PROTOCOL STREQUAL "PER_KEY")
-  target_compile_definitions(slog_core PRIVATE REMASTER_PROTOCOL_PER_KEY)
+  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_PER_KEY)
 elseif (REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
-  target_compile_definitions(slog_core PRIVATE REMASTER_PROTOCOL_COUNTERLESS)
+  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_COUNTERLESS)
 elseif (REMASTER_PROTOCOL STREQUAL "NONE")
   set(ENABLE_REMASTER FALSE)
 else()
@@ -216,11 +216,11 @@ else()
 endif()
 
 if (ENABLE_REMASTER)
-  target_compile_definitions(slog_core PRIVATE ENABLE_REMASTER)
+  target_compile_definitions(slog_core PUBLIC ENABLE_REMASTER)
 endif()
 
 if (ENABLE_REPLICATION_DELAY)
-  target_compile_definitions(slog_core PRIVATE ENABLE_REPLICATION_DELAY)
+  target_compile_definitions(slog_core PUBLIC ENABLE_REPLICATION_DELAY)
 endif()
 
 #========================================
