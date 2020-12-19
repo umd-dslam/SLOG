@@ -65,7 +65,14 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
       const auto& key = pair.first;
-      auto partition = config_->partition_of_key(key);
+      uint32_t partition = 0;
+      
+      try {
+        partition = config_->partition_of_key(key);
+      } catch (std::invalid_argument& e) {
+        LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
+        return;
+      }
 
       // Add the partition of this key to the partition list of current txn if not exist
       if (std::find(partitions->begin(), partitions->end(), partition) == partitions->end()) {
