@@ -68,7 +68,7 @@ public:
       long poll_timeout_ms = kModuleTimeoutMs);
   ~Broker();
 
-  void StartInNewThread();
+  void StartInNewThread(int cpu = -1);
 
   void AddChannel(Channel chan);
 

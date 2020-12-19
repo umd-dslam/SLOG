@@ -1,6 +1,7 @@
 #include "module/base/module.h"
 
 #include "common/constants.h"
+#include "common/cpu.h"
 
 #include <glog/logging.h>
 
@@ -19,19 +20,21 @@ ModuleRunner::~ModuleRunner() {
   thread_.join();
 }
 
-void ModuleRunner::StartInNewThread() {
+void ModuleRunner::StartInNewThread(int cpu) {
   if (running_) {
     throw std::runtime_error("The module has already started");
   }
   running_ = true;
   thread_ = std::thread(&ModuleRunner::Run, this);
+  PinToCpu(thread_.native_handle(), cpu);
 }
 
-void ModuleRunner::Start() {
+void ModuleRunner::Start(int cpu) {
   if (running_) {
     throw std::runtime_error("The module has already started");
   }
   running_ = true;
+  PinToCpu(pthread_self(), cpu);
   Run();
 }
 

@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 
 #include "common/proto_utils.h"
+#include "common/cpu.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
@@ -40,12 +41,13 @@ Broker::~Broker() {
   thread_.join();
 }
 
-void Broker::StartInNewThread() {
+void Broker::StartInNewThread(int cpu) {
   if (running_) {
     return;
   }
   running_ = true;
   thread_ = std::thread(&Broker::Run, this);
+  PinToCpu(pthread_self(), cpu);
 }
 
 void Broker::AddChannel(Channel chan) {

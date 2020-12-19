@@ -64,8 +64,7 @@ private:
 /**
  * A deterministic lock manager grants locks for transactions in
  * the order that they request. If transaction X, appears before
- * transaction Y in the log, thus requesting lock before transaction Y,
- * then X always gets all locks before Y.
+ * transaction Y in the log, X always gets all locks before Y.
  * 
  * Remastering:
  * Locks are taken on the tuple <key, replica>, using the transaction's

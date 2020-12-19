@@ -44,8 +44,8 @@ public:
   ModuleRunner(const std::shared_ptr<Module>& module);
   ~ModuleRunner();
 
-  void Start();
-  void StartInNewThread();
+  void Start(int cpu = -1);
+  void StartInNewThread(int cpu = -1);
 
 private:
   void Run();
