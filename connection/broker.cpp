@@ -38,6 +38,7 @@ Broker::Broker(
 
 Broker::~Broker() {
   running_ = false;
+  LOG(INFO) << "Stopping Broker";
   thread_.join();
 }
 
@@ -48,6 +49,10 @@ void Broker::StartInNewThread(int cpu) {
   running_ = true;
   thread_ = std::thread(&Broker::Run, this);
   PinToCpu(pthread_self(), cpu);
+}
+
+void Broker::Stop() {
+  running_ = false;
 }
 
 void Broker::AddChannel(Channel chan) {

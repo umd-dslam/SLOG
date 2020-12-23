@@ -16,7 +16,7 @@ ModuleRunner::ModuleRunner(const shared_ptr<Module>& module)
 
 ModuleRunner::~ModuleRunner() {
   running_ = false;
-  LOG(INFO) << module_->name() << " exitting...";
+  LOG(INFO) << "Stopping " << module_->name();
   thread_.join();
 }
 
@@ -43,6 +43,10 @@ void ModuleRunner::Run() {
   while (running_) {
     module_->Loop();
   }
+}
+
+void ModuleRunner::Stop() {
+  running_ = false;
 }
 
 } // namespace slog

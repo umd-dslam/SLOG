@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 #include <fcntl.h>
+#include <csignal>
 
 #include "common/configuration.h"
 #include "common/constants.h"
@@ -117,7 +118,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
 
 int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
-  
+
   auto zmq_version = zmq::version();
   LOG(INFO) << "ZMQ version "
             << std::get<0>(zmq_version) << "."
@@ -195,6 +196,12 @@ int main(int argc, char* argv[]) {
         MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
   }
 
+  // Block SIGINT from here so that the new threads inherit the block mask
+  sigset_t signal_set;
+  sigemptyset(&signal_set);
+  sigaddset(&signal_set, SIGINT);
+  pthread_sigmask(SIG_BLOCK, &signal_set, nullptr);
+
   // New modules cannot be bound to the broker after it starts so start 
   // the Broker only after it is used to initialized all modules.
   broker->StartInNewThread();
@@ -206,7 +213,18 @@ int main(int argc, char* argv[]) {
 
   // Run the server in the current main thread so that the whole process
   // does not immediately terminate after this line.
-  server->Start();
+  server->StartInNewThread();
+
+  // Suspense this thread until receiving SIGINT
+  int sig;
+  sigwait(&signal_set, &sig);
+
+  // Shutdown all threads
+  server->Stop();
+  for (auto& module : modules) {
+    module->Stop();
+  }
+  broker->Stop();
 
   return 0;
 }

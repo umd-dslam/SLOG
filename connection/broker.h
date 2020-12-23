@@ -70,6 +70,8 @@ public:
 
   void StartInNewThread(int cpu = -1);
 
+  void Stop();
+
   void AddChannel(Channel chan);
 
   const std::shared_ptr<zmq::context_t>& context() const;

@@ -47,6 +47,8 @@ public:
   void Start(int cpu = -1);
   void StartInNewThread(int cpu = -1);
 
+  void Stop();
+
 private:
   void Run();
 
