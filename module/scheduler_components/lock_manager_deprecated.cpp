@@ -1,4 +1,4 @@
-#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/lock_manager_deprecated.h"
 
 #include <glog/logging.h>
 
@@ -104,7 +104,7 @@ unordered_set<TxnId> LockStateDeprecated::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool DeterministicLockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool LockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     return false;
   }
@@ -118,7 +118,7 @@ bool DeterministicLockManagerDeprecated::AcceptTransaction(const TransactionHold
   return false;
 }
 
-bool DeterministicLockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
+bool LockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     return false;
   }
@@ -161,13 +161,13 @@ bool DeterministicLockManagerDeprecated::AcquireLocks(const TransactionHolder& t
   return false;
 }
 
-bool DeterministicLockManagerDeprecated::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+bool LockManagerDeprecated::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
 unordered_set<TxnId>
-DeterministicLockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
+LockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> ready_txns;
   auto txn_id = txn_holder.transaction()->internal().id();
 
@@ -199,7 +199,7 @@ DeterministicLockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_ho
   return ready_txns;
 }
 
-void DeterministicLockManagerDeprecated::GetStats(rapidjson::Document& stats, uint32_t level) const {
+void LockManagerDeprecated::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();

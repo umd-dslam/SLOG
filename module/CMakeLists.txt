@@ -10,8 +10,8 @@ target_sources(slog_core
     sequencer.cpp
     scheduler.cpp
     scheduler_components/commands.cpp
-    scheduler_components/deterministic_lock_manager.cpp
-    scheduler_components/deterministic_lock_manager_deprecated.cpp
+    scheduler_components/lock_manager.cpp
+    scheduler_components/lock_manager_deprecated.cpp
     scheduler_components/per_key_remaster_manager.cpp
     scheduler_components/simple_remaster_manager.cpp
     scheduler_components/worker.cpp

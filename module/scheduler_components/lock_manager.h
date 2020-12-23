@@ -1,10 +1,10 @@
 #pragma once
 
 // Prevent mixing with deprecated version
-#ifdef DETERMINISTIC_LOCK_MANAGER
+#ifdef LOCK_MANAGER
   #error "Only one lock manager can be included"
 #endif
-#define DETERMINISTIC_LOCK_MANAGER
+#define LOCK_MANAGER
 
 #include <list>
 #include <unordered_map>
@@ -75,7 +75,7 @@ private:
  * 
  * TODO: aborts can be detected here, before transactions are dispatched
  */
-class DeterministicLockManager {
+class LockManager {
 public:
   /**
    * Counts the number of locks a txn needs.

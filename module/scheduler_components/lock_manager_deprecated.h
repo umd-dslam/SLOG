@@ -1,9 +1,9 @@
 #pragma once
 
-#ifdef DETERMINISTIC_LOCK_MANAGER
+#ifdef LOCK_MANAGER
   #error "Only one lock manager can be included"
 #endif
-#define DETERMINISTIC_LOCK_MANAGER
+#define LOCK_MANAGER
 
 #include <list>
 #include <unordered_map>
@@ -63,10 +63,9 @@ private:
 /**
  * A deterministic lock manager grants locks for transactions in
  * the order that they request. If transaction X, appears before
- * transaction Y in the log, thus requesting lock before transaction Y,
- * then X always gets all locks before Y.
+ * transaction Y in the log then X always gets all locks before Y.
  */
-class DeterministicLockManagerDeprecated {
+class LockManagerDeprecated {
 public:
   /**
    * Counts the number of locks a txn needs.

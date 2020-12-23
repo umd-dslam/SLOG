@@ -21,7 +21,7 @@ Server::Server(
     txn_id_counter_(0) {}
 
 /***********************************************
-                SetUp and Loop
+                Custom socket
 ***********************************************/
 
 std::vector<zmq::socket_t> Server::InitializeCustomSockets() {

@@ -14,13 +14,13 @@
 #include "storage/storage.h"
 
 #if defined(REMASTER_PROTOCOL_SIMPLE)
-#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/lock_manager_deprecated.h"
 #include "module/scheduler_components/simple_remaster_manager.h"
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
-#include "module/scheduler_components/deterministic_lock_manager_deprecated.h"
+#include "module/scheduler_components/lock_manager_deprecated.h"
 #include "module/scheduler_components/per_key_remaster_manager.h"
 #else
-#include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/lock_manager.h"
 #endif
 
 namespace slog {
@@ -100,13 +100,13 @@ private:
   ConfigurationPtr config_;
   
 #if defined(REMASTER_PROTOCOL_SIMPLE)
-  DeterministicLockManagerDeprecated lock_manager_;
+  LockManagerDeprecated lock_manager_;
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
-  DeterministicLockManagerDeprecated lock_manager_;
+  LockManagerDeprecated lock_manager_;
   PerKeyRemasterManager remaster_manager_;
 #else
-  DeterministicLockManager lock_manager_;
+  LockManager lock_manager_;
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;

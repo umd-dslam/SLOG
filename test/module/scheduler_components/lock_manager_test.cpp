@@ -2,14 +2,14 @@
 
 #include "test/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/lock_manager.h"
 
 using namespace std;
 using namespace slog;
 
-class DeterministicLockManagerTest : public ::testing::Test {
+class LockManagerTest : public ::testing::Test {
 protected:
-  DeterministicLockManager lock_manager;
+  LockManager lock_manager;
   MessagePool<internal::Request> pool;
 
   TransactionHolder MakeHolder(const ConfigurationPtr& config, Transaction* txn) {
@@ -19,7 +19,7 @@ protected:
   }
 };
 
-TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
+TEST_F(LockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn = FillMetadata(MakeTransaction(
     {"readA", "readB"},
@@ -30,7 +30,7 @@ TEST_F(DeterministicLockManagerTest, GetAllLocksOnFirstTry) {
   ASSERT_TRUE(result.empty());
 }
 
-TEST_F(DeterministicLockManagerTest, ReadLocks) {
+TEST_F(LockManagerTest, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"readA", "readB"}, {}));
   txn1->mutable_internal()->set_id(100);
@@ -46,7 +46,7 @@ TEST_F(DeterministicLockManagerTest, ReadLocks) {
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
 }
 
-TEST_F(DeterministicLockManagerTest, WriteLocks) {
+TEST_F(LockManagerTest, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
@@ -64,7 +64,7 @@ TEST_F(DeterministicLockManagerTest, WriteLocks) {
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::WAITING);
 }
 
-TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
+TEST_F(LockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
@@ -94,7 +94,7 @@ TEST_F(DeterministicLockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   ASSERT_TRUE(result.count(400) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
+TEST_F(LockManagerTest, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
@@ -119,7 +119,7 @@ TEST_F(DeterministicLockManagerTest, PartiallyAcquiredLocks) {
   ASSERT_TRUE(result.count(300) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
+TEST_F(LockManagerTest, PrioritizeWriteLock) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"A"}));
   txn1->mutable_internal()->set_id(100);
@@ -136,7 +136,7 @@ TEST_F(DeterministicLockManagerTest, PrioritizeWriteLock) {
   ASSERT_TRUE(result.count(200) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
+TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
@@ -162,7 +162,7 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_TRUE(result.count(100) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
+TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
@@ -188,7 +188,7 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_TRUE(result.count(100) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
+TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
@@ -214,7 +214,7 @@ TEST_F(DeterministicLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_TRUE(result.count(100) > 0);
 }
 
-TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
+TEST_F(LockManagerTest, BlockedLockOnlyTxn) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
 
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B"}));
@@ -228,7 +228,7 @@ TEST_F(DeterministicLockManagerTest, BlockedLockOnlyTxn) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder2), AcquireLocksResult::WAITING);
 }
 
-TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
+TEST_F(LockManagerTest, KeyReplicaLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
@@ -242,7 +242,7 @@ TEST_F(DeterministicLockManagerTest, KeyReplicaLocks) {
   ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
 }
 
-TEST_F(DeterministicLockManagerTest, RemasterTxn) {
+TEST_F(LockManagerTest, RemasterTxn) {
   auto configs = MakeTestConfigurations("locking", 2, 1);
   auto txn = FillMetadata(MakeTransaction({}, {"A"}));
   txn->mutable_internal()->set_id(100);

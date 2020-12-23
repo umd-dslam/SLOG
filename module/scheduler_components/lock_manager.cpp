@@ -1,4 +1,4 @@
-#include "module/scheduler_components/deterministic_lock_manager.h"
+#include "module/scheduler_components/lock_manager.h"
 
 #include <glog/logging.h>
 
@@ -104,7 +104,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool LockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -124,7 +124,7 @@ bool DeterministicLockManager::AcceptTransaction(const TransactionHolder& txn_ho
   return false;
 }
 
-AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult LockManager::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -192,12 +192,12 @@ AcquireLocksResult DeterministicLockManager::AcquireLocks(const TransactionHolde
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult DeterministicLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult LockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+unordered_set<TxnId> LockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   unordered_set<TxnId> result;
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
@@ -250,7 +250,7 @@ unordered_set<TxnId> DeterministicLockManager::ReleaseLocks(const TransactionHol
   return result;
 }
 
-void DeterministicLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
+void LockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();
