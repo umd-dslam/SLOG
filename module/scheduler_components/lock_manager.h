@@ -94,7 +94,7 @@ public:
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
-   * for the current holders to release.
+   * for the current lock holders to release.
    * 
    * @param txn_holder Holder of the transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
@@ -116,7 +116,7 @@ public:
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  unordered_set<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
+  vector<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager
@@ -126,8 +126,6 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  bool TransactionRequestsNewLock(const TransactionHolder& txn_holder);
-
   unordered_map<KeyReplica, LockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;

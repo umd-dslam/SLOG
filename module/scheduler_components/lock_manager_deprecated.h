@@ -106,7 +106,7 @@ public:
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  unordered_set<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
+  vector<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager

@@ -101,12 +101,12 @@ TEST(LockManagerDeprecated, ReleaseLocksAndGetManyNewHolders) {
 
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1);
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
-  ASSERT_EQ(new_ready_txns.size(), 2U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
-  ASSERT_TRUE(new_ready_txns.count(400) > 0);
+  ASSERT_EQ(ready_txns.size(), 2U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 200) != ready_txns.end());
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 400) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, PartiallyAcquiredLocks) {
@@ -126,13 +126,13 @@ TEST(LockManagerDeprecated, PartiallyAcquiredLocks) {
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder3));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 200) != ready_txns.end());
 
-  new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(300) > 0);
+  ready_txns = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 300) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, PrioritizeWriteLock) {
@@ -148,9 +148,9 @@ TEST(LockManagerDeprecated, PrioritizeWriteLock) {
   ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
   ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder1);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(200) > 0);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 200) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxn1) {
@@ -175,9 +175,9 @@ TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_FALSE(lock_manager.AcquireLocks(holder1));
   ASSERT_TRUE(lock_manager.AcquireLocks(holder2_lockonly2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto ready_txns = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 100) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxn2) {
@@ -202,9 +202,9 @@ TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
   ASSERT_TRUE(lock_manager.AcceptTransaction(holder2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto ready_txns = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 100) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxnOutOfOrder) {
@@ -229,9 +229,9 @@ TEST(LockManagerDeprecated, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder1));
   ASSERT_TRUE(lock_manager.AcquireLocks(holder2_lockonly2));
 
-  auto new_ready_txns = lock_manager.ReleaseLocks(holder2);
-  ASSERT_EQ(new_ready_txns.size(), 1U);
-  ASSERT_TRUE(new_ready_txns.count(100) > 0);
+  auto ready_txns = lock_manager.ReleaseLocks(holder2);
+  ASSERT_EQ(ready_txns.size(), 1U);
+  ASSERT_TRUE(find(ready_txns.begin(), ready_txns.end(), 100) != ready_txns.end());
 }
 
 TEST(LockManagerDeprecated, GhostTxns) {

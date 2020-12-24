@@ -165,6 +165,8 @@ string LockModeStr(LockMode mode) {
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 /*
+  TODO: Fix this
+
   Header("Local Log");
   cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
   cout << "Buffered batches per queue:\n";

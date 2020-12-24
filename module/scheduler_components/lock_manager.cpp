@@ -1,5 +1,7 @@
 #include "module/scheduler_components/lock_manager.h"
 
+#include <algorithm>
+
 #include <glog/logging.h>
 
 using std::make_pair;
@@ -197,8 +199,8 @@ AcquireLocksResult LockManager::AcceptTransactionAndAcquireLocks(const Transacti
   return AcquireLocks(txn_holder);
 }
 
-unordered_set<TxnId> LockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
-  unordered_set<TxnId> result;
+vector<TxnId> LockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+  vector<TxnId> result;
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
 
@@ -240,10 +242,15 @@ unordered_set<TxnId> LockManager::ReleaseLocks(const TransactionHolder& txn_hold
       num_locks_waited_[new_txn]--;
       if (num_locks_waited_[new_txn] == 0) {
         num_locks_waited_.erase(new_txn);
-        result.insert(new_txn);
+        result.push_back(new_txn);
       }
     }
   }
+
+  // Deduplicate the result
+  std::sort(result.begin(), result.end());
+  auto last = std::unique(result.begin(), result.end());
+  result.erase(last, result.end());
 
   num_locks_waited_.erase(txn_id);
 

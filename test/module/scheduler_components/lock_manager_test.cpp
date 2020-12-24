@@ -90,8 +90,8 @@ TEST_F(LockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
   ASSERT_EQ(result.size(), 2U);
-  ASSERT_TRUE(result.count(200) > 0);
-  ASSERT_TRUE(result.count(400) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 200) != result.end());
+  ASSERT_TRUE(find(result.begin(), result.end(), 400) != result.end());
 }
 
 TEST_F(LockManagerTest, PartiallyAcquiredLocks) {
@@ -112,11 +112,11 @@ TEST_F(LockManagerTest, PartiallyAcquiredLocks) {
 
   auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(200) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 200) != result.end());
 
   result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(300) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 300) != result.end());
 }
 
 TEST_F(LockManagerTest, PrioritizeWriteLock) {
@@ -133,7 +133,7 @@ TEST_F(LockManagerTest, PrioritizeWriteLock) {
 
   auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(200) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 200) != result.end());
 }
 
 TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn1) {
@@ -159,7 +159,7 @@ TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn1) {
 
   auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(100) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 100) != result.end());
 }
 
 TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn2) {
@@ -185,7 +185,7 @@ TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxn2) {
 
   auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(100) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 100) != result.end());
 }
 
 TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
@@ -211,7 +211,7 @@ TEST_F(LockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
 
   auto result = lock_manager.ReleaseLocks(holder2);
   ASSERT_EQ(result.size(), 1U);
-  ASSERT_TRUE(result.count(100) > 0);
+  ASSERT_TRUE(find(result.begin(), result.end(), 100) != result.end());
 }
 
 TEST_F(LockManagerTest, BlockedLockOnlyTxn) {

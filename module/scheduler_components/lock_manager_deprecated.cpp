@@ -1,5 +1,7 @@
 #include "module/scheduler_components/lock_manager_deprecated.h"
 
+#include <algorithm>
+
 #include <glog/logging.h>
 
 using std::make_pair;
@@ -166,9 +168,9 @@ bool LockManagerDeprecated::AcceptTransactionAndAcquireLocks(const TransactionHo
   return AcquireLocks(txn_holder);
 }
 
-unordered_set<TxnId>
+vector<TxnId>
 LockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
-  unordered_set<TxnId> ready_txns;
+  vector<TxnId> result;
   auto txn_id = txn_holder.transaction()->internal().id();
 
   for (const auto& pair : txn_holder.keys_in_partition()) {
@@ -189,14 +191,19 @@ LockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
       num_locks_waited_[new_txn]--;
       if (num_locks_waited_[new_txn] == 0) {
         num_locks_waited_.erase(new_txn);
-        ready_txns.insert(new_txn);
+        result.push_back(new_txn);
       }
     }
   }
 
+  // Deduplicate the result
+  std::sort(result.begin(), result.end());
+  auto last = std::unique(result.begin(), result.end());
+  result.erase(last, result.end());
+
   num_locks_waited_.erase(txn_id);
 
-  return ready_txns;
+  return result;
 }
 
 void LockManagerDeprecated::GetStats(rapidjson::Document& stats, uint32_t level) const {
