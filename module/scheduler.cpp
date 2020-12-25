@@ -16,7 +16,6 @@ namespace slog {
 
 namespace {
 uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) {
-  // TODO: Use a hash function
   return txn_id % num_workers;
 }
 } // namespace

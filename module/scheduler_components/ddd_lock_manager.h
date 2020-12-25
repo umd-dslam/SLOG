@@ -1,12 +1,13 @@
 #pragma once
 
-// Prevent mixing with deprecated version
+// Prevent mixing with other versions
 #ifdef LOCK_MANAGER
   #error "Only one lock manager can be included"
 #endif
 #define LOCK_MANAGER
 
 #include <list>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -18,6 +19,7 @@
 #include "common/types.h"
 
 using std::list;
+using std::optional;
 using std::shared_ptr;
 using std::pair;
 using std::unordered_map;
@@ -31,34 +33,39 @@ using KeyReplica = string;
 enum class AcquireLocksResult {ACQUIRED, WAITING, ABORT};
 
 /**
- * An object of this class represents the locking state of a key.
- * It contains the IDs of transactions that are holding and waiting
- * the lock and the mode of the lock.
+ * An object of this class represents the tail of the lock queue.
+ * We don't update this structure when a transaction releases its
+ * locks. Therefore, this structure might contain released transactions
+ * so we need to verify any result returned from it.
  */
-class LockState {
-
+class LockQueueTail {
 public:
-  bool AcquireReadLock(TxnId txn_id);
-  bool AcquireWriteLock(TxnId txn_id);
-  unordered_set<TxnId> Release(TxnId txn_id);
-  bool Contains(TxnId txn_id);
-
-  LockMode mode = LockMode::UNLOCKED;
+  optional<TxnId> AcquireReadLock(TxnId txn_id);
+  vector<TxnId> AcquireWriteLock(TxnId txn_id);
 
   /* For debugging */
-  const unordered_set<TxnId>& GetHolders() const {
-    return holders_;
+  optional<TxnId> write_lock_requester() const {
+    return write_lock_requester_;
   }
 
   /* For debugging */
-  const list<pair<TxnId, LockMode>>& GetWaiters() const {
-    return waiter_queue_;
+  vector<TxnId> read_lock_requesters() const {
+    return read_lock_requesters_;
   }
 
 private:
-  unordered_set<TxnId> holders_;
-  unordered_set<TxnId> waiters_;
-  list<pair<TxnId, LockMode>> waiter_queue_;
+  optional<TxnId> write_lock_requester_;
+  vector<TxnId> read_lock_requesters_;
+};
+
+struct TxnInfo {
+  vector<TxnId> waited_by;
+  int waiting_for_cnt = 0;
+  int pending_parts = 0;
+
+  bool is_ready() const {
+    return waiting_for_cnt == 0 && pending_parts == 0;
+  }
 };
 
 /**
@@ -75,7 +82,7 @@ private:
  * 
  * TODO: aborts can be detected here, before transactions are dispatched
  */
-class LockManager {
+class DDDLockManager {
 public:
   /**
    * Counts the number of locks a txn needs.
@@ -94,7 +101,7 @@ public:
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
-   * for the current lock holders to release.
+   * for the current holders to release.
    * 
    * @param txn_holder Holder of the transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
@@ -126,12 +133,11 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  unordered_map<KeyReplica, LockState> lock_table_;
-  unordered_map<TxnId, int32_t> num_locks_waited_;
-  uint32_t num_locked_keys_ = 0;
+  unordered_map<KeyReplica, LockQueueTail> lock_table_;
+  unordered_map<TxnId, TxnInfo> txn_info_;
 };
 
-inline KeyReplica MakeKeyReplica(const Key& key, uint32_t master) {
+inline KeyReplica MakeKeyReplica(Key key, uint32_t master) {
   std::string new_key;
   auto master_str = std::to_string(master);
   new_key.reserve(key.length() + master_str.length() + 1);

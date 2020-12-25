@@ -50,12 +50,14 @@ message TransactionInternal {
     map<string, MasterMetadata> master_metadata = 2;
     TransactionType type = 3;
     uint32 coordinating_server = 4;
-    repeated uint32 partitions = 5;
+    // number of lock-only txns. For SINGLE_HOME txn, this is always 1
+    uint32 num_lock_only_txns = 5;
+    repeated uint32 partitions = 6;
 
     // for recording time of different events of txn
-    repeated TransactionEvent events = 6;
-    repeated int64 event_times = 7;    // when the events took place
-    repeated uint32 event_machines = 8; // where the events took place
+    repeated TransactionEvent events = 7;
+    repeated int64 event_times = 8;    // when the events took place
+    repeated uint32 event_machines = 9; // where the events took place
 }
 
 message RemasterProcedure {
