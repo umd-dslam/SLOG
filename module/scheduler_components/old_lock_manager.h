@@ -25,17 +25,12 @@ using std::vector;
 
 namespace slog {
 
-struct LockReleaseResult {
-  list<TxnId> unblocked;
-  list<TxnId> should_abort;
-};
-
 /**
  * An object of this class represents the locking state of a key.
  * It contains the IDs of transactions that are holding and waiting
  * the lock and the mode of the lock.
  */
-class LockStateDeprecated {
+class OldLockState {
 public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
@@ -61,11 +56,11 @@ private:
 };
 
 /**
- * A deterministic lock manager grants locks for transactions in
- * the order that they request. If transaction X, appears before
- * transaction Y in the log then X always gets all locks before Y.
+ * This is a deterministic lock manager which grants locks for transactions
+ * in the order that they request. If transaction X, appears before
+ * transaction Y in the log, X always gets all locks before Y.
  */
-class LockManagerDeprecated {
+class OldLockManager {
 public:
   /**
    * Counts the number of locks a txn needs.
@@ -90,13 +85,13 @@ public:
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  bool AcquireLocks(const TransactionHolder& txn);
+  AcquireLocksResult AcquireLocks(const TransactionHolder& txn);
 
   /**
    * Convenient method to perform txn registration and 
    * lock acquisition at the same time.
    */
-  bool AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder);
+  AcquireLocksResult AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -116,7 +111,7 @@ public:
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
 private:
-  unordered_map<Key, LockStateDeprecated> lock_table_;
+  unordered_map<Key, OldLockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };

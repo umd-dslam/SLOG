@@ -15,8 +15,8 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 option(BUILD_SLOG_CLIENT "Build the client" ON)
 option(BUILD_SLOG_TESTS "Build the tests" ON)
-set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering")
 option(ENABLE_REPLICATION_DELAY "Delay transaction batches in the sequencer" OFF)
+set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering")
 
 message(STATUS "Options:")
 message(STATUS "  BUILD_SLOG_CLIENT = ${BUILD_SLOG_CLIENT}")

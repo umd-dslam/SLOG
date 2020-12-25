@@ -1,4 +1,4 @@
-#include "module/scheduler_components/lock_manager_deprecated.h"
+#include "module/scheduler_components/rma_lock_manager.h"
 
 #include <algorithm>
 
@@ -9,7 +9,7 @@ using std::move;
 
 namespace slog {
 
-bool LockStateDeprecated::AcquireReadLock(TxnId txn_id) {
+bool LockState::AcquireReadLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
       holders_.insert(txn_id);
@@ -33,7 +33,7 @@ bool LockStateDeprecated::AcquireReadLock(TxnId txn_id) {
   }
 }
 
-bool LockStateDeprecated::AcquireWriteLock(TxnId txn_id) {
+bool LockState::AcquireWriteLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
       holders_.insert(txn_id);
@@ -49,11 +49,11 @@ bool LockStateDeprecated::AcquireWriteLock(TxnId txn_id) {
   }
 }
 
-bool LockStateDeprecated::Contains(TxnId txn_id) {
+bool LockState::Contains(TxnId txn_id) {
   return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0;
 }
 
-unordered_set<TxnId> LockStateDeprecated::Release(TxnId txn_id) {
+unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   // If the transaction is not among the lock holders, find and remove it in
   // the queue of waiters
   if (holders_.count(txn_id) == 0) {
@@ -106,12 +106,18 @@ unordered_set<TxnId> LockStateDeprecated::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool LockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool RMALockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
-    return false;
+    LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
-  auto txn_id = txn_holder.transaction()->internal().id();
-  num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
+
+  auto txn = txn_holder.transaction();
+  auto txn_id = txn->internal().id();
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    num_locks_waited_[txn_id] = 2;
+  } else {
+    num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
+  }
 
   if (num_locks_waited_[txn_id] == 0) {
     num_locks_waited_.erase(txn_id);
@@ -120,35 +126,60 @@ bool LockManagerDeprecated::AcceptTransaction(const TransactionHolder& txn_holde
   return false;
 }
 
-bool LockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult RMALockManager::AcquireLocks(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
-    return false;
+    LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
 
-  auto txn_id = txn_holder.transaction()->internal().id();
+  auto txn = txn_holder.transaction();
+  auto txn_id = txn->internal().id();
+
+  vector<pair<KeyReplica, LockMode>> locks_to_request;
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    auto pair = *txn_holder.keys_in_partition().begin();
+    auto& key = pair.first;
+    auto mode = LockMode::WRITE;
+    // Lock on old master if this is the first part of the remaster
+    auto master = txn->internal().master_metadata().at(key).master();
+    if (txn->remaster().is_new_master_lock_only()) {
+      // Lock on new master if this is the second part of the remaster
+      master = txn->remaster().new_master();
+    }
+    auto key_replica = MakeKeyReplica(key, master);
+    locks_to_request.emplace_back(key_replica, mode);
+  } else {
+    for (auto& pair : txn_holder.keys_in_partition()) {
+      auto& key = pair.first;
+      auto mode = pair.second;
+      auto master = txn->internal().master_metadata().at(key).master();
+      auto key_replica = MakeKeyReplica(key, master);
+      locks_to_request.emplace_back(key_replica, mode);
+    }
+  }
+
   int num_locks_acquired = 0;
-  for (auto pair : txn_holder.keys_in_partition()) {
-    auto key = pair.first;
+  for (auto& pair : locks_to_request) {
+    auto& key_replica = pair.first;
     auto mode = pair.second;
-    CHECK(!lock_table_[key].Contains(txn_id))
-        << "Txn requested lock twice: " << txn_id << ", " << key;
-    auto before_mode = lock_table_[key].mode;
+
+    CHECK(!lock_table_[key_replica].Contains(txn_id))
+        << "Txn requested lock twice: " << txn_id << ", " << key_replica;
+    auto before_mode = lock_table_[key_replica].mode;
     switch (mode) {
       case LockMode::READ:
-        if (lock_table_[key].AcquireReadLock(txn_id)) {
+        if (lock_table_[key_replica].AcquireReadLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       case LockMode::WRITE:
-        if (lock_table_[key].AcquireWriteLock(txn_id)) {
+        if (lock_table_[key_replica].AcquireWriteLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       default:
         LOG(FATAL) << "Invalid lock mode";
-        break;
     }
-    if (before_mode == LockMode::UNLOCKED && lock_table_[key].mode != before_mode) {
+    if (before_mode == LockMode::UNLOCKED && lock_table_[key_replica].mode != before_mode) {
       num_locked_keys_++;
     }
   }
@@ -157,33 +188,53 @@ bool LockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
     num_locks_waited_[txn_id] -= num_locks_acquired;
     if (num_locks_waited_[txn_id] == 0) {
       num_locks_waited_.erase(txn_id);
-      return true;
+      return AcquireLocksResult::ACQUIRED;
     }
   }
-  return false;
+  return AcquireLocksResult::WAITING;
 }
 
-bool LockManagerDeprecated::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult RMALockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-vector<TxnId>
-LockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
+vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   vector<TxnId> result;
-  auto txn_id = txn_holder.transaction()->internal().id();
+  auto txn = txn_holder.transaction();
+  auto txn_id = txn->internal().id();
 
-  for (const auto& pair : txn_holder.keys_in_partition()) {
-    auto key = pair.first;
-    auto old_mode = lock_table_[key].mode;
-    auto new_grantees = lock_table_[key].Release(txn_id);
+  vector<KeyReplica> locks_to_release;
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
+    auto pair = *txn_holder.keys_in_partition().begin();
+    auto& key = pair.first;
+    auto old_master = txn->internal().master_metadata().at(key).master();
+    auto old_key_replica = MakeKeyReplica(key, old_master);
+    locks_to_release.push_back(old_key_replica);
+    auto new_master = txn->remaster().new_master();
+    auto new_key_replica = MakeKeyReplica(key, new_master);
+    locks_to_release.push_back(new_key_replica);
+  } else {
+    for (auto& pair : txn_holder.keys_in_partition()) {
+      auto& key = pair.first;
+      auto master = txn->internal().master_metadata().at(key).master();
+      auto key_replica = MakeKeyReplica(key, master);
+      locks_to_release.push_back(key_replica);
+    }
+  }
+
+  for (auto& key_replica : locks_to_release) {
+    auto old_mode = lock_table_[key_replica].mode;
+    auto new_grantees = lock_table_[key_replica].Release(txn_id);
      // Prevent the lock table from growing too big
-    if (lock_table_[key].mode == LockMode::UNLOCKED) {
+     // TODO: automatically delete remastered keys
+    if (lock_table_[key_replica].mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }
       if (lock_table_.size() > kLockTableSizeLimit) {
-        lock_table_.erase(key);
+        lock_table_.erase(key_replica);
       }
     }
 
@@ -206,7 +257,7 @@ LockManagerDeprecated::ReleaseLocks(const TransactionHolder& txn_holder) {
   return result;
 }
 
-void LockManagerDeprecated::GetStats(rapidjson::Document& stats, uint32_t level) const {
+void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();

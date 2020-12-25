@@ -361,12 +361,6 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
 
 void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->transaction()->internal().id();
-
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  if (lock_manager_.AcquireLocks(*txn_holder)) {
-    Dispatch(txn_id);
-  }
-#else
   switch (lock_manager_.AcquireLocks(*txn_holder)) {
     case AcquireLocksResult::ACQUIRED:
       Dispatch(txn_id);
@@ -380,8 +374,6 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
       LOG(ERROR) << "Unknown lock result type";
       break;
   }
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
-
 }
 
 /***********************************************

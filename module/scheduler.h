@@ -14,13 +14,19 @@
 #include "storage/storage.h"
 
 #if defined(REMASTER_PROTOCOL_SIMPLE)
-#include "module/scheduler_components/lock_manager_deprecated.h"
 #include "module/scheduler_components/simple_remaster_manager.h"
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
-#include "module/scheduler_components/lock_manager_deprecated.h"
 #include "module/scheduler_components/per_key_remaster_manager.h"
+#endif
+
+#if defined(REMASTER_PROTOCOL_SIMPLE)\
+  || defined(REMASTER_PROTOCOL_PER_KEY)\
+  || (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
+#include "module/scheduler_components/old_lock_manager.h"
+#elif defined(LOCK_MANAGER_DDR)
+#include "module/scheduler_components/ddr_lock_manager.h"
 #else
-#include "module/scheduler_components/lock_manager.h"
+#include "module/scheduler_components/rma_lock_manager.h"
 #endif
 
 namespace slog {
@@ -98,16 +104,22 @@ private:
   void MaybeFinishAbort(TxnId txn_id);
 
   ConfigurationPtr config_;
-  
+
 #if defined(REMASTER_PROTOCOL_SIMPLE)
-  LockManagerDeprecated lock_manager_;
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
-  LockManagerDeprecated lock_manager_;
   PerKeyRemasterManager remaster_manager_;
+#endif
+
+#if defined(REMASTER_PROTOCOL_SIMPLE)\
+  || defined(REMASTER_PROTOCOL_PER_KEY)\
+  || (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
+  OldLockManager lock_manager_;
+#elif defined(LOCK_MANAGER_DDD)
+  DDRLockManager lock_manager_;
 #else
-  LockManager lock_manager_;
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+  RMALockManager lock_manager_;
+#endif
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
   
