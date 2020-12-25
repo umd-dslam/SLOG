@@ -1,5 +1,6 @@
 #include "common/proto_utils.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -77,40 +78,40 @@ TransactionType SetTransactionType(Transaction& txn) {
   auto txn_internal = txn.mutable_internal();
   auto& master_metadata = txn_internal->master_metadata();
 
-  bool all_master_metadata_received = true;
+  bool master_metadata_is_complete = true;
   for (auto& pair : txn.read_set()) {
     if (!master_metadata.contains(pair.first)) {
-      all_master_metadata_received = false;
+      master_metadata_is_complete = false;
       break;
     }
   }
-  for (auto& pair : txn.write_set()) {
-    if (!master_metadata.contains(pair.first)) {
-      all_master_metadata_received = false;
-      break;
+  if (master_metadata_is_complete) {
+    for (auto& pair : txn.write_set()) {
+      if (!master_metadata.contains(pair.first)) {
+        master_metadata_is_complete = false;
+        break;
+      }
     }
   }
 
-  if (!all_master_metadata_received) {
+  if (!master_metadata_is_complete) {
     txn_internal->set_type(TransactionType::UNKNOWN);
     return txn_internal->type();
   }
 
-  bool is_single_home = true;
-  // If this is a single-home txn, home of all other keys must
-  // be the same as that of the first key
-  // TODO: check and report empty transaction
-  const auto& home_replica = master_metadata.begin()->second.master();
+  vector<uint32_t> masters;
   for (const auto& pair : master_metadata) {
-    if (pair.second.master() != home_replica) {
-      is_single_home = false;
-      break;
-    }
+    masters.push_back(pair.second.master());
   }
+  std::sort(masters.begin(), masters.end());
+  auto last = std::unique(masters.begin(), masters.end());
+  txn_internal->set_num_masters(last - masters.begin());
+  bool is_single_home = txn_internal->num_masters() == 1;
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
   // Remaster txn will become multi-home
   if (txn.procedure_case() == Transaction::kRemaster) {
+    txn_internal->set_num_masters(2);
     is_single_home = false;
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */

@@ -6,6 +6,7 @@
 #include "common/proto_utils.h"
 
 using std::move;
+using std::string;
 
 namespace slog {
 
@@ -59,7 +60,7 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
 
   // This function will be called on the read and write set of the current txn
   auto LocalMasterLookupFn = [this, txn, local_partition, lookup_master](
-      const google::protobuf::Map<std::string, std::string>& keys) {
+      const google::protobuf::Map<string, string>& keys) {
     auto partitions = txn->mutable_internal()->mutable_partitions();
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     lookup_master->set_txn_id(txn->internal().id());

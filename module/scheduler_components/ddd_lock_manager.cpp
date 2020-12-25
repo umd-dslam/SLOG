@@ -36,7 +36,7 @@ bool DDDLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   auto& txn_info = txn_info_[txn_id];
-  txn_info.pending_parts += txn->internal().num_lock_only_txns();
+  txn_info.pending_parts += txn->internal().num_masters();
   return txn_info.is_ready();
 }
 

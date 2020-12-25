@@ -66,6 +66,7 @@ void Sequencer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from *
   }
 }
 
+// Ticker socket
 void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
   // Remove the dummy message out of the queue
   if (zmq::message_t msg; !socket.recv(msg, zmq::recv_flags::dontwait)) {

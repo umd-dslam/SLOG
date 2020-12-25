@@ -78,7 +78,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
 
-      if(ValidateTransaction(txn)) {
+      if (ValidateTransaction(txn)) {
         // Send to forwarder
         internal::Request forward_request;
         forward_request.mutable_forward_txn()->set_allocated_txn(txn);
