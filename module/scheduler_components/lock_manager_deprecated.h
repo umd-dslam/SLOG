@@ -96,7 +96,7 @@ public:
    * Convenient method to perform txn registration and 
    * lock acquisition at the same time.
    */
-  bool AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder);
+  bool AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.

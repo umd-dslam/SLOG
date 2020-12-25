@@ -163,7 +163,7 @@ bool LockManagerDeprecated::AcquireLocks(const TransactionHolder& txn_holder) {
   return false;
 }
 
-bool LockManagerDeprecated::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+bool LockManagerDeprecated::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }

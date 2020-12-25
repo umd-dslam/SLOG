@@ -122,7 +122,7 @@ AcquireLocksResult DDDLockManager::AcquireLocks(const TransactionHolder& txn_hol
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult DDDLockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult DDDLockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }

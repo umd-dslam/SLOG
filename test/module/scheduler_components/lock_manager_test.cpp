@@ -25,7 +25,7 @@ TEST_F(LockManagerTest, GetAllLocksOnFirstTry) {
     {"readA", "readB"},
     {"writeC"}));
   TransactionHolder holder = MakeHolder(configs[0], txn);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
   auto result = lock_manager.ReleaseLocks(holder);
   ASSERT_TRUE(result.empty());
 }
@@ -40,8 +40,8 @@ TEST_F(LockManagerTest, ReadLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).empty());
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
 }
@@ -56,12 +56,12 @@ TEST_F(LockManagerTest, WriteLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
   // The blocked txn becomes ready
   ASSERT_EQ(lock_manager.ReleaseLocks(holder1).size(), 1U);
   // Make sure the lock is already held by txn2
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::WAITING);
 }
 
 TEST_F(LockManagerTest, ReleaseLocksAndGetManyNewHolders) {
@@ -79,10 +79,10 @@ TEST_F(LockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   txn4->mutable_internal()->set_id(400);
   TransactionHolder holder4 = MakeHolder(configs[0], txn4);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder4), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder4), AcquireLocksResult::WAITING);
 
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
 
@@ -106,9 +106,9 @@ TEST_F(LockManagerTest, PartiallyAcquiredLocks) {
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder3), AcquireLocksResult::WAITING);
 
   auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
@@ -128,8 +128,8 @@ TEST_F(LockManagerTest, PrioritizeWriteLock) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
  
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
 
   auto result = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(result.size(), 1U);
@@ -220,7 +220,7 @@ TEST_F(LockManagerTest, BlockedLockOnlyTxn) {
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
 
   auto txn2 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2->mutable_internal()->set_id(101);
@@ -238,8 +238,8 @@ TEST_F(LockManagerTest, KeyReplicaLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
 }
 
 TEST_F(LockManagerTest, RemasterTxn) {
@@ -272,6 +272,6 @@ TEST_F(LockManagerTest, RemasterTxn) {
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTransactionAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
 }

@@ -22,7 +22,7 @@ TEST(LockManagerDeprecatedTest, GetAllLocksOnFirstTry) {
     {"readA", "readB"},
     {"writeC"});
   TransactionHolder holder = MakeHolder(configs[0], txn);
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder));
   auto new_holders = lock_manager.ReleaseLocks(holder);
   ASSERT_TRUE(new_holders.empty());
 }
@@ -38,8 +38,8 @@ TEST(LockManagerDeprecatedTest, GetAllLocksMultiPartitions) {
   auto txn2 = MakeTransaction({"readX"}, {"ZZZZ"});
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
 }
 
 TEST(LockManagerDeprecated, ReadLocks) {
@@ -53,8 +53,8 @@ TEST(LockManagerDeprecated, ReadLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).empty());
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
 }
@@ -70,12 +70,12 @@ TEST(LockManagerDeprecated, WriteLocks) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
   // The blocked txn becomes ready
   ASSERT_EQ(lock_manager.ReleaseLocks(holder1).size(), 1U);
   // Make sure the lock is already held by txn2
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
 }
 
 TEST(LockManagerDeprecated, ReleaseLocksAndGetManyNewHolders) {
@@ -94,10 +94,10 @@ TEST(LockManagerDeprecated, ReleaseLocksAndGetManyNewHolders) {
   txn4->mutable_internal()->set_id(400);
   TransactionHolder holder4 = MakeHolder(configs[0], txn4);
 
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder3));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder4));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder3));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder4));
 
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
 
@@ -122,9 +122,9 @@ TEST(LockManagerDeprecated, PartiallyAcquiredLocks) {
   txn3->mutable_internal()->set_id(300);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder3));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder3));
 
   auto ready_txns = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(ready_txns.size(), 1U);
@@ -145,8 +145,8 @@ TEST(LockManagerDeprecated, PrioritizeWriteLock) {
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
  
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
-  ASSERT_FALSE(lock_manager.AcceptTransactionAndAcquireLocks(holder2));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
+  ASSERT_FALSE(lock_manager.AcceptTxnAndAcquireLocks(holder2));
 
   auto ready_txns = lock_manager.ReleaseLocks(holder1);
   ASSERT_EQ(ready_txns.size(), 1U);
@@ -257,7 +257,7 @@ TEST(LockManagerDeprecated, BlockedLockOnlyTxn) {
   auto txn1 = MakeTransaction({"A"}, {"B"});
   txn1->mutable_internal()->set_id(100);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
-  ASSERT_TRUE(lock_manager.AcceptTransactionAndAcquireLocks(holder1));
+  ASSERT_TRUE(lock_manager.AcceptTxnAndAcquireLocks(holder1));
 
   auto txn2 = MakeTransaction({}, {"B"});
   txn2->mutable_internal()->set_id(101);

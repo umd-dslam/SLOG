@@ -194,7 +194,7 @@ AcquireLocksResult LockManager::AcquireLocks(const TransactionHolder& txn_holder
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult LockManager::AcceptTransactionAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult LockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
