@@ -115,7 +115,7 @@ private:
   || defined(REMASTER_PROTOCOL_PER_KEY)\
   || (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
   OldLockManager lock_manager_;
-#elif defined(LOCK_MANAGER_DDD)
+#elif defined(LOCK_MANAGER_DDR)
   DDRLockManager lock_manager_;
 #else
   RMALockManager lock_manager_;

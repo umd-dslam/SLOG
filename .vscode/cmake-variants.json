@@ -30,13 +30,30 @@
     }
   },
   "remasterProtocol": {
-    "default": "none",
+    "default": "none/rma",
     "choices": {
-      "none": {
-        "short": "None",
-        "long": "No remaster protocol",
+      "none/old": {
+        "short": "None/OLD",
+        "long": "No remaster protocol with OLD lock manager",
         "settings": {
-          "REMASTER_PROTOCOL": "NONE"
+          "REMASTER_PROTOCOL": "NONE",
+          "LOCK_MANAGER": "OLD"
+        }
+      },
+      "none/rma": {
+        "short": "None/RMA",
+        "long": "No remaster protocol with RMA lock manager",
+        "settings": {
+          "REMASTER_PROTOCOL": "NONE",
+          "LOCK_MANAGER": "RMA"
+        }
+      },
+      "none/ddr": {
+        "short": "None/DDR",
+        "long": "No remaster protocol with DDR lock manager",
+        "settings": {
+          "REMASTER_PROTOCOL": "NONE",
+          "LOCK_MANAGER": "DDR"
         }
       },
       "simple": {
@@ -53,11 +70,20 @@
           "REMASTER_PROTOCOL": "PER_KEY"
         }
       },
-      "counterless": {
-        "short": "Counterless",
-        "long": "Counterless remaster protocol",
+      "counterless/rma": {
+        "short": "Counterless/RMA",
+        "long": "Counterless remaster protocol with RMA lock manager",
         "settings": {
-          "REMASTER_PROTOCOL": "COUNTERLESS"
+          "REMASTER_PROTOCOL": "COUNTERLESS",
+          "LOCK_MANAGER": "RMA"
+        }
+      },
+      "counterless/ddr": {
+        "short": "Counterless/DDR",
+        "long": "Counterless remaster protocol with DDR lock manager",
+        "settings": {
+          "REMASTER_PROTOCOL": "COUNTERLESS",
+          "LOCK_MANAGER": "DDR"
         }
       }
     }
