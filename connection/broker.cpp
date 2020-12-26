@@ -148,7 +148,7 @@ bool Broker::InitializeConnection() {
   while (running_) {
     if (zmq::poll(&item, 1, poll_timeout_ms_)) {
       zmq::message_t msg;
-      if (!socket_.recv(msg)) {
+      if (!socket_.recv(msg, zmq::recv_flags::dontwait)) {
         continue;
       }
 
