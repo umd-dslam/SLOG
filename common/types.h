@@ -10,6 +10,7 @@ using namespace std::chrono;
 namespace slog {
 
 using Key = std::string;
+using KeyReplica = std::string;
 using Value = std::string;
 using TxnId = uint64_t;
 using BatchId = uint32_t;
@@ -45,5 +46,15 @@ using Duration = Clock::duration;
 
 enum class LockMode { UNLOCKED, READ, WRITE };
 enum class AcquireLocksResult { ACQUIRED, WAITING, ABORT };
+
+inline KeyReplica MakeKeyReplica(Key key, uint32_t master) {
+  std::string new_key;
+  auto master_str = std::to_string(master);
+  new_key.reserve(key.length() + master_str.length() + 1);
+  new_key += key;
+  new_key += ":";
+  new_key += master_str;
+  return new_key;
+}
 
 } // namespace slog

@@ -28,8 +28,6 @@ using std::vector;
 
 namespace slog {
 
-using KeyReplica = string;
-
 /**
  * An object of this class represents the tail of the lock queue.
  * We don't update this structure when a transaction releases its
@@ -140,15 +138,5 @@ private:
   unordered_map<KeyReplica, LockQueueTail> lock_table_;
   unordered_map<TxnId, TxnInfo> txn_info_;
 };
-
-inline KeyReplica MakeKeyReplica(Key key, uint32_t master) {
-  std::string new_key;
-  auto master_str = std::to_string(master);
-  new_key.reserve(key.length() + master_str.length() + 1);
-  new_key += key;
-  new_key += ":";
-  new_key += master_str;
-  return new_key;
-}
 
 } // namespace slog

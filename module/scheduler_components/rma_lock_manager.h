@@ -26,8 +26,6 @@ using std::vector;
 
 namespace slog {
 
-using KeyReplica = string;
-
 /**
  * An object of this class represents the locking state of a key.
  * It contains the IDs of transactions that are holding and waiting
@@ -130,15 +128,5 @@ private:
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };
-
-inline KeyReplica MakeKeyReplica(const Key& key, uint32_t master) {
-  std::string new_key;
-  auto master_str = std::to_string(master);
-  new_key.reserve(key.length() + master_str.length() + 1);
-  new_key += key;
-  new_key += ":";
-  new_key += master_str;
-  return new_key;
-}
 
 } // namespace slog
