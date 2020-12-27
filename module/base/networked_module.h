@@ -21,8 +21,9 @@ using ReusableResponse = ReusableMessage<internal::Response>;
  */
 class NetworkedModule : public Module {
  public:
-  NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel, int poll_timeout_ms,
-                  int recv_batch = 100, size_t request_pool_size = 5000, size_t response_pool_size = 5000);
+  NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
+                  std::chrono::milliseconds poll_timeout, int recv_batch = 100, size_t request_pool_size = 5000,
+                  size_t response_pool_size = 5000);
 
  protected:
   virtual std::vector<zmq::socket_t> InitializeCustomSockets() { return {}; }
@@ -68,7 +69,7 @@ class NetworkedModule : public Module {
   std::vector<zmq::socket_t> custom_sockets_;
   Sender sender_;
   Channel channel_;
-  int poll_timeout_ms_;
+  std::chrono::milliseconds poll_timeout_ms_;
   int recv_batch_;
   MessagePool<internal::Request> request_pool_;
   MessagePool<internal::Response> response_pool_;

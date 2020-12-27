@@ -52,7 +52,8 @@ class LocalLog {
  */
 class Interleaver : public NetworkedModule {
  public:
-  Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, int poll_timeout_ms = kModuleTimeoutMs);
+  Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+              std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

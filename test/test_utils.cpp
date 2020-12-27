@@ -20,8 +20,6 @@ using std::to_string;
 
 namespace slog {
 
-const int kTestModuleTimeoutMs = 5;
-
 internal::Request MakeEchoRequest(const std::string& data) {
   internal::Request request;
   auto echo = request.mutable_echo();
@@ -92,7 +90,7 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
     : config_(config),
       context_(new zmq::context_t(1)),
       storage_(new MemOnlyStorage<Key, Record, Metadata>()),
-      broker_(new Broker(config, context_, kTestModuleTimeoutMs)),
+      broker_(new Broker(config, context_, kTestModuleTimeout)),
       client_context_(1),
       client_socket_(client_context_, ZMQ_DEALER) {
   ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
@@ -104,33 +102,29 @@ void TestSlog::Data(Key&& key, Record&& record) {
   storage_->Write(key, record);
 }
 
-void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, broker_, kTestModuleTimeoutMs); }
+void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, broker_, kTestModuleTimeout); }
 
-void TestSlog::AddForwarder() {
-  forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddForwarder() { forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeout); }
 
-void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, kTestModuleTimeoutMs); }
+void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, kTestModuleTimeout); }
 
-void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeoutMs); }
+void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeout); }
 
-void TestSlog::AddScheduler() {
-  scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddScheduler() { scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_, kTestModuleTimeout); }
 
-void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_, kTestModuleTimeoutMs); }
+void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_, kTestModuleTimeout); }
 
-void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeoutMs); }
+void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeout); }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, kTestModuleTimeoutMs);
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, kTestModuleTimeout);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {
   broker_->AddChannel(channel);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
-  socket.setsockopt(ZMQ_LINGER, 0);
+  socket.set(zmq::sockopt::linger, 0);
   socket.bind("inproc://channel_" + to_string(channel));
   channels_.insert_or_assign(channel, std::move(socket));
 }

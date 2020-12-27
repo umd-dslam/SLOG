@@ -20,7 +20,7 @@ class SimpleMultiPaxos : public NetworkedModule {
    * @param me            Machine Id of the current machine
    */
   SimpleMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker, const vector<MachineId>& group_members,
-                   MachineId me, int poll_timeout_ms = kModuleTimeoutMs);
+                   MachineId me, std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
   bool IsMember() const;
 

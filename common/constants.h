@@ -6,7 +6,7 @@
 
 namespace slog {
 
-const int kModuleTimeoutMs = 1000;
+const auto kModuleTimeout = 1000ms;
 
 const Channel kServerChannel = 1;
 const Channel kForwarderChannel = 2;

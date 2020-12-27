@@ -36,7 +36,8 @@ struct TransactionState {
 class Worker : public NetworkedModule {
  public:
   Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
-         const std::shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms = kModuleTimeoutMs);
+         const std::shared_ptr<Storage<Key, Record>>& storage,
+         std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

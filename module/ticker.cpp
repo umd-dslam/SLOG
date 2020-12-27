@@ -10,18 +10,18 @@ zmq::socket_t Ticker::Subscribe(zmq::context_t& context) {
   zmq::socket_t socket(context, ZMQ_SUB);
   socket.connect(Ticker::ENDPOINT);
   // Subscribe to any message
-  socket.setsockopt(ZMQ_SUBSCRIBE, "", 0);
+  socket.set(zmq::sockopt::subscribe, "");
   return socket;
 }
 
 Ticker::Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms)
     : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  socket_.setsockopt(ZMQ_LINGER, 0);
+  socket_.set(zmq::sockopt::linger, 0);
   sleep_us_ = std::chrono::duration_cast<milliseconds>(tick_period_ms);
 }
 
 Ticker::Ticker(zmq::context_t& context, uint32_t ticks_per_sec) : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  socket_.setsockopt(ZMQ_LINGER, 0);
+  socket_.set(zmq::sockopt::linger, 0);
   sleep_us_ = std::chrono::microseconds(1000 * 1000 / ticks_per_sec);
 }
 

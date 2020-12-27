@@ -81,7 +81,8 @@ class CompletedTransaction {
  */
 class Server : public NetworkedModule {
  public:
-  Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, int poll_timeout_ms = kModuleTimeoutMs);
+  Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+         std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;

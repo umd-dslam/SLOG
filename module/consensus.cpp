@@ -17,8 +17,9 @@ vector<MachineId> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
   return members;
 }
 
-GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, int poll_timeout_ms)
-    : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout_ms) {}
+GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                         std::chrono::milliseconds poll_timeout)
+    : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
 void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;
@@ -38,8 +39,9 @@ vector<MachineId> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
   return members;
 }
 
-LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, int poll_timeout_ms)
-    : SimpleMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout_ms) {}
+LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                       std::chrono::milliseconds poll_timeout)
+    : SimpleMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
   Request req;

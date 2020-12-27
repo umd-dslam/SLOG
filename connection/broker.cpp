@@ -19,7 +19,8 @@ namespace slog {
 
 using internal::Request;
 
-Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context, long poll_timeout_ms)
+Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
+               std::chrono::milliseconds poll_timeout_ms)
     : config_(config),
       context_(context),
       poll_timeout_ms_(poll_timeout_ms),
@@ -28,9 +29,9 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
       is_synchronized_(false) {
   // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
   // Otherwise, it would hang indefinitely until the messages are sent.
-  socket_.setsockopt(ZMQ_LINGER, 0);
+  socket_.set(zmq::sockopt::linger, 0);
   // Remove all limits on the message queue
-  socket_.setsockopt(ZMQ_RCVHWM, 0);
+  socket_.set(zmq::sockopt::rcvhwm, 0);
 }
 
 Broker::~Broker() {
@@ -55,8 +56,8 @@ void Broker::AddChannel(Channel chan) {
   CHECK(channels_.count(chan) == 0) << "Channel \"" << chan << "\" already exists";
 
   zmq::socket_t new_channel(*context_, ZMQ_PUSH);
-  new_channel.setsockopt(ZMQ_LINGER, 0);
-  new_channel.setsockopt(ZMQ_SNDHWM, 0);
+  new_channel.set(zmq::sockopt::linger, 0);
+  new_channel.set(zmq::sockopt::sndhwm, 0);
   new_channel.connect("inproc://channel_" + std::to_string(chan));
   channels_.insert_or_assign(chan, move(new_channel));
 }
@@ -115,7 +116,7 @@ bool Broker::InitializeConnection() {
   // Connect to all other machines and send the READY message
   for (const auto& addr : config_->all_addresses()) {
     zmq::socket_t tmp_socket(*context_, ZMQ_PUSH);
-    tmp_socket.setsockopt(ZMQ_LINGER, 0);
+    tmp_socket.set(zmq::sockopt::linger, 0);
 
     auto endpoint = MakeEndpoint(addr);
     tmp_socket.connect(endpoint);
@@ -209,7 +210,6 @@ void Broker::Run() {
         }
       }
     }
-    VLOG_EVERY_N(4, 5000 / poll_timeout_ms_) << "Broker is alive";
   }  // while-loop
 }
 

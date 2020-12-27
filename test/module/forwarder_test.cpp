@@ -53,7 +53,7 @@ class ForwarderTest : public ::testing::Test {
     for (auto i : indices) {
       poll_items.push_back(test_slogs[i]->GetPollItemForChannel(kSequencerChannel));
     }
-    auto rc = zmq::poll(poll_items, 1000);
+    auto rc = zmq::poll(poll_items, 1s);
     if (rc == 0) return nullptr;
 
     for (size_t i = 0; i < poll_items.size(); i++) {

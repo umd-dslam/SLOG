@@ -61,7 +61,7 @@ namespace slog {
 class Broker {
  public:
   Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
-         long poll_timeout_ms = kModuleTimeoutMs);
+         std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
   ~Broker();
 
   void StartInNewThread(int cpu = -1);
@@ -97,7 +97,7 @@ class Broker {
 
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
-  long poll_timeout_ms_;
+  std::chrono::milliseconds poll_timeout_ms_;
   zmq::socket_t socket_;
 
   // Thread stuff

@@ -23,10 +23,10 @@ using internal::Request;
 using internal::Response;
 
 Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                     const shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms)
-    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout_ms), config_(config) {
+                     const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
+    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config) {
   for (size_t i = 0; i < config->num_workers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(config, broker, kWorkerChannelOffset + i, storage, poll_timeout_ms));
+    workers_.push_back(MakeRunnerFor<Worker>(config, broker, kWorkerChannelOffset + i, storage, poll_timeout));
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)

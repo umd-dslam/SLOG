@@ -17,8 +17,8 @@ using internal::Request;
 using internal::Response;
 
 Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
-               const shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms)
-    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout_ms),
+               const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
+    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout),
       config_(config),
       storage_(storage),
       // TODO: change this dynamically based on selected experiment

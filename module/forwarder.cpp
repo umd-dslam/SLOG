@@ -22,8 +22,9 @@ inline bool TransactionContainsKey(const Transaction& txn, const Key& key) {
 }  // namespace
 
 Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, int poll_timeout_ms)
-    : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout_ms),
+                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
+                     std::chrono::milliseconds poll_timeout)
+    : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout),
       config_(config),
       lookup_master_index_(lookup_master_index),
       rg_(std::random_device()()) {}

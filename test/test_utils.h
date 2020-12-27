@@ -17,6 +17,8 @@ using std::string;
 using std::unique_ptr;
 namespace slog {
 
+const auto kTestModuleTimeout = 5ms;
+
 using ConfigVec = std::vector<ConfigurationPtr>;
 
 internal::Request MakeEchoRequest(const string& data);

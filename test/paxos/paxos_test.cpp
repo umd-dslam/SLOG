@@ -17,7 +17,7 @@ const Channel kTestChannel = 100;
 class TestSimpleMultiPaxos : public SimpleMultiPaxos {
  public:
   TestSimpleMultiPaxos(const shared_ptr<Broker>& broker, const vector<MachineId>& group_members, const MachineId& me)
-      : SimpleMultiPaxos(kTestChannel, broker, group_members, me, 5) {}
+      : SimpleMultiPaxos(kTestChannel, broker, group_members, me, kTestModuleTimeout) {}
 
   Pair Poll() {
     unique_lock<mutex> lock(m_);
@@ -55,7 +55,7 @@ class PaxosTest : public ::testing::Test {
 
   void AddAndStartNewPaxos(const ConfigurationPtr& config, const vector<MachineId>& members, MachineId me) {
     auto context = make_shared<zmq::context_t>(1);
-    auto broker = make_shared<Broker>(config, context, 5 /* timeout_ms */);
+    auto broker = make_shared<Broker>(config, context, kTestModuleTimeout);
     auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
     auto sender = make_unique<Sender>(broker);
     auto paxos_runner = new ModuleRunner(paxos);

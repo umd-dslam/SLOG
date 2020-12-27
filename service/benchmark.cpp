@@ -206,8 +206,8 @@ void InitializeBenchmark() {
 
     LOG(INFO) << "Connecting to " << endpoint;
     auto socket = make_unique<zmq::socket_t>(context, ZMQ_DEALER);
-    socket->setsockopt(ZMQ_SNDHWM, 0);
-    socket->setsockopt(ZMQ_RCVHWM, 0);
+    socket->set(zmq::sockopt::sndhwm, 0);
+    socket->set(zmq::sockopt::rcvhwm, 0);
     socket->connect(endpoint);
     poll_items.push_back({static_cast<void*>(*socket), 0, /* fd */
                           ZMQ_POLLIN, 0 /* revent */});
@@ -241,7 +241,7 @@ void RunBenchmark() {
 
   stats.start_time = Clock::now();
   while (!StopConditionMet() || !outstanding_txns.empty()) {
-    if (zmq::poll(poll_items, 10)) {
+    if (zmq::poll(poll_items, 10ms)) {
       // Check if the ticker ticks
       if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
         // Receive the empty message then throw away

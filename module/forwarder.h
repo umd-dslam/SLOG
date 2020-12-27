@@ -31,7 +31,7 @@ class Forwarder : public NetworkedModule {
  public:
   Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
             const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-            int poll_timeout_ms = kModuleTimeoutMs);
+            std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;

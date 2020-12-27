@@ -15,7 +15,7 @@ using internal::Request;
 using internal::Response;
 
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
-                                 int poll_timeout_ms, int recv_batch, size_t request_pool_size,
+                                 std::chrono::milliseconds poll_timeout_ms, int recv_batch, size_t request_pool_size,
                                  size_t response_pool_size)
     : Module(name),
       context_(broker->context()),
@@ -28,9 +28,9 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
       response_pool_(response_pool_size) {
   broker->AddChannel(channel);
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
-  pull_socket_.setsockopt(ZMQ_LINGER, 0);
+  pull_socket_.set(zmq::sockopt::linger, 0);
   // Remove limit on the zmq message queues
-  pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
+  pull_socket_.set(zmq::sockopt::rcvhwm, 0);
 
   poll_items_.push_back({
       static_cast<void*>(pull_socket_), 0, /* fd */

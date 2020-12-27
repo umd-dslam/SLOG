@@ -24,7 +24,7 @@ namespace slog {
 class MultiHomeOrderer : public NetworkedModule {
  public:
   MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
-                   int poll_timeout_ms = kModuleTimeoutMs);
+                   std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
