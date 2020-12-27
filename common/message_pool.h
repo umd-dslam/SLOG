@@ -4,9 +4,9 @@
 
 namespace slog {
 
-template<typename T>
+template <typename T>
 class MessagePool {
-public:
+ public:
   MessagePool() : MessagePool(0) {}
 
   MessagePool(size_t size) {
@@ -38,20 +38,18 @@ public:
     }
   }
 
-  size_t size() const {
-    return messages_.size();
-  }
+  size_t size() const { return messages_.size(); }
 
-private:
+ private:
   MessagePool(const MessagePool&) = delete;
   MessagePool& operator=(const MessagePool&) = delete;
 
   std::vector<T*> messages_;
 };
 
-template<typename T>
+template <typename T>
 class ReusableMessage {
-public:
+ public:
   ReusableMessage() = default;
 
   explicit ReusableMessage(MessagePool<T>* pool) : pool_(pool) {
@@ -62,7 +60,7 @@ public:
   }
 
   ~ReusableMessage() {
-    if (pool_!= nullptr) {
+    if (pool_ != nullptr) {
       pool_->Return(msg_);
       msg_ = nullptr;
     }
@@ -76,8 +74,7 @@ public:
     }
   }
 
-  ReusableMessage(ReusableMessage<T>&& other) noexcept 
-    : msg_(other.msg_), pool_(other.pool_) {
+  ReusableMessage(ReusableMessage<T>&& other) noexcept : msg_(other.msg_), pool_(other.pool_) {
     other.msg_ = nullptr;
     other.pool_ = nullptr;
   }
@@ -90,10 +87,10 @@ public:
 
   inline T* get() const { return msg_; }
 
-private:
+ private:
   // Invariant: If pool_ is nullptr then msg_ must also be nullptr
   T* msg_ = nullptr;
   MessagePool<T>* pool_ = nullptr;
 };
 
-}
+}  // namespace slog

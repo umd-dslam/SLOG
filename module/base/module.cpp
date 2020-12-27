@@ -1,18 +1,16 @@
 #include "module/base/module.h"
 
+#include <glog/logging.h>
+
 #include "common/constants.h"
 #include "common/cpu.h"
-
-#include <glog/logging.h>
 
 using std::shared_ptr;
 using std::unique_ptr;
 
 namespace slog {
 
-ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) 
-  : module_(module),
-    running_(false) {}
+ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) : module_(module), running_(false) {}
 
 ModuleRunner::~ModuleRunner() {
   running_ = false;
@@ -45,8 +43,6 @@ void ModuleRunner::Run() {
   }
 }
 
-void ModuleRunner::Stop() {
-  running_ = false;
-}
+void ModuleRunner::Stop() { running_ = false; }
 
-} // namespace slog
+}  // namespace slog

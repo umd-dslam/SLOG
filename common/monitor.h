@@ -1,6 +1,6 @@
-#include "common/types.h"
-
 #include <glog/logging.h>
+
+#include "common/types.h"
 
 namespace slog {
 
@@ -11,13 +11,11 @@ inline void MonitorThroughput() {
   counter++;
   auto span = Clock::now() - last_time;
   if (span > 1s) {
-    LOG(INFO) <<  "Throughput: "
-              << (counter - last_counter) / duration_cast<seconds>(span).count()
-              << " txn/s"; 
+    LOG(INFO) << "Throughput: " << (counter - last_counter) / duration_cast<seconds>(span).count() << " txn/s";
 
     last_counter = counter;
     last_time = Clock::now();
   }
 }
 
-} // namespace slog
+}  // namespace slog

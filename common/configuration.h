@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 #include "common/types.h"
 #include "proto/configuration.pb.h"
 #include "proto/internal.pb.h"
@@ -15,18 +16,12 @@ class Configuration;
 using ConfigurationPtr = std::shared_ptr<const Configuration>;
 
 class Configuration {
-public:
-  static ConfigurationPtr FromFile(
-      const string& file_path,
-      const string& local_address = "",
-      uint32_t local_replica = 0U,
-      uint32_t local_partition = 0U);
+ public:
+  static ConfigurationPtr FromFile(const string& file_path, const string& local_address = "",
+                                   uint32_t local_replica = 0U, uint32_t local_partition = 0U);
 
-  Configuration(
-      const internal::Configuration& config,
-      const string& local_address,
-      uint32_t local_replica,
-      uint32_t local_partition);
+  Configuration(const internal::Configuration& config, const string& local_address, uint32_t local_replica,
+                uint32_t local_partition);
 
   const string& protocol() const;
   const vector<string>& all_addresses() const;
@@ -61,7 +56,7 @@ public:
   uint32_t replication_delay_amount() const;
 #endif /* ENABLE_REPLICATION_DELAY */
 
-private:
+ private:
   internal::Configuration config_;
   string local_address_;
   uint32_t local_replica_;
@@ -70,4 +65,4 @@ private:
   vector<string> all_addresses_;
 };
 
-} // namespace slog
+}  // namespace slog

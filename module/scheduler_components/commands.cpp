@@ -12,12 +12,10 @@ namespace slog {
 
 namespace {
 const string SPACE(" \t\n\v\f\r");
-} // namespace
+}  // namespace
 
-const std::unordered_map<string, size_t>
-KeyValueCommands::COMMAND_NUM_ARGS = {
-  {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}, {"EQ", 2}
-};
+const std::unordered_map<string, size_t> KeyValueCommands::COMMAND_NUM_ARGS = {
+    {"GET", 1}, {"SET", 2}, {"DEL", 1}, {"COPY", 2}, {"EQ", 2}};
 
 void KeyValueCommands::Execute(Transaction& txn) {
   Reset();
@@ -46,8 +44,7 @@ void KeyValueCommands::Execute(Transaction& txn) {
     } else if (cmd_ == "EQ") {
       DCHECK(read_set.contains(args_[0]));
       if (read_set[args_[0]] != args_[1]) {
-        Abort() << "Key = " << args_[0]
-                << ". Expected value = " << args_[1]
+        Abort() << "Key = " << args_[0] << ". Expected value = " << args_[1]
                 << ". Actual value = " << read_set[args_[0]];
       }
     }
@@ -81,7 +78,7 @@ bool KeyValueCommands::NextCommand(const string& code) {
 
   auto it = COMMAND_NUM_ARGS.find(cmd_);
   if (it == COMMAND_NUM_ARGS.end()) {
-    Abort() << "Invalid command: " << cmd_; 
+    Abort() << "Invalid command: " << cmd_;
     return false;
   }
 
@@ -95,8 +92,6 @@ bool KeyValueCommands::NextCommand(const string& code) {
   return true;
 }
 
-void TPCCCommands::Execute(Transaction& /*txn*/) {
-  
-}
+void TPCCCommands::Execute(Transaction& /*txn*/) {}
 
-} // namespace slog
+}  // namespace slog

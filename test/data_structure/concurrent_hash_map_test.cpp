@@ -1,8 +1,8 @@
+#include "data_structure/concurrent_hash_map.h"
+
 #include <gtest/gtest.h>
 
 #include <thread>
-
-#include "data_structure/concurrent_hash_map.h"
 
 using namespace std;
 using namespace slog;
@@ -62,7 +62,7 @@ TEST(ConcurrentHashMapTest, TwoReadersOneWriter) {
   uint32_t N = 500000;
   string key = "foo";
   ConcurrentHashMap<string, string> map;
-  
+
   auto Updates = [&]() {
     for (size_t i = 0; i < N; i++) {
       map.InsertOrUpdate(key, to_string(i));
@@ -92,7 +92,7 @@ TEST(ConcurrentHashMapTest, TwoReadersOneWriter) {
 TEST(ConcurrentHashMapTest, TwoWritersDifferentKeys) {
   int N = 500000;
   ConcurrentHashMap<string, string> map;
-  
+
   auto Updates = [&](int start) {
     for (int i = start; i < N; i += 2) {
       map.InsertOrUpdate(to_string(i), to_string(i));
@@ -115,7 +115,7 @@ TEST(ConcurrentHashMapTest, TwoWritersSameKey) {
   int N = 500000;
   string key = "foo";
   ConcurrentHashMap<string, string> map;
-  
+
   auto Updates = [&]() {
     for (int i = 0; i < N; i += 1) {
       map.InsertOrUpdate(key, to_string(i));
@@ -129,13 +129,13 @@ TEST(ConcurrentHashMapTest, TwoWritersSameKey) {
 
   string result;
   ASSERT_TRUE(map.Get(result, key));
-  ASSERT_EQ(result, to_string(N-1));
+  ASSERT_EQ(result, to_string(N - 1));
 }
 
 TEST(ConcurrentHashMapTest, OneWriterOneEraser) {
   int N = 100000;
   ConcurrentHashMap<string, string> map;
-  
+
   auto Updates = [&]() {
     for (int i = 0; i < N; i++) {
       map.InsertOrUpdate(to_string(i), to_string(i));

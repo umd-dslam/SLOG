@@ -6,11 +6,10 @@ using std::make_pair;
 
 namespace slog {
 
-PerKeyRemasterManager::PerKeyRemasterManager(
-    const shared_ptr<const Storage<Key, Record>>& storage) : storage_(storage) {}
+PerKeyRemasterManager::PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
+    : storage_(storage) {}
 
-VerifyMasterResult
-PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
+VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
   auto txn = txn_holder->transaction();
   auto& keys = txn_holder->keys_in_partition();
   if (keys.empty()) {
@@ -25,14 +24,14 @@ PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
     return VerifyMasterResult::VALID;
   }
 
-  switch(CheckCounters(txn_holder, storage_)) {
+  switch (CheckCounters(txn_holder, storage_)) {
     case VerifyMasterResult::ABORT: {
       return VerifyMasterResult::ABORT;
     }
     case VerifyMasterResult::VALID: {
       // Check if other transactions are blocking the queue
       auto indirectly_blocked = false;
-      for (auto& key_pair :keys) {
+      for (auto& key_pair : keys) {
         auto q_it = blocked_queue_.find(key_pair.first);
         // If the queue is emtpy, can be skipped
         if (q_it != blocked_queue_.end() && !q_it->second.empty()) {
@@ -72,7 +71,7 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
       for (auto itr = queue.begin(); itr != queue.end(); itr++) {
         if ((*itr).first->transaction()->internal().id() == txn_id) {
           queue.erase(itr);
-          break; // Txns should only occur in a queue once
+          break;  // Txns should only occur in a queue once
         }
       }
       if (queue.empty()) {
@@ -89,7 +88,8 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
   return result;
 }
 
-void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter, const TransactionHolder* txn_holder) {
+void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter,
+                                                   const TransactionHolder* txn_holder) {
   auto entry = make_pair(txn_holder, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
@@ -165,4 +165,4 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
   }
 }
 
-} // namespace slog 
+}  // namespace slog

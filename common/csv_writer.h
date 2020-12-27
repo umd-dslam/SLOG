@@ -6,18 +6,14 @@
 
 namespace slog {
 
-const struct CSVWriterLineEnder{} csvendl;
+const struct CSVWriterLineEnder {
+} csvendl;
 
 class CSVWriter {
-public:
-  CSVWriter(
-      const std::string& file_name,
-      const std::vector<std::string>& columns,
-      char delimiter=',');
+ public:
+  CSVWriter(const std::string& file_name, const std::vector<std::string>& columns, char delimiter = ',');
 
-  template<
-      typename T,
-      typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+  template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
   CSVWriter& operator<<(T val) {
     IncrementLineItemsAndCheck();
     AppendDelim();
@@ -36,13 +32,13 @@ public:
     if (line_items_ != num_columns_) {
       throw std::runtime_error("Number of items must match number of columns");
     }
-    (void)ender; // Silent unused warning
+    (void)ender;  // Silent unused warning
     file_ << "\n";
     line_items_ = 0;
     return *this;
   }
 
-private:
+ private:
   void AppendDelim();
   void IncrementLineItemsAndCheck();
 
@@ -52,4 +48,4 @@ private:
   char delim_;
 };
 
-} // namespace slog
+}  // namespace slog

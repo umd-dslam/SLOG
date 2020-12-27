@@ -17,18 +17,15 @@ namespace slog {
  * the next local batch in the order given by the local Paxos process
  */
 class LocalLog {
-public:
-  void AddBatchId(
-      uint32_t queue_id, uint32_t position, BatchId batch_id);
+ public:
+  void AddBatchId(uint32_t queue_id, uint32_t position, BatchId batch_id);
   void AddSlot(SlotId slot_id, uint32_t queue_id);
 
   bool HasNextBatch() const;
   std::pair<SlotId, BatchId> NextBatch();
 
   /* For debugging */
-  size_t NumBufferedSlots() const {
-    return slots_.NumBufferredItems();
-  }
+  size_t NumBufferedSlots() const { return slots_.NumBufferredItems(); }
 
   /* For debugging */
   std::unordered_map<uint32_t, size_t> NumBufferedBatchesPerQueue() const {
@@ -39,7 +36,7 @@ public:
     return queue_sizes;
   }
 
-private:
+ private:
   void UpdateReadyBatches();
 
   // Used to decide the next queue to choose a batch from
@@ -54,24 +51,21 @@ private:
  * ...
  */
 class Interleaver : public NetworkedModule {
-public:
-  Interleaver(
-      const ConfigurationPtr& config,
-      const shared_ptr<Broker>& broker,
-      int poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, int poll_timeout_ms = kModuleTimeoutMs);
 
-protected:
+ protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
-private:
+ private:
   void AdvanceLogs();
 
   void EmitBatch(BatchPtr&& batch);
-  
+
   ConfigurationPtr config_;
   std::unordered_map<uint32_t, BatchLog> single_home_logs_;
   BatchLog multi_home_log_;
   LocalLog local_log_;
 };
 
-} // namespace slog
+}  // namespace slog

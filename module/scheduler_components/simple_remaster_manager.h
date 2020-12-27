@@ -7,7 +7,6 @@
 using std::unordered_map;
 using std::unordered_set;
 
-
 namespace slog {
 
 /**
@@ -16,7 +15,7 @@ namespace slog {
  * following transactions from region 1 will be blocked behind it
  */
 class SimpleRemasterManager : public RemasterManager {
-public:
+ public:
   SimpleRemasterManager() = default;
   SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
@@ -24,11 +23,9 @@ public:
   virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
 
-  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) {
-    storage_ = storage;
-  }
+  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) { storage_ = storage; }
 
-private:
+ private:
   /**
    * Test if the head of this queue can be unblocked
    */
@@ -41,4 +38,4 @@ private:
   unordered_map<uint32_t, list<const TransactionHolder*>> blocked_queue_;
 };
 
-} // namespace slog
+}  // namespace slog

@@ -1,25 +1,23 @@
 #pragma once
 
-#include <zmq.hpp>
 #include <google/protobuf/any.pb.h>
+
+#include <zmq.hpp>
 
 #include "common/types.h"
 
 namespace slog {
 
 /**
- * The format of a message is: 
+ * The format of a message is:
  * <sender machine id> <receiver channel> <proto>
  */
 
-inline void SendProto(
-    zmq::socket_t& socket,
-    const google::protobuf::Message& proto,
-    Channel chan = 0,
-    MachineId machineId = -1) {
+inline void SendProto(zmq::socket_t& socket, const google::protobuf::Message& proto, Channel chan = 0,
+                      MachineId machineId = -1) {
   google::protobuf::Any any;
   any.PackFrom(proto);
-  
+
   size_t sz = sizeof(MachineId) + sizeof(Channel) + any.ByteSizeLong();
   zmq::message_t msg(sz);
 
@@ -33,9 +31,7 @@ inline void SendProto(
   socket.send(msg, zmq::send_flags::none);
 }
 
-inline void SendProtoWithEmptyDelimiter(
-    zmq::socket_t& socket,
-    const google::protobuf::Message& proto) {
+inline void SendProtoWithEmptyDelimiter(zmq::socket_t& socket, const google::protobuf::Message& proto) {
   socket.send(zmq::message_t{}, zmq::send_flags::sndmore);
   SendProto(socket, proto);
 }
@@ -70,7 +66,7 @@ inline bool ParseAny(google::protobuf::Any& any, const zmq::message_t& msg) {
   return true;
 }
 
-template<typename T>
+template <typename T>
 inline bool ParseProto(T& out, const zmq::message_t& msg) {
   google::protobuf::Any any;
   if (!ParseAny(any, msg)) {
@@ -79,7 +75,7 @@ inline bool ParseProto(T& out, const zmq::message_t& msg) {
   return any.UnpackTo(&out);
 }
 
-template<typename T>
+template <typename T>
 inline bool ReceiveProto(zmq::socket_t& socket, T& out, bool dont_wait = false) {
   zmq::message_t msg;
   auto flag = dont_wait ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
@@ -89,7 +85,7 @@ inline bool ReceiveProto(zmq::socket_t& socket, T& out, bool dont_wait = false) 
   return ParseProto(out, msg);
 }
 
-template<typename T>
+template <typename T>
 inline bool ReceiveProtoWithEmptyDelimiter(zmq::socket_t& socket, T& out, bool dont_wait = false) {
   if (zmq::message_t empty; !socket.recv(empty) || !empty.more()) {
     return false;
@@ -97,4 +93,4 @@ inline bool ReceiveProtoWithEmptyDelimiter(zmq::socket_t& socket, T& out, bool d
   return ReceiveProto(socket, out, dont_wait);
 }
 
-} // namespace slog
+}  // namespace slog

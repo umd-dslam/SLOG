@@ -1,16 +1,16 @@
+#include <gtest/gtest.h>
+
 #include <thread>
 #include <vector>
-
-#include <gtest/gtest.h>
 
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/proto_utils.h"
-#include "test/test_utils.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;

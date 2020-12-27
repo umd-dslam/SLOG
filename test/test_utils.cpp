@@ -1,18 +1,18 @@
 #include "test/test_utils.h"
 
-#include <random>
-
 #include <glog/logging.h>
+
+#include <random>
 
 #include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "module/consensus.h"
-#include "module/interleaver.h"
 #include "module/forwarder.h"
+#include "module/interleaver.h"
 #include "module/multi_home_orderer.h"
-#include "module/server.h"
-#include "module/sequencer.h"
 #include "module/scheduler.h"
+#include "module/sequencer.h"
+#include "module/server.h"
 #include "module/ticker.h"
 #include "proto/api.pb.h"
 
@@ -36,11 +36,8 @@ internal::Response MakeEchoResponse(const std::string& data) {
   return response;
 }
 
-ConfigVec MakeTestConfigurations(
-    string&& prefix,
-    int num_replicas, 
-    int num_partitions,
-    internal::Configuration common_config) {
+ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_partitions,
+                                 internal::Configuration common_config) {
   std::random_device rd;
   std::mt19937 re(rd());
   std::uniform_int_distribution<> dis(20000, 30000);
@@ -64,19 +61,15 @@ ConfigVec MakeTestConfigurations(
 
   for (int rep = 0; rep < num_replicas; rep++) {
     for (int part = 0; part < num_partitions; part++) {
-      // Generate different server ports because tests 
+      // Generate different server ports because tests
       // run on the same machine
       common_config.set_server_port(dis(re));
       int i = rep * num_partitions + part;
       string local_addr = addr + to_string(i);
-      configs.push_back(std::make_shared<Configuration>(
-          common_config,
-          local_addr,
-          rep, 
-          part));
+      configs.push_back(std::make_shared<Configuration>(common_config, local_addr, rep, part));
     }
   }
-  
+
   return configs;
 }
 
@@ -96,59 +89,41 @@ Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter) {
 }
 
 TestSlog::TestSlog(const ConfigurationPtr& config)
-  : config_(config),
-    context_(new zmq::context_t(1)),
-    storage_(new MemOnlyStorage<Key, Record, Metadata>()),
-    broker_(new Broker(config, context_, kTestModuleTimeoutMs)),
-    client_context_(1),
-    client_socket_(client_context_, ZMQ_DEALER) {
+    : config_(config),
+      context_(new zmq::context_t(1)),
+      storage_(new MemOnlyStorage<Key, Record, Metadata>()),
+      broker_(new Broker(config, context_, kTestModuleTimeoutMs)),
+      client_context_(1),
+      client_socket_(client_context_, ZMQ_DEALER) {
   ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {
-  CHECK(config_->key_is_in_local_partition(key)) 
+  CHECK(config_->key_is_in_local_partition(key))
       << "Key \"" << key << "\" belongs to partition " << config_->partition_of_key(key);
   storage_->Write(key, record);
 }
 
-void TestSlog::AddServerAndClient() {
-  server_ = MakeRunnerFor<Server>(
-      config_, broker_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, broker_, kTestModuleTimeoutMs); }
 
 void TestSlog::AddForwarder() {
-  forwarder_ = MakeRunnerFor<Forwarder>(
-      config_, broker_, storage_, kTestModuleTimeoutMs);
+  forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeoutMs);
 }
 
-void TestSlog::AddSequencer() {
-  sequencer_ = MakeRunnerFor<Sequencer>(
-      config_, broker_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, kTestModuleTimeoutMs); }
 
-void TestSlog::AddInterleaver() {
-  interleaver_ = MakeRunnerFor<Interleaver>(
-      config_, broker_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeoutMs); }
 
 void TestSlog::AddScheduler() {
-  scheduler_ = MakeRunnerFor<Scheduler>(
-      config_, broker_, storage_, kTestModuleTimeoutMs);
+  scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_, kTestModuleTimeoutMs);
 }
 
-void TestSlog::AddLocalPaxos() {
-  local_paxos_ = MakeRunnerFor<LocalPaxos>(
-      config_, broker_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_, kTestModuleTimeoutMs); }
 
-void TestSlog::AddGlobalPaxos() {
-  global_paxos_ = MakeRunnerFor<GlobalPaxos>(
-      config_, broker_, kTestModuleTimeoutMs);
-}
+void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeoutMs); }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(
-      config_, broker_, kTestModuleTimeoutMs);
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, kTestModuleTimeoutMs);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {
@@ -165,24 +140,18 @@ zmq::pollitem_t TestSlog::GetPollItemForChannel(Channel channel) {
   if (it == channels_.end()) {
     LOG(FATAL) << "Channel " << channel << " does not exist";
   }
-  return {
-      static_cast<void*>(it->second),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */};
+  return {static_cast<void*>(it->second), 0, /* fd */
+          ZMQ_POLLIN, 0 /* revent */};
 }
 
-unique_ptr<Sender> TestSlog::GetSender() {
-  return std::make_unique<Sender>(broker_);
-}
+unique_ptr<Sender> TestSlog::GetSender() { return std::make_unique<Sender>(broker_); }
 
 void TestSlog::StartInNewThreads() {
   broker_->StartInNewThread();
   ticker_->StartInNewThread();
   if (server_) {
     server_->StartInNewThread();
-    string endpoint = 
-        "tcp://localhost:" + to_string(config_->server_port());
+    string endpoint = "tcp://localhost:" + to_string(config_->server_port());
     client_socket_.connect(endpoint);
   }
   if (forwarder_) {
@@ -227,4 +196,4 @@ Transaction TestSlog::RecvTxnResult() {
   return txn;
 }
 
-} // namespace slog
+}  // namespace slog

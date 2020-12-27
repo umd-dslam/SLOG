@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef LOCK_MANAGER
-  #error "Only one lock manager can be included"
+#error "Only one lock manager can be included"
 #endif
 #define LOCK_MANAGER
 
@@ -17,8 +17,8 @@
 #include "common/types.h"
 
 using std::list;
-using std::shared_ptr;
 using std::pair;
+using std::shared_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
@@ -31,7 +31,7 @@ namespace slog {
  * the lock and the mode of the lock.
  */
 class OldLockState {
-public:
+ public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
   unordered_set<TxnId> Release(TxnId txn_id);
@@ -40,16 +40,12 @@ public:
   LockMode mode = LockMode::UNLOCKED;
 
   /* For debugging */
-  const unordered_set<TxnId>& GetHolders() const {
-    return holders_;
-  }
+  const unordered_set<TxnId>& GetHolders() const { return holders_; }
 
   /* For debugging */
-  const list<pair<TxnId, LockMode>>& GetWaiters() const {
-    return waiter_queue_;
-  }
+  const list<pair<TxnId, LockMode>>& GetWaiters() const { return waiter_queue_; }
 
-private:
+ private:
   unordered_set<TxnId> holders_;
   unordered_set<TxnId> waiters_;
   list<pair<TxnId, LockMode>> waiter_queue_;
@@ -61,15 +57,15 @@ private:
  * transaction Y in the log, X always gets all locks before Y.
  */
 class OldLockManager {
-public:
+ public:
   /**
    * Counts the number of locks a txn needs.
-   * 
+   *
    * For MULTI_HOME txns, the number of needed locks before
    * calling this method can be negative due to its LockOnly
    * txn. Calling this function would bring the number of waited
    * locks back to 0, meaning all locks are granted.
-   * 
+   *
    * @param txn_holder Holder of the transaction to be registered.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
@@ -80,7 +76,7 @@ public:
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
    * for the current holders to release.
-   * 
+   *
    * @param txn_holder Holder of the transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
@@ -88,14 +84,14 @@ public:
   AcquireLocksResult AcquireLocks(const TransactionHolder& txn);
 
   /**
-   * Convenient method to perform txn registration and 
+   * Convenient method to perform txn registration and
    * lock acquisition at the same time.
    */
   AcquireLocksResult AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
-   * 
+   *
    * @param txn_holder Holder of the transaction whose locks are released.
    *            LockOnly txn is not accepted.
    * @return    A set of IDs of transactions that are able to obtain
@@ -105,15 +101,15 @@ public:
 
   /**
    * Gets current statistics of the lock manager
-   * 
+   *
    * @param stats A JSON object where the statistics are stored into
    */
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
-private:
+ private:
   unordered_map<Key, OldLockState> lock_table_;
   unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };
 
-} // namespace slog
+}  // namespace slog

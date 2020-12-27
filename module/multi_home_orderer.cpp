@@ -12,14 +12,11 @@ namespace slog {
 using internal::Batch;
 using internal::Request;
 
-MultiHomeOrderer::MultiHomeOrderer(
-    const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker,
-    int poll_timeout_ms)
-  : NetworkedModule(
-        "MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout_ms),
-    config_(config),
-    batch_id_counter_(0) {
+MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                                   int poll_timeout_ms)
+    : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout_ms),
+      config_(config),
+      batch_id_counter_(0) {
   NewBatch();
 }
 
@@ -42,10 +39,7 @@ void MultiHomeOrderer::HandleInternalRequest(ReusableRequest&& req, MachineId /*
     case Request::kForwardTxn: {
       // Received a new multi-home txn
       auto txn = req.get()->mutable_forward_txn()->release_txn();
-      RecordTxnEvent(
-          config_,
-          txn->mutable_internal(),
-          TransactionEvent::ENTER_MULTI_HOME_ORDERER);
+      RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
       batch_->mutable_transactions()->AddAllocated(txn);
       break;
     }
@@ -54,8 +48,7 @@ void MultiHomeOrderer::HandleInternalRequest(ReusableRequest&& req, MachineId /*
       ProcessForwardBatch(req.get()->mutable_forward_batch());
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
       break;
   }
 }
@@ -73,9 +66,8 @@ void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
   auto batch_id = NextBatchId();
   batch_->set_id(batch_id);
 
-  VLOG(1) << "Finished multi-home batch " << batch_id
-          << ". Sending out for ordering and replicating";
-  
+  VLOG(1) << "Finished multi-home batch " << batch_id << ". Sending out for ordering and replicating";
+
   // Make a proposal for multi-home batch ordering
   auto paxos_req = NewRequest();
   auto paxos_propose = paxos_req.get()->mutable_paxos_propose();
@@ -102,17 +94,13 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
-      RecordTxnEvent(
-          config_,
-          batch.get(),
-          TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
+      RecordTxnEvent(config_, batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
     case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
-      multi_home_batch_log_.AddSlot(
-          batch_order.slot(), batch_order.batch_id());
+      multi_home_batch_log_.AddSlot(batch_order.slot(), batch_order.batch_id());
       break;
     }
     default:
@@ -132,10 +120,7 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
     auto forward_batch = req.get()->mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());
 
-    RecordTxnEvent(
-        config_,
-        forward_batch->mutable_batch_data(),
-        TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
+    RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
 
     // Send the newly ordered multi-home batch to the sequencer
     Send(*req.get(), kSequencerChannel);
@@ -147,4 +132,4 @@ BatchId MultiHomeOrderer::NextBatchId() {
   return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
-} // namespace slog
+}  // namespace slog

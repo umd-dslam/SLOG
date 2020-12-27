@@ -1,34 +1,31 @@
 #include "connection/broker.h"
 
+#include <glog/logging.h>
+
 #include <sstream>
 #include <unordered_set>
 
-#include <glog/logging.h>
-
-#include "common/proto_utils.h"
 #include "common/cpu.h"
+#include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
-using std::pair;
-using std::unordered_set;
 using std::move;
+using std::pair;
 using std::string;
+using std::unordered_set;
 
 namespace slog {
 
 using internal::Request;
 
-Broker::Broker(
-    const ConfigurationPtr& config, 
-    const shared_ptr<zmq::context_t>& context,
-    long poll_timeout_ms) 
-  : config_(config),
-    context_(context),
-    poll_timeout_ms_(poll_timeout_ms),
-    socket_(*context, ZMQ_PULL),
-    running_(false),
-    is_synchronized_(false) {
+Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context, long poll_timeout_ms)
+    : config_(config),
+      context_(context),
+      poll_timeout_ms_(poll_timeout_ms),
+      socket_(*context, ZMQ_PULL),
+      running_(false),
+      is_synchronized_(false) {
   // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
   // Otherwise, it would hang indefinitely until the messages are sent.
   socket_.setsockopt(ZMQ_LINGER, 0);
@@ -51,9 +48,7 @@ void Broker::StartInNewThread(int cpu) {
   PinToCpu(pthread_self(), cpu);
 }
 
-void Broker::Stop() {
-  running_ = false;
-}
+void Broker::Stop() { running_ = false; }
 
 void Broker::AddChannel(Channel chan) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
@@ -66,9 +61,7 @@ void Broker::AddChannel(Channel chan) {
   channels_.insert_or_assign(chan, move(new_channel));
 }
 
-const std::shared_ptr<zmq::context_t>& Broker::context() const {
-  return context_;
-}
+const std::shared_ptr<zmq::context_t>& Broker::context() const { return context_; }
 
 std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   std::unique_lock<std::mutex> lock(mutex_);
@@ -86,9 +79,7 @@ std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   return endpoint_it->second;
 }
 
-MachineId Broker::GetLocalMachineId() const {
-  return config_->local_machine_id();
-}
+MachineId Broker::GetLocalMachineId() const { return config_->local_machine_id(); }
 
 string Broker::MakeEndpoint(const string& addr) const {
   std::stringstream endpoint;
@@ -125,7 +116,7 @@ bool Broker::InitializeConnection() {
   for (const auto& addr : config_->all_addresses()) {
     zmq::socket_t tmp_socket(*context_, ZMQ_PUSH);
     tmp_socket.setsockopt(ZMQ_LINGER, 0);
-    
+
     auto endpoint = MakeEndpoint(addr);
     tmp_socket.connect(endpoint);
 
@@ -172,9 +163,7 @@ bool Broker::InitializeConnection() {
         continue;
       }
 
-      LOG(INFO) << "Received READY message from " << addr 
-                << " (rep: " << replica 
-                << ", part: " << partition << ")";
+      LOG(INFO) << "Received READY message from " << addr << " (rep: " << replica << ", part: " << partition << ")";
 
       machine_id_to_endpoint_.insert_or_assign(machine_id, MakeEndpoint(addr));
       needed_machine_ids.erase(machine_id);
@@ -189,7 +178,6 @@ bool Broker::InitializeConnection() {
 }
 
 void Broker::Run() {
-
   if (!InitializeConnection()) {
     LOG(ERROR) << "Unable to initialize connection";
     return;
@@ -221,8 +209,8 @@ void Broker::Run() {
         }
       }
     }
-   VLOG_EVERY_N(4, 5000/poll_timeout_ms_) << "Broker is alive";
-  } // while-loop
+    VLOG_EVERY_N(4, 5000 / poll_timeout_ms_) << "Broker is alive";
+  }  // while-loop
 }
 
 void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
@@ -239,8 +227,6 @@ void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
   chan_it->second.send(msg, zmq::send_flags::none);
 }
 
-zmq::pollitem_t Broker::GetSocketPollItem() {
-  return {static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0};
-}
+zmq::pollitem_t Broker::GetSocketPollItem() { return {static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0}; }
 
-} // namespace slog
+}  // namespace slog

@@ -18,11 +18,9 @@ namespace slog {
 class SimpleMultiPaxos;
 
 struct Proposal {
-  Proposal()
-    : ballot(0), value(0), is_committed(false) {}
+  Proposal() : ballot(0), value(0), is_committed(false) {}
 
-  Proposal(uint32_t ballot, uint32_t value)
-    : ballot(ballot), value(value), is_committed(false) {}
+  Proposal(uint32_t ballot, uint32_t value) : ballot(ballot), value(value), is_committed(false) {}
 
   uint32_t ballot;
   uint32_t value;
@@ -30,24 +28,21 @@ struct Proposal {
 };
 
 class Leader {
-public:
+ public:
   /**
    * @param paxos   The enclosing Paxos class
    * @param members Machine Id of all members participating in this Paxos process
    * @param me      Machine Id of the current machine
    */
-  Leader(
-      SimpleMultiPaxos& paxos,
-      const vector<MachineId>& members,
-      MachineId me);
+  Leader(SimpleMultiPaxos& paxos, const vector<MachineId>& members, MachineId me);
 
   void HandleRequest(const internal::Request& req);
 
   void HandleResponse(const internal::Response& res, MachineId from);
-  
+
   bool IsMember() const;
 
-private:
+ private:
   void ProcessCommitRequest(const internal::PaxosCommitRequest& commit);
 
   void StartNewAcceptance(uint32_t value);
@@ -72,4 +67,4 @@ private:
   unordered_map<SlotId, Proposal> proposals_;
   vector<unique_ptr<QuorumTracker>> quorum_trackers_;
 };
-} // namespace slog
+}  // namespace slog

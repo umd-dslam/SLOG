@@ -1,7 +1,8 @@
+#include "storage/mem_only_storage.h"
+
 #include <gtest/gtest.h>
 
 #include "common/types.h"
-#include "storage/mem_only_storage.h"
 
 using namespace slog;
 

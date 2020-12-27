@@ -1,17 +1,18 @@
+#include "module/scheduler_components/per_key_remaster_manager.h"
+
 #include <gmock/gmock.h>
 
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/per_key_remaster_manager.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
+using std::make_pair;
 using ::testing::ElementsAre;
 using ::testing::IsEmpty;
-using std::make_pair;
 
 class PerKeyRemasterManagerTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() {
     configs = MakeTestConfigurations("locking", 1, 1);
     storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
@@ -46,9 +47,12 @@ TEST_F(PerKeyRemasterManagerTest, CheckMultipleCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   storage->Write("C", Record("valueC", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 1}}}), 100);
-  auto txn2 = MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}}), 101);
-  auto txn3 = MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}}), 102);
+  auto txn1 =
+      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 1}}}), 100);
+  auto txn2 =
+      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}}), 101);
+  auto txn3 =
+      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}}), 102);
 
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::VALID);
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
@@ -103,4 +107,4 @@ TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleTxns) {
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2).unblocked, ElementsAre());
   storage->Write("A", Record("valueA", 1, 2));
   ASSERT_THAT(remaster_manager->RemasterOccured("A", 2).unblocked, ElementsAre(&txn1, &txn2));
-} 
+}

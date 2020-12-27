@@ -4,12 +4,10 @@
 
 namespace slog {
 
-SimpleRemasterManager::SimpleRemasterManager(
-    const shared_ptr<const Storage<Key, Record>>& storage)
-  : storage_(storage) {}
+SimpleRemasterManager::SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
+    : storage_(storage) {}
 
-VerifyMasterResult
-SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
+VerifyMasterResult SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
   auto& keys = txn_holder->keys_in_partition();
   if (keys.empty()) {
     return VerifyMasterResult::VALID;
@@ -17,7 +15,7 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 
   auto txn = txn_holder->transaction();
   auto& txn_master_metadata = txn->internal().master_metadata();
-  if (txn_master_metadata.empty()) { // This should only be the case for testing
+  if (txn_master_metadata.empty()) {  // This should only be the case for testing
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return VerifyMasterResult::VALID;
   }
@@ -42,8 +40,8 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
   return result;
 }
 
-RemasterOccurredResult
-SimpleRemasterManager::RemasterOccured(const Key& remaster_key, uint32_t /* remaster_counter */) {
+RemasterOccurredResult SimpleRemasterManager::RemasterOccured(const Key& remaster_key,
+                                                              uint32_t /* remaster_counter */) {
   RemasterOccurredResult result;
   // Try to unblock each txn at the head of a queue, if it contains the remastered key.
   // Note that multiple queues could contain the same key with different counters
@@ -64,8 +62,7 @@ SimpleRemasterManager::RemasterOccured(const Key& remaster_key, uint32_t /* rema
   return result;
 }
 
-RemasterOccurredResult
-SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
+RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->transaction()->internal().id();
   for (auto replica : txn_holder->involved_replicas()) {
     auto it = blocked_queue_.find(replica);
@@ -76,11 +73,11 @@ SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
     for (auto itr = queue.begin(); itr != queue.end(); itr++) {
       if ((*itr)->transaction()->internal().id() == txn_id) {
         queue.erase(itr);
-        break; // Any transaction should only occur once per queue
+        break;  // Any transaction should only occur once per queue
       }
     }
   }
-  
+
   // Note: this must happen after the transaction is released, otherwise it could be returned in
   // the unblocked list
   RemasterOccurredResult result;
@@ -115,4 +112,4 @@ void SimpleRemasterManager::TryToUnblock(uint32_t local_log_machine_id, Remaster
   TryToUnblock(local_log_machine_id, result);
 }
 
-} // namespace slog
+}  // namespace slog

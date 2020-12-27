@@ -4,34 +4,24 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
-
 #include <zmq.hpp>
 
 #include "common/configuration.h"
-#include "common/types.h"
 #include "common/transaction_holder.h"
+#include "common/types.h"
 #include "module/base/networked_module.h"
 #include "module/scheduler_components/commands.h"
-#include "proto/transaction.pb.h"
 #include "proto/internal.pb.h"
+#include "proto/transaction.pb.h"
 #include "storage/storage.h"
 
 namespace slog {
 
 struct TransactionState {
-  enum class Phase {
-    READ_LOCAL_STORAGE,
-    WAIT_REMOTE_READ,
-    EXECUTE,
-    COMMIT,
-    FINISH,
-    PRE_ABORT
-  };
+  enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, COMMIT, FINISH, PRE_ABORT };
 
-  TransactionState(TransactionHolder* txn_holder) :
-      txn_holder(txn_holder),
-      remote_reads_waiting_on(0),
-      phase(Phase::READ_LOCAL_STORAGE) {}
+  TransactionState(TransactionHolder* txn_holder)
+      : txn_holder(txn_holder), remote_reads_waiting_on(0), phase(Phase::READ_LOCAL_STORAGE) {}
   TransactionHolder* txn_holder;
   uint32_t remote_reads_waiting_on;
   Phase phase;
@@ -44,23 +34,19 @@ struct TransactionState {
  * X to the subsequent phases as much as possible.
  */
 class Worker : public NetworkedModule {
-public:
-  Worker(
-      const ConfigurationPtr& config,
-      const std::shared_ptr<Broker>& broker,
-      Channel channel,
-      const std::shared_ptr<Storage<Key, Record>>& storage,
-      int poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
+         const std::shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms = kModuleTimeoutMs);
 
-protected:
+ protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
-private:
+ private:
   /**
    * Initializes the state of a new transaction
    */
   std::optional<TxnId> ProcessWorkerRequest(const internal::WorkerRequest& req);
-  
+
   /**
    * Applies remote read for transactions that are in the WAIT_REMOTE_READ phase.
    * When all remote reads are received, the transaction is moved to the EXECUTE phase.
@@ -77,7 +63,7 @@ private:
    * buffer, then broadcast local data to other partitions
    */
   void ReadLocalStorage(TxnId txn_id);
-  
+
   /**
    * Executes the code inside the transaction
    */
@@ -113,4 +99,4 @@ private:
   std::unordered_map<TxnId, TransactionState> txn_states_;
 };
 
-} // namespace slog
+}  // namespace slog

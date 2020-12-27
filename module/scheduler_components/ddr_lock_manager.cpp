@@ -19,10 +19,7 @@ vector<TxnId> LockQueueTail::AcquireWriteLock(TxnId txn_id) {
       deps.push_back(write_lock_requester_.value());
     }
   } else {
-    deps.insert(
-        deps.end(),
-        read_lock_requesters_.begin(),
-        read_lock_requesters_.end());
+    deps.insert(deps.end(), read_lock_requesters_.begin(), read_lock_requesters_.end());
     read_lock_requesters_.clear();
   }
   write_lock_requester_ = txn_id;
@@ -171,13 +168,10 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
     // Collect number of locks waited per txn
     // TODO: Give this another name. For this lock manager, this is
     // number of txn waited, not the number of locks.
-    stats.AddMember(
-        StringRef(NUM_LOCKS_WAITED_PER_TXN),
-        ToJsonArrayOfKeyValue(
-            txn_info_,
-            [](const auto& info) { return info.waiting_for_cnt; },
-            alloc),
-        alloc);
+    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN),
+                    ToJsonArrayOfKeyValue(
+                        txn_info_, [](const auto& info) { return info.waiting_for_cnt; }, alloc),
+                    alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), 0, alloc);
@@ -190,13 +184,12 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
       entry.PushBack(key_json, alloc)
-           .PushBack(lock_state.write_lock_requester().value_or(0), alloc)
-           .PushBack(
-                ToJsonArray(lock_state.read_lock_requesters(), alloc), alloc);
+          .PushBack(lock_state.write_lock_requester().value_or(0), alloc)
+          .PushBack(ToJsonArray(lock_state.read_lock_requesters(), alloc), alloc);
       lock_table.PushBack(move(entry), alloc);
     }
     stats.AddMember(StringRef(LOCK_TABLE), move(lock_table), alloc);
   }
 }
 
-} // namespace slog
+}  // namespace slog

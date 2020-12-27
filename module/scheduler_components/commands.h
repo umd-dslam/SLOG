@@ -10,16 +10,16 @@
 namespace slog {
 
 class Commands {
-public:
+ public:
   virtual ~Commands() = default;
   virtual void Execute(Transaction& txn) = 0;
 };
 
 class KeyValueCommands : public Commands {
-public:
+ public:
   void Execute(Transaction& txn) final;
 
-private:
+ private:
   static const std::unordered_map<std::string, size_t> COMMAND_NUM_ARGS;
 
   void Reset();
@@ -34,8 +34,8 @@ private:
 };
 
 class TPCCCommands : public Commands {
-public:
+ public:
   void Execute(Transaction& txn) final;
 };
 
-} // namespace slog
+}  // namespace slog

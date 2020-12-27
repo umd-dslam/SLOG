@@ -1,8 +1,9 @@
+#include "module/scheduler_components/old_lock_manager.h"
+
 #include <gtest/gtest.h>
 
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/old_lock_manager.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
@@ -18,9 +19,7 @@ TransactionHolder MakeHolder(const ConfigurationPtr& config, Transaction* txn) {
 TEST(OldLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto txn = MakeTransaction(
-    {"readA", "readB"},
-    {"writeC"});
+  auto txn = MakeTransaction({"readA", "readB"}, {"writeC"});
   TransactionHolder holder = MakeHolder(configs[0], txn);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
   auto new_holders = lock_manager.ReleaseLocks(holder);
@@ -144,7 +143,7 @@ TEST(OldLockManager, PrioritizeWriteLock) {
   auto txn2 = MakeTransaction({"A"}, {});
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
- 
+
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
 

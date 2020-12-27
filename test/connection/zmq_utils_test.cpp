@@ -1,6 +1,9 @@
-#include <gtest/gtest.h>
-#include <iostream>
 #include "connection/zmq_utils.h"
+
+#include <gtest/gtest.h>
+
+#include <iostream>
+
 #include "proto/internal.pb.h"
 
 using namespace std;

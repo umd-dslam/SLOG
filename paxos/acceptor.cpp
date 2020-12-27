@@ -12,17 +12,17 @@ Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 void Acceptor::HandleRequest(const Request& req, MachineId from) {
   switch (req.type_case()) {
     case Request::TypeCase::kPaxosAccept:
-      ProcessAcceptRequest(req.paxos_accept(), from); break;
+      ProcessAcceptRequest(req.paxos_accept(), from);
+      break;
     case Request::TypeCase::kPaxosCommit:
-      ProcessCommitRequest(req.paxos_commit(), from); break;
+      ProcessCommitRequest(req.paxos_commit(), from);
+      break;
     default:
       break;
   }
 }
 
-void Acceptor::ProcessAcceptRequest(
-    const internal::PaxosAcceptRequest& req,
-    MachineId from_machine_id) {
+void Acceptor::ProcessAcceptRequest(const internal::PaxosAcceptRequest& req, MachineId from_machine_id) {
   if (req.ballot() < ballot_) {
     return;
   }
@@ -34,9 +34,7 @@ void Acceptor::ProcessAcceptRequest(
   sender_.SendSameChannel(res, from_machine_id);
 }
 
-void Acceptor::ProcessCommitRequest(
-    const internal::PaxosCommitRequest& req,
-    MachineId from_machine_id) {
+void Acceptor::ProcessCommitRequest(const internal::PaxosCommitRequest& req, MachineId from_machine_id) {
   // TODO: If leader election is implemented, this is where we erase
   //       memory about an accepted value
   Response res;
@@ -45,4 +43,4 @@ void Acceptor::ProcessCommitRequest(
   sender_.SendSameChannel(res, from_machine_id);
 }
 
-} // namespace slog
+}  // namespace slog

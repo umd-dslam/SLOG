@@ -1,7 +1,7 @@
 #pragma once
 
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "google/protobuf/stubs/common.h"
 namespace slog {
@@ -17,4 +17,4 @@ inline void InitializeService(int* argc, char*** argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 }
 
-} // namespace slog
+}  // namespace slog

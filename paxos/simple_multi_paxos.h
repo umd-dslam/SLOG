@@ -11,41 +11,34 @@ using std::string;
 namespace slog {
 
 class SimpleMultiPaxos : public NetworkedModule {
-public:
-
+ public:
   /**
-   * @param group_number  Number of the current paxos group. Used to differentiate messages 
+   * @param group_number  Number of the current paxos group. Used to differentiate messages
    *                      from other paxos groups
    * @param broker        The broker for sending and receiving messages
    * @param members       Machine Id of all members participating in this Paxos process
    * @param me            Machine Id of the current machine
    */
-  SimpleMultiPaxos(
-      Channel group_number,
-      const shared_ptr<Broker>& broker,
-      const vector<MachineId>& group_members,
-      MachineId me,
-      int poll_timeout_ms = kModuleTimeoutMs);
+  SimpleMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker, const vector<MachineId>& group_members,
+                   MachineId me, int poll_timeout_ms = kModuleTimeoutMs);
 
   bool IsMember() const;
 
-protected:
+ protected:
   void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
 
   void HandleInternalResponse(ReusableResponse&& res, MachineId from) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
 
-private:
+ private:
   Leader leader_;
   Acceptor acceptor_;
 
-  void SendSameChannel(
-      const google::protobuf::Message& request_or_response,
-      MachineId to_machine_id);
+  void SendSameChannel(const google::protobuf::Message& request_or_response, MachineId to_machine_id);
 
   friend class Leader;
   friend class Acceptor;
 };
 
-} // namespace slog
+}  // namespace slog

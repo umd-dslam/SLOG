@@ -9,13 +9,8 @@ using std::move;
 
 namespace slog {
 
-Server::Server(
-    const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker,
-    int poll_timeout_ms)
-  : NetworkedModule("Server", broker, kServerChannel, poll_timeout_ms),
-    config_(config),
-    txn_id_counter_(0) {}
+Server::Server(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, int poll_timeout_ms)
+    : NetworkedModule("Server", broker, kServerChannel, poll_timeout_ms), config_(config), txn_id_counter_(0) {}
 
 /***********************************************
                 Custom socket
@@ -111,8 +106,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
     }
     default:
       pending_responses_.erase(txn_id);
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(request.type_case(), api::Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request.type_case(), api::Request) << "\"";
       break;
   }
 }
@@ -123,8 +117,8 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
 
 void Server::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) {
   if (req.get()->type_case() != internal::Request::kCompletedSubtxn) {
-    LOG(ERROR) << "Unexpected request type received: \""
-              << CASE_NAME(req.get()->type_case(), internal::Request) << "\"";
+    LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), internal::Request)
+               << "\"";
     return;
   }
   ProcessCompletedSubtxn(move(req));
@@ -132,18 +126,14 @@ void Server::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) 
 
 void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
   auto completed_subtxn = req.get()->mutable_completed_subtxn();
-  RecordTxnEvent(
-      config_,
-      completed_subtxn->mutable_txn()->mutable_internal(),
-      TransactionEvent::RETURN_TO_SERVER);
+  RecordTxnEvent(config_, completed_subtxn->mutable_txn()->mutable_internal(), TransactionEvent::RETURN_TO_SERVER);
 
   auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
     return;
   }
 
-  auto res = completed_txns_.try_emplace(txn_id,
-      config_, completed_subtxn->num_involved_partitions());
+  auto res = completed_txns_.try_emplace(txn_id, config_, completed_subtxn->num_involved_partitions());
 
   auto& completed_txn = res.first->second;
   if (completed_txn.AddSubTxn(std::move(req))) {
@@ -151,10 +141,7 @@ void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
     auto txn_response = response.mutable_txn();
     auto txn = completed_txn.txn();
 
-    RecordTxnEvent(
-        config_,
-        txn->mutable_internal(),
-        TransactionEvent::EXIT_SERVER_TO_CLIENT);
+    RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
 
     // This is ony temporary, "txn" is still owned by the request inside completed_txn
     txn_response->set_allocated_txn(txn);
@@ -181,21 +168,15 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   stats.AddMember(StringRef(NUM_PENDING_RESPONSES), pending_responses_.size(), alloc);
   stats.AddMember(StringRef(NUM_PARTIALLY_COMPLETED_TXNS), completed_txns_.size(), alloc);
   if (level >= 1) {
-    stats.AddMember(
-        StringRef(PENDING_RESPONSES),
-        ToJsonArrayOfKeyValue(
-            pending_responses_,
-            [](const auto& resp) { return resp.stream_id; },
-            alloc),
-        alloc);
+    stats.AddMember(StringRef(PENDING_RESPONSES),
+                    ToJsonArrayOfKeyValue(
+                        pending_responses_, [](const auto& resp) { return resp.stream_id; }, alloc),
+                    alloc);
 
-    stats.AddMember(
-        StringRef(PARTIALLY_COMPLETED_TXNS),
-        ToJsonArray(
-            completed_txns_,
-            [](const auto& p) { return p.first; },
-            alloc),
-        alloc);
+    stats.AddMember(StringRef(PARTIALLY_COMPLETED_TXNS),
+                    ToJsonArray(
+                        completed_txns_, [](const auto& p) { return p.first; }, alloc),
+                    alloc);
   }
 
   rapidjson::StringBuffer buf;
@@ -208,20 +189,18 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   HandleInternalResponse(move(res), 0);
 }
 
-
 /***********************************************
               Internal Responses
 ***********************************************/
 
 void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
   if (res.get()->type_case() != internal::Response::kStats) {
-    LOG(ERROR) << "Unexpected response type received: \""
-               << CASE_NAME(res.get()->type_case(), internal::Response) << "\"";
+    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(res.get()->type_case(), internal::Response)
+               << "\"";
   }
   api::Response response;
   auto stats_response = response.mutable_stats();
-  stats_response->set_allocated_stats_json(
-      res.get()->mutable_stats()->release_stats_json());
+  stats_response->set_allocated_stats_json(res.get()->mutable_stats()->release_stats_json());
   SendAPIResponse(res.get()->stats().id(), std::move(response));
 }
 
@@ -247,14 +226,11 @@ void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
 }
 
 bool Server::ValidateTransaction(const Transaction* txn) {
-  CHECK_NE(txn->read_set_size() + txn->write_set_size(), 0)
-    << "Txn accesses no keys: " << txn->internal().id();
+  CHECK_NE(txn->read_set_size() + txn->write_set_size(), 0) << "Txn accesses no keys: " << txn->internal().id();
 
   if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-    CHECK_EQ(txn->read_set_size(), 0)
-        << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
-    CHECK_EQ(txn->write_set_size(), 1)
-        << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
+    CHECK_EQ(txn->read_set_size(), 0) << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
+    CHECK_EQ(txn->write_set_size(), 1) << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
   }
 
   return true;
@@ -265,4 +241,4 @@ TxnId Server::NextTxnId() {
   return txn_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
-} // namespace slog
+}  // namespace slog

@@ -14,7 +14,7 @@ using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
 using ReusableRequest = ReusableMessage<internal::Request>;
 
 class TransactionHolder {
-public:
+ public:
   TransactionHolder();
   TransactionHolder(const ConfigurationPtr& config, ReusableRequest&& req);
 
@@ -27,13 +27,9 @@ public:
     return txn_request_.get()->mutable_forward_txn()->mutable_txn();
   }
 
-  void SetWorker(uint32_t worker) {
-    worker_ = worker;
-  }
+  void SetWorker(uint32_t worker) { worker_ = worker; }
 
-  std::optional<uint32_t> worker() const {
-    return worker_;
-  }
+  std::optional<uint32_t> worker() const { return worker_; }
 
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
   uint32_t num_involved_partitions() const;
@@ -55,7 +51,7 @@ public:
   const TxnIdReplicaIdPair transaction_id_replica_id() const;
   static const TxnIdReplicaIdPair transaction_id_replica_id(const Transaction*);
 
-private:
+ private:
   ReusableRequest txn_request_;
   std::optional<uint32_t> worker_;
   std::vector<ReusableRequest> early_remote_reads_;
@@ -65,4 +61,4 @@ private:
   std::vector<uint32_t> involved_replicas_;
 };
 
-} // namespace slog
+}  // namespace slog

@@ -1,7 +1,9 @@
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include <iostream>
 #include "common/string_utils.h"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <iostream>
 
 using namespace std;
 using namespace slog;
@@ -60,7 +62,7 @@ TEST(StringUtilsTest, NextNTokensTest) {
     auto pos = NextNTokens(res, str, delims, 3);
     ASSERT_THAT(res, ElementsAre("this", "is", "a"));
     ASSERT_EQ(pos, 11U);
- 
+
     pos = NextNTokens(res, str, delims, 1, pos);
     ASSERT_THAT(res, ElementsAre("test"));
     ASSERT_EQ(pos, 18U);

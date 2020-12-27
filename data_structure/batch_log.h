@@ -12,7 +12,7 @@ namespace slog {
 using BatchPtr = std::unique_ptr<internal::Batch>;
 
 class BatchLog {
-public:
+ public:
   BatchLog();
 
   void AddBatch(BatchPtr&& batch);
@@ -22,16 +22,12 @@ public:
   std::pair<SlotId, BatchPtr> NextBatch();
 
   /* For debugging */
-  size_t NumBufferedSlots() const {
-    return slots_.NumBufferredItems();
-  }
+  size_t NumBufferedSlots() const { return slots_.NumBufferredItems(); }
 
   /* For debugging */
-  size_t NumBufferedBatches() const {
-    return batches_.size();
-  }
+  size_t NumBufferedBatches() const { return batches_.size(); }
 
-private:
+ private:
   void UpdateReadyBatches();
 
   AsyncLog<BatchId> slots_;
@@ -39,4 +35,4 @@ private:
   std::queue<std::pair<SlotId, BatchId>> ready_batches_;
 };
 
-} // namespace slog
+}  // namespace slog

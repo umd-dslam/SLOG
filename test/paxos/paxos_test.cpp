@@ -1,11 +1,11 @@
-#include <vector>
-#include <condition_variable>
-
 #include <gtest/gtest.h>
 
+#include <condition_variable>
+#include <vector>
+
 #include "common/proto_utils.h"
-#include "test/test_utils.h"
 #include "paxos/simple_multi_paxos.h"
+#include "test/test_utils.h"
 
 using namespace slog;
 using namespace std;
@@ -15,18 +15,14 @@ using Pair = pair<uint32_t, uint32_t>;
 const Channel kTestChannel = 100;
 
 class TestSimpleMultiPaxos : public SimpleMultiPaxos {
-public:
-  TestSimpleMultiPaxos(
-      const shared_ptr<Broker>& broker,
-      const vector<MachineId>& group_members,
-      const MachineId& me)
-    : SimpleMultiPaxos(kTestChannel, broker, group_members, me, 5) {}
+ public:
+  TestSimpleMultiPaxos(const shared_ptr<Broker>& broker, const vector<MachineId>& group_members, const MachineId& me)
+      : SimpleMultiPaxos(kTestChannel, broker, group_members, me, 5) {}
 
   Pair Poll() {
     unique_lock<mutex> lock(m_);
     // Wait until committed_ is not null
-    bool ok = cv_.wait_for(
-        lock, milliseconds(2000), [this]{return committed_ != nullptr;});
+    bool ok = cv_.wait_for(lock, milliseconds(2000), [this] { return committed_ != nullptr; });
     if (!ok) {
       CHECK(false) << "Poll timed out";
     }
@@ -35,36 +31,29 @@ public:
     return ret;
   }
 
-protected:
+ protected:
   void OnCommit(uint32_t slot, uint32_t value) final {
     {
       lock_guard<mutex> g(m_);
-      CHECK(committed_ == nullptr)
-          << "The result needs to be read before committing another one";
+      CHECK(committed_ == nullptr) << "The result needs to be read before committing another one";
       committed_.reset(new Pair(slot, value));
     }
     cv_.notify_all();
   }
 
-private:
+ private:
   unique_ptr<Pair> committed_;
   mutex m_;
   condition_variable cv_;
 };
 
 class PaxosTest : public ::testing::Test {
-protected:
+ protected:
   void AddAndStartNewPaxos(const ConfigurationPtr& config) {
-    AddAndStartNewPaxos(
-        config,
-        config->all_machine_ids(),
-        config->local_machine_id());
+    AddAndStartNewPaxos(config, config->all_machine_ids(), config->local_machine_id());
   }
 
-  void AddAndStartNewPaxos(
-      const ConfigurationPtr& config,
-      const vector<MachineId>& members,
-      MachineId me) {
+  void AddAndStartNewPaxos(const ConfigurationPtr& config, const vector<MachineId>& members, MachineId me) {
     auto context = make_shared<zmq::context_t>(1);
     auto broker = make_shared<Broker>(config, context, 5 /* timeout_ms */);
     auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
@@ -78,7 +67,7 @@ protected:
     brokers_.emplace_back(broker);
     senders_.push_back(move(sender));
     paxos_runners_.emplace_back(paxos_runner);
-    
+
     paxi.push_back(paxos);
   }
 
@@ -91,7 +80,7 @@ protected:
 
   vector<shared_ptr<TestSimpleMultiPaxos>> paxi;
 
-private:
+ private:
   vector<shared_ptr<zmq::context_t>> contexts_;
   vector<shared_ptr<Broker>> brokers_;
   vector<unique_ptr<ModuleRunner>> paxos_runners_;
@@ -165,7 +154,7 @@ TEST_F(PaxosTest, MultiRegionsWithNonMembers) {
     AddAndStartNewPaxos(config, members, config->local_machine_id());
   }
 
-  auto non_member = (member_part + 1) % configs.front()->num_partitions(); 
+  auto non_member = (member_part + 1) % configs.front()->num_partitions();
   Propose(non_member, 111);
   for (auto& paxos : paxi) {
     if (paxos->IsMember()) {

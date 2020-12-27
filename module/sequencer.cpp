@@ -14,13 +14,8 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(
-    const ConfigurationPtr& config,
-    const std::shared_ptr<Broker>& broker,
-    int poll_timeout_ms)
-  : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout_ms),
-    config_(config),
-    batch_id_counter_(0) {
+Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, int poll_timeout_ms)
+    : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout_ms), config_(config), batch_id_counter_(0) {
   NewBatch();
 }
 
@@ -44,10 +39,7 @@ void Sequencer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from *
       // Received a single-home txn
       auto txn = req.get()->mutable_forward_txn()->release_txn();
 
-      RecordTxnEvent(
-          config_,
-          txn->mutable_internal(),
-          TransactionEvent::ENTER_SEQUENCER);
+      RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
       PutSingleHomeTransactionIntoBatch(txn);
       break;
@@ -60,8 +52,7 @@ void Sequencer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from *
       break;
     }
     default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
       break;
   }
 }
@@ -101,10 +92,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   forward_batch->set_allocated_batch_data(batch_.get());
 
   // Replicate batch to all machines
-  RecordTxnEvent(
-      config_,
-      forward_batch->mutable_batch_data(),
-      TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+  RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
 #ifdef ENABLE_REPLICATION_DELAY
   // Maybe delay current batch
@@ -116,7 +104,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
     DelaySingleHomeBatch(move(batch_req));
     NewBatch();
     return;
-  } // Otherwise send it normally
+  }    // Otherwise send it normally
 #endif /* ENABLE_REPLICATION_DELAY */
 
   // Replicate batch to all machines
@@ -141,20 +129,17 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
     return;
   }
 
-  RecordTxnEvent(
-      config_,
-      batch,
-      TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
+  RecordTxnEvent(config_, batch, TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
 
   auto local_rep = config_->local_replica();
   // For each multi-home txn, create a lock-only txn and put into
   // the single-home batch to be sent to the local log
   for (auto& txn : batch->transactions()) {
     auto lock_only_txn = new Transaction();
-    
+
     const auto& metadata = txn.internal().master_metadata();
     auto lock_only_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
-    
+
     // Copy keys and metadata in local replica
     for (auto& key_value : txn.read_set()) {
       auto master = metadata.at(key_value.first).master();
@@ -176,13 +161,13 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
     // TODO: refactor to remote metadata from lock-onlys. Requires
     // changes in the scheduler
     if (txn.procedure_case() == Transaction::kRemaster) {
-    lock_only_txn->mutable_remaster()->set_new_master((txn.remaster().new_master()));
+      lock_only_txn->mutable_remaster()->set_new_master((txn.remaster().new_master()));
       if (txn.remaster().new_master() == local_rep) {
         lock_only_txn->CopyFrom(txn);
         lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
       }
     }
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */ 
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
     lock_only_txn->mutable_internal()->set_id(txn.internal().id());
     lock_only_txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
@@ -193,10 +178,7 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
   }
 
   // Replicate the batch of multi-home txns to all machines in the same region
-  RecordTxnEvent(
-      config_,
-      batch,
-      TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+  RecordTxnEvent(config_, batch, TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
@@ -206,9 +188,7 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
 }
 
 void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
-  DCHECK(
-      txn->internal().type() == TransactionType::SINGLE_HOME
-      || txn->internal().type() == TransactionType::LOCK_ONLY)
+  DCHECK(txn->internal().type() == TransactionType::SINGLE_HOME || txn->internal().type() == TransactionType::LOCK_ONLY)
       << "Sequencer batch can only contain single-home or lock-only txn. "
       << "Multi-home txn or unknown txn type received instead.";
   batch_->mutable_transactions()->AddAllocated(txn);
@@ -226,10 +206,7 @@ void Sequencer::DelaySingleHomeBatch(ReusableRequest&& request) {
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineId(local_rep, part);
-    Send(
-        *request.get(),
-        kInterleaverChannel,
-        machine_id);
+    Send(*request.get(), kInterleaverChannel, machine_id);
   }
   delayed_batches_.emplace_back(std::move(request));
 }
@@ -252,10 +229,7 @@ void Sequencer::MaybeSendDelayedBatches() {
         }
         for (uint32_t part = 0; part < num_partitions; part++) {
           auto machine_id = config_->MakeMachineId(rep, part);
-          Send(
-              *request.get(),
-              kInterleaverChannel,
-              machine_id);
+          Send(*request.get(), kInterleaverChannel, machine_id);
         }
       }
 
@@ -267,4 +241,4 @@ void Sequencer::MaybeSendDelayedBatches() {
 }
 #endif /* ENABLE_REPLICATION_DELAY */
 
-} // namespace slog
+}  // namespace slog

@@ -1,7 +1,7 @@
-#include <sstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <random>
+#include <sstream>
 
 #include "common/configuration.h"
 #include "common/csv_writer.h"
@@ -16,21 +16,18 @@
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_uint32(r, 0, "The region where the current machine is located");
-DEFINE_int32(p, -1, "The partition the transactions are sent to. "
-                     "Set to a negative number to randomly send to any partiton");
+DEFINE_int32(p, -1,
+             "The partition the transactions are sent to. "
+             "Set to a negative number to randomly send to any partiton");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_string(out_dir, "", "Directory containing output data");
 DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
-DEFINE_uint32(
-    duration,
-    0,
-    "How long the benchmark is run in seconds. "
-    "This is mutually exclusive with \"num_txns\"");
-DEFINE_uint32(
-    num_txns,
-    0,
-    "Total number of txns being sent. "
-    "This is mutually exclusive with \"duration\"");
+DEFINE_uint32(duration, 0,
+              "How long the benchmark is run in seconds. "
+              "This is mutually exclusive with \"num_txns\"");
+DEFINE_uint32(num_txns, 0,
+              "Total number of txns being sent. "
+              "This is mutually exclusive with \"duration\"");
 DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
@@ -50,7 +47,7 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-template<typename T>
+template <typename T>
 uint64_t TimeElapsedSince(TimePoint tp) {
   return duration_cast<T>(Clock::now() - tp).count();
 }
@@ -59,31 +56,20 @@ const uint32_t STATS_PRINT_EVERY_MS = 1000;
 const uint32_t ESTIMATED_OVERHEAD = 111;
 
 const string TXNS_FILE = "transactions.csv";
-const vector<string> TXN_COLUMNS = {
-    "client_txn_id",
-    "txn_id",
-    "is_mh",
-    "is_mp",
-    "sent_at",      // microseconds since epoch
-    "received_at"};  // microseconds since epoch
-
+const vector<string> TXN_COLUMNS = {"client_txn_id", "txn_id", "is_mh", "is_mp",
+                                    "sent_at",       // microseconds since epoch
+                                    "received_at"};  // microseconds since epoch
 
 const string EVENTS_FILE = "events.csv";
-const vector<string> EVENTS_COLUMNS = {
-    "txn_id",
-    "event_id",
-    "time",     // microseconds since epoch
-    "machine"};
+const vector<string> EVENTS_COLUMNS = {"txn_id", "event_id",
+                                       "time",  // microseconds since epoch
+                                       "machine"};
 
 const string EVENT_NAMES_FILE = "event_names.csv";
-const vector<string> EVENT_NAMES_COLUMNS = {
-    "id",
-    "event"};
+const vector<string> EVENT_NAMES_COLUMNS = {"id", "event"};
 
 const string THROUGHPUT_FILE = "throughput.csv";
-const vector<string> THROUGHPUT_COLUMNS = {
-    "time",
-    "txns_per_sec"};
+const vector<string> THROUGHPUT_COLUMNS = {"time", "txns_per_sec"};
 
 /**
  * Connection stuff
@@ -148,19 +134,17 @@ struct Statistics {
 
   void FinalPrint() {
     Print();
-    cout << "Elapsed time: " << TimeElapsedSince<seconds>(start_time)
-         << " seconds" << endl;
+    cout << "Elapsed time: " << TimeElapsedSince<seconds>(start_time) << " seconds" << endl;
   }
 
-private:
+ private:
   TimePoint time_last_print_;
 
   TimePoint time_last_throughput_;
   uint32_t resp_last_throughput_ = 0;
 
   double Throughput() {
-    double time_since_last_compute_sec =
-        TimeElapsedSince<milliseconds>(time_last_throughput_) / 1000.0;
+    double time_since_last_compute_sec = TimeElapsedSince<milliseconds>(time_last_throughput_) / 1000.0;
     double throughput = (resp_counter - resp_last_throughput_) / time_since_last_compute_sec;
     time_last_throughput_ = Clock::now();
     resp_last_throughput_ = resp_counter;
@@ -175,9 +159,8 @@ private:
     cout << "Throughput: " << fixed << tp << " txns/s" << endl;
 
     if (throughput_writer != nullptr) {
-      (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count()
-                          << tp
-                          << csvendl;
+      (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count() << tp
+                           << csvendl;
     }
   }
 
@@ -185,12 +168,12 @@ private:
 
 void InitializeBenchmark() {
   if (FLAGS_duration > 0 && FLAGS_num_txns > 0) {
-    LOG(FATAL) << "Only either \"duration\" or \"num_txns\" can be set"; 
+    LOG(FATAL) << "Only either \"duration\" or \"num_txns\" can be set";
   }
 
   // Potentially speed up execution
   std::ios_base::sync_with_stdio(false);
-  
+
   // Create a ticker and subscribe to it
   if (FLAGS_rate > 2000) {
     LOG(WARNING) << "The maximum possible rate is 2000 txns/sec.";
@@ -200,27 +183,22 @@ void InitializeBenchmark() {
   uint32_t rate = 1000000 / (1000000 / FLAGS_rate - ESTIMATED_OVERHEAD);
   ticker = MakeRunnerFor<Ticker>(context, rate);
   ticker->StartInNewThread();
-  ticker_socket = make_unique<zmq::socket_t>(
-      Ticker::Subscribe(context));
+  ticker_socket = make_unique<zmq::socket_t>(Ticker::Subscribe(context));
   // This has to be pushed to poll_items before the server sockets
-  poll_items.push_back({
-      static_cast<void*>(*ticker_socket),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */});
+  poll_items.push_back({static_cast<void*>(*ticker_socket), 0, /* fd */
+                        ZMQ_POLLIN, 0 /* revent */});
 
   config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
 
   if (FLAGS_p >= 0 && static_cast<uint32_t>(FLAGS_p) >= config->num_partitions()) {
-    LOG(FATAL) << "Invalid partition: " << FLAGS_p
-               << ". Number of partition is: " << config->num_partitions();
+    LOG(FATAL) << "Invalid partition: " << FLAGS_p << ". Number of partition is: " << config->num_partitions();
   }
 
   // Connect to all server in the same region
   for (uint32_t p = 0; p < config->num_partitions(); p++) {
     std::ostringstream endpoint_s;
     if (config->protocol() == "ipc") {
-      endpoint_s << "tcp://localhost:"  << config->server_port();
+      endpoint_s << "tcp://localhost:" << config->server_port();
     } else {
       endpoint_s << "tcp://" << config->address(FLAGS_r, p) << ":" << config->server_port();
     }
@@ -231,12 +209,9 @@ void InitializeBenchmark() {
     socket->setsockopt(ZMQ_SNDHWM, 0);
     socket->setsockopt(ZMQ_RCVHWM, 0);
     socket->connect(endpoint);
-    poll_items.push_back({
-        static_cast<void*>(*socket),
-        0, /* fd */
-        ZMQ_POLLIN,
-        0 /* revent */});
-    
+    poll_items.push_back({static_cast<void*>(*socket), 0, /* fd */
+                          ZMQ_POLLIN, 0 /* revent */});
+
     server_sockets.push_back(move(socket));
   }
 
@@ -320,11 +295,11 @@ void SendNextTransaction() {
       log << std::setw(2) << p.second << " ";
     }
     log << "\n" << std::setw(11) << "is_write: ";
-    for (const auto&p : profile.is_write_record) {
+    for (const auto& p : profile.is_write_record) {
       log << std::setw(2) << p.second << " ";
     }
     log << "\n" << std::setw(11) << "is_hot: ";
-    for (const auto&p : profile.is_hot_record) {
+    for (const auto& p : profile.is_hot_record) {
       log << std::setw(2) << p.second << " ";
     }
     LOG(INFO) << "Transaction profile:\n" << log.str();
@@ -364,8 +339,7 @@ void ReceiveResult(int from_socket) {
   if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
     auto txn_id = res.txn().txn().internal().id();
     LOG(ERROR) << "Received response for a non-outstanding txn "
-                << "(stream_id = " << res.stream_id()
-                << ", txn_id = " << txn_id << "). Dropping...";
+               << "(stream_id = " << res.stream_id() << ", txn_id = " << txn_id << "). Dropping...";
   }
 
   stats.resp_counter++;
@@ -381,24 +355,18 @@ void ReceiveResult(int from_socket) {
   }
 
   if (txn_writer != nullptr) {
-    (*txn_writer) << txn_info.profile.client_txn_id
-                  << txn_internal.id()
-                  << txn_info.profile.is_multi_home
+    (*txn_writer) << txn_info.profile.client_txn_id << txn_internal.id() << txn_info.profile.is_multi_home
                   << txn_info.profile.is_multi_partition
                   << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
-                  << duration_cast<microseconds>(recv_at.time_since_epoch()).count()
-                  << csvendl;
+                  << duration_cast<microseconds>(recv_at.time_since_epoch()).count() << csvendl;
   }
 
   if (events_writer != nullptr) {
     for (int i = 0; i < txn_internal.events_size(); i++) {
       auto event = txn_internal.events(i);
       event_names[event] = ENUM_NAME(event, TransactionEvent);
-      (*events_writer) << txn_internal.id()
-                      << static_cast<int>(event)
-                      << txn_internal.event_times(i)
-                      << txn_internal.event_machines(i)
-                      << csvendl;
+      (*events_writer) << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
+                       << txn_internal.event_machines(i) << csvendl;
     }
   }
 
@@ -407,10 +375,10 @@ void ReceiveResult(int from_socket) {
 
 int main(int argc, char* argv[]) {
   InitializeService(&argc, &argv);
-  
+
   InitializeBenchmark();
-  
+
   RunBenchmark();
- 
+
   return 0;
 }

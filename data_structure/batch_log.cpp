@@ -19,9 +19,7 @@ void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id) {
   UpdateReadyBatches();
 }
 
-bool BatchLog::HasNextBatch() const {
-  return !ready_batches_.empty();
-}
+bool BatchLog::HasNextBatch() const { return !ready_batches_.empty(); }
 
 std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
   if (!HasNextBatch()) {
@@ -48,4 +46,4 @@ void BatchLog::UpdateReadyBatches() {
   }
 }
 
-} // namespace slog
+}  // namespace slog

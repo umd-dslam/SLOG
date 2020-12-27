@@ -57,4 +57,4 @@ inline KeyReplica MakeKeyReplica(Key key, uint32_t master) {
   return new_key;
 }
 
-} // namespace slog
+}  // namespace slog

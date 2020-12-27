@@ -12,57 +12,47 @@ using std::vector;
 
 namespace slog {
 
-enum class QuorumState {
-  INCOMPLETE,
-  QUORUM_REACHED,
-  COMPLETE,
-  ABORTED
-};
+enum class QuorumState { INCOMPLETE, QUORUM_REACHED, COMPLETE, ABORTED };
 
 class QuorumTracker {
-public:
+ public:
   QuorumTracker(uint32_t num_members);
   virtual ~QuorumTracker() = default;
 
   bool HandleResponse(const internal::Response& res, MachineId from);
-    
+
   QuorumState GetState() const;
- 
-protected:
+
+ protected:
   virtual bool ResponseIsValid(const internal::Response& res) = 0;
-  
+
   void Abort();
 
-private:
+ private:
   uint32_t num_members_;
   unordered_set<MachineId> machine_responded_;
   QuorumState state_;
 };
 
 class AcceptanceTracker : public QuorumTracker {
-public:
-  AcceptanceTracker(
-      uint32_t num_members,
-      uint32_t ballot,
-      uint32_t slot);
+ public:
+  AcceptanceTracker(uint32_t num_members, uint32_t ballot, uint32_t slot);
 
   const uint32_t ballot;
   const uint32_t slot;
 
-protected:
+ protected:
   bool ResponseIsValid(const internal::Response& res) final;
 };
 
 class CommitTracker : public QuorumTracker {
-public:
-  CommitTracker(
-      uint32_t num_members,
-      uint32_t slot);
-  
+ public:
+  CommitTracker(uint32_t num_members, uint32_t slot);
+
   const uint32_t slot;
 
-protected:
+ protected:
   bool ResponseIsValid(const internal::Response& res) final;
 };
 
-} // namespace slog
+}  // namespace slog

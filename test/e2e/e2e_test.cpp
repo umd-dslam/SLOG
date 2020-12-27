@@ -1,30 +1,29 @@
+#include <gtest/gtest.h>
+
 #include <thread>
 #include <vector>
 
-#include <gtest/gtest.h>
-
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
 #include "connection/broker.h"
-#include "proto/api.pb.h"
-#include "module/server.h"
 #include "module/forwarder.h"
+#include "module/server.h"
+#include "proto/api.pb.h"
 #include "storage/mem_only_storage.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
 
 class E2ETest : public ::testing::Test {
-protected:
+ protected:
   static const size_t NUM_MACHINES = 4;
 
   void SetUp() {
     internal::Configuration config_proto;
     config_proto.set_replication_factor(2);
-    configs = MakeTestConfigurations(
-        "e2e", 2 /* num_replicas */, 2 /* num_partitions */, config_proto);
+    configs = MakeTestConfigurations("e2e", 2 /* num_replicas */, 2 /* num_partitions */, config_proto);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
@@ -37,8 +36,7 @@ protected:
       test_slogs[i]->AddLocalPaxos();
 
       // Only one partition per replica participates in the global paxos process
-      if (configs[i]->leader_partition_for_multi_home_ordering() 
-          == configs[i]->local_partition()) {
+      if (configs[i]->leader_partition_for_multi_home_ordering() == configs[i]->local_partition()) {
         test_slogs[i]->AddGlobalPaxos();
         test_slogs[i]->AddMultiHomeOrderer();
       }
@@ -68,11 +66,10 @@ protected:
 // read values for correctness.
 // TODO: submit transactions concurrently (multiple outcomes would be valid)
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
-  auto txn1 = MakeTransaction(
-    {}, /* read_set */
-    {"A"},  /* write_set */
-    "SET A newA\n" /* code */);
-  auto txn2 = MakeTransaction({"A"} /* read_set */, {}  /* write_set */);
+  auto txn1 = MakeTransaction({},    /* read_set */
+                              {"A"}, /* write_set */
+                              "SET A newA\n" /* code */);
+  auto txn2 = MakeTransaction({"A"} /* read_set */, {} /* write_set */);
 
   test_slogs[0]->SendTxn(txn1);
   auto txn1_resp = test_slogs[0]->RecvTxnResult();
@@ -88,7 +85,7 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
 
 TEST_F(E2ETest, MultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "B"} /* read_set */, {}  /* write_set */);
+    auto txn = MakeTransaction({"A", "B"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
@@ -101,7 +98,7 @@ TEST_F(E2ETest, MultiPartitionTxn) {
 
 TEST_F(E2ETest, MultiHomeTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "C"} /* read_set */, {}  /* write_set */);
+    auto txn = MakeTransaction({"A", "C"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
@@ -114,7 +111,7 @@ TEST_F(E2ETest, MultiHomeTxn) {
 
 TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
+    auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
@@ -127,13 +124,11 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
 
 #ifdef ENABLE_REMASTER
 TEST_F(E2ETest, RemasterTxn) {
-  auto remaster_txn = MakeTransaction(
-      {}, /* read_set */
-      {"A"},  /* write_set */
-      "", /* code */
-      {}, /* master metadata */
-      0,
-      1 /* new master */);
+  auto remaster_txn = MakeTransaction({},    /* read_set */
+                                      {"A"}, /* write_set */
+                                      "",    /* code */
+                                      {},    /* master metadata */
+                                      0, 1 /* new master */);
 
   test_slogs[1]->SendTxn(remaster_txn);
   auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();
@@ -145,14 +140,14 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
-  auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
+  auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
 
   // Since replication factor is set to 2 for all tests in this file, it is
   // guaranteed that this txn will see the changes made by the remaster txn
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type()); // used to be MH
+  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());  // used to be MH
   ASSERT_EQ("valA", txn_resp.read_set().at("A"));
   ASSERT_EQ("valX", txn_resp.read_set().at("X"));
 }
@@ -160,21 +155,19 @@ TEST_F(E2ETest, RemasterTxn) {
 
 TEST_F(E2ETest, AbortTxn) {
   // Multi-partition transaction where one of the partition will abort
-  auto aborted_txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"B"},  /* write_set */
-      "SET B notB EQ A notA", /* code */
-      {} /* master metadata */);
+  auto aborted_txn = MakeTransaction({"A"},                  /* read_set */
+                                     {"B"},                  /* write_set */
+                                     "SET B notB EQ A notA", /* code */
+                                     {} /* master metadata */);
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
   ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
 
-  auto txn = MakeTransaction(
-      {"B"}, /* read_set */
-      {},  /* write_set */
-      "GET B");
+  auto txn = MakeTransaction({"B"}, /* read_set */
+                             {},    /* write_set */
+                             "GET B");
 
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();

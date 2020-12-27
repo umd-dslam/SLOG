@@ -1,6 +1,7 @@
+#include "common/message_pool.h"
+
 #include <gtest/gtest.h>
 
-#include "common/message_pool.h"
 #include "proto/internal.pb.h"
 
 using namespace std;

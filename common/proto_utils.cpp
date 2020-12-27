@@ -14,11 +14,10 @@ namespace {
 using google::protobuf::Map;
 
 bool operator!=(MasterMetadata metadata1, MasterMetadata metadata2) {
-  return metadata1.master() != metadata2.master() 
-      || metadata1.counter() != metadata2.counter();
+  return metadata1.master() != metadata2.master() || metadata1.counter() != metadata2.counter();
 }
 
-template<typename K, typename V>
+template <typename K, typename V>
 bool operator==(Map<K, V> map1, Map<K, V> map2) {
   if (map1.size() != map2.size()) {
     return false;
@@ -33,15 +32,11 @@ bool operator==(Map<K, V> map1, Map<K, V> map2) {
   return true;
 }
 
-} // namespace
+}  // namespace
 
-Transaction* MakeTransaction(
-    const unordered_set<Key>& read_set,
-    const unordered_set<Key>& write_set,
-    const string& code,
-    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
-    const MachineId coordinating_server,
-    const int32_t new_master) {
+Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
+                             const string& code, const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
+                             const MachineId coordinating_server, const int32_t new_master) {
   Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
     txn->mutable_read_set()->insert({key, ""});
@@ -49,7 +44,7 @@ Transaction* MakeTransaction(
   for (const auto& key : write_set) {
     txn->mutable_write_set()->insert({key, ""});
   }
-  if (new_master >= 0) { // Not set as default
+  if (new_master >= 0) {  // Not set as default
     txn->mutable_remaster()->set_new_master(new_master);
   } else {
     txn->set_code(code);
@@ -62,13 +57,10 @@ Transaction* MakeTransaction(
       MasterMetadata metadata;
       metadata.set_master(pair.second.first);
       metadata.set_counter(pair.second.second);
-      txn->mutable_internal()
-          ->mutable_master_metadata()
-          ->insert({pair.first, std::move(metadata)});
+      txn->mutable_internal()->mutable_master_metadata()->insert({pair.first, std::move(metadata)});
     }
   }
-  txn->mutable_internal()
-      ->set_coordinating_server(coordinating_server);
+  txn->mutable_internal()->set_coordinating_server(coordinating_server);
 
   SetTransactionType(*txn);
   return txn;
@@ -116,25 +108,23 @@ TransactionType SetTransactionType(Transaction& txn) {
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
-  txn_internal->set_type(
-      is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME);
+  txn_internal->set_type(is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME);
   return txn_internal->type();
 }
 
 void MergeTransaction(Transaction& txn, const Transaction& other) {
   if (txn.internal().id() != other.internal().id()) {
     std::ostringstream oss;
-    oss << "Cannot merge transactions with different IDs: "
-        << txn.internal().id() << " vs. " << other.internal().id();
+    oss << "Cannot merge transactions with different IDs: " << txn.internal().id() << " vs. " << other.internal().id();
     throw std::runtime_error(oss.str());
   }
   if (txn.internal().type() != other.internal().type()) {
     std::ostringstream oss;
-    oss << "Cannot merge transactions with different types: "
-        << txn.internal().type() << " vs. " << other.internal().type();
+    oss << "Cannot merge transactions with different types: " << txn.internal().type() << " vs. "
+        << other.internal().type();
     throw std::runtime_error(oss.str());
   }
-  
+
   if (other.status() == TransactionStatus::ABORTED) {
     txn.set_status(TransactionStatus::ABORTED);
     txn.set_abort_reason(other.abort_reason());
@@ -146,8 +136,8 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
         if (this_set->contains(key)) {
           if (this_set->at(key) != value) {
             std::ostringstream oss;
-            oss << "Found conflicting value at key \"" << key << "\" while merging transactions. Val: "
-                << this_set->at(key) << ". Other val: " << value;
+            oss << "Found conflicting value at key \"" << key
+                << "\" while merging transactions. Val: " << this_set->at(key) << ". Other val: " << value;
             throw std::runtime_error(oss.str());
           }
         } else {
@@ -160,22 +150,16 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
     txn.mutable_delete_set()->MergeFrom(other.delete_set());
   }
 
-  txn.mutable_internal()
-      ->mutable_events()
-      ->MergeFrom(other.internal().events());
-  txn.mutable_internal()
-      ->mutable_event_times()
-      ->MergeFrom(other.internal().event_times());
-  txn.mutable_internal()
-      ->mutable_event_machines()
-      ->MergeFrom(other.internal().event_machines());
+  txn.mutable_internal()->mutable_events()->MergeFrom(other.internal().events());
+  txn.mutable_internal()->mutable_event_times()->MergeFrom(other.internal().event_times());
+  txn.mutable_internal()->mutable_event_machines()->MergeFrom(other.internal().event_machines());
 }
 
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   os << "Transaction ID: " << txn.internal().id() << "\n";
-  os << "Status: " 
-      << ENUM_NAME(txn.status(), TransactionStatus) << "\n";
-  os << "Read set:" << "\n";
+  os << "Status: " << ENUM_NAME(txn.status(), TransactionStatus) << "\n";
+  os << "Read set:"
+     << "\n";
   os << std::setfill(' ');
   for (const auto& pair : txn.read_set()) {
     os << std::setw(10) << pair.first << " ==> " << pair.second << "\n";
@@ -188,8 +172,7 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   for (const auto& pair : txn.internal().master_metadata()) {
     os << std::setw(10) << pair.first << ": " << pair.second << ")\n";
   }
-  os << "Type: "
-      << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
+  os << "Type: " << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
   if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
     os << "Code: " << txn.code() << std::endl;
   } else {
@@ -199,14 +182,11 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
 }
 
 bool operator==(const Transaction& txn1, const Transaction txn2) {
-  return txn1.status() == txn2.status()
-      && txn1.read_set() == txn2.read_set()
-      && txn1.write_set() == txn2.write_set()
-      && txn1.procedure_case() == txn2.procedure_case()
-      && txn1.abort_reason() == txn2.abort_reason()
-      && txn1.internal().id() == txn2.internal().id()
-      && txn1.internal().master_metadata() == txn2.internal().master_metadata()
-      && txn1.internal().type() == txn2.internal().type();
+  return txn1.status() == txn2.status() && txn1.read_set() == txn2.read_set() && txn1.write_set() == txn2.write_set() &&
+         txn1.procedure_case() == txn2.procedure_case() && txn1.abort_reason() == txn2.abort_reason() &&
+         txn1.internal().id() == txn2.internal().id() &&
+         txn1.internal().master_metadata() == txn2.internal().master_metadata() &&
+         txn1.internal().type() == txn2.internal().type();
 }
 
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
@@ -214,4 +194,4 @@ std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
   return os;
 }
 
-} // namespace slog
+}  // namespace slog

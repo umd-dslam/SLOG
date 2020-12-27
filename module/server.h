@@ -1,12 +1,12 @@
 #pragma once
 
+#include <glog/logging.h>
+
 #include <chrono>
-#include <thread>
 #include <set>
+#include <thread>
 #include <unordered_map>
 #include <vector>
-
-#include <glog/logging.h>
 #include <zmq.hpp>
 
 #include "common/configuration.h"
@@ -14,8 +14,8 @@
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/networked_module.h"
-#include "storage/lookup_master_index.h"
 #include "proto/api.pb.h"
+#include "storage/lookup_master_index.h"
 
 namespace slog {
 
@@ -23,15 +23,14 @@ struct PendingResponse {
   zmq::message_t identity;
   uint32_t stream_id;
 
-  explicit PendingResponse(zmq::message_t&& identity, uint32_t stream_id) 
-    : identity(std::move(identity)), stream_id(stream_id) {}
+  explicit PendingResponse(zmq::message_t&& identity, uint32_t stream_id)
+      : identity(std::move(identity)), stream_id(stream_id) {}
 };
 
 class CompletedTransaction {
-public:
+ public:
   explicit CompletedTransaction(const ConfigurationPtr& config, size_t involved_partitions)
-    : required_copies_(config->replication_factor()),
-      replicating_partitions_(involved_partitions) {
+      : required_copies_(config->replication_factor()), replicating_partitions_(involved_partitions) {
     partition_counters_.resize(config->num_partitions());
   }
 
@@ -52,7 +51,7 @@ public:
     if (counter == required_copies_) {
       replicating_partitions_--;
     }
-    
+
     return replicating_partitions_ == 0;
   }
 
@@ -61,7 +60,7 @@ public:
     return req_.get()->mutable_completed_subtxn()->mutable_txn();
   }
 
-private:
+ private:
   ReusableRequest req_;
   uint32_t required_copies_;
   // Number of partitions that are still not fully replicated
@@ -73,21 +72,18 @@ private:
 /**
  * A Server serves external requests from the clients. It also answers
  * requests about mastership of data.
- * 
+ *
  * INPUT:  External TransactionRequest
- * 
+ *
  * OUTPUT: For external TransactionRequest, it forwards the txn internally
  *         to appropriate modules and waits for internal responses before
  *         responding back to the client with an external TransactionResponse.
  */
 class Server : public NetworkedModule {
-public:
-  Server(
-      const ConfigurationPtr& config,
-      const std::shared_ptr<Broker>& broker,
-      int poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, int poll_timeout_ms = kModuleTimeoutMs);
 
-protected:
+ protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
   /**
@@ -103,7 +99,7 @@ protected:
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
-private:
+ private:
   void ProcessCompletedSubtxn(ReusableRequest&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
@@ -120,4 +116,4 @@ private:
   std::unordered_map<TxnId, CompletedTransaction> completed_txns_;
 };
 
-} // namespace slog
+}  // namespace slog

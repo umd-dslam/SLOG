@@ -4,10 +4,9 @@
 
 #include "module/scheduler_components/remaster_manager.h"
 
+using std::pair;
 using std::unordered_map;
 using std::unordered_set;
-using std::pair;
-
 
 namespace slog {
 
@@ -18,7 +17,7 @@ namespace slog {
  * transactions, the overhead of creating queues may be too high.
  */
 class PerKeyRemasterManager : public RemasterManager {
-public:
+ public:
   PerKeyRemasterManager() = default;
   PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
@@ -26,11 +25,9 @@ public:
   virtual RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter);
   virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder);
 
-  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) {
-    storage_ = storage;
-  }
+  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) { storage_ = storage; }
 
-private:
+ private:
   /**
    * Insert the key into the priority queue sorted by counter. This way remasters can
    * unblock txns starting from the front of the queue, and stop when they reach a
@@ -51,4 +48,4 @@ private:
   unordered_map<Key, list<pair<const TransactionHolder*, uint32_t>>> blocked_queue_;
 };
 
-} // namespace slog
+}  // namespace slog

@@ -3,7 +3,6 @@
 #include <condition_variable>
 #include <thread>
 #include <unordered_map>
-
 #include <zmq.hpp>
 
 #include "common/configuration.h"
@@ -20,7 +19,7 @@ namespace slog {
 /**
  * A Broker distributes messages coming into a machine to the modules
  * It runs its own thread with the components depicted below
- * 
+ *
  *                   --------------------------
  *                   |                        |
  *  Module A <---- Channel A                Router  <----- Incoming Messages
@@ -43,28 +42,26 @@ namespace slog {
  *  Module B  ----------------> Sender -------------> Outgoing Messages
  *                                          |
  *  Module C  --------------------------> Sender ---> Outgoing Messages
- * 
- * 
+ *
+ *
  * To receive messages from other machines, it uses a ZMQ_ROUTER socket, which constructs
  * a map from an identity to the corresponding connection. Using this identity, it can
  * tell where the message comes from.
- * 
+ *
  * The messages going into the system via the router will be brokered to the channel
  * specified in each message. On the other end of each channel is a module which also runs
  * in its own thread.
- * 
+ *
  * A module sends message to another machine via a Sender object. Each Sender object maintains
  * a weak pointer to the broker to get notified when the brokers are synchronized and to access
  * the map translating logical machine IDs to physical machine addresses.
- * 
+ *
  * Not showed above: the modules can send message to each other using Sender without going through the Broker.
  */
 class Broker {
-public:
-  Broker(
-      const ConfigurationPtr& config, 
-      const shared_ptr<zmq::context_t>& context,
-      long poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
+         long poll_timeout_ms = kModuleTimeoutMs);
   ~Broker();
 
   void StartInNewThread(int cpu = -1);
@@ -79,19 +76,19 @@ public:
 
   MachineId GetLocalMachineId() const;
 
-private:
+ private:
   string MakeEndpoint(const string& addr = "") const;
 
   /**
    * A broker only starts working after every other broker is up and sends a READY
-   * message to everyone. There is one caveat: if after the synchronization happens, 
+   * message to everyone. There is one caveat: if after the synchronization happens,
    * a machine goes down, and restarts, that machine cannot join anymore since the
    * READY messages are only sent once in the beginning.
    * In a real system, HEARTBEAT messages should be periodically sent out instead
    * to mitigate this problem.
    */
   bool InitializeConnection();
-  
+
   void Run();
 
   void HandleIncomingMessage(zmq::message_t&& msg);
@@ -133,4 +130,4 @@ private:
   std::vector<zmq::socket_t> tmp_sockets_;
 };
 
-} // namespace slog
+}  // namespace slog

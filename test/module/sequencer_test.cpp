@@ -1,9 +1,9 @@
-#include <vector>
-
 #include <gtest/gtest.h>
 
-#include "test/test_utils.h"
+#include <vector>
+
 #include "common/proto_utils.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
@@ -11,7 +11,7 @@ using namespace slog;
 using internal::Request;
 
 class SequencerTest : public ::testing::Test {
-public:
+ public:
   void SetUp() {
     auto configs = MakeTestConfigurations("sequencer", 1, 1);
     slog_ = make_unique<TestSlog>(configs[0]);
@@ -21,9 +21,7 @@ public:
     slog_->StartInNewThreads();
   }
 
-  void SendToSequencer(internal::Request req) {
-    sender_->Send(req, kSequencerChannel);
-  }
+  void SendToSequencer(internal::Request req) { sender_->Send(req, kSequencerChannel); }
 
   internal::Batch* ReceiveBatch() {
     Request req;
@@ -46,11 +44,7 @@ public:
 };
 
 TEST_F(SequencerTest, SingleHomeTransaction) {
-  auto txn = MakeTransaction(
-      {"A", "B"},
-      {"C"},
-      "some code",
-      {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
+  auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   Request req;
   req.mutable_forward_txn()->set_allocated_txn(txn);
@@ -67,17 +61,9 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
 }
 
 TEST_F(SequencerTest, MultiHomeTransaction) {
-  auto txn1 = MakeTransaction(
-      {"A", "B"},
-      {},
-      "some code",
-      {{"A", {0, 0}}, {"B", {1, 0}}});
-  
-  auto txn2 = MakeTransaction(
-      {},
-      {"C", "D"},
-      "some code",
-      {{"C", {1, 0}}, {"D", {0, 0}}});
+  auto txn1 = MakeTransaction({"A", "B"}, {}, "some code", {{"A", {0, 0}}, {"B", {1, 0}}});
+
+  auto txn2 = MakeTransaction({}, {"C", "D"}, "some code", {{"C", {1, 0}}, {"D", {0, 0}}});
 
   Request req;
   auto mh_batch = req.mutable_forward_batch()->mutable_batch_data();
@@ -112,13 +98,13 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
 
         auto mh_txn1 = batch->transactions().at(0);
         ASSERT_EQ(mh_txn1, *txn1);
-        
+
         auto mh_txn2 = batch->transactions().at(1);
         ASSERT_EQ(mh_txn2, *txn2);
         break;
       }
       default:
-        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: " 
+        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: "
                << ENUM_NAME(batch->transaction_type(), TransactionType);
         break;
     }
@@ -129,7 +115,7 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
 #ifdef ENABLE_REPLICATION_DELAY
 
 class SequencerReplicationDelayTest : public SequencerTest {
-public:
+ public:
   void SetUp() {}
   void CustomSetUp(uint32_t delay_percent, uint32_t delay_amount) {
     internal::Configuration extra_config;
@@ -154,11 +140,7 @@ public:
 
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   CustomSetUp(100, 3);
-  auto txn = MakeTransaction(
-      {"A", "B"},
-      {"C"},
-      "some code",
-      {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
+  auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   Request req;
   req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);

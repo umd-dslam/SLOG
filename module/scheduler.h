@@ -19,9 +19,8 @@
 #include "module/scheduler_components/per_key_remaster_manager.h"
 #endif
 
-#if defined(REMASTER_PROTOCOL_SIMPLE)\
-  || defined(REMASTER_PROTOCOL_PER_KEY)\
-  || (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) || \
+    (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
 #include "module/scheduler_components/old_lock_manager.h"
 #elif defined(LOCK_MANAGER_DDR)
 #include "module/scheduler_components/ddr_lock_manager.h"
@@ -32,20 +31,17 @@
 namespace slog {
 
 class Scheduler : public NetworkedModule {
-public:
-  Scheduler(
-      const ConfigurationPtr& config,
-      const std::shared_ptr<Broker>& broker,
-      const std::shared_ptr<Storage<Key, Record>>& storage,
-      int poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  Scheduler(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+            const std::shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms = kModuleTimeoutMs);
 
-protected:
+ protected:
   void Initialize() final;
 
   void HandleInternalRequest(ReusableRequest&& req, MachineId) final;
   void HandleInternalResponse(ReusableResponse&& res, MachineId) final;
 
-private:
+ private:
   void ProcessRemoteReadResult(ReusableRequest&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
   void ProcessTransaction(ReusableRequest&& txn);
@@ -75,16 +71,16 @@ private:
 
   /**
    * Aborts
-   * 
+   *
    * Once a transaction is sent to a worker, the worker will manage an abort.
    * If a remaster abort occurs at this partition or if a remote read abort
    * is received before the transaction is dispatched, then the abort is handled
    * here.
-   * 
+   *
    * Aborts are triggered once on every partition. Once the main transaction
    * arrives, it's returned to the coordinating server and remote read aborts
    * are sent to every active remote partition.
-   * 
+   *
    * Before the transaction data is erased, we wait to collect all
    * - lock-onlys (if multi-home)
    * - remote reads (if multi-partition and an active partition)
@@ -99,7 +95,7 @@ private:
   bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
   // Abort lock-only transactions from the remaster manager and lock manager
   void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
-  // Return the transaction to the server if lock-only transactions and 
+  // Return the transaction to the server if lock-only transactions and
   // remote reads are received
   void MaybeFinishAbort(TxnId txn_id);
 
@@ -111,9 +107,8 @@ private:
   PerKeyRemasterManager remaster_manager_;
 #endif
 
-#if defined(REMASTER_PROTOCOL_SIMPLE)\
-  || defined(REMASTER_PROTOCOL_PER_KEY)\
-  || (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) || \
+    (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
   OldLockManager lock_manager_;
 #elif defined(LOCK_MANAGER_DDR)
   DDRLockManager lock_manager_;
@@ -122,7 +117,7 @@ private:
 #endif
 
   std::unordered_map<TxnId, TransactionHolder> all_txns_;
-  
+
   /**
    * Lock-only transactions are kept here during remaster checking and locking.
    * This map is also used to track which LOs have arrived during an abort, which means
@@ -146,4 +141,4 @@ private:
   std::vector<unique_ptr<ModuleRunner>> workers_;
 };
 
-} // namespace slog
+}  // namespace slog

@@ -8,7 +8,7 @@
 namespace slog {
 
 class Ticker : public Module {
-public:
+ public:
   const static std::string ENDPOINT;
   static zmq::socket_t Subscribe(zmq::context_t& context);
 
@@ -18,9 +18,9 @@ public:
   void SetUp() final;
   void Loop() final;
 
-private:
+ private:
   zmq::socket_t socket_;
   Duration sleep_us_;
 };
 
-} // slog
+}  // namespace slog

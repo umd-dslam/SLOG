@@ -11,15 +11,8 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-Leader::Leader(
-    SimpleMultiPaxos& paxos,
-    const vector<MachineId>& members,
-    MachineId me)
-  : paxos_(paxos), 
-    members_(members),
-    me_(me),
-    min_uncommitted_slot_(0),
-    next_empty_slot_(0) {
+Leader::Leader(SimpleMultiPaxos& paxos, const vector<MachineId>& members, MachineId me)
+    : paxos_(paxos), members_(members), me_(me), min_uncommitted_slot_(0), next_empty_slot_(0) {
   auto it = std::find(members.begin(), members.end(), me);
   is_member_ = it != members.end();
   if (is_member_) {
@@ -29,7 +22,7 @@ Leader::Leader(
   } else {
     // When the current machine is not a member of this paxos group, it
     // will always forward a proposal request to the initially elected
-    // leader of the group (which would never change in this implementation 
+    // leader of the group (which would never change in this implementation
     // of paxos)
     is_elected_ = false;
   }
@@ -48,7 +41,8 @@ void Leader::HandleRequest(const Request& req) {
       }
       break;
     case Request::TypeCase::kPaxosCommit:
-      ProcessCommitRequest(req.paxos_commit()); break;
+      ProcessCommitRequest(req.paxos_commit());
+      break;
     default:
       break;
   }
@@ -67,10 +61,8 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
 
   auto& proposal = proposals_[slot];
   if (proposal.is_committed) {
-    CHECK_EQ(value, proposal.value) 
-        << "Paxos invariant violated: Two values are committed for the same slot";
-    CHECK_EQ(ballot, proposal.ballot)
-        << "Paxos invariatn violated: Two leaders commit to the same slot";
+    CHECK_EQ(value, proposal.value) << "Paxos invariant violated: Two values are committed for the same slot";
+    CHECK_EQ(ballot, proposal.ballot) << "Paxos invariatn violated: Two leaders commit to the same slot";
   }
   proposal.ballot = ballot;
   proposal.value = value;
@@ -82,8 +74,7 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
   if (slot >= next_empty_slot_) {
     next_empty_slot_ = slot + 1;
   }
-  while (proposals_.count(min_uncommitted_slot_) > 0 
-      && proposals_[min_uncommitted_slot_].is_committed) {
+  while (proposals_.count(min_uncommitted_slot_) > 0 && proposals_[min_uncommitted_slot_].is_committed) {
     proposals_.erase(min_uncommitted_slot_);
     min_uncommitted_slot_++;
   }
@@ -101,26 +92,21 @@ void Leader::HandleResponse(const Response& res, MachineId from) {
 
       if (const auto acceptance = dynamic_cast<AcceptanceTracker*>(raw_tracker)) {
         AcceptanceStateChanged(acceptance);
-      }
-      else if (const auto commit = dynamic_cast<CommitTracker*>(raw_tracker)) {
+      } else if (const auto commit = dynamic_cast<CommitTracker*>(raw_tracker)) {
         CommitStateChanged(commit);
       }
     }
   }
   // Clean up trackers with COMPLETE and ABORTED state
-  auto pend = std::remove_if(
-      quorum_trackers_.begin(),
-      quorum_trackers_.end(),
-      [](auto& tracker) {
-        return tracker->GetState() == QuorumState::COMPLETE 
-            || tracker->GetState() == QuorumState::ABORTED;});
+  auto pend = std::remove_if(quorum_trackers_.begin(), quorum_trackers_.end(), [](auto& tracker) {
+    return tracker->GetState() == QuorumState::COMPLETE || tracker->GetState() == QuorumState::ABORTED;
+  });
   quorum_trackers_.erase(pend, quorum_trackers_.end());
 }
 
 void Leader::StartNewAcceptance(uint32_t value) {
   proposals_[next_empty_slot_] = Proposal(ballot_, value);
-  quorum_trackers_.emplace_back(
-      new AcceptanceTracker(members_.size(), ballot_, next_empty_slot_));
+  quorum_trackers_.emplace_back(new AcceptanceTracker(members_.size(), ballot_, next_empty_slot_));
 
   Request request;
   auto paxos_accept = request.mutable_paxos_accept();
@@ -135,8 +121,8 @@ void Leader::StartNewAcceptance(uint32_t value) {
 void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
   // When member size is <= 2, a tracker will reach the COMPLETE state without ever
   // reaching the QUORUM_REACHED state, so we have a separate check for that case.
-  if (acceptance->GetState() == QuorumState::QUORUM_REACHED
-      || (members_.size() <= 2 && acceptance->GetState() == QuorumState::COMPLETE)) {
+  if (acceptance->GetState() == QuorumState::QUORUM_REACHED ||
+      (members_.size() <= 2 && acceptance->GetState() == QuorumState::COMPLETE)) {
     auto slot = acceptance->slot;
     StartNewCommit(slot);
   }
@@ -144,9 +130,8 @@ void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
 }
 
 void Leader::StartNewCommit(SlotId slot) {
-  quorum_trackers_.emplace_back(
-      new CommitTracker(members_.size(), slot));
-  
+  quorum_trackers_.emplace_back(new CommitTracker(members_.size(), slot));
+
   Request request;
   auto paxos_commit = request.mutable_paxos_commit();
   paxos_commit->set_slot(slot);
@@ -165,8 +150,6 @@ void Leader::SendToAllMembers(const Request& request) {
   }
 }
 
-bool Leader::IsMember() const {
-  return is_member_;
-}
+bool Leader::IsMember() const { return is_member_; }
 
-} // namespace slog
+}  // namespace slog

@@ -1,16 +1,16 @@
+#include "module/scheduler_components/simple_remaster_manager.h"
+
 #include <gmock/gmock.h>
 
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
-
-#include "module/scheduler_components/simple_remaster_manager.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
 using ::testing::ElementsAre;
 
 class SimpleRemasterManagerTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() {
     configs = MakeTestConfigurations("remaster", 1, 1);
     storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();

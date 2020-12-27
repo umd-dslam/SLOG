@@ -14,23 +14,18 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-NetworkedModule::NetworkedModule(
-    const std::string& name,
-    const std::shared_ptr<Broker>& broker,
-    Channel channel,
-    int poll_timeout_ms,
-    int recv_batch,
-    size_t request_pool_size,
-    size_t response_pool_size)
-  : Module(name),
-    context_(broker->context()),
-    pull_socket_(*context_, ZMQ_PULL),
-    sender_(broker),
-    channel_(channel),
-    poll_timeout_ms_(poll_timeout_ms),
-    recv_batch_(recv_batch),
-    request_pool_(request_pool_size),
-    response_pool_(response_pool_size) {
+NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
+                                 int poll_timeout_ms, int recv_batch, size_t request_pool_size,
+                                 size_t response_pool_size)
+    : Module(name),
+      context_(broker->context()),
+      pull_socket_(*context_, ZMQ_PULL),
+      sender_(broker),
+      channel_(channel),
+      poll_timeout_ms_(poll_timeout_ms),
+      recv_batch_(recv_batch),
+      request_pool_(request_pool_size),
+      response_pool_(response_pool_size) {
   broker->AddChannel(channel);
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
   pull_socket_.setsockopt(ZMQ_LINGER, 0);
@@ -38,29 +33,21 @@ NetworkedModule::NetworkedModule(
   pull_socket_.setsockopt(ZMQ_RCVHWM, 0);
 
   poll_items_.push_back({
-    static_cast<void*>(pull_socket_),
-    0, /* fd */
-    ZMQ_POLLIN,
-    0 /* revent */
+      static_cast<void*>(pull_socket_), 0, /* fd */
+      ZMQ_POLLIN, 0                        /* revent */
   });
 }
 
-zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) {
-  return custom_sockets_[i];
-}
+zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_[i]; }
 
-const std::shared_ptr<zmq::context_t> NetworkedModule::context() const {
-  return context_;
-}
+const std::shared_ptr<zmq::context_t> NetworkedModule::context() const { return context_; }
 
 void NetworkedModule::SetUp() {
   custom_sockets_ = InitializeCustomSockets();
   for (auto& socket : custom_sockets_) {
-    poll_items_.push_back({ 
-      static_cast<void*>(socket),
-      0, /* fd */
-      ZMQ_POLLIN,
-      0 /* revent */
+    poll_items_.push_back({
+        static_cast<void*>(socket), 0, /* fd */
+        ZMQ_POLLIN, 0                  /* revent */
     });
   }
 
@@ -72,7 +59,7 @@ void NetworkedModule::Loop() {
     return;
   }
 
-  for (int i = 0; i < recv_batch_; i++) { 
+  for (int i = 0; i < recv_batch_; i++) {
     // Message from pull socket
     if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
       if (google::protobuf::Any any; ParseAny(any, msg)) {
@@ -99,17 +86,13 @@ void NetworkedModule::Loop() {
   }
 }
 
-void NetworkedModule::Send(
-    const google::protobuf::Message& request_or_response,
-    Channel to_channel,
-    MachineId to_machine_id) {
+void NetworkedModule::Send(const google::protobuf::Message& request_or_response, Channel to_channel,
+                           MachineId to_machine_id) {
   sender_.Send(request_or_response, to_channel, to_machine_id);
 }
 
-void NetworkedModule::Send(
-    const google::protobuf::Message& request_or_response,
-    Channel to_channel) {
+void NetworkedModule::Send(const google::protobuf::Message& request_or_response, Channel to_channel) {
   sender_.Send(request_or_response, to_channel);
 }
 
-} // namespace slog
+}  // namespace slog

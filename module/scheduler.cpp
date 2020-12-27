@@ -1,15 +1,14 @@
 #include "module/scheduler.h"
 
-#include <algorithm>
-
 #include <glog/logging.h>
 
+#include <algorithm>
+
 #include "common/json_utils.h"
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
-
-#include "common/monitor.h"
 
 using std::make_shared;
 using std::move;
@@ -17,33 +16,23 @@ using std::move;
 namespace slog {
 
 namespace {
-inline uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) {
-  return txn_id % num_workers;
-}
-} // namespace
+inline uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) { return txn_id % num_workers; }
+}  // namespace
 
 using internal::Request;
 using internal::Response;
 
-Scheduler::Scheduler(
-    const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker,
-    const shared_ptr<Storage<Key, Record>>& storage,
-    int poll_timeout_ms)
-  : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout_ms),
-    config_(config) {
+Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                     const shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms)
+    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout_ms), config_(config) {
   for (size_t i = 0; i < config->num_workers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(
-        config,
-        broker,
-        kWorkerChannelOffset + i,
-        storage,
-        poll_timeout_ms));
+    workers_.push_back(MakeRunnerFor<Worker>(config, broker, kWorkerChannelOffset + i, storage, poll_timeout_ms));
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   remaster_manager_.SetStorage(storage);
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
+          defined(REMASTER_PROTOCOL_PER_KEY) */
 }
 
 void Scheduler::Initialize() {
@@ -58,7 +47,7 @@ void Scheduler::Initialize() {
 
 void Scheduler::HandleInternalRequest(ReusableRequest&& req, MachineId) {
   switch (req.get()->type_case()) {
-    case Request::kForwardTxn: 
+    case Request::kForwardTxn:
       ProcessTransaction(move(req));
       break;
     case Request::kRemoteReadResult:
@@ -68,8 +57,7 @@ void Scheduler::HandleInternalRequest(ReusableRequest&& req, MachineId) {
       ProcessStatsRequest(req.get()->stats());
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                 << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
       break;
   }
 }
@@ -85,7 +73,7 @@ void Scheduler::ProcessRemoteReadResult(ReusableRequest&& req) {
     // is processed by this partition
     //
     // NOTE: The logic guarantees that it'd never happens but if somehow this
-    // request was not needed but still arrived AFTER the transaction 
+    // request was not needed but still arrived AFTER the transaction
     // was already commited, it would be stuck in early_remote_reads forever.
     // Consider garbage collecting them if that happens.
     VLOG(2) << "Got early remote read result for txn " << txn_id;
@@ -114,10 +102,10 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   // Add stats for current transactions in the system
   stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
   if (level >= 1) {
-    stats.AddMember(
-        StringRef(ALL_TXNS),
-        ToJsonArray(all_txns_, [](const auto& p) { return p.first; }, alloc),
-        alloc);
+    stats.AddMember(StringRef(ALL_TXNS),
+                    ToJsonArray(
+                        all_txns_, [](const auto& p) { return p.first; }, alloc),
+                    alloc);
   }
 
   // Add stats from the lock manager
@@ -154,7 +142,8 @@ void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
     auto counter = txn->internal().master_metadata().at(key).counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
+          defined(REMASTER_PROTOCOL_PER_KEY) */
 
   all_txns_.erase(txn_id);
 }
@@ -166,11 +155,8 @@ void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
 void Scheduler::ProcessTransaction(ReusableRequest&& req) {
   auto txn = req.get()->mutable_forward_txn()->mutable_txn();
   auto txn_internal = txn->mutable_internal();
-  
-  RecordTxnEvent(
-      config_,
-      txn_internal,
-      TransactionEvent::ENTER_SCHEDULER);
+
+  RecordTxnEvent(config_, txn_internal, TransactionEvent::ENTER_SCHEDULER);
 
   if (!AcceptTransaction(move(req))) {
     return;
@@ -200,8 +186,7 @@ void Scheduler::ProcessTransaction(ReusableRequest&& req) {
     }
     case TransactionType::LOCK_ONLY: {
       auto txn_replica_id = TransactionHolder::transaction_id_replica_id(txn);
-      VLOG(2) << "Accepted LOCK-ONLY transaction "
-          << txn_replica_id.first <<", home = " << txn_replica_id.second;
+      VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_replica_id.first << ", home = " << txn_replica_id.second;
 
       if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
         break;
@@ -261,7 +246,7 @@ bool Scheduler::AcceptTransaction(ReusableRequest&& req) {
     case TransactionType::MULTI_HOME: {
       auto txn_id = txn.internal().id();
       auto& holder = all_txns_[txn_id];
-      
+
       holder.SetTxnRequest(config_, move(req));
       if (holder.keys_in_partition().empty()) {
         all_txns_.erase(txn_id);
@@ -324,18 +309,18 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
   for (auto unblocked_txn_holder : result.should_abort) {
     aborting_txn_ids.insert(unblocked_txn_holder->transaction()->internal().id());
   }
-  CHECK_EQ(result.should_abort.size(), aborting_txn_ids.size())
-      << "Duplicate transactions returned for abort";
+  CHECK_EQ(result.should_abort.size(), aborting_txn_ids.size()) << "Duplicate transactions returned for abort";
   for (auto txn_id : aborting_txn_ids) {
     TriggerPreDispatchAbort(txn_id);
   }
 }
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
+          defined(REMASTER_PROTOCOL_PER_KEY) */
 
 void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->transaction()->internal().id();
   auto txn_type = txn_holder->transaction()->internal().type();
-  switch(txn_type) {
+  switch (txn_type) {
     case TransactionType::SINGLE_HOME: {
       lock_manager_.AcceptTransaction(*txn_holder);
       AcquireLocksAndProcessResult(txn_holder);
@@ -344,11 +329,8 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
     case TransactionType::MULTI_HOME: {
       if (lock_manager_.AcceptTransaction(*txn_holder)) {
         // Note: this only records when MH arrives after lock-onlys
-        RecordTxnEvent(
-            config_,
-            txn_holder->transaction()->mutable_internal(),
-            TransactionEvent::ACCEPTED);
-        Dispatch(txn_id); 
+        RecordTxnEvent(config_, txn_holder->transaction()->mutable_internal(), TransactionEvent::ACCEPTED);
+        Dispatch(txn_id);
       }
       break;
     }
@@ -390,8 +372,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
 
   auto& txn_holder = all_txns_[txn_id];
-  CHECK(!txn_holder.worker())
-      << "Dispatched transactions are handled by the worker, txn " << txn_id;
+  CHECK(!txn_holder.worker()) << "Dispatched transactions are handled by the worker, txn " << txn_id;
 
   aborting_txns_.insert(txn_id);
 
@@ -426,9 +407,9 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   //
   // This also releases any lock-only transactions.
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  ProcessRemasterResult(
-    remaster_manager_.ReleaseTransaction(&txn_holder));
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
+  ProcessRemasterResult(remaster_manager_.ReleaseTransaction(&txn_holder));
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
+          defined(REMASTER_PROTOCOL_PER_KEY) */
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -489,10 +470,8 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   // Active partitions must receive remote reads from all other partitions
   auto num_remote_partitions = txn_holder.num_involved_partitions() - 1;
   auto local_partition = config_->local_partition();
-  auto local_partition_active = std::find(
-      txn_holder.active_partitions().begin(),
-      txn_holder.active_partitions().end(),
-      local_partition) != txn_holder.active_partitions().end();
+  auto local_partition_active = std::find(txn_holder.active_partitions().begin(), txn_holder.active_partitions().end(),
+                                          local_partition) != txn_holder.active_partitions().end();
   if (num_remote_partitions > 0 && local_partition_active) {
     if (txn_holder.early_remote_reads().size() < num_remote_partitions) {
       return;
@@ -543,10 +522,7 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   // Select a worker for this transaction
   txn_holder->SetWorker(SelectWorkerForTxn(txn_id, config_->num_workers()));
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::DISPATCHED);
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
   auto req = NewRequest();
@@ -565,4 +541,4 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   VLOG(2) << "Dispatched txn " << txn_id;
 }
 
-} // namespace slog
+}  // namespace slog

@@ -7,11 +7,7 @@ namespace slog {
 using std::string;
 using std::vector;
 
-size_t NextToken(
-    string& token,
-    const string& str,
-    const string& delims,
-    size_t pos) {
+size_t NextToken(string& token, const string& str, const string& delims, size_t pos) {
   auto start = str.find_first_not_of(delims, pos);
   if (start == string::npos) {
     token = "";
@@ -25,12 +21,7 @@ size_t NextToken(
   return start + token.length();
 }
 
-size_t NextNTokens(
-    vector<string>& tokens,
-    const string& str,
-    const string& delims,
-    size_t n,
-    size_t pos) {
+size_t NextNTokens(vector<string>& tokens, const string& str, const string& delims, size_t n, size_t pos) {
   tokens.clear();
   for (size_t i = 0; i < n; i++) {
     string token;
@@ -47,15 +38,19 @@ size_t NextNTokens(
 string Trim(string str) {
   // trim left
   auto it = str.begin();
-  while (it != str.end() && std::isspace(*it)) { it++; }
+  while (it != str.end() && std::isspace(*it)) {
+    it++;
+  }
   str.erase(str.begin(), it);
 
   // trim right
   auto rit = str.rbegin();
-  while (rit != str.rend() && std::isspace(*rit)) { rit++; }
+  while (rit != str.rend() && std::isspace(*rit)) {
+    rit++;
+  }
   str.erase(rit.base(), str.end());
 
   return str;
 }
 
-} // namespace slog
+}  // namespace slog

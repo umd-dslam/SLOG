@@ -19,17 +19,14 @@ inline bool TransactionContainsKey(const Transaction& txn, const Key& key) {
   return txn.read_set().contains(key) || txn.write_set().contains(key);
 }
 
-} // namespace
+}  // namespace
 
-Forwarder::Forwarder(
-    const ConfigurationPtr& config,
-    const shared_ptr<Broker>& broker,
-    const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-    int poll_timeout_ms)
-  : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout_ms),
-    config_(config),
-    lookup_master_index_(lookup_master_index),
-    rg_(std::random_device()()) {}
+Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, int poll_timeout_ms)
+    : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout_ms),
+      config_(config),
+      lookup_master_index_(lookup_master_index),
+      rg_(std::random_device()()) {}
 
 void Forwarder::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
   switch (req.get()->type_case()) {
@@ -40,17 +37,13 @@ void Forwarder::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
       ProcessLookUpMasterRequest(move(req), from);
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \""
-                << CASE_NAME(req.get()->type_case(), Request) << "\"";
-    }
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
+  }
 }
 
 void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   auto txn = req.get()->mutable_forward_txn()->mutable_txn();
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::ENTER_FORWARDER);
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
   auto local_partition = config_->local_partition();
 
@@ -59,15 +52,15 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   auto lookup_master = lookup_master_request.get()->mutable_lookup_master();
 
   // This function will be called on the read and write set of the current txn
-  auto LocalMasterLookupFn = [this, txn, local_partition, lookup_master](
-      const google::protobuf::Map<string, string>& keys) {
+  auto LocalMasterLookupFn = [this, txn, local_partition,
+                              lookup_master](const google::protobuf::Map<string, string>& keys) {
     auto partitions = txn->mutable_internal()->mutable_partitions();
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
       const auto& key = pair.first;
       uint32_t partition = 0;
-      
+
       try {
         partition = config_->partition_of_key(key);
       } catch (std::invalid_argument& e) {
@@ -118,10 +111,7 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     if (part != local_partition) {
-      Send(
-          *lookup_master_request.get(),
-          kForwarderChannel,
-          config_->MakeMachineId(local_rep, part));
+      Send(*lookup_master_request.get(), kForwarderChannel, config_->MakeMachineId(local_rep, part));
     }
   }
 }
@@ -155,8 +145,7 @@ void Forwarder::ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from
 void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from */) {
   // The forwarder only cares about lookup master responses
   if (res.get()->type_case() != Response::kLookupMaster) {
-    LOG(ERROR) << "Unexpected response type received: \""
-               << CASE_NAME(res.get()->type_case(), Response) << "\"";
+    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(res.get()->type_case(), Response) << "\"";
   }
 
   const auto& lookup_master = res.get()->lookup_master();
@@ -210,47 +199,31 @@ void Forwarder::Forward(Transaction* txn) {
     auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->local_replica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
-      RecordTxnEvent(
-          config_,
-          txn_internal,
-          TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
       Send(forward_txn, kSequencerChannel);
     } else {
       std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
       auto partition = RandomPartition(rg_);
       auto random_machine_in_home_replica = config_->MakeMachineId(home_replica, partition);
 
-      VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: "
-              << home_replica << ", part: " << partition << ")";
+      VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: " << home_replica << ", part: " << partition
+              << ")";
 
-      RecordTxnEvent(
-          config_,
-          txn_internal,
-          TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
-      Send(
-          forward_txn,
-          kSequencerChannel,
-          random_machine_in_home_replica);
+      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+      Send(forward_txn, kSequencerChannel, random_machine_in_home_replica);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    auto destination = config_->MakeMachineId(
-        config_->local_replica(),
-        config_->leader_partition_for_multi_home_ordering());
+    auto destination =
+        config_->MakeMachineId(config_->local_replica(), config_->leader_partition_for_multi_home_ordering());
 
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
-    RecordTxnEvent(
-        config_,
-        txn_internal,
-        TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
-    Send(
-        forward_txn,
-        kMultiHomeOrdererChannel,
-        destination);
+    RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
+    Send(forward_txn, kMultiHomeOrdererChannel, destination);
   }
   // Release txn so that it won't be freed by forward_txn and later double-freed
   // by the request
   forward_txn.mutable_forward_txn()->release_txn();
 }
 
-} // namespace slog
+}  // namespace slog

@@ -1,10 +1,10 @@
 /**
  * concurrent_hash_map.h
- * 
+ *
  * This implementation borrows from folly::ConcurrentHashMap the idea of sharding key space
  * into different segments. However, each segment here is only coarsely guarded with a read-write
  * latch as opposed to a more granular approach in the highly-optimized folly::ConcurrentHashMap.
- * 
+ *
  * This map should be used in conjuction with shared_ptr because its destructor is not
  * thread-safe. With shared_ptr, the last thread that releases the pointer will be the only
  * one accessing the map at destruction time.
@@ -20,9 +20,7 @@ namespace slog {
 
 namespace concurrent_hash_map {
 
-template<
-    typename KeyType,
-    typename ValueType>
+template <typename KeyType, typename ValueType>
 struct NodeT {
   NodeT() = default;
 
@@ -37,23 +35,18 @@ struct NodeT {
   ValueType value;
 };
 
-template<
-    typename KeyType,
-    typename ValueType,
-    typename HashFn = std::hash<KeyType>,
-    uint8_t ShardBits = 8>
+template <typename KeyType, typename ValueType, typename HashFn = std::hash<KeyType>, uint8_t ShardBits = 8>
 class SegmentT {
   using Node = NodeT<KeyType, ValueType>;
 
   static constexpr float kLoadFactor = 1.05;
 
-public:
+ public:
   /**
    * initial_bucket_count must be a power of 2
    */
   SegmentT(size_t initial_bucket_count = 8)
-    : load_factor_max_size_(static_cast<size_t>(kLoadFactor * initial_bucket_count)),
-      size_(0) {
+      : load_factor_max_size_(static_cast<size_t>(kLoadFactor * initial_bucket_count)), size_(0) {
     buckets_.reset(Buckets::CreateBuckets(initial_bucket_count));
   }
 
@@ -82,7 +75,6 @@ public:
   }
 
   bool InsertOrUpdate(const KeyType& key, const ValueType& value) {
-    
     if (size_ >= load_factor_max_size_) {
       rw_latch_.WLock();
       Rehash();
@@ -90,12 +82,12 @@ public:
     }
 
     auto h = HashFn{}(key);
-    
+
     rw_latch_.WLock();
 
     auto idx = GetIndex(buckets_->count, h);
     Node* prev = nullptr;
-    bool key_exists = false; 
+    bool key_exists = false;
     auto node = buckets_->bucket_roots[idx];
     while (node) {
       if (key == node->key) {
@@ -134,7 +126,7 @@ public:
 
     return key_exists;
   }
-  
+
   bool Erase(const KeyType& key) {
     auto h = HashFn{}(key);
 
@@ -164,12 +156,9 @@ public:
     return key_exists;
   }
 
-private:
-
+ private:
   // Must hold lock
-  static uint64_t GetIndex(size_t nbuckets, size_t hash) {
-    return (hash >> ShardBits) & (nbuckets - 1);
-  }
+  static uint64_t GetIndex(size_t nbuckets, size_t hash) { return (hash >> ShardBits) & (nbuckets - 1); }
 
   // Must hold lock
   void Rehash() {
@@ -196,7 +185,7 @@ private:
     buckets_.reset(new_buckets);
     load_factor_max_size_ = static_cast<size_t>(kLoadFactor * buckets_->count);
   }
-  
+
   struct Buckets {
     static Buckets* CreateBuckets(size_t num_buckets) {
       auto buckets = new Buckets();
@@ -220,23 +209,19 @@ private:
     std::unique_ptr<Node*[]> bucket_roots;
   };
 
-  mutable bustub::ReaderWriterLatch rw_latch_; 
+  mutable bustub::ReaderWriterLatch rw_latch_;
   std::unique_ptr<Buckets> buckets_;
   size_t load_factor_max_size_;
   size_t size_;
 };
 
-} // namespace concurrent_hash_map
+}  // namespace concurrent_hash_map
 
-template<
-    typename KeyType,
-    typename ValueType,
-    typename HashFn = std::hash<KeyType>,
-    uint8_t ShardBits = 8>
+template <typename KeyType, typename ValueType, typename HashFn = std::hash<KeyType>, uint8_t ShardBits = 8>
 class ConcurrentHashMap {
   using Segment = concurrent_hash_map::SegmentT<KeyType, ValueType, HashFn, ShardBits>;
-  
-public:
+
+ public:
   ConcurrentHashMap() {
     for (uint64_t i = 0; i < NumShards; i++) {
       segments_[i].store(nullptr);
@@ -267,8 +252,7 @@ public:
     return EnsureSegment(idx)->Erase(key);
   }
 
-private:
-
+ private:
   uint64_t PickSegment(const KeyType& key) const {
     auto h = HashFn{}(key);
     return h & (NumShards - 1);
@@ -288,8 +272,8 @@ private:
   }
 
   static constexpr uint64_t NumShards = (1LL << ShardBits);
-  
+
   mutable std::atomic<Segment*> segments_[NumShards];
 };
 
-} // namespace slog
+}  // namespace slog

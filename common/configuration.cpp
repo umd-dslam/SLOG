@@ -1,12 +1,12 @@
 #include "common/configuration.h"
 
 #include <fcntl.h>
-#include <fstream>
-
+#include <glog/logging.h>
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/text_format.h>
-#include <glog/logging.h>
+
+#include <fstream>
 
 #include "common/proto_utils.h"
 
@@ -14,7 +14,7 @@ namespace slog {
 
 namespace {
 
-template<class It>
+template <class It>
 uint32_t FNVHash(It begin, It end) {
   uint64_t hash = 0x811c9dc5;
   for (auto it = begin; it != end; it++) {
@@ -24,17 +24,14 @@ uint32_t FNVHash(It begin, It end) {
   return hash;
 }
 
-} // namespace
+}  // namespace
 
-using std::string;
-using google::protobuf::io::ZeroCopyInputStream;
 using google::protobuf::io::FileInputStream;
+using google::protobuf::io::ZeroCopyInputStream;
+using std::string;
 
-ConfigurationPtr Configuration::FromFile(
-    const string& file_path, 
-    const string& local_address,
-    uint32_t local_replica,
-    uint32_t local_partition) {
+ConfigurationPtr Configuration::FromFile(const string& file_path, const string& local_address, uint32_t local_replica,
+                                         uint32_t local_partition) {
   int fd = open(file_path.c_str(), O_RDONLY);
   if (fd < 0) {
     LOG(FATAL) << "Configuration file error: " << strerror(errno);
@@ -47,19 +44,12 @@ ConfigurationPtr Configuration::FromFile(
   delete input;
   close(fd);
 
-  return std::make_shared<Configuration>(
-      config, local_address, local_replica, local_partition);
+  return std::make_shared<Configuration>(config, local_address, local_replica, local_partition);
 }
 
-Configuration::Configuration(
-    const internal::Configuration& config,
-    const string& local_address,
-    uint32_t local_replica,
-    uint32_t local_partition)
-  : config_(config),
-    local_address_(local_address),
-    local_replica_(local_replica),
-    local_partition_(local_partition) {
+Configuration::Configuration(const internal::Configuration& config, const string& local_address, uint32_t local_replica,
+                             uint32_t local_partition)
+    : config_(config), local_address_(local_address), local_replica_(local_replica), local_partition_(local_partition) {
   for (const auto& replica : config.replicas()) {
     CHECK_EQ((uint32_t)replica.addresses_size(), config.num_partitions())
         << "Number of addresses in each replica must match number of partitions.";
@@ -69,45 +59,27 @@ Configuration::Configuration(
   }
 }
 
-const string& Configuration::protocol() const {
-  return config_.protocol();
-}
+const string& Configuration::protocol() const { return config_.protocol(); }
 
-const vector<string>& Configuration::all_addresses() const {
-  return all_addresses_;
-}
+const vector<string>& Configuration::all_addresses() const { return all_addresses_; }
 
 const string& Configuration::address(uint32_t replica, uint32_t partition) const {
   return config_.replicas(replica).addresses(partition);
 }
 
-uint32_t Configuration::num_replicas() const {
-  return config_.replicas_size();
-}
+uint32_t Configuration::num_replicas() const { return config_.replicas_size(); }
 
-uint32_t Configuration::num_partitions() const {
-  return config_.num_partitions();
-}
+uint32_t Configuration::num_partitions() const { return config_.num_partitions(); }
 
-uint32_t Configuration::num_workers() const {
-  return std::max(config_.num_workers(), 1U);
-}
+uint32_t Configuration::num_workers() const { return std::max(config_.num_workers(), 1U); }
 
-uint32_t Configuration::broker_port() const {
-  return config_.broker_port();
-}
+uint32_t Configuration::broker_port() const { return config_.broker_port(); }
 
-uint32_t Configuration::server_port() const {
-  return config_.server_port();
-}
+uint32_t Configuration::server_port() const { return config_.server_port(); }
 
-long Configuration::batch_duration() const {
-  return config_.batch_duration();
-}
+long Configuration::batch_duration() const { return config_.batch_duration(); }
 
-uint32_t Configuration::replication_factor() const {
-  return std::max(config_.replication_factor(), 1U);
-}
+uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 
 vector<MachineId> Configuration::all_machine_ids() const {
   auto num_reps = num_replicas();
@@ -122,21 +94,13 @@ vector<MachineId> Configuration::all_machine_ids() const {
   return ret;
 }
 
-const string& Configuration::local_address() const {
-  return local_address_;
-}
+const string& Configuration::local_address() const { return local_address_; }
 
-uint32_t Configuration::local_replica() const {
-  return local_replica_;
-}
+uint32_t Configuration::local_replica() const { return local_replica_; }
 
-uint32_t Configuration::local_partition() const {
-  return local_partition_;
-}
+uint32_t Configuration::local_partition() const { return local_partition_; }
 
-uint32_t Configuration::local_machine_id() const {
-  return MakeMachineId(local_replica_, local_partition_);
-}
+uint32_t Configuration::local_machine_id() const { return MakeMachineId(local_replica_, local_partition_); }
 
 MachineId Configuration::MakeMachineId(uint32_t replica, uint32_t partition) const {
   return replica * num_partitions() + partition;
@@ -155,9 +119,9 @@ uint32_t Configuration::leader_partition_for_multi_home_ordering() const {
 
 uint32_t Configuration::partition_of_key(const Key& key) const {
   if (config_.has_hash_partitioning()) {
-    auto end = config_.hash_partitioning().partition_key_num_bytes() >= key.length() 
-        ? key.end() 
-        : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
+    auto end = config_.hash_partitioning().partition_key_num_bytes() >= key.length()
+                   ? key.end()
+                   : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
     return FNVHash(key.begin(), end) % num_partitions();
   } else {
     return partition_of_key(std::stoll(key));
@@ -168,26 +132,18 @@ bool Configuration::key_is_in_local_partition(const Key& key) const {
   return partition_of_key(key) == local_partition_;
 }
 
-uint32_t Configuration::partition_of_key(uint32_t key) const {
-  return key % num_partitions();
-}
+uint32_t Configuration::partition_of_key(uint32_t key) const { return key % num_partitions(); }
 
-uint32_t Configuration::master_of_key(uint32_t key) const {
-  return (key / num_partitions()) % num_replicas();
-}
+uint32_t Configuration::master_of_key(uint32_t key) const { return (key / num_partitions()) % num_replicas(); }
 
 const internal::SimplePartitioning* Configuration::simple_partitioning() const {
   return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
 #ifdef ENABLE_REPLICATION_DELAY
-uint32_t Configuration::replication_delay_percent() const {
-  return config_.replication_delay().batch_delay_percent();
-}
+uint32_t Configuration::replication_delay_percent() const { return config_.replication_delay().batch_delay_percent(); }
 
-uint32_t Configuration::replication_delay_amount() const {
-  return config_.replication_delay().batch_delay_amount();
-}
+uint32_t Configuration::replication_delay_amount() const { return config_.replication_delay().batch_delay_amount(); }
 #endif /* ENABLE_REPLICATION_DELAY */
 
-} // namespace slog
+}  // namespace slog

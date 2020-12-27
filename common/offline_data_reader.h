@@ -8,7 +8,7 @@
 namespace slog {
 
 class OfflineDataReader {
-public:
+ public:
   OfflineDataReader(int fd);
   ~OfflineDataReader();
 
@@ -16,11 +16,11 @@ public:
   bool HasNextDatum();
   Datum GetNextDatum();
 
-private:
+ private:
   google::protobuf::io::ZeroCopyInputStream* raw_input_;
   google::protobuf::io::CodedInputStream* coded_input_;
   uint32_t num_datums_;
   uint32_t num_read_datums_;
 };
 
-} // namespace slog
+}  // namespace slog

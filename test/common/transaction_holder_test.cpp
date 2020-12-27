@@ -1,8 +1,9 @@
+#include "common/transaction_holder.h"
+
 #include <gmock/gmock.h>
 
 #include <algorithm>
 
-#include "common/transaction_holder.h"
 #include "common/proto_utils.h"
 #include "test/test_utils.h"
 
@@ -13,15 +14,12 @@ using ::testing::ElementsAre;
 using ::testing::UnorderedElementsAre;
 
 class TransactionHolderTest : public ::testing::Test {
-protected:
+ protected:
   static const size_t NUM_MACHINES = 6;
   void SetUp() {
-    configs = MakeTestConfigurations(
-        "txn_holder",
-        2 /* num_replicas */,
-        3 /* num_partitions */);
+    configs = MakeTestConfigurations("txn_holder", 2 /* num_replicas */, 3 /* num_partitions */);
 
-    /* 
+    /*
     Partition 0: A, D, Y
     Partition 1: C, F, X
     Partition 2: B, E, Z
@@ -39,11 +37,10 @@ protected:
 };
 
 TEST_F(TransactionHolderTest, TxnReplicaId) {
-  auto txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"D"},  /* write_set */
-      "", /* code */
-      {{"A", {1, 3}}, {"D", {1,0}}}); /* metadata */
+  auto txn = MakeTransaction({"A"},                           /* read_set */
+                             {"D"},                           /* write_set */
+                             "",                              /* code */
+                             {{"A", {1, 3}}, {"D", {1, 0}}}); /* metadata */
   txn->mutable_internal()->set_id(100);
 
   auto holder = MakeHolder(configs[0], txn);
@@ -51,18 +48,17 @@ TEST_F(TransactionHolderTest, TxnReplicaId) {
 }
 
 TEST_F(TransactionHolderTest, keys_in_partition) {
-  auto txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"D"},  /* write_set */
-      "", /* code */
-      {{"A", {1, 3}}, {"D", {1,0}}}); /* metadata */
+  auto txn = MakeTransaction({"A"},                           /* read_set */
+                             {"D"},                           /* write_set */
+                             "",                              /* code */
+                             {{"A", {1, 3}}, {"D", {1, 0}}}); /* metadata */
   txn->mutable_internal()->set_id(100);
 
   auto txn2 = new Transaction(*txn);
 
   auto holder1 = MakeHolder(configs[0], txn);
   ASSERT_THAT(holder1.keys_in_partition(),
-    ElementsAre(make_pair("A", LockMode::READ), make_pair("D", LockMode::WRITE)));
+              ElementsAre(make_pair("A", LockMode::READ), make_pair("D", LockMode::WRITE)));
 
   auto holder2 = MakeHolder(configs[1], txn2);
   ASSERT_TRUE(holder2.keys_in_partition().empty());
@@ -70,11 +66,10 @@ TEST_F(TransactionHolderTest, keys_in_partition) {
 
 TEST_F(TransactionHolderTest, num_involved_partitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"B", "D"},  /* write_set */
-      "", /* code */
-      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
+    auto txn = MakeTransaction({"A"},                                          /* read_set */
+                               {"B", "D"},                                     /* write_set */
+                               "",                                             /* code */
+                               {{"A", {1, 3}}, {"B", {1, 0}}, {"D", {0, 0}}}); /* metadata */
     txn->mutable_internal()->set_id(100);
 
     auto holder = MakeHolder(configs[i], txn);
@@ -84,11 +79,10 @@ TEST_F(TransactionHolderTest, num_involved_partitions) {
 
 TEST_F(TransactionHolderTest, active_partitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"B", "D"},  /* write_set */
-      "", /* code */
-      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
+    auto txn = MakeTransaction({"A"},                                          /* read_set */
+                               {"B", "D"},                                     /* write_set */
+                               "",                                             /* code */
+                               {{"A", {1, 3}}, {"B", {1, 0}}, {"D", {0, 0}}}); /* metadata */
     txn->mutable_internal()->set_id(100);
 
     auto holder = MakeHolder(configs[i], txn);
@@ -100,11 +94,10 @@ TEST_F(TransactionHolderTest, active_partitions) {
 
 TEST_F(TransactionHolderTest, involved_replicas) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction(
-      {"A"}, /* read_set */
-      {"B", "D"},  /* write_set */
-      "", /* code */
-      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
+    auto txn = MakeTransaction({"A"},                                          /* read_set */
+                               {"B", "D"},                                     /* write_set */
+                               "",                                             /* code */
+                               {{"A", {1, 3}}, {"B", {1, 0}}, {"D", {0, 0}}}); /* metadata */
     txn->mutable_internal()->set_id(100);
 
     auto holder = MakeHolder(configs[i], txn);

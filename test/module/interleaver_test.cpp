@@ -1,10 +1,11 @@
-#include <vector>
+#include "module/interleaver.h"
 
 #include <gtest/gtest.h>
 
-#include "test/test_utils.h"
+#include <vector>
+
 #include "common/proto_utils.h"
-#include "module/interleaver.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
@@ -100,7 +101,7 @@ TEST(LocalLogTest, SameOriginOutOfOrder) {
 
   interleaver.AddBatchId(111 /* queue_id */, 1 /* position */, 200 /* batch_id */);
   interleaver.AddBatchId(111 /* queue_id */, 2 /* position */, 300 /* batch_id */);
-  
+
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */);
   ASSERT_FALSE(interleaver.HasNextBatch());
 
@@ -111,7 +112,6 @@ TEST(LocalLogTest, SameOriginOutOfOrder) {
 
   interleaver.AddSlot(2 /* slot_id */, 111 /* queue_id */);
   ASSERT_TRUE(interleaver.HasNextBatch());
-
 
   ASSERT_EQ(make_pair(0U, 100U), interleaver.NextBatch());
   ASSERT_EQ(make_pair(1U, 200U), interleaver.NextBatch());
@@ -125,7 +125,7 @@ const int NUM_PARTITIONS = 2;
 constexpr int NUM_MACHINES = NUM_REPLICAS * NUM_PARTITIONS;
 
 class InterleaverTest : public ::testing::Test {
-public:
+ public:
   void SetUp() {
     auto configs = MakeTestConfigurations("interleaver", NUM_REPLICAS, NUM_PARTITIONS);
     for (int i = 0; i < 4; i++) {
@@ -156,10 +156,7 @@ public:
   unique_ptr<TestSlog> slogs_[4];
 };
 
-internal::Batch* MakeBatch(
-    BatchId batch_id,
-    const vector<Transaction*>& txns,
-    TransactionType batch_type) {
+internal::Batch* MakeBatch(BatchId batch_id, const vector<Transaction*>& txns, TransactionType batch_type) {
   internal::Batch* batch = new internal::Batch();
   batch->set_id(batch_id);
   batch->set_transaction_type(batch_type);
@@ -176,7 +173,6 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
 
   // Replicate batch data to all machines
   {
-
     Request req;
     auto forward_batch = req.mutable_forward_batch();
     forward_batch->mutable_batch_data()->CopyFrom(*batch);
@@ -317,5 +313,5 @@ TEST_F(InterleaverTest, ThreeBatches) {
       ASSERT_EQ(*txn, *sh_txn_1);
       delete txn;
     }
-  } 
+  }
 }

@@ -4,10 +4,7 @@
 
 namespace slog {
 
-CSVWriter::CSVWriter(
-    const std::string& file_name,
-    const std::vector<std::string>& columns,
-    char delimiter) {
+CSVWriter::CSVWriter(const std::string& file_name, const std::vector<std::string>& columns, char delimiter) {
   if (columns.empty()) {
     throw std::runtime_error("There must be at least one column");
   }
@@ -43,4 +40,4 @@ void CSVWriter::IncrementLineItemsAndCheck() {
   }
 }
 
-} // namespace slog
+}  // namespace slog

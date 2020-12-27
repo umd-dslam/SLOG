@@ -1,14 +1,15 @@
+#include "module/scheduler_components/ddr_lock_manager.h"
+
 #include <gtest/gtest.h>
 
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/ddr_lock_manager.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
 
 class DDRLockManagerTest : public ::testing::Test {
-protected:
+ protected:
   DDRLockManager lock_manager;
   MessagePool<internal::Request> pool;
 
@@ -21,9 +22,7 @@ protected:
 
 TEST_F(DDRLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn = FillMetadata(MakeTransaction(
-    {"readA", "readB"},
-    {"writeC"}));
+  auto txn = FillMetadata(MakeTransaction({"readA", "readB"}, {"writeC"}));
   txn->mutable_internal()->set_num_masters(1);
   TransactionHolder holder = MakeHolder(configs[0], txn);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
@@ -145,7 +144,7 @@ TEST_F(DDRLockManagerTest, PrioritizeWriteLock) {
   txn2->mutable_internal()->set_id(200);
   txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
- 
+
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
 
@@ -343,7 +342,6 @@ TEST_F(DDRLockManagerTest, EnsureStateIsClean) {
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
   ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
 }
-
 
 TEST_F(DDRLockManagerTest, LongChain) {
   auto configs = MakeTestConfigurations("locking", 1, 1);

@@ -1,14 +1,15 @@
+#include "module/scheduler_components/rma_lock_manager.h"
+
 #include <gtest/gtest.h>
 
-#include "test/test_utils.h"
 #include "common/proto_utils.h"
-#include "module/scheduler_components/rma_lock_manager.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
 
 class RMALockManagerTest : public ::testing::Test {
-protected:
+ protected:
   RMALockManager lock_manager;
   MessagePool<internal::Request> pool;
 
@@ -21,9 +22,7 @@ protected:
 
 TEST_F(RMALockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
-  auto txn = FillMetadata(MakeTransaction(
-    {"readA", "readB"},
-    {"writeC"}));
+  auto txn = FillMetadata(MakeTransaction({"readA", "readB"}, {"writeC"}));
   TransactionHolder holder = MakeHolder(configs[0], txn);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
   auto result = lock_manager.ReleaseLocks(holder);
@@ -127,7 +126,7 @@ TEST_F(RMALockManagerTest, PrioritizeWriteLock) {
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2->mutable_internal()->set_id(200);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
- 
+
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::WAITING);
 

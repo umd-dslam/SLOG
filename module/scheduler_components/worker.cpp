@@ -4,8 +4,9 @@
 #include "module/scheduler_components/remaster_manager.h"
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
-#include <thread>
 #include <glog/logging.h>
+
+#include <thread>
 
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
@@ -15,18 +16,13 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-Worker::Worker(
-    const ConfigurationPtr& config,
-    const std::shared_ptr<Broker>& broker,
-    Channel channel,
-    const shared_ptr<Storage<Key, Record>>& storage,
-    int poll_timeout_ms)
-  : NetworkedModule(
-        "Worker-" + std::to_string(channel), broker, channel, poll_timeout_ms),
-    config_(config),
-    storage_(storage),
-    // TODO: change this dynamically based on selected experiment
-    commands_(new KeyValueCommands()) {}
+Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
+               const shared_ptr<Storage<Key, Record>>& storage, int poll_timeout_ms)
+    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout_ms),
+      config_(config),
+      storage_(storage),
+      // TODO: change this dynamically based on selected experiment
+      commands_(new KeyValueCommands()) {}
 
 void Worker::HandleInternalRequest(ReusableRequest&& req, MachineId) {
   std::optional<TxnId> txn_id = {};
@@ -59,10 +55,7 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::ENTER_WORKER);
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_WORKER);
 
   // Create a state for the new transaction
   auto [iter, ok] = txn_states_.try_emplace(txn_id, txn_holder);
@@ -136,8 +129,7 @@ std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadR
     if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
       state.phase = TransactionState::Phase::EXECUTE;
       VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
-    }
-    else {
+    } else {
       LOG(FATAL) << "Invalid phase";
     }
   }
@@ -188,7 +180,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   auto will_abort = false;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  switch(RemasterManager::CheckCounters(txn_holder, storage_)) {
+  switch (RemasterManager::CheckCounters(txn_holder, storage_)) {
     case VerifyMasterResult::VALID: {
       break;
     }
@@ -248,10 +240,8 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
   const auto& active_partitions = txn_holder->active_partitions();
-  if (std::find(
-      active_partitions.begin(),
-      active_partitions.end(),
-      config_->local_partition()) != active_partitions.end()) {
+  if (std::find(active_partitions.begin(), active_partitions.end(), config_->local_partition()) !=
+      active_partitions.end()) {
     // Active partition needs remote reads from all partitions
     state.remote_reads_waiting_on = txn_holder->num_involved_partitions() - 1;
   }
@@ -304,8 +294,7 @@ void Worker::Commit(TxnId txn_id) {
           Record record;
           bool found = storage_->Read(key_value.first, record);
           if (!found) {
-            DCHECK(master_metadata.contains(key))
-                << "Master metadata for key \"" << key << "\" is missing";
+            DCHECK(master_metadata.contains(key)) << "Master metadata for key \"" << key << "\" is missing";
             record.metadata = master_metadata.at(key);
           }
           record.value = value;
@@ -344,10 +333,7 @@ void Worker::Commit(TxnId txn_id) {
 void Worker::Finish(TxnId txn_id) {
   auto txn = TxnState(txn_id).txn_holder->transaction();
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::EXIT_WORKER);
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // This must happen before the sending to scheduler below. Otherwise,
   // the scheduler may destroy the transaction holder before we can
@@ -371,10 +357,7 @@ void Worker::PreAbort(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->transaction();
 
-  RecordTxnEvent(
-      config_,
-      txn->mutable_internal(),
-      TransactionEvent::EXIT_WORKER);
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   SendToCoordinatingServer(txn_id);
 
@@ -434,8 +417,8 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());
   completed_sub_txn->set_num_involved_partitions(txn_holder->num_involved_partitions());
-  
-  Send(*req.get(), kServerChannel,  txn->internal().coordinating_server());
+
+  Send(*req.get(), kServerChannel, txn->internal().coordinating_server());
   completed_sub_txn->release_txn();
 }
 
@@ -445,5 +428,4 @@ TransactionState& Worker::TxnState(TxnId txn_id) {
   return state_it->second;
 }
 
-
-} // namespace slog
+}  // namespace slog

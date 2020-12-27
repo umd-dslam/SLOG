@@ -4,9 +4,7 @@ namespace slog {
 
 using internal::Response;
 
-QuorumTracker::QuorumTracker(uint32_t num_members)
-  : num_members_(num_members),
-    state_(QuorumState::INCOMPLETE) {}
+QuorumTracker::QuorumTracker(uint32_t num_members) : num_members_(num_members), state_(QuorumState::INCOMPLETE) {}
 
 bool QuorumTracker::HandleResponse(const Response& res, MachineId from) {
   if (state_ == QuorumState::COMPLETE || state_ == QuorumState::ABORTED) {
@@ -28,25 +26,16 @@ bool QuorumTracker::HandleResponse(const Response& res, MachineId from) {
   if (sz > num_members_ / 2 && state_ != QuorumState::QUORUM_REACHED) {
     state_ = QuorumState::QUORUM_REACHED;
     return true;
-  } 
+  }
   return false;
 }
 
-void QuorumTracker::Abort() {
-  state_ = QuorumState::ABORTED;
-}
+void QuorumTracker::Abort() { state_ = QuorumState::ABORTED; }
 
-QuorumState QuorumTracker::GetState() const {
-  return state_;
-}
+QuorumState QuorumTracker::GetState() const { return state_; }
 
-AcceptanceTracker::AcceptanceTracker(
-    uint32_t num_members,
-    uint32_t ballot,
-    uint32_t slot)
-  : QuorumTracker(num_members),
-    ballot(ballot),
-    slot(slot) {}
+AcceptanceTracker::AcceptanceTracker(uint32_t num_members, uint32_t ballot, uint32_t slot)
+    : QuorumTracker(num_members), ballot(ballot), slot(slot) {}
 
 bool AcceptanceTracker::ResponseIsValid(const internal::Response& res) {
   if (res.type_case() != Response::TypeCase::kPaxosAccept) {
@@ -56,11 +45,7 @@ bool AcceptanceTracker::ResponseIsValid(const internal::Response& res) {
   return paxos_accept.ballot() == ballot && paxos_accept.slot() == slot;
 }
 
-CommitTracker::CommitTracker(
-    uint32_t num_members,
-    uint32_t slot)
-  : QuorumTracker(num_members),
-    slot(slot) {}
+CommitTracker::CommitTracker(uint32_t num_members, uint32_t slot) : QuorumTracker(num_members), slot(slot) {}
 
 bool CommitTracker::ResponseIsValid(const internal::Response& res) {
   if (res.type_case() != Response::TypeCase::kPaxosCommit) {
@@ -70,4 +55,4 @@ bool CommitTracker::ResponseIsValid(const internal::Response& res) {
   return paxos_commit.slot() == slot;
 }
 
-} // namespace slog
+}  // namespace slog

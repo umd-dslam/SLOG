@@ -8,34 +8,32 @@
 namespace slog {
 
 /**
- * A MultiHomeOrderer batches multi-home transactions and orders them globally 
+ * A MultiHomeOrderer batches multi-home transactions and orders them globally
  * with paxos.
- * 
+ *
  * INPUT:  ForwardTxn or ForwardBatch
- * 
+ *
  * OUTPUT: For ForwardTxn, it has to contains a MULTI_HOME txn, which is put
  *         into a batch. The ID of this batch is sent to the global paxos
  *         process for ordering, and simultaneously, this batch is sent to
  *         the MultiHomeOrderer of all regions.
- * 
+ *
  *         ForwardBatch'es are serialized into a log according to
  *         their globally orderred IDs and then forwarded to the Sequencer.
  */
 class MultiHomeOrderer : public NetworkedModule {
-public:
-  MultiHomeOrderer(
-      const ConfigurationPtr& config,
-      const std::shared_ptr<Broker>& broker,
-      int poll_timeout_ms = kModuleTimeoutMs);
+ public:
+  MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+                   int poll_timeout_ms = kModuleTimeoutMs);
 
-protected:
+ protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
   void HandleInternalRequest(ReusableRequest&& req, MachineId from_machine_id) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
-private:
+ private:
   void NewBatch();
   BatchId NextBatchId();
 
@@ -49,4 +47,4 @@ private:
   BatchLog multi_home_batch_log_;
 };
 
-} // namespace slog
+}  // namespace slog

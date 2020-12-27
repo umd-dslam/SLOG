@@ -1,7 +1,7 @@
 #pragma once
 
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -28,29 +28,27 @@ namespace slog {
  *                            transaction result to the client.
  * @return                    A new transaction having given properties
  */
-Transaction* MakeTransaction(
-    const unordered_set<Key>& read_set,
-    const unordered_set<Key>& write_set,
-    const string& code = "",
-    const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-    const MachineId coordinating_server = 0,
-    const int32_t new_master = -1); // TODO: make this a union wtih code
+Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
+                             const string& code = "",
+                             const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
+                             const MachineId coordinating_server = 0,
+                             const int32_t new_master = -1);  // TODO: make this a union wtih code
 
 /**
  * Inspects the internal metadata of a transaction then determines whether
  * a transaction is SINGLE_HOME, MULTI_HOME, or UNKNOWN.
- * Pre-condition: all keys in master_metadata exist in either write set or 
+ * Pre-condition: all keys in master_metadata exist in either write set or
  * read set of the transaction
- * 
+ *
  * @param txn The questioned transaction. Its `type` property will also be
  *            set to the result.
- * @return    The type of the given transaction. 
+ * @return    The type of the given transaction.
  */
 TransactionType SetTransactionType(Transaction& txn);
 
 /**
  * Merges the results of two transactions
- * 
+ *
  * @param txn   The transaction that will hold the final merged result
  * @param other The transaction to be merged with
  */
@@ -61,16 +59,11 @@ bool operator==(const Transaction& txn1, const Transaction txn2);
 
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata);
 
-template<typename TxnOrBatch>
+template <typename TxnOrBatch>
 inline void RecordTxnEvent(const ConfigurationPtr& config, TxnOrBatch txn, TransactionEvent event) {
   txn->mutable_events()->Add(event);
-  txn->mutable_event_times()->Add(
-      duration_cast<microseconds>(
-          Clock::now()
-              .time_since_epoch()).count()
-  );
-  txn->mutable_event_machines()->Add(
-      config->local_machine_id());
+  txn->mutable_event_times()->Add(duration_cast<microseconds>(Clock::now().time_since_epoch()).count());
+  txn->mutable_event_machines()->Add(config->local_machine_id());
 }
 
-} // namespace slog
+}  // namespace slog

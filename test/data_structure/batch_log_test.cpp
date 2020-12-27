@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "data_structure/batch_log.h"
+
+#include <gtest/gtest.h>
 
 using namespace std;
 using namespace slog;
@@ -8,7 +8,7 @@ using namespace slog;
 using internal::Batch;
 
 class BatchLogTest : public ::testing::Test {
-protected:
+ protected:
   static const size_t NUM_BATCHES = 3;
 
   void SetUp() {
@@ -18,15 +18,11 @@ protected:
     }
   }
 
-  bool BatchEQ(
-      pair<uint32_t, uint32_t> expected_id,
-      pair<SlotId, BatchPtr> batch) {
-    return batch.second != nullptr
-        && expected_id.second == batch.second->id()
-        && expected_id.first == batch.first;
+  bool BatchEQ(pair<uint32_t, uint32_t> expected_id, pair<SlotId, BatchPtr> batch) {
+    return batch.second != nullptr && expected_id.second == batch.second->id() && expected_id.first == batch.first;
   }
 
-  BatchPtr batches[NUM_BATCHES]; // batch ids: 100 200 300
+  BatchPtr batches[NUM_BATCHES];  // batch ids: 100 200 300
 };
 
 TEST_F(BatchLogTest, InOrder) {

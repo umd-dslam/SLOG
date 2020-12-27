@@ -1,7 +1,8 @@
+#include <fcntl.h>
+
+#include <csignal>
 #include <memory>
 #include <vector>
-#include <fcntl.h>
-#include <csignal>
 
 #include "common/configuration.h"
 #include "common/constants.h"
@@ -13,8 +14,8 @@
 #include "module/interleaver.h"
 #include "module/multi_home_orderer.h"
 #include "module/scheduler.h"
-#include "module/server.h"
 #include "module/sequencer.h"
+#include "module/server.h"
 #include "module/ticker.h"
 #include "proto/internal.pb.h"
 #include "proto/offline_data.pb.h"
@@ -30,28 +31,23 @@ DEFINE_string(data_dir, "", "Directory containing intial data");
 using slog::Broker;
 using slog::ConfigurationPtr;
 using slog::Key;
-using slog::Record;
-using slog::Metadata;
 using slog::MakeRunnerFor;
+using slog::Metadata;
+using slog::Record;
 
 using std::make_shared;
 
-void LoadData(
-    slog::Storage<Key, Record>& storage,
-    const ConfigurationPtr& config,
-    const string& data_dir) {
+void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config, const string& data_dir) {
   if (data_dir.empty()) {
     LOG(INFO) << "No initial data directory specified. Starting with an empty storage.";
     return;
   }
 
-  auto data_file = data_dir + "/" + 
-      std::to_string(config->local_partition()) + ".dat";
+  auto data_file = data_dir + "/" + std::to_string(config->local_partition()) + ".dat";
 
   auto fd = open(data_file.c_str(), O_RDONLY);
   if (fd < 0) {
-    LOG(ERROR) << "Error while loading \"" << data_file << "\": "
-               << strerror(errno)
+    LOG(ERROR) << "Error while loading \"" << data_file << "\": " << strerror(errno)
                << ". Starting with an empty storage.";
     return;
   }
@@ -69,11 +65,9 @@ void LoadData(
     }
 
     CHECK(config->key_is_in_local_partition(datum.key()))
-        << "Key " << datum.key()
-        << " does not belong to partition " << config->local_partition();
+        << "Key " << datum.key() << " does not belong to partition " << config->local_partition();
 
-    CHECK_LT(datum.master(), config->num_replicas())
-        << "Master number exceeds number of replicas";
+    CHECK_LT(datum.master(), config->num_replicas()) << "Master number exceeds number of replicas";
 
     // Write to storage
     Record record(datum.record(), datum.master());
@@ -88,11 +82,11 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
   auto num_threads = config->num_workers();
   auto num_partitions = config->num_partitions();
   auto partition = config->local_partition();
-  
+
   // Create a value of specified size by repeating the character 'a'
   string value(simple_partitioning->record_size_bytes(), 'a');
 
-  LOG(INFO) << "Generating ~" << num_records/num_partitions << " records using " << num_threads << " threads. "
+  LOG(INFO) << "Generating ~" << num_records / num_partitions << " records using " << num_threads << " threads. "
             << "Record size = " << simple_partitioning->record_size_bytes() << " bytes";
 
   auto GenerateFn = [&](uint64_t from_key, uint64_t to_key) {
@@ -120,9 +114,7 @@ int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
 
   auto zmq_version = zmq::version();
-  LOG(INFO) << "ZMQ version "
-            << std::get<0>(zmq_version) << "."
-            << std::get<1>(zmq_version) << "."
+  LOG(INFO) << "ZMQ version " << std::get<0>(zmq_version) << "." << std::get<1>(zmq_version) << "."
             << std::get<2>(zmq_version);
 
 #ifdef REMASTER_PROTOCOL_SIMPLE
@@ -139,20 +131,12 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Replication delay enabled";
 #endif /* GetReplicationDelayEnabled */
 
-  auto config = slog::Configuration::FromFile(
-      FLAGS_config, 
-      FLAGS_address,
-      FLAGS_replica,
-      FLAGS_partition);
+  auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address, FLAGS_replica, FLAGS_partition);
   const auto& all_addresses = config->all_addresses();
-  CHECK(std::find(
-      all_addresses.begin(),
-      all_addresses.end(),
-      config->local_address()) != all_addresses.end())
+  CHECK(std::find(all_addresses.begin(), all_addresses.end(), config->local_address()) != all_addresses.end())
       << "The configuration does not contain the provided "
       << "local machine ID: \"" << config->local_address() << "\"";
-  CHECK_LT(config->local_replica(), config->num_replicas())
-      << "Replica numbers must be within number of replicas";
+  CHECK_LT(config->local_replica(), config->num_replicas()) << "Replica numbers must be within number of replicas";
   CHECK_LT(config->local_partition(), config->num_partitions())
       << "Partition number must be within number of partitions";
 
@@ -169,31 +153,22 @@ int main(int argc, char* argv[]) {
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
-  // Create the server module. This is not added to the "modules" 
+  // Create the server module. This is not added to the "modules"
   // list below because it starts differently.
   auto server = MakeRunnerFor<slog::Server>(config, broker);
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
-  modules.push_back(
-      MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->batch_duration())));
-  modules.push_back(
-      MakeRunnerFor<slog::LocalPaxos>(config, broker));
-  modules.push_back(
-      MakeRunnerFor<slog::Forwarder>(config, broker, storage));
-  modules.push_back(
-      MakeRunnerFor<slog::Sequencer>(config, broker));
-  modules.push_back(
-      MakeRunnerFor<slog::Interleaver>(config, broker));
-  modules.push_back(
-      MakeRunnerFor<slog::Scheduler>(config, broker, storage));
-  
+  modules.push_back(MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->batch_duration())));
+  modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
+  modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
+  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker));
+  modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
+  modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
+
   // Only one partition per replica participates in the global paxos process
-  if (config->leader_partition_for_multi_home_ordering() 
-      == config->local_partition()) {
-    modules.push_back(
-        MakeRunnerFor<slog::GlobalPaxos>(config, broker));
-    modules.push_back(
-        MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
+  if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
+    modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
+    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
   }
 
   // Block SIGINT from here so that the new threads inherit the block mask
@@ -202,10 +177,10 @@ int main(int argc, char* argv[]) {
   sigaddset(&signal_set, SIGINT);
   pthread_sigmask(SIG_BLOCK, &signal_set, nullptr);
 
-  // New modules cannot be bound to the broker after it starts so start 
+  // New modules cannot be bound to the broker after it starts so start
   // the Broker only after it is used to initialized all modules.
   broker->StartInNewThread();
-  
+
   // Start modules in their own threads
   for (auto& module : modules) {
     module->StartInNewThread();

@@ -1,17 +1,17 @@
 #include <fstream>
 #include <functional>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 #include "common/constants.h"
 #include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/api.pb.h"
-#include "service/service_utils.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
-#include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+#include "service/service_utils.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
@@ -75,13 +75,7 @@ void ExecuteTxn(const char* txn_file) {
     new_master = d["new_master"].GetInt();
   }
 
-  auto txn = MakeTransaction(
-    read_set,
-    write_set,
-    d["code"].GetString(),
-    metadata,
-    0,
-    new_master);
+  auto txn = MakeTransaction(read_set, write_set, d["code"].GetString(), metadata, 0, new_master);
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);
@@ -132,8 +126,7 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
         break;
       }
 
-      cout << "(" << entry.GetArray()[0].GetUint()
-           << ", " << entry.GetArray()[1].GetUint() << ")\n";
+      cout << "(" << entry.GetArray()[0].GetUint() << ", " << entry.GetArray()[1].GetUint() << ")\n";
     }
     cout << "\n";
   }
@@ -156,49 +149,52 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
 
 string LockModeStr(LockMode mode) {
   switch (mode) {
-    case LockMode::UNLOCKED: return "UNLOCKED";
-    case LockMode::READ: return "READ";
-    case LockMode::WRITE: return "WRITE";
+    case LockMode::UNLOCKED:
+      return "UNLOCKED";
+    case LockMode::READ:
+      return "READ";
+    case LockMode::WRITE:
+      return "WRITE";
   }
   return "<error>";
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
-/*
-  TODO: Fix this
+  /*
+    TODO: Fix this
 
-  Header("Local Log");
-  cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
-  cout << "Buffered batches per queue:\n";
-  const auto& batches_per_queue = stats[LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE].GetArray();
-  
-  for (size_t i = 0; i < batches_per_queue.Size(); i++) {
-    const auto& pair = batches_per_queue[i].GetArray();
-    cout << "\tQueue " << pair[0].GetUint() << ": " << pair[1].GetUint() << "\n";
-  }
+    Header("Local Log");
+    cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
+    cout << "Buffered batches per queue:\n";
+    const auto& batches_per_queue = stats[LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE].GetArray();
 
-  Header("Global Log");
-  const auto& slots_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION].GetArray();
-  const auto& batches_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION].GetArray();
+    for (size_t i = 0; i < batches_per_queue.Size(); i++) {
+      const auto& pair = batches_per_queue[i].GetArray();
+      cout << "\tQueue " << pair[0].GetUint() << ": " << pair[1].GetUint() << "\n";
+    }
 
-  // The last "region" is the log for multi-home txns
-  int num_regions = slots_per_region.Size() - 1;
-  cout << setw(12) << "Regions" 
-       << setw(20) << "# buffered slots"
-       << setw(22) << "# buffered batches\n";
-  for (int i = 0; i < num_regions; i++) {
-    const auto& slots = slots_per_region[i].GetArray();
-    const auto& batches = batches_per_region[i].GetArray();
-    cout << setw(12) << slots[0].GetUint()
-         << setw(20) << slots[1].GetUint()
-         << setw(22) << batches[1].GetUint() << "\n";
-  }
-  if (num_regions >= 0) {
-    cout << setw(12) << "multi-home"
-        << setw(20) << slots_per_region[num_regions].GetArray()[1].GetUint()
-        << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << "\n";
-  }
-*/
+    Header("Global Log");
+    const auto& slots_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION].GetArray();
+    const auto& batches_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION].GetArray();
+
+    // The last "region" is the log for multi-home txns
+    int num_regions = slots_per_region.Size() - 1;
+    cout << setw(12) << "Regions"
+         << setw(20) << "# buffered slots"
+         << setw(22) << "# buffered batches\n";
+    for (int i = 0; i < num_regions; i++) {
+      const auto& slots = slots_per_region[i].GetArray();
+      const auto& batches = batches_per_region[i].GetArray();
+      cout << setw(12) << slots[0].GetUint()
+           << setw(20) << slots[1].GetUint()
+           << setw(22) << batches[1].GetUint() << "\n";
+    }
+    if (num_regions >= 0) {
+      cout << setw(12) << "multi-home"
+          << setw(20) << slots_per_region[num_regions].GetArray()[1].GetUint()
+          << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << "\n";
+    }
+  */
   Header("Transactions");
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {
@@ -218,8 +214,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Txns waiting for lock: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
   if (level >= 1) {
     cout << "Locks waited per txn:\n";
-    cout << setw(10) << "Txn" 
-         << setw(18) << "# locks waited\n";
+    cout << setw(10) << "Txn" << setw(18) << "# locks waited\n";
     size_t counter = 0;
     for (auto& pair : stats[NUM_LOCKS_WAITED_PER_TXN].GetArray()) {
       if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
@@ -228,8 +223,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       }
 
       const auto& txn_and_locks = pair.GetArray();
-      cout << setw(10) << txn_and_locks[0].GetUint() 
-           << setw(18) << txn_and_locks[1].GetInt() << "\n";
+      cout << setw(10) << txn_and_locks[0].GetUint() << setw(18) << txn_and_locks[1].GetInt() << "\n";
     }
   }
 
@@ -245,9 +239,8 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 
       const auto& entry = entry_.GetArray();
       auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
-      
-      cout << "Key: " << entry[0].GetString()
-           << ". Mode: " << LockModeStr(lock_mode) << "\n";
+
+      cout << "Key: " << entry[0].GetString() << ". Mode: " << LockModeStr(lock_mode) << "\n";
 
       cout << "\tHolders: ";
       for (auto& holder : entry[2].GetArray()) {
@@ -258,8 +251,8 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       cout << "\tWaiters: ";
       for (auto& waiter : entry[3].GetArray()) {
         auto txn_and_mode = waiter.GetArray();
-        cout << "(" << txn_and_mode[0].GetUint()
-             << ", "<< LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
+        cout << "(" << txn_and_mode[0].GetUint() << ", "
+             << LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
       }
       cout << "\n";
     }
@@ -268,9 +261,8 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 }
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
-  {"server", {api::StatsModule::SERVER, PrintServerStats}},
-  {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}
-};
+    {"server", {api::StatsModule::SERVER, PrintServerStats}},
+    {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}};
 
 void ExecuteStats(const char* module, uint32_t level) {
   auto& stats_module = STATS_MODULES.at(string(module));

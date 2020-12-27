@@ -1,8 +1,8 @@
 #include "module/scheduler_components/rma_lock_manager.h"
 
-#include <algorithm>
-
 #include <glog/logging.h>
+
+#include <algorithm>
 
 using std::make_pair;
 using std::move;
@@ -49,20 +49,15 @@ bool LockState::AcquireWriteLock(TxnId txn_id) {
   }
 }
 
-bool LockState::Contains(TxnId txn_id) {
-  return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0;
-}
+bool LockState::Contains(TxnId txn_id) { return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0; }
 
 unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   // If the transaction is not among the lock holders, find and remove it in
   // the queue of waiters
   if (holders_.count(txn_id) == 0) {
-    waiter_queue_.erase(
-      std::remove_if(
-          waiter_queue_.begin(),
-          waiter_queue_.end(),
-          [txn_id](auto& pair) { return pair.first == txn_id; }),
-      waiter_queue_.end());
+    waiter_queue_.erase(std::remove_if(waiter_queue_.begin(), waiter_queue_.end(),
+                                       [txn_id](auto& pair) { return pair.first == txn_id; }),
+                        waiter_queue_.end());
     waiters_.erase(txn_id);
     // No new transaction get the lock
     return {};
@@ -163,8 +158,7 @@ AcquireLocksResult RMALockManager::AcquireLocks(const TransactionHolder& txn_hol
     auto mode = pair.second;
     auto& lock_state = lock_table_[key_replica];
 
-    DCHECK(!lock_state.Contains(txn_id))
-        << "Txn requested lock twice: " << txn_id << ", " << key_replica;
+    DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key_replica;
     auto before_mode = lock_state.mode;
     switch (mode) {
       case LockMode::READ:
@@ -233,8 +227,8 @@ vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) 
     auto& lock_state = lock_state_it->second;
     auto old_mode = lock_state.mode;
     auto new_grantees = lock_state.Release(txn_id);
-     // Prevent the lock table from growing too big
-     // TODO: automatically delete remastered keys
+    // Prevent the lock table from growing too big
+    // TODO: automatically delete remastered keys
     if (lock_state.mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
@@ -270,10 +264,7 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
 
   if (level >= 1) {
     // Collect number of locks waited per txn
-    stats.AddMember(
-        StringRef(NUM_LOCKS_WAITED_PER_TXN),
-        ToJsonArrayOfKeyValue(num_locks_waited_, alloc),
-        alloc);
+    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), ToJsonArrayOfKeyValue(num_locks_waited_, alloc), alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);
@@ -289,19 +280,15 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
       entry.PushBack(key_json, alloc)
-           .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
-           .PushBack(
-                ToJsonArray(lock_state.GetHolders(), alloc), alloc)
-           .PushBack(
-                ToJsonArrayOfKeyValue(
-                    lock_state.GetWaiters(),
-                    [](const auto& v) { return static_cast<uint32_t>(v); },
-                    alloc),
-                alloc);
+          .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
+          .PushBack(ToJsonArray(lock_state.GetHolders(), alloc), alloc)
+          .PushBack(ToJsonArrayOfKeyValue(
+                        lock_state.GetWaiters(), [](const auto& v) { return static_cast<uint32_t>(v); }, alloc),
+                    alloc);
       lock_table.PushBack(move(entry), alloc);
     }
     stats.AddMember(StringRef(LOCK_TABLE), move(lock_table), alloc);
   }
 }
 
-} // namespace slog
+}  // namespace slog

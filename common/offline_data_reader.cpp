@@ -9,8 +9,7 @@ using google::protobuf::io::FileInputStream;
 namespace slog {
 
 OfflineDataReader::OfflineDataReader(int fd)
-  : raw_input_(new FileInputStream(fd)),
-    coded_input_(new CodedInputStream(raw_input_)) {
+    : raw_input_(new FileInputStream(fd)), coded_input_(new CodedInputStream(raw_input_)) {
   if (!coded_input_->ReadVarint32(&num_datums_)) {
     LOG(FATAL) << "Error while reading data file";
   }
@@ -22,14 +21,10 @@ OfflineDataReader::~OfflineDataReader() {
   delete raw_input_;
 }
 
-uint32_t OfflineDataReader::GetNumDatums() {
-  return num_datums_;
-}
+uint32_t OfflineDataReader::GetNumDatums() { return num_datums_; }
 
-bool OfflineDataReader::HasNextDatum() {
-  return num_read_datums_ < num_datums_;
-}
-  
+bool OfflineDataReader::HasNextDatum() { return num_read_datums_ < num_datums_; }
+
 Datum OfflineDataReader::GetNextDatum() {
   int sz;
   // Read the size of the next datum
@@ -45,10 +40,10 @@ Datum OfflineDataReader::GetNextDatum() {
   Datum datum;
   // Parse raw bytes into protobuf object
   datum.ParseFromString(buf);
-  
+
   num_read_datums_++;
-  
+
   return datum;
 }
 
-} // namespace slog
+}  // namespace slog

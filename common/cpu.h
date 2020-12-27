@@ -1,8 +1,8 @@
 #pragma once
 
-#include <thread>
-
 #include <glog/logging.h>
+
+#include <thread>
 
 namespace slog {
 
@@ -18,4 +18,4 @@ inline void PinToCpu(pthread_t thread, int cpu) {
   }
 }
 
-} // namespace slog
+}  // namespace slog

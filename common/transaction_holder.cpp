@@ -1,15 +1,15 @@
 #include "common/transaction_holder.h"
 
-#include <algorithm>
-
 #include <glog/logging.h>
 
-using std::pair;
+#include <algorithm>
+
 using std::make_pair;
 using std::move;
-using std::vector;
-using std::unordered_set;
+using std::pair;
 using std::string;
+using std::unordered_set;
+using std::vector;
 
 namespace slog {
 
@@ -31,8 +31,7 @@ void TransactionHolder::SetTxnRequest(const ConfigurationPtr& config, ReusableRe
   for (const auto& kv : txn.read_set()) {
     involved_partitions.push_back(config->partition_of_key(kv.first));
     // If this key is also in write_set, give it write lock instead
-    if (config->key_is_in_local_partition(kv.first) 
-        && !txn.write_set().contains(kv.first)) {
+    if (config->key_is_in_local_partition(kv.first) && !txn.write_set().contains(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::READ);
     }
   }
@@ -72,29 +71,17 @@ void TransactionHolder::SetTxnRequest(const ConfigurationPtr& config, ReusableRe
   txn_request_ = move(req);
 }
 
-const vector<pair<Key, LockMode>>& TransactionHolder::keys_in_partition() const {
-  return keys_in_partition_;
-}
+const vector<pair<Key, LockMode>>& TransactionHolder::keys_in_partition() const { return keys_in_partition_; }
 
-uint32_t TransactionHolder::num_involved_partitions() const {
-  return num_involved_partitions_;
-}
+uint32_t TransactionHolder::num_involved_partitions() const { return num_involved_partitions_; }
 
-const std::vector<uint32_t>& TransactionHolder::active_partitions() const {
-  return active_partitions_;
-}
+const std::vector<uint32_t>& TransactionHolder::active_partitions() const { return active_partitions_; }
 
-const std::vector<uint32_t>& TransactionHolder::involved_replicas() const {
-  return involved_replicas_;
-}
+const std::vector<uint32_t>& TransactionHolder::involved_replicas() const { return involved_replicas_; }
 
-vector<ReusableRequest>& TransactionHolder::early_remote_reads() {
-  return early_remote_reads_;
-}
+vector<ReusableRequest>& TransactionHolder::early_remote_reads() { return early_remote_reads_; }
 
-uint32_t TransactionHolder::replica_id() const {
-  return replica_id(transaction());
-}
+uint32_t TransactionHolder::replica_id() const { return replica_id(transaction()); }
 
 uint32_t TransactionHolder::replica_id(const Transaction* txn) {
   // This should only be empty for testing.
@@ -121,4 +108,4 @@ const TxnIdReplicaIdPair TransactionHolder::transaction_id_replica_id(const Tran
   return make_pair(txn_id, local_log_id);
 }
 
-} // namespace slog
+}  // namespace slog
