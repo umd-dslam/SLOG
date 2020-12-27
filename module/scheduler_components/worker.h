@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,10 +16,6 @@
 #include "proto/internal.pb.h"
 #include "storage/storage.h"
 
-using std::shared_ptr;
-using std::unique_ptr;
-using std::unordered_set;
-
 namespace slog {
 
 struct TransactionState {
@@ -31,10 +28,12 @@ struct TransactionState {
     PRE_ABORT
   };
 
-  TransactionState() = default;
-  TransactionState(TransactionHolder* txn_holder) : txn_holder(txn_holder) {}
-  TransactionHolder* txn_holder = nullptr;
-  uint32_t remote_reads_waiting_on = 0;
+  TransactionState(TransactionHolder* txn_holder) :
+      txn_holder(txn_holder),
+      remote_reads_waiting_on(0),
+      phase(Phase::READ_LOCAL_STORAGE) {}
+  TransactionHolder* txn_holder;
+  uint32_t remote_reads_waiting_on;
   Phase phase;
 };
 
@@ -50,7 +49,7 @@ public:
       const ConfigurationPtr& config,
       const std::shared_ptr<Broker>& broker,
       Channel channel,
-      const shared_ptr<Storage<Key, Record>>& storage,
+      const std::shared_ptr<Storage<Key, Record>>& storage,
       int poll_timeout_ms = kModuleTimeoutMs);
 
 protected:
@@ -103,12 +102,15 @@ private:
 
   void SendToCoordinatingServer(TxnId txn_id);
 
+  // Precondition: txn_id must exists in txn states table
+  TransactionState& TxnState(TxnId txn_id);
+
   ConfigurationPtr config_;
-  shared_ptr<Storage<Key, Record>> storage_;
-  unique_ptr<Commands> commands_;
+  std::shared_ptr<Storage<Key, Record>> storage_;
+  std::unique_ptr<Commands> commands_;
   zmq::pollitem_t poll_item_;
 
-  unordered_map<TxnId, TransactionState> txn_states_;
+  std::unordered_map<TxnId, TransactionState> txn_states_;
 };
 
 } // namespace slog

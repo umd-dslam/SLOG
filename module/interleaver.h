@@ -34,7 +34,7 @@ public:
   std::unordered_map<uint32_t, size_t> NumBufferedBatchesPerQueue() const {
     std::unordered_map<uint32_t, size_t> queue_sizes;
     for (const auto& pair : batch_queues_) {
-      queue_sizes[pair.first] = pair.second.NumBufferredItems();
+      queue_sizes.insert_or_assign(pair.first, pair.second.NumBufferredItems());
     }
     return queue_sizes;
   }

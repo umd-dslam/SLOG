@@ -111,7 +111,7 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
     return;
   }
 
-  pending_transactions_[txn->internal().id()] = move(req);
+  pending_transactions_.insert_or_assign(txn->internal().id(), move(req));
 
   // Send a look up master request to each partition in the same region
   auto local_rep = config_->local_replica();
@@ -161,12 +161,13 @@ void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from
 
   const auto& lookup_master = res.get()->lookup_master();
   auto txn_id = lookup_master.txn_id();
-  if (pending_transactions_.count(txn_id) == 0) {
+  auto pending_txn_it = pending_transactions_.find(txn_id);
+  if (pending_txn_it == pending_transactions_.end()) {
     return;
   }
 
   // Transfer master info from the lookup response to its intended transaction
-  auto txn = pending_transactions_[txn_id].get()->mutable_forward_txn()->mutable_txn();
+  auto txn = pending_txn_it->second.get()->mutable_forward_txn()->mutable_txn();
   auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
   for (const auto& pair : lookup_master.master_metadata()) {
     if (TransactionContainsKey(*txn, pair.first)) {

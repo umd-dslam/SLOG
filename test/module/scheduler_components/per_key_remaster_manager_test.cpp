@@ -10,7 +10,7 @@ using ::testing::ElementsAre;
 using ::testing::IsEmpty;
 using std::make_pair;
 
-class RemasterManagerTest : public ::testing::Test {
+class PerKeyRemasterManagerTest : public ::testing::Test {
 protected:
   void SetUp() {
     configs = MakeTestConfigurations("locking", 1, 1);
@@ -31,7 +31,7 @@ protected:
   }
 };
 
-TEST_F(RemasterManagerTest, CheckCounters) {
+TEST_F(PerKeyRemasterManagerTest, CheckCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 100);
   auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 101);
@@ -42,7 +42,7 @@ TEST_F(RemasterManagerTest, CheckCounters) {
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::ABORT);
 }
 
-TEST_F(RemasterManagerTest, CheckMultipleCounters) {
+TEST_F(PerKeyRemasterManagerTest, CheckMultipleCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   storage->Write("C", Record("valueC", 0, 1));
@@ -55,7 +55,7 @@ TEST_F(RemasterManagerTest, CheckMultipleCounters) {
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::ABORT);
 }
 
-TEST_F(RemasterManagerTest, CheckIndirectBlocking) {
+TEST_F(PerKeyRemasterManagerTest, CheckIndirectBlocking) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 2}}}), 100);
@@ -67,7 +67,7 @@ TEST_F(RemasterManagerTest, CheckIndirectBlocking) {
   ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::VALID);
 }
 
-TEST_F(RemasterManagerTest, RemasterQueueSingleKey) {
+TEST_F(PerKeyRemasterManagerTest, RemasterQueueSingleKey) {
   storage->Write("A", Record("valueA", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {1, 2}}}), 100);
 
@@ -77,7 +77,7 @@ TEST_F(RemasterManagerTest, RemasterQueueSingleKey) {
   ASSERT_THAT(unblocked, ElementsAre(&txn1));
 }
 
-TEST_F(RemasterManagerTest, RemasterQueueMultipleKeys) {
+TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleKeys) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {1, 2}}, {"B", {0, 3}}}), 100);
@@ -91,7 +91,7 @@ TEST_F(RemasterManagerTest, RemasterQueueMultipleKeys) {
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 3).unblocked, ElementsAre(&txn1));
 }
 
-TEST_F(RemasterManagerTest, RemasterQueueMultipleTxns) {
+TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleTxns) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {1, 2}}, {"B", {1, 2}}}), 100);

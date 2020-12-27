@@ -24,13 +24,15 @@ void Sender::Send(
     return;
   }
   // Lazily establish a new connection when necessary
-  if (machine_id_to_socket_.count(to_machine_id) == 0) {
+  auto it = machine_id_to_socket_.find(to_machine_id);
+  if (it == machine_id_to_socket_.end()) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
       new_socket.setsockopt(ZMQ_LINGER, 0);
       new_socket.setsockopt(ZMQ_SNDHWM, 0);
       new_socket.connect(br->GetEndpointByMachineId(to_machine_id));
-      machine_id_to_socket_[to_machine_id] = move(new_socket);
+      auto res = machine_id_to_socket_.insert_or_assign(to_machine_id, move(new_socket));
+      it = res.first;
     } else {
       // Broker has been destroyed. This can only happen during cleaning up
       return;
@@ -38,7 +40,7 @@ void Sender::Send(
   }
   
   SendProto(
-      machine_id_to_socket_[to_machine_id],
+      it->second,
       request_or_response,
       to_channel,
       local_machine_id_);
@@ -48,13 +50,15 @@ void Sender::Send(
     const google::protobuf::Message& request_or_response,
     Channel to_channel) {
   // Lazily establish a new connection when necessary
-  if (local_channel_to_socket_.count(to_channel) == 0) {
+  auto it = local_channel_to_socket_.find(to_channel);
+  if (it == local_channel_to_socket_.end()) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
       new_socket.connect("inproc://channel_" + std::to_string(to_channel));
       new_socket.setsockopt(ZMQ_LINGER, 0);
       new_socket.setsockopt(ZMQ_SNDHWM, 0);
-      local_channel_to_socket_[to_channel] = move(new_socket);
+      auto res = local_channel_to_socket_.insert_or_assign(to_channel, move(new_socket));
+      it = res.first;
     } else {
       // Broker has been destroyed. This can only happen during cleaning up
       return;
@@ -62,7 +66,7 @@ void Sender::Send(
   }
 
   SendProto(
-      local_channel_to_socket_[to_channel],
+      it->second,
       request_or_response,
       to_channel,
       local_machine_id_);

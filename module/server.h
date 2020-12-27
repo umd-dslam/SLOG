@@ -19,6 +19,9 @@ namespace slog {
 struct PendingResponse {
   zmq::message_t identity;
   uint32_t stream_id;
+
+  explicit PendingResponse(zmq::message_t&& identity, uint32_t stream_id) 
+    : identity(std::move(identity)), stream_id(stream_id) {}
 };
 
 struct CompletedTransaction {

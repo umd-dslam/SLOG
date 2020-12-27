@@ -1,13 +1,11 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include "common/types.h"
 #include "proto/configuration.pb.h"
 #include "proto/internal.pb.h"
 
 using std::string;
-using std::unordered_map;
 using std::vector;
 
 namespace slog {

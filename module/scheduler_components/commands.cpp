@@ -79,12 +79,13 @@ bool KeyValueCommands::NextCommand(const string& code) {
     return false;
   }
 
-  if (COMMAND_NUM_ARGS.count(cmd_) == 0) {
+  auto it = COMMAND_NUM_ARGS.find(cmd_);
+  if (it == COMMAND_NUM_ARGS.end()) {
     Abort() << "Invalid command: " << cmd_; 
     return false;
   }
 
-  auto required_num_args = COMMAND_NUM_ARGS.at(cmd_);
+  auto required_num_args = it->second;
   pos_ = NextNTokens(args_, code, SPACE, required_num_args, pos_);
   if (pos_ == string::npos) {
     Abort() << "Invalid number of arguments for command " << cmd_;

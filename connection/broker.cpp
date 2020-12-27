@@ -63,7 +63,7 @@ void Broker::AddChannel(Channel chan) {
   new_channel.setsockopt(ZMQ_LINGER, 0);
   new_channel.setsockopt(ZMQ_SNDHWM, 0);
   new_channel.connect("inproc://channel_" + std::to_string(chan));
-  channels_[chan] = move(new_channel);
+  channels_.insert_or_assign(chan, move(new_channel));
 }
 
 const std::shared_ptr<zmq::context_t>& Broker::context() const {
@@ -79,8 +79,11 @@ std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
 
   // Once we can reach this point, we'll always be able to reach this point
   // and the machine_id_to_endpoint_ map becomes read-only.
-  CHECK(machine_id_to_endpoint_.count(machine_id) > 0) << "Invalid machine id: " << machine_id;
-  return machine_id_to_endpoint_[machine_id];
+  auto endpoint_it = machine_id_to_endpoint_.find(machine_id);
+  if (endpoint_it == machine_id_to_endpoint_.end()) {
+    LOG(FATAL) << "Invalid machine id: " << machine_id;
+  }
+  return endpoint_it->second;
 }
 
 MachineId Broker::GetLocalMachineId() const {
@@ -173,7 +176,7 @@ bool Broker::InitializeConnection() {
                 << " (rep: " << replica 
                 << ", part: " << partition << ")";
 
-      machine_id_to_endpoint_[machine_id] = MakeEndpoint(addr);
+      machine_id_to_endpoint_.insert_or_assign(machine_id, MakeEndpoint(addr));
       needed_machine_ids.erase(machine_id);
     }
 
@@ -223,16 +226,17 @@ void Broker::Run() {
 }
 
 void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
-  Channel chan;
-  if (!ParseChannel(chan, msg)) {
+  Channel chan_id;
+  if (!ParseChannel(chan_id, msg)) {
     LOG(ERROR) << "Message without channel info";
     return;
   }
-  if (channels_.count(chan) == 0) {
-    LOG(ERROR) << "Unknown channel: \"" << chan << "\". Dropping message";
+  auto chan_it = channels_.find(chan_id);
+  if (chan_it == channels_.end()) {
+    LOG(ERROR) << "Unknown channel: \"" << chan_id << "\". Dropping message";
     return;
   }
-  channels_[chan].send(msg, zmq::send_flags::none);
+  chan_it->second.send(msg, zmq::send_flags::none);
 }
 
 zmq::pollitem_t Broker::GetSocketPollItem() {

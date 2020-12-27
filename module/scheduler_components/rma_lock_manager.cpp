@@ -161,25 +161,26 @@ AcquireLocksResult RMALockManager::AcquireLocks(const TransactionHolder& txn_hol
   for (auto& pair : locks_to_request) {
     auto& key_replica = pair.first;
     auto mode = pair.second;
+    auto& lock_state = lock_table_[key_replica];
 
-    CHECK(!lock_table_[key_replica].Contains(txn_id))
+    DCHECK(!lock_state.Contains(txn_id))
         << "Txn requested lock twice: " << txn_id << ", " << key_replica;
-    auto before_mode = lock_table_[key_replica].mode;
+    auto before_mode = lock_state.mode;
     switch (mode) {
       case LockMode::READ:
-        if (lock_table_[key_replica].AcquireReadLock(txn_id)) {
+        if (lock_state.AcquireReadLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       case LockMode::WRITE:
-        if (lock_table_[key_replica].AcquireWriteLock(txn_id)) {
+        if (lock_state.AcquireWriteLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       default:
         LOG(FATAL) << "Invalid lock mode";
     }
-    if (before_mode == LockMode::UNLOCKED && lock_table_[key_replica].mode != before_mode) {
+    if (before_mode == LockMode::UNLOCKED && lock_state.mode != before_mode) {
       num_locked_keys_++;
     }
   }
@@ -200,7 +201,6 @@ AcquireLocksResult RMALockManager::AcceptTxnAndAcquireLocks(const TransactionHol
 }
 
 vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
-  vector<TxnId> result;
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
 
@@ -224,12 +224,18 @@ vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) 
     }
   }
 
+  vector<TxnId> result;
   for (auto& key_replica : locks_to_release) {
-    auto old_mode = lock_table_[key_replica].mode;
-    auto new_grantees = lock_table_[key_replica].Release(txn_id);
+    auto lock_state_it = lock_table_.find(key_replica);
+    if (lock_state_it == lock_table_.end()) {
+      continue;
+    }
+    auto& lock_state = lock_state_it->second;
+    auto old_mode = lock_state.mode;
+    auto new_grantees = lock_state.Release(txn_id);
      // Prevent the lock table from growing too big
      // TODO: automatically delete remastered keys
-    if (lock_table_[key_replica].mode == LockMode::UNLOCKED) {
+    if (lock_state.mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }
@@ -246,7 +252,6 @@ vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) 
       }
     }
   }
-
   // Deduplicate the result
   std::sort(result.begin(), result.end());
   auto last = std::unique(result.begin(), result.end());

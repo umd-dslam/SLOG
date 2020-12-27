@@ -65,12 +65,9 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
       TransactionEvent::ENTER_WORKER);
 
   // Create a state for the new transaction
-  auto [iter, ok] = txn_states_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(txn_id),
-      std::forward_as_tuple(txn_holder));
+  auto [iter, ok] = txn_states_.try_emplace(txn_id, txn_holder);
 
-  CHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
+  DCHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
   if (txn->status() == TransactionStatus::ABORTED) {
     iter->second.phase = TransactionState::Phase::PRE_ABORT;
@@ -108,12 +105,13 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
 
 std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
   auto txn_id = read_result.txn_id();
-  if (txn_states_.count(txn_id) == 0) {
+  auto state_it = txn_states_.find(txn_id);
+  if (state_it == txn_states_.end()) {
     VLOG(1) << "Transaction " << txn_id << " does not exist for remote read result";
     return {};
   }
 
-  auto& state = txn_states_[txn_id];
+  auto& state = state_it->second;
   auto txn = state.txn_holder->transaction();
 
   if (txn->status() != TransactionStatus::ABORTED) {
@@ -147,7 +145,7 @@ std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadR
 }
 
 void Worker::AdvanceTransaction(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   switch (state.phase) {
     case TransactionState::Phase::READ_LOCAL_STORAGE:
       ReadLocalStorage(txn_id);
@@ -182,7 +180,7 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
 }
 
 void Worker::ReadLocalStorage(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
   auto txn = txn_holder->transaction();
 
@@ -263,7 +261,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 }
 
 void Worker::Execute(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->transaction();
 
   switch (txn->procedure_case()) {
@@ -285,7 +283,7 @@ void Worker::Execute(TxnId txn_id) {
 }
 
 void Worker::Commit(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->transaction();
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
@@ -338,7 +336,7 @@ void Worker::Commit(TxnId txn_id) {
 }
 
 void Worker::Finish(TxnId txn_id) {
-  auto txn = txn_states_[txn_id].txn_holder->transaction();
+  auto txn = TxnState(txn_id).txn_holder->transaction();
 
   RecordTxnEvent(
       config_,
@@ -364,7 +362,7 @@ void Worker::Finish(TxnId txn_id) {
 void Worker::PreAbort(TxnId txn_id) {
   NotifyOtherPartitions(txn_id);
 
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->transaction();
 
   RecordTxnEvent(
@@ -385,7 +383,7 @@ void Worker::PreAbort(TxnId txn_id) {
 }
 
 void Worker::NotifyOtherPartitions(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
 
   if (txn_holder->active_partitions().empty()) {
@@ -419,7 +417,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
 }
 
 void Worker::SendToCoordinatingServer(TxnId txn_id) {
-  auto& state = txn_states_[txn_id];
+  auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
   auto txn = txn_holder->transaction();
 
@@ -435,5 +433,12 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   Send(*req.get(), kServerChannel,  txn->internal().coordinating_server());
   completed_sub_txn->release_txn();
 }
+
+TransactionState& Worker::TxnState(TxnId txn_id) {
+  auto state_it = txn_states_.find(txn_id);
+  DCHECK(state_it != txn_states_.end());
+  return state_it->second;
+}
+
 
 } // namespace slog

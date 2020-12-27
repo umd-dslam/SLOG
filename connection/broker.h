@@ -13,7 +13,6 @@
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
-using std::unordered_map;
 using std::vector;
 
 namespace slog {
@@ -116,7 +115,7 @@ private:
   // Messages that are sent to this broker when it is not READY yet
   vector<zmq::message_t> unhandled_incoming_messages_;
   // Map from channel name to the channel
-  unordered_map<Channel, zmq::socket_t> channels_;
+  std::unordered_map<Channel, zmq::socket_t> channels_;
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages

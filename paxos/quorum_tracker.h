@@ -1,7 +1,6 @@
 #pragma once
 
 #include <unordered_set>
-#include <unordered_map>
 #include <vector>
 
 #include "common/types.h"
@@ -9,7 +8,6 @@
 
 using std::string;
 using std::unordered_set;
-using std::unordered_map;
 using std::vector;
 
 namespace slog {

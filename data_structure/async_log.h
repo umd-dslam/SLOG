@@ -46,9 +46,10 @@ public:
     auto position = next_;
     next_++;
 
-    T result = std::move(log_[position]);
-    log_.erase(position);
-    return std::make_pair(position, std::move(result));
+    auto it = log_.find(position);
+    auto res = *it;
+    log_.erase(it);
+    return res;
   }
 
   /* For debugging */

@@ -28,8 +28,9 @@ SimpleRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
 
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
-  if (blocked_queue_.count(local_log_machine_id) && !blocked_queue_[local_log_machine_id].empty()) {
-    blocked_queue_[local_log_machine_id].push_back(txn_holder);
+  auto it = blocked_queue_.find(local_log_machine_id);
+  if (it != blocked_queue_.end() && !it->second.empty()) {
+    it->second.push_back(txn_holder);
     return VerifyMasterResult::WAITING;
   }
 
@@ -67,10 +68,11 @@ RemasterOccurredResult
 SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->transaction()->internal().id();
   for (auto replica : txn_holder->involved_replicas()) {
-    if (blocked_queue_.count(replica) == 0 || blocked_queue_[replica].empty()) {
+    auto it = blocked_queue_.find(replica);
+    if (it == blocked_queue_.end() || it->second.empty()) {
       continue;
     }
-    auto& queue = blocked_queue_[replica];
+    auto& queue = it->second;
     for (auto itr = queue.begin(); itr != queue.end(); itr++) {
       if ((*itr)->transaction()->internal().id() == txn_id) {
         queue.erase(itr);
@@ -90,11 +92,12 @@ SimpleRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
 }
 
 void SimpleRemasterManager::TryToUnblock(uint32_t local_log_machine_id, RemasterOccurredResult& result) {
-  if (blocked_queue_[local_log_machine_id].empty()) {
+  auto it = blocked_queue_.find(local_log_machine_id);
+  if (it == blocked_queue_.end() || it->second.empty()) {
     return;
   }
 
-  auto& txn_holder = blocked_queue_[local_log_machine_id].front();
+  auto& txn_holder = it->second.front();
 
   auto counter_result = CheckCounters(txn_holder, storage_);
   if (counter_result == VerifyMasterResult::WAITING) {
@@ -106,7 +109,7 @@ void SimpleRemasterManager::TryToUnblock(uint32_t local_log_machine_id, Remaster
   }
 
   // Head of queue has changed
-  blocked_queue_[local_log_machine_id].pop_front();
+  it->second.pop_front();
 
   // Note: queue may be left empty, since there are not many replicas
   TryToUnblock(local_log_machine_id, result);

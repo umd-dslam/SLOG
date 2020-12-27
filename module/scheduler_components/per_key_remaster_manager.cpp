@@ -33,11 +33,11 @@ PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
       // Check if other transactions are blocking the queue
       auto indirectly_blocked = false;
       for (auto& key_pair :keys) {
-        auto key = key_pair.first;
+        auto q_it = blocked_queue_.find(key_pair.first);
         // If the queue is emtpy, can be skipped
-        if (blocked_queue_.count(key)) {
+        if (q_it != blocked_queue_.end() && !q_it->second.empty()) {
           // If we won't be at the front of the queue, the txn will need to wait.
-          if (blocked_queue_[key].front().second <= txn_master_metadata.at(key).counter()) {
+          if (q_it->second.front().second <= txn_master_metadata.at(key_pair.first).counter()) {
             indirectly_blocked = true;
             break;
           }
@@ -93,11 +93,12 @@ void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_
   auto entry = make_pair(txn_holder, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
-  auto itr = blocked_queue_[key].begin();
-  while (itr != blocked_queue_[key].end() && (*itr).second <= counter /* note <= */) {
+  auto& q = blocked_queue_[key];
+  auto itr = q.begin();
+  while (itr != q.end() && (*itr).second <= counter /* note <= */) {
     itr++;
   }
-  blocked_queue_[key].insert(itr, entry);
+  q.insert(itr, entry);
 }
 
 RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(const Key& key, const uint32_t /* remaster_counter */) {
@@ -114,11 +115,12 @@ RemasterOccurredResult PerKeyRemasterManager::RemasterOccured(const Key& key, co
 }
 
 void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccurredResult& result) {
-  if (blocked_queue_.count(unblocked_key) == 0) {
+  auto q_it = blocked_queue_.find(unblocked_key);
+  if (q_it == blocked_queue_.end()) {
     return;
   }
 
-  auto& txn_pair = blocked_queue_[unblocked_key].front();
+  auto& txn_pair = q_it->second.front();
   auto& txn_holder = txn_pair.first;
 
   switch (CheckCounters(txn_holder, storage_)) {
@@ -135,9 +137,9 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
     }
     case VerifyMasterResult::VALID: {
       for (auto& key_pair : txn_holder->keys_in_partition()) {
-        auto key = key_pair.first;
-        CHECK(blocked_queue_.count(key) > 0) << "Transaction was not in correct blocked_queues";
-        auto& front_txn_replica_id = blocked_queue_[key].front().first;
+        auto q_it = blocked_queue_.find(key_pair.first);
+        DCHECK(q_it != blocked_queue_.end()) << "Transaction was not in correct blocked_queues";
+        auto& front_txn_replica_id = q_it->second.front().first;
         if (front_txn_replica_id != txn_holder) {
           return;
         }
@@ -146,10 +148,10 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
 
       // Garbage collect queue and counters
       for (auto& key_pair : txn_holder->keys_in_partition()) {
-        auto key = key_pair.first;
-        blocked_queue_[key].pop_front();
-        if (blocked_queue_[key].size() == 0) {
-          blocked_queue_.erase(key);
+        auto q_it = blocked_queue_.find(key_pair.first);
+        q_it->second.pop_front();
+        if (q_it->second.size() == 0) {
+          blocked_queue_.erase(key_pair.first);
         }
       }
 

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "rapidjson/allocators.h"
 #include "rapidjson/document.h"

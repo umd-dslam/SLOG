@@ -2,12 +2,15 @@
 
 #include <glog/logging.h>
 
+using std::make_pair;
+using std::move;
+
 namespace slog {
 
 BatchLog::BatchLog() {}
 
 void BatchLog::AddBatch(BatchPtr&& batch) {
-  batches_[batch->id()] = std::move(batch);
+  batches_.insert_or_assign(batch->id(), move(batch));
   UpdateReadyBatches();
 }
 
@@ -28,10 +31,11 @@ std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
   auto next_batch_id = ready_batches_.front().second;
   ready_batches_.pop();
 
-  auto next_batch = std::move(batches_[next_batch_id]);
-  batches_.erase(next_batch_id);
+  auto it = batches_.find(next_batch_id);
+  auto res = make_pair(move(next_slot), move(it->second));
+  batches_.erase(it);
 
-  return {next_slot, std::move(next_batch)};
+  return res;
 }
 
 void BatchLog::UpdateReadyBatches() {

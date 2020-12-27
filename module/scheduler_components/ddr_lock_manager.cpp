@@ -78,17 +78,18 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
   for (auto& pair : locks_to_request) {
     auto& key_replica = pair.first;
     auto mode = pair.second;
+    auto& lock_queue_tail = lock_table_[key_replica];
 
     switch (mode) {
       case LockMode::READ: {
-        auto b_txn = lock_table_[key_replica].AcquireReadLock(txn_id);
+        auto b_txn = lock_queue_tail.AcquireReadLock(txn_id);
         if (b_txn.has_value()) {
           blocking_txns.push_back(b_txn.value());
         }
         break;
       }
       case LockMode::WRITE: {
-        auto b_txns = lock_table_[key_replica].AcquireWriteLock(txn_id);
+        auto b_txns = lock_queue_tail.AcquireWriteLock(txn_id);
         blocking_txns.insert(blocking_txns.begin(), b_txns.begin(), b_txns.end());
         break;
       }
@@ -103,16 +104,17 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
   auto last = std::unique(blocking_txns.begin(), blocking_txns.end());
 
   // Add current txn to the waited_by list of each blocking txn
-  for (auto it = blocking_txns.begin(); it != last; it++) {
+  for (auto b_txn = blocking_txns.begin(); b_txn != last; b_txn++) {
     // The txns returned from the lock table might already leave
     // the lock manager so we need to check for their existence here
-    if (txn_info_.find(*it) != txn_info_.end()) {
+    auto b_txn_info = txn_info_.find(*b_txn);
+    if (b_txn_info != txn_info_.end()) {
       // Let A be a blocking txn of a multi-home txn B. It is possible that
       // two lock-only txns of B both sees A and A is double counted here.
       // However, B is also added twice in the waited_by list of A. Therefore,
       // on releasing A, waiting_for_cnt of B is correctly subtracted.
       txn_info.waiting_for_cnt++;
-      txn_info_[*it].waited_by.push_back(txn_id);
+      b_txn_info->second.waited_by.push_back(txn_id);
     }
   }
 
@@ -131,12 +133,22 @@ vector<TxnId> DDRLockManager::ReleaseLocks(const TransactionHolder& txn_holder) 
   vector<TxnId> result;
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
-  auto& txn_info = txn_info_[txn_id];
+  auto txn_info_it = txn_info_.find(txn_id);
+  if (txn_info_it == txn_info_.end()) {
+    LOG(ERROR) << "The released transaction does not exist";
+    return result;
+  }
+  auto& txn_info = txn_info_it->second;
   if (!txn_info.is_ready()) {
     LOG(FATAL) << "Releasing unready txn is forbidden";
   }
   for (auto blocked_txn_id : txn_info.waited_by) {
-    auto& blocked_txn = txn_info_.at(blocked_txn_id);
+    auto it = txn_info_.find(blocked_txn_id);
+    if (it == txn_info_.end()) {
+      LOG(ERROR) << "Blocked txn does not exist";
+      continue;
+    }
+    auto& blocked_txn = it->second;
     blocked_txn.waiting_for_cnt--;
     if (blocked_txn.is_ready()) {
       // While the waited_by list might contain duplicates, the blocked

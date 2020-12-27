@@ -60,15 +60,8 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
 
   // While this is called txn id, we use it for any kind of request
   auto txn_id = NextTxnId();
-  CHECK(pending_responses_.count(txn_id) == 0) << "Duplicate transaction id: " << txn_id;
-
-  pending_responses_[txn_id] = {
-    // Save the identity of the client to response later
-    .identity = std::move(identity),
-    // Stream id is used by a client to match up request-response on its side.
-    // The server does not use this and just echos it back to the client.
-    .stream_id = request.stream_id()
-  };
+  auto res = pending_responses_.try_emplace(txn_id, move(identity), request.stream_id());
+  DCHECK(res.second) << "Duplicate transaction id: " << txn_id;
 
   switch (request.type_case()) {
     case api::Request::kTxn: {
@@ -255,11 +248,12 @@ void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
 ***********************************************/
 
 void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
-  if (pending_responses_.count(txn_id) == 0) {
+  auto it = pending_responses_.find(txn_id);
+  if (it == pending_responses_.end()) {
     LOG(ERROR) << "Cannot find info to response back to client for txn: " << txn_id;
     return;
   }
-  auto& pr = pending_responses_[txn_id];
+  auto& pr = it->second;
   auto& socket = GetCustomSocket(0);
 
   res.set_stream_id(pr.stream_id);

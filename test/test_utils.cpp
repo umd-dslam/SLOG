@@ -157,13 +157,16 @@ void TestSlog::AddOutputChannel(Channel channel) {
   zmq::socket_t socket(*context_, ZMQ_PULL);
   socket.setsockopt(ZMQ_LINGER, 0);
   socket.bind("inproc://channel_" + to_string(channel));
-  channels_[channel] = std::move(socket);
+  channels_.insert_or_assign(channel, std::move(socket));
 }
 
 zmq::pollitem_t TestSlog::GetPollItemForChannel(Channel channel) {
-  CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
+  auto it = channels_.find(channel);
+  if (it == channels_.end()) {
+    LOG(FATAL) << "Channel " << channel << " does not exist";
+  }
   return {
-      static_cast<void*>(channels_[channel]),
+      static_cast<void*>(it->second),
       0, /* fd */
       ZMQ_POLLIN,
       0 /* revent */};

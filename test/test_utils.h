@@ -14,7 +14,6 @@
 using std::string;
 using std::shared_ptr;
 using std::unique_ptr;
-
 namespace slog {
 
 using ConfigVec = std::vector<ConfigurationPtr>;
@@ -79,7 +78,7 @@ private:
   ModuleRunnerPtr global_paxos_;
   ModuleRunnerPtr multi_home_orderer_;
 
-  unordered_map<Channel, zmq::socket_t> channels_;
+  std::unordered_map<Channel, zmq::socket_t> channels_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

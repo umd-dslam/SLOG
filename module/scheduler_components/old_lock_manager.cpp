@@ -130,17 +130,18 @@ AcquireLocksResult OldLockManager::AcquireLocks(const TransactionHolder& txn_hol
   for (auto pair : txn_holder.keys_in_partition()) {
     auto key = pair.first;
     auto mode = pair.second;
-    CHECK(!lock_table_[key].Contains(txn_id))
+    auto& lock_state = lock_table_[key];
+    DCHECK(!lock_state.Contains(txn_id))
         << "Txn requested lock twice: " << txn_id << ", " << key;
-    auto before_mode = lock_table_[key].mode;
+    auto before_mode = lock_state.mode;
     switch (mode) {
       case LockMode::READ:
-        if (lock_table_[key].AcquireReadLock(txn_id)) {
+        if (lock_state.AcquireReadLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
       case LockMode::WRITE:
-        if (lock_table_[key].AcquireWriteLock(txn_id)) {
+        if (lock_state.AcquireWriteLock(txn_id)) {
           num_locks_acquired++;
         }
         break;
@@ -148,7 +149,7 @@ AcquireLocksResult OldLockManager::AcquireLocks(const TransactionHolder& txn_hol
         LOG(FATAL) << "Invalid lock mode";
         break;
     }
-    if (before_mode == LockMode::UNLOCKED && lock_table_[key].mode != before_mode) {
+    if (before_mode == LockMode::UNLOCKED && lock_state.mode != before_mode) {
       num_locked_keys_++;
     }
   }
@@ -174,11 +175,16 @@ OldLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
   auto txn_id = txn_holder.transaction()->internal().id();
 
   for (const auto& pair : txn_holder.keys_in_partition()) {
-    auto key = pair.first;
-    auto old_mode = lock_table_[key].mode;
-    auto new_grantees = lock_table_[key].Release(txn_id);
+    auto& key = pair.first;
+    auto lock_state_it = lock_table_.find(key);
+    if (lock_state_it == lock_table_.end()) {
+      continue;
+    }
+    auto& lock_state = lock_state_it->second;
+    auto old_mode = lock_state.mode;
+    auto new_grantees = lock_state.Release(txn_id);
      // Prevent the lock table from growing too big
-    if (lock_table_[key].mode == LockMode::UNLOCKED) {
+    if (lock_state.mode == LockMode::UNLOCKED) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }

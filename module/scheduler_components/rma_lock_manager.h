@@ -34,7 +34,6 @@ using KeyReplica = string;
  * the lock and the mode of the lock.
  */
 class LockState {
-
 public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);

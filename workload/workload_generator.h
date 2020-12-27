@@ -23,13 +23,14 @@ public:
   void Update(const std::string& params_str) {
     auto new_params_ = Parse(params_str);
     for (const auto& pair : new_params_) {
-      if (raw_params_.count(pair.first) == 0) {
+      auto res = raw_params_.insert_or_assign(pair.first, pair.second);
+      // If did an insertion instead of an assignment
+      if (res.second) {
         std::ostringstream ss;
-        ss << "Invalid param for current workload: " << pair.first
-           << "\nDefault params: " << ToString();
+        ss << "Unknown param for current workload: " << pair.first
+           << ". Default params: " << ToString();
         throw std::runtime_error(ss.str());
       }
-      raw_params_[pair.first] = pair.second;
     }
   }
 
