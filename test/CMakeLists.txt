@@ -11,8 +11,8 @@ if(NOT googletest_POPULATED)
   add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 endif()
 
-add_library(test_utils test_utils.cpp)
-target_link_libraries(test_utils PUBLIC slog_core)
+add_library(test-utils test_utils.cpp)
+target_link_libraries(test-utils PUBLIC slog-core)
 
 macro(add_slog_test TESTFILE)
   get_filename_component(TESTNAME ${TESTFILE} NAME_WE)
@@ -22,7 +22,7 @@ macro(add_slog_test TESTFILE)
       gmock
       gtest
       gtest_main
-      test_utils)
+      test-utils)
   gtest_discover_tests(${TESTNAME}
     PROPERTIES RUN_SERIAL TRUE)
 endmacro()

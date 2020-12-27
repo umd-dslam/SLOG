@@ -190,14 +190,13 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS
 #            Library
 #========================================
 
-add_library(slog_core STATIC "")
-add_subdirectory(common)
-add_subdirectory(connection)
-add_subdirectory(data_structure)
-add_subdirectory(module)
-add_subdirectory(paxos)
-target_include_directories(slog_core PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(slog_core
+set(SLOG_CORE_SRC_DIRS common connection data_structure module paxos)
+add_library(slog-core STATIC "")
+foreach (DIR ${SLOG_CORE_SRC_DIRS})
+  add_subdirectory(${DIR})
+endforeach()
+target_include_directories(slog-core PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(slog-core
   PUBLIC
     proto
     glog::glog
@@ -206,11 +205,11 @@ target_link_libraries(slog_core
 
 set(ENABLE_REMASTER TRUE)
 if (REMASTER_PROTOCOL STREQUAL "SIMPLE")
-  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_SIMPLE)
+  target_compile_definitions(slog-core PUBLIC REMASTER_PROTOCOL_SIMPLE)
 elseif (REMASTER_PROTOCOL STREQUAL "PER_KEY")
-  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_PER_KEY)
+  target_compile_definitions(slog-core PUBLIC REMASTER_PROTOCOL_PER_KEY)
 elseif (REMASTER_PROTOCOL STREQUAL "COUNTERLESS")
-  target_compile_definitions(slog_core PUBLIC REMASTER_PROTOCOL_COUNTERLESS)
+  target_compile_definitions(slog-core PUBLIC REMASTER_PROTOCOL_COUNTERLESS)
 elseif (REMASTER_PROTOCOL STREQUAL "NONE")
   set(ENABLE_REMASTER FALSE)
 else()
@@ -218,21 +217,21 @@ else()
 endif()
 
 if (LOCK_MANAGER STREQUAL "OLD")
-  target_compile_definitions(slog_core PUBLIC LOCK_MANAGER_OLD)
+  target_compile_definitions(slog-core PUBLIC LOCK_MANAGER_OLD)
 elseif (LOCK_MANAGER STREQUAL "RMA")
-  target_compile_definitions(slog_core PUBLIC LOCK_MANAGER_RMA)
+  target_compile_definitions(slog-core PUBLIC LOCK_MANAGER_RMA)
 elseif (LOCK_MANAGER STREQUAL "DDR")
-  target_compile_definitions(slog_core PUBLIC LOCK_MANAGER_DDR)
+  target_compile_definitions(slog-core PUBLIC LOCK_MANAGER_DDR)
 else()
   message(FATAL_ERROR "Invalid LOCK_MANAGER. It must be one of: \"OLD\", \"RMA\", or \"DDR\"")
 endif()
 
 if (ENABLE_REMASTER)
-  target_compile_definitions(slog_core PUBLIC ENABLE_REMASTER)
+  target_compile_definitions(slog-core PUBLIC ENABLE_REMASTER)
 endif()
 
 if (ENABLE_REPLICATION_DELAY)
-  target_compile_definitions(slog_core PUBLIC ENABLE_REPLICATION_DELAY)
+  target_compile_definitions(slog-core PUBLIC ENABLE_REPLICATION_DELAY)
 endif()
 
 #========================================
@@ -240,24 +239,25 @@ endif()
 #========================================
 
 # Create an executable for each service
-add_executable(slog service/slog.cpp)
-target_link_libraries(slog PRIVATE slog_core gflags::gflags)
+add_executable(slog service/slog.cpp service/service_utils.h)
+target_link_libraries(slog PRIVATE slog-core gflags::gflags)
 
 add_executable(benchmark
   service/benchmark.cpp
+  service/service_utils.h
   workload/basic_workload.cpp
   workload/remastering_workload.cpp)
 target_link_libraries(benchmark
   PRIVATE
-    slog_core
+    slog-core
     gflags::gflags
 )
 
 if (BUILD_SLOG_CLIENT)
-  add_executable(client service/client.cpp)
+  add_executable(client service/client.cpp service/service_utils.h)
   target_link_libraries(client
     PRIVATE
-      slog_core
+      slog-core
       gflags::gflags
   )
 endif()
@@ -271,4 +271,29 @@ if (BUILD_SLOG_TESTS)
   add_subdirectory(test)
 else()
   message(STATUS "BUILD_SLOG_TESTS is off. No test will be built")
+endif()
+
+#========================================
+#              clang-format
+#========================================
+
+find_program(CLANG_FORMAT "clang-format")
+if (CLANG_FORMAT)
+  set(ALL_SRC_FILES)
+  foreach (SRC_DIR ${SLOG_CORE_SRC_DIRS} service test)
+    file(GLOB_RECURSE SRC_FILES 
+      ${PROJECT_SOURCE_DIR}/${SRC_DIR}/*.cpp
+      ${PROJECT_SOURCE_DIR}/${SRC_DIR}/*.h)
+    list(APPEND ALL_SRC_FILES ${SRC_FILES})
+  endforeach()
+
+  add_custom_target(
+    format
+    ${CLANG_FORMAT}
+    -i
+    -style=file
+    ${ALL_SRC_FILES}
+  )
+else()
+  message(STATUS "Could not find clang-format")
 endif()

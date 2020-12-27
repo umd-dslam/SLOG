@@ -1,6 +1,11 @@
-target_sources(slog_core
+target_sources(slog-core
   PRIVATE
     acceptor.cpp
-    simple_multi_paxos.cpp
+    acceptor.h
+    CMakeLists.txt
     leader.cpp
-    quorum_tracker.cpp)
+    leader.h
+    quorum_tracker.cpp
+    quorum_tracker.h
+    simple_multi_paxos.cpp
+    simple_multi_paxos.h)

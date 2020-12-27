@@ -1,8 +1,20 @@
-target_sources(slog_core
+target_sources(slog-core
   PRIVATE
     configuration.cpp
+    configuration.h
+    constants.h
+    cpu.h
     csv_writer.cpp
+    csv_writer.h
+    json_utils.h
+    message_pool.h
+    monitor.h
     offline_data_reader.cpp
+    offline_data_reader.h
     proto_utils.cpp
+    proto_utils.h
     string_utils.cpp
-    transaction_holder.cpp)
+    string_utils.h
+    transaction_holder.cpp
+    transaction_holder.h
+    types.h)

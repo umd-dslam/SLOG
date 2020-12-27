@@ -1,1 +1,7 @@
-target_sources(slog_core PRIVATE broker.cpp sender.cpp)
+target_sources(slog-core
+  PRIVATE
+    broker.cpp
+    broker.h
+    sender.cpp
+    sender.h
+    zmq_utils.h)

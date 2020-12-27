@@ -1,19 +1,37 @@
-target_sources(slog_core
+target_sources(slog-core
   PRIVATE
-    base/networked_module.cpp
     base/module.cpp
-    consensus.cpp
-    forwarder.cpp
-    interleaver.cpp
-    multi_home_orderer.cpp
-    server.cpp
-    sequencer.cpp
-    scheduler.cpp
+    base/module.h
+    base/networked_module.cpp
+    base/networked_module.h
     scheduler_components/commands.cpp
+    scheduler_components/commands.h
     scheduler_components/ddr_lock_manager.cpp
-    scheduler_components/rma_lock_manager.cpp
+    scheduler_components/ddr_lock_manager.h
     scheduler_components/old_lock_manager.cpp
+    scheduler_components/old_lock_manager.h
     scheduler_components/per_key_remaster_manager.cpp
+    scheduler_components/per_key_remaster_manager.h
+    scheduler_components/remaster_manager.h
+    scheduler_components/rma_lock_manager.cpp
+    scheduler_components/rma_lock_manager.h
     scheduler_components/simple_remaster_manager.cpp
+    scheduler_components/simple_remaster_manager.h
     scheduler_components/worker.cpp
-    ticker.cpp)
+    scheduler_components/worker.h
+    consensus.cpp
+    consensus.h
+    forwarder.cpp
+    forwarder.h
+    interleaver.cpp
+    interleaver.h
+    multi_home_orderer.cpp
+    multi_home_orderer.h
+    scheduler.cpp
+    scheduler.h
+    sequencer.cpp
+    sequencer.h
+    server.cpp
+    server.h
+    ticker.cpp
+    ticker.h)
