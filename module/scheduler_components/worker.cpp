@@ -247,9 +247,13 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   //       before moving on.
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
-  if (txn_holder->active_partitions().count(config_->local_partition()) > 0) {
+  const auto& active_partitions = txn_holder->active_partitions();
+  if (std::find(
+      active_partitions.begin(),
+      active_partitions.end(),
+      config_->local_partition()) != active_partitions.end()) {
     // Active partition needs remote reads from all partitions
-    state.remote_reads_waiting_on = txn_holder->involved_partitions().size() - 1;
+    state.remote_reads_waiting_on = txn_holder->num_involved_partitions() - 1;
   }
   if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
@@ -429,9 +433,7 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto completed_sub_txn = req.get()->mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());
-  for (auto p : txn_holder->involved_partitions()) {
-    completed_sub_txn->add_involved_partitions(p);
-  }
+  completed_sub_txn->set_num_involved_partitions(txn_holder->num_involved_partitions());
   
   Send(*req.get(), kServerChannel,  txn->internal().coordinating_server());
   completed_sub_txn->release_txn();

@@ -1,10 +1,7 @@
 #include "module/server.h"
 
-#include <glog/logging.h>
-
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
@@ -86,7 +83,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
         completed_subtxn->set_allocated_txn(txn);
         // Txn only exists in single, local partition
         completed_subtxn->set_partition(0);
-        completed_subtxn->add_involved_partitions(0);
+        completed_subtxn->set_num_involved_partitions(1);
         ProcessCompletedSubtxn(move(r));
       }
       break;
@@ -144,43 +141,28 @@ void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
   if (pending_responses_.count(txn_id) == 0) {
     return;
   }
-  auto& completed_txn = completed_txns_[txn_id];
-  auto sub_txn_origin = completed_subtxn->partition();
-  // If this is the first sub-transaction, initialize the
-  // finished transaction with this sub-transaction as the starting
-  // point and populate the list of partitions that we are still
-  // waiting for sub-transactions from. Otherwise, remove the
-  // partition of this sub-transaction from the awaiting list and
-  // merge the sub-txn to the current txn.
-  if (completed_txn.txn() == nullptr) {
-    completed_txn.req = move(req);
-    completed_txn.awaited_partitions.clear();
-    for (auto p : completed_subtxn->involved_partitions()) {
-      if (p != sub_txn_origin) {
-        completed_txn.awaited_partitions.insert(p);
-      }
-    }
-  } else if (completed_txn.awaited_partitions.erase(sub_txn_origin)) {
-    MergeTransaction(*completed_txn.txn(), completed_subtxn->txn());
-  }
 
-  // If all sub-txns are received, response back to the client and
-  // clean up all tracking data for this txn.
-  if (completed_txn.awaited_partitions.empty()) {
+  auto res = completed_txns_.try_emplace(txn_id,
+      config_, completed_subtxn->num_involved_partitions());
+
+  auto& completed_txn = res.first->second;
+  if (completed_txn.AddSubTxn(std::move(req))) {
     api::Response response;
     auto txn_response = response.mutable_txn();
     auto txn = completed_txn.txn();
-    // This is ony temporary, "txn" is still owned by the request inside completed_txn
-    txn_response->set_allocated_txn(txn);
 
     RecordTxnEvent(
         config_,
         txn->mutable_internal(),
         TransactionEvent::EXIT_SERVER_TO_CLIENT);
 
+    // This is ony temporary, "txn" is still owned by the request inside completed_txn
+    txn_response->set_allocated_txn(txn);
+    // Send back to the client
     SendAPIResponse(txn_id, move(response));
     // Release the txn so that it won't be freed along with the Response object
     txn_response->release_txn();
+
     completed_txns_.erase(txn_id);
   }
 }

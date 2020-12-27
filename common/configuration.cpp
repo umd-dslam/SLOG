@@ -105,6 +105,10 @@ long Configuration::batch_duration() const {
   return config_.batch_duration();
 }
 
+uint32_t Configuration::replication_factor() const {
+  return std::max(config_.replication_factor(), 1U);
+}
+
 vector<MachineId> Configuration::all_machine_ids() const {
   auto num_reps = num_replicas();
   auto num_parts = num_partitions();

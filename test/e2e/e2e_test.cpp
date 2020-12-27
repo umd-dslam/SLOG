@@ -21,8 +21,10 @@ protected:
   static const size_t NUM_MACHINES = 4;
 
   void SetUp() {
+    internal::Configuration config_proto;
+    config_proto.set_replication_factor(2);
     configs = MakeTestConfigurations(
-        "e2e", 2 /* num_replicas */, 2 /* num_partitions */);
+        "e2e", 2 /* num_replicas */, 2 /* num_partitions */, config_proto);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
@@ -145,8 +147,8 @@ TEST_F(E2ETest, RemasterTxn) {
 
   auto txn = MakeTransaction({"A", "X"} /* read_set */, {}  /* write_set */);
 
-  // Note: this relies on metadata being updated synchronously, or the txn may abort.
-  // May break in future implementations
+  // Since replication factor is set to 2 for all tests in this file, it is
+  // guaranteed that this txn will see the changes made by the remaster txn
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());

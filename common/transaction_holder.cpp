@@ -1,5 +1,7 @@
 #include "common/transaction_holder.h"
 
+#include <algorithm>
+
 #include <glog/logging.h>
 
 using std::pair;
@@ -21,13 +23,13 @@ TransactionHolder::TransactionHolder(const ConfigurationPtr& config, ReusableReq
 void TransactionHolder::SetTxnRequest(const ConfigurationPtr& config, ReusableRequest&& req) {
   auto& txn = req.get()->forward_txn().txn();
   keys_in_partition_.clear();
-  involved_partitions_.clear();
   active_partitions_.clear();
   involved_replicas_.clear();
+  vector<uint32_t> involved_partitions;
 
   // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
   for (const auto& kv : txn.read_set()) {
-    involved_partitions_.insert(config->partition_of_key(kv.first));
+    involved_partitions.push_back(config->partition_of_key(kv.first));
     // If this key is also in write_set, give it write lock instead
     if (config->key_is_in_local_partition(kv.first) 
         && !txn.write_set().contains(kv.first)) {
@@ -35,8 +37,8 @@ void TransactionHolder::SetTxnRequest(const ConfigurationPtr& config, ReusableRe
     }
   }
   for (const auto& kv : txn.write_set()) {
-    involved_partitions_.insert(config->partition_of_key(kv.first));
-    active_partitions_.insert(config->partition_of_key(kv.first));
+    involved_partitions.push_back(config->partition_of_key(kv.first));
+    active_partitions_.push_back(config->partition_of_key(kv.first));
     if (config->key_is_in_local_partition(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::WRITE);
     }
@@ -44,7 +46,27 @@ void TransactionHolder::SetTxnRequest(const ConfigurationPtr& config, ReusableRe
 
   // TODO: only needed for MH
   for (auto& pair : txn.internal().master_metadata()) {
-    involved_replicas_.insert(pair.second.master());
+    involved_replicas_.push_back(pair.second.master());
+  }
+
+  // Deduplicate the involved partitions/replicas arrays
+
+  {
+    std::sort(involved_partitions.begin(), involved_partitions.end());
+    auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
+    num_involved_partitions_ = last - involved_partitions.begin();
+  }
+
+  {
+    std::sort(active_partitions_.begin(), active_partitions_.end());
+    auto last = std::unique(active_partitions_.begin(), active_partitions_.end());
+    active_partitions_.erase(last, active_partitions_.end());
+  }
+
+  {
+    std::sort(involved_replicas_.begin(), involved_replicas_.end());
+    auto last = std::unique(involved_replicas_.begin(), involved_replicas_.end());
+    involved_replicas_.erase(last, involved_replicas_.end());
   }
 
   txn_request_ = move(req);
@@ -54,15 +76,15 @@ const vector<pair<Key, LockMode>>& TransactionHolder::keys_in_partition() const 
   return keys_in_partition_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::involved_partitions() const {
-  return involved_partitions_;
+uint32_t TransactionHolder::num_involved_partitions() const {
+  return num_involved_partitions_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::active_partitions() const {
+const std::vector<uint32_t>& TransactionHolder::active_partitions() const {
   return active_partitions_;
 }
 
-const std::unordered_set<uint32_t>& TransactionHolder::involved_replicas() const {
+const std::vector<uint32_t>& TransactionHolder::involved_replicas() const {
   return involved_replicas_;
 }
 

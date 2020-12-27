@@ -36,9 +36,9 @@ public:
   }
 
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
-  const std::unordered_set<uint32_t>& involved_partitions() const;
-  const std::unordered_set<uint32_t>& active_partitions() const;
-  const std::unordered_set<uint32_t>& involved_replicas() const;
+  uint32_t num_involved_partitions() const;
+  const std::vector<uint32_t>& active_partitions() const;
+  const std::vector<uint32_t>& involved_replicas() const;
 
   std::vector<ReusableRequest>& early_remote_reads();
 
@@ -60,9 +60,9 @@ private:
   std::optional<uint32_t> worker_;
   std::vector<ReusableRequest> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
-  std::unordered_set<uint32_t> involved_partitions_;
-  std::unordered_set<uint32_t> active_partitions_;
-  std::unordered_set<uint32_t> involved_replicas_;
+  uint32_t num_involved_partitions_;
+  std::vector<uint32_t> active_partitions_;
+  std::vector<uint32_t> involved_replicas_;
 };
 
 } // namespace slog

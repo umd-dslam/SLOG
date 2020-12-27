@@ -38,6 +38,7 @@ public:
   uint32_t num_workers() const;
   vector<MachineId> all_machine_ids() const;
   long batch_duration() const;
+  uint32_t replication_factor() const;
 
   const string& local_address() const;
   uint32_t local_replica() const;

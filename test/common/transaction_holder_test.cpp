@@ -1,5 +1,7 @@
 #include <gmock/gmock.h>
 
+#include <algorithm>
+
 #include "common/transaction_holder.h"
 #include "common/proto_utils.h"
 #include "test/test_utils.h"
@@ -8,6 +10,7 @@ using namespace std;
 using namespace slog;
 
 using ::testing::ElementsAre;
+using ::testing::UnorderedElementsAre;
 
 class TransactionHolderTest : public ::testing::Test {
 protected:
@@ -65,19 +68,48 @@ TEST_F(TransactionHolderTest, keys_in_partition) {
   ASSERT_TRUE(holder2.keys_in_partition().empty());
 }
 
-TEST_F(TransactionHolderTest, involved_partitions) {
+TEST_F(TransactionHolderTest, num_involved_partitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction(
       {"A"}, /* read_set */
       {"B", "D"},  /* write_set */
       "", /* code */
-      {{"A", {1, 3}}, {"B", {1,0}}, {"A", {1, 0}}}); /* metadata */
+      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
     txn->mutable_internal()->set_id(100);
 
     auto holder = MakeHolder(configs[i], txn);
-    auto partitions = holder.involved_partitions();
-    ASSERT_EQ(partitions.size(), 2U);
-    ASSERT_TRUE(partitions.count(0));
-    ASSERT_TRUE(partitions.count(2));
+    ASSERT_EQ(holder.num_involved_partitions(), 2U);
+  }
+}
+
+TEST_F(TransactionHolderTest, active_partitions) {
+  for (uint32_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"B", "D"},  /* write_set */
+      "", /* code */
+      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
+    txn->mutable_internal()->set_id(100);
+
+    auto holder = MakeHolder(configs[i], txn);
+    const auto& active_partitions = holder.active_partitions();
+    ASSERT_EQ(active_partitions.size(), 2U);
+    ASSERT_THAT(active_partitions, UnorderedElementsAre(0U, 2U));
+  }
+}
+
+TEST_F(TransactionHolderTest, involved_replicas) {
+  for (uint32_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction(
+      {"A"}, /* read_set */
+      {"B", "D"},  /* write_set */
+      "", /* code */
+      {{"A", {1, 3}}, {"B", {1,0}}, {"D", {0, 0}}}); /* metadata */
+    txn->mutable_internal()->set_id(100);
+
+    auto holder = MakeHolder(configs[i], txn);
+    const auto& involved_replicas = holder.involved_replicas();
+    ASSERT_EQ(involved_replicas.size(), 2U);
+    ASSERT_THAT(involved_replicas, UnorderedElementsAre(0U, 1U));
   }
 }

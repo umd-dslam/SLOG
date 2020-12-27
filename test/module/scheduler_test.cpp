@@ -93,7 +93,7 @@ protected:
       CHECK(test_slogs_[receiver]->ReceiveFromOutputChannel(req, kServerChannel));
       CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);
       auto completed_subtxn = req.completed_subtxn();
-      CHECK_EQ((uint32_t)completed_subtxn.involved_partitions_size(), num_partitions);
+      CHECK_EQ(completed_subtxn.num_involved_partitions(), num_partitions);
       auto sub_txn = completed_subtxn.txn();
 
       if (first_time) {

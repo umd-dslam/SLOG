@@ -1,5 +1,7 @@
 #include "module/scheduler.h"
 
+#include <algorithm>
+
 #include <glog/logging.h>
 
 #include "common/json_utils.h"
@@ -485,10 +487,12 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   }
 
   // Active partitions must receive remote reads from all other partitions
-  auto num_remote_partitions = txn_holder.involved_partitions().size() - 1;
+  auto num_remote_partitions = txn_holder.num_involved_partitions() - 1;
   auto local_partition = config_->local_partition();
-  auto local_partition_active =
-      (txn_holder.active_partitions().count(local_partition) > 0);
+  auto local_partition_active = std::find(
+      txn_holder.active_partitions().begin(),
+      txn_holder.active_partitions().end(),
+      local_partition) != txn_holder.active_partitions().end();
   if (num_remote_partitions > 0 && local_partition_active) {
     if (txn_holder.early_remote_reads().size() < num_remote_partitions) {
       return;
