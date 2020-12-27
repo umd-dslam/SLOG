@@ -141,7 +141,6 @@ private:
    */
   std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
 
-  std::vector<string> worker_identities_;
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed
   std::vector<unique_ptr<ModuleRunner>> workers_;

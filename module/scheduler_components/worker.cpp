@@ -119,6 +119,7 @@ std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadR
       // TODO: optimize by returning an aborting transaction to the scheduler immediately.
       // later remote reads will need to be garbage collected.
       txn->set_status(TransactionStatus::ABORTED);
+      txn->set_abort_reason(read_result.abort_reason());
     } else {
       // Apply remote reads. After this point, the transaction has all the data it needs to
       // execute the code.
@@ -206,25 +207,24 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 #else
   // Check whether the store master metadata matches with the information
   // stored in the transaction
-  // TODO: this loop can be merged with the one below to avoid
-  // duplicate access to the storage
+  // TODO: this loop can be merged with the one below to reduce accesses to
+  //       the storage
   for (auto& key_pair : txn->internal().master_metadata()) {
     auto& key = key_pair.first;
     auto txn_master = key_pair.second.master();
 
     Record record;
     bool found = storage_->Read(key, record);
-    if (found) {
-      if (txn_master != record.metadata.master) {
-        will_abort = true;
-        break;
-      }
+    if (found && txn_master != record.metadata.master) {
+      will_abort = true;
+      break;
     }
   }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
   if (will_abort) {
     txn->set_status(TransactionStatus::ABORTED);
+    txn->set_abort_reason("Outdated master information");
   } else {
     // If not abort due to remastering, read from local storage
     for (auto& key_value : *txn->mutable_read_set()) {
@@ -289,6 +289,7 @@ void Worker::Commit(TxnId txn_id) {
     case Transaction::ProcedureCase::kCode: {
       // Apply all writes to local storage if the transaction is not aborted
       if (txn->status() != TransactionStatus::COMMITTED) {
+        VLOG(3) << "Txn " << txn_id << " aborted with reason: " << txn->abort_reason();
         break;
       }
       auto& master_metadata = txn->internal().master_metadata();
@@ -299,7 +300,7 @@ void Worker::Commit(TxnId txn_id) {
           Record record;
           bool found = storage_->Read(key_value.first, record);
           if (!found) {
-            CHECK(master_metadata.contains(key))
+            DCHECK(master_metadata.contains(key))
                 << "Master metadata for key \"" << key << "\" is missing";
             record.metadata = master_metadata.at(key);
           }
@@ -312,6 +313,7 @@ void Worker::Commit(TxnId txn_id) {
           storage_->Delete(key);
         }
       }
+      VLOG(3) << "Committed txn " << txn_id;
       break;
     }
     case Transaction::ProcedureCase::kRemaster: {
@@ -401,6 +403,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
   rrr->set_will_abort(aborted);
+  rrr->set_abort_reason(txn->abort_reason());
   if (!aborted) {
     auto reads_to_be_sent = rrr->mutable_reads();
     for (auto& key_value : txn->read_set()) {

@@ -15,7 +15,7 @@ using std::move;
 namespace slog {
 
 namespace {
-uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) {
+inline uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) {
   return txn_id % num_workers;
 }
 } // namespace
@@ -134,13 +134,14 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
 void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
   auto txn_id = res.get()->worker().txn_id();
-
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
   auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
+
+  VLOG(2) << "Released locks of txn " << txn_id;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   auto txn_holder = &all_txns_[txn_id];
@@ -198,7 +199,7 @@ void Scheduler::ProcessTransaction(ReusableRequest&& req) {
     case TransactionType::LOCK_ONLY: {
       auto txn_replica_id = TransactionHolder::transaction_id_replica_id(txn);
       VLOG(2) << "Accepted LOCK-ONLY transaction "
-          << txn_replica_id.first <<", " << txn_replica_id.second;
+          << txn_replica_id.first <<", home = " << txn_replica_id.second;
 
       if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
         break;
@@ -361,6 +362,7 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
 
 void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder) {
   auto txn_id = txn_holder->transaction()->internal().id();
+  VLOG(2) << "Trying to acquires locks of txn " << txn_id;
   switch (lock_manager_.AcquireLocks(*txn_holder)) {
     case AcquireLocksResult::ACQUIRED:
       Dispatch(txn_id);
@@ -369,6 +371,7 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
       TriggerPreDispatchAbort(txn_id);
       break;
     case AcquireLocksResult::WAITING:
+      VLOG(2) << "Locks cannot be immediately acquired for txn " << txn_id;
       break;
     default:
       LOG(ERROR) << "Unknown lock result type";
@@ -382,7 +385,7 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
 
 void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   CHECK(aborting_txns_.count(txn_id) == 0) << "Abort was triggered twice: " << txn_id;
-  VLOG(2) << "Triggering abort of txn: " << txn_id;
+  VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
 
   auto& txn_holder = all_txns_[txn_id];
   CHECK(!txn_holder.worker())
