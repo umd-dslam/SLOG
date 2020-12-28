@@ -355,7 +355,7 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
       TriggerPreDispatchAbort(txn_id);
       break;
     case AcquireLocksResult::WAITING:
-      VLOG(2) << "Locks cannot be immediately acquired for txn " << txn_id;
+      VLOG(2) << "Txn " << txn_id << " cannot be dispatched yet";
       break;
     default:
       LOG(ERROR) << "Unknown lock result type";

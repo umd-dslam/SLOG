@@ -102,17 +102,22 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
 
   // Add current txn to the waited_by list of each blocking txn
   for (auto b_txn = blocking_txns.begin(); b_txn != last; b_txn++) {
+    if (*b_txn == txn_id) {
+      VLOG(1) << "Txn " << txn_id << " is trying to acquire the same lock twice";
+      continue;
+    }
     // The txns returned from the lock table might already leave
     // the lock manager so we need to check for their existence here
     auto b_txn_info = txn_info_.find(*b_txn);
-    if (b_txn_info != txn_info_.end()) {
-      // Let A be a blocking txn of a multi-home txn B. It is possible that
-      // two lock-only txns of B both sees A and A is double counted here.
-      // However, B is also added twice in the waited_by list of A. Therefore,
-      // on releasing A, waiting_for_cnt of B is correctly subtracted.
-      txn_info.waiting_for_cnt++;
-      b_txn_info->second.waited_by.push_back(txn_id);
+    if (b_txn_info == txn_info_.end()) {
+      continue;
     }
+    // Let A be a blocking txn of a multi-home txn B. It is possible that
+    // two lock-only txns of B both sees A and A is double counted here.
+    // However, B is also added twice in the waited_by list of A. Therefore,
+    // on releasing A, waiting_for_cnt of B is correctly subtracted.
+    txn_info.waiting_for_cnt++;
+    b_txn_info->second.waited_by.push_back(txn_id);
   }
 
   if (txn_info.is_ready()) {
@@ -142,7 +147,7 @@ vector<TxnId> DDRLockManager::ReleaseLocks(const TransactionHolder& txn_holder) 
   for (auto blocked_txn_id : txn_info.waited_by) {
     auto it = txn_info_.find(blocked_txn_id);
     if (it == txn_info_.end()) {
-      LOG(ERROR) << "Blocked txn does not exist";
+      LOG(ERROR) << "Blocked txn " << blocked_txn_id << " does not exist";
       continue;
     }
     auto& blocked_txn = it->second;

@@ -109,7 +109,7 @@ bool RMALockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   if (txn->procedure_case() == Transaction::kRemaster) {
-    num_locks_waited_[txn_id] = 2;
+    num_locks_waited_[txn_id] += 2;
   } else {
     num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
   }

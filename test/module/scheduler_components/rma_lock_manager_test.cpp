@@ -260,17 +260,15 @@ TEST_F(RMALockManagerTest, RemasterTxn) {
   ASSERT_FALSE(lock_manager.AcceptTransaction(holder));
   ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly2), AcquireLocksResult::ACQUIRED);
-
   lock_manager.ReleaseLocks(holder);
-  // Check locks have been released
-  auto txn2 = FillMetadata(MakeTransaction({}, {"A"}));
-  txn2->mutable_internal()->set_id(200);
-  TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
-  auto txn3 = FillMetadata(MakeTransaction({}, {"A"}), 1);
-  txn3->mutable_internal()->set_id(300);
-  TransactionHolder holder3 = MakeHolder(configs[0], txn3);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_FALSE(lock_manager.AcceptTransaction(holder));
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly2), AcquireLocksResult::ACQUIRED);
+  lock_manager.ReleaseLocks(holder);
 
-  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder2), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder3), AcquireLocksResult::ACQUIRED);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly1), AcquireLocksResult::WAITING);
+  ASSERT_EQ(lock_manager.AcquireLocks(holder_lockonly2), AcquireLocksResult::WAITING);
+  ASSERT_TRUE(lock_manager.AcceptTransaction(holder));
+  lock_manager.ReleaseLocks(holder);
 }
