@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <random>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -47,12 +48,10 @@ class Sequencer : public NetworkedModule {
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
 
-#ifdef ENABLE_REPLICATION_DELAY
   void DelaySingleHomeBatch(ReusableRequest&& request);
   void MaybeSendDelayedBatches();
-
+  std::mt19937 rg_;
   std::list<ReusableRequest> delayed_batches_;
-#endif /* ENABLE_REPLICATION_DELAY */
 };
 
 }  // namespace slog

@@ -140,10 +140,8 @@ const internal::SimplePartitioning* Configuration::simple_partitioning() const {
   return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
-#ifdef ENABLE_REPLICATION_DELAY
 uint32_t Configuration::replication_delay_percent() const { return config_.replication_delay().batch_delay_percent(); }
 
 uint32_t Configuration::replication_delay_amount() const { return config_.replication_delay().batch_delay_amount(); }
-#endif /* ENABLE_REPLICATION_DELAY */
 
 }  // namespace slog

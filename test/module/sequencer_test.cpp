@@ -112,8 +112,6 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
   }
 }
 
-#ifdef ENABLE_REPLICATION_DELAY
-
 class SequencerReplicationDelayTest : public SequencerTest {
  public:
   void SetUp() {}
@@ -170,4 +168,3 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
     ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
   }
 }
-#endif /* ENABLE_REPLICATION_DELAY */

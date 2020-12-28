@@ -30,7 +30,7 @@
     }
   },
   "remasterProtocol": {
-    "default": "none/rma",
+    "default": "none-rma",
     "choices": {
       "none/old": {
         "short": "None/OLD",
@@ -40,7 +40,7 @@
           "LOCK_MANAGER": "OLD"
         }
       },
-      "none/rma": {
+      "none-rma": {
         "short": "None/RMA",
         "long": "No remaster protocol with RMA lock manager",
         "settings": {
@@ -48,7 +48,7 @@
           "LOCK_MANAGER": "RMA"
         }
       },
-      "none/ddr": {
+      "none-ddr": {
         "short": "None/DDR",
         "long": "No remaster protocol with DDR lock manager",
         "settings": {
@@ -70,7 +70,7 @@
           "REMASTER_PROTOCOL": "PER_KEY"
         }
       },
-      "counterless/rma": {
+      "counterless-rma": {
         "short": "Counterless/RMA",
         "long": "Counterless remaster protocol with RMA lock manager",
         "settings": {
@@ -78,31 +78,12 @@
           "LOCK_MANAGER": "RMA"
         }
       },
-      "counterless/ddr": {
+      "counterless-ddr": {
         "short": "Counterless/DDR",
         "long": "Counterless remaster protocol with DDR lock manager",
         "settings": {
           "REMASTER_PROTOCOL": "COUNTERLESS",
           "LOCK_MANAGER": "DDR"
-        }
-      }
-    }
-  },
-  "replicationDelay": {
-    "default": "no",
-    "choices": {
-      "yes": {
-        "short": "Replication delay",
-        "long": "Enable replication delay",
-        "settings": {
-          "ENABLE_REPLICATION_DELAY": "YES"
-        }
-      },
-      "no": {
-        "short": "No replication delay",
-        "long": "Disable replication delay",
-        "settings": {
-          "ENABLE_REPLICATION_DELAY": "NO"
         }
       }
     }

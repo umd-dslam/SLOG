@@ -79,7 +79,6 @@ message Configuration {
     uint64 batch_duration = 9;
     // Number of regions that need to be synchronously replicated to
     uint32 replication_factor = 10;
-    // Config for CMake option ENABLE_REPLICATION_DELAY. Replication
-    // of txn batches will be delayed to simulate uneven network latency
+    // Replication of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 11;
 }

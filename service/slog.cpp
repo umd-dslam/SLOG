@@ -127,10 +127,6 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Remastering disabled";
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
-#ifdef ENABLE_REPLICATION_DELAY
-  LOG(INFO) << "Replication delay enabled";
-#endif /* GetReplicationDelayEnabled */
-
   auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address, FLAGS_replica, FLAGS_partition);
   const auto& all_addresses = config->all_addresses();
   CHECK(std::find(all_addresses.begin(), all_addresses.end(), config->local_address()) != all_addresses.end())

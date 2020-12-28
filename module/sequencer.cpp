@@ -65,9 +65,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
     return;
   }
 
-#ifdef ENABLE_REPLICATION_DELAY
   MaybeSendDelayedBatches();
-#endif /* ENABLE_REPLICATION_DELAY */
 
   // Do nothing if there is nothing to send
   if (batch_->transactions().empty()) {
@@ -95,18 +93,19 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   // Replicate batch to all machines
   RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
-#ifdef ENABLE_REPLICATION_DELAY
-  // Maybe delay current batch
-  if ((uint32_t)(rand() % 100) < config_->replication_delay_percent()) {
-    VLOG(4) << "Delay batch " << batch_->id();
-    // Completely release the batch because its lifetime is now tied with the
-    // delayed request
-    batch_.release();
-    DelaySingleHomeBatch(move(batch_req));
-    NewBatch();
-    return;
-  }    // Otherwise send it normally
-#endif /* ENABLE_REPLICATION_DELAY */
+  if (config_->replication_delay_percent()) {
+    // Maybe delay current batch
+    std::uniform_int_distribution dis(0, 100);
+    if (dis(rg_) <= config_->replication_delay_percent()) {
+      VLOG(4) << "Delay batch " << batch_->id();
+      // Completely release the batch because its lifetime is now tied with the
+      // delayed request
+      batch_.release();
+      DelaySingleHomeBatch(move(batch_req));
+      NewBatch();
+      return;
+    }
+  }
 
   // Replicate batch to all machines
   auto num_partitions = config_->num_partitions();
@@ -200,7 +199,6 @@ BatchId Sequencer::NextBatchId() {
   return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id();
 }
 
-#ifdef ENABLE_REPLICATION_DELAY
 void Sequencer::DelaySingleHomeBatch(ReusableRequest&& request) {
   // Send the batch to interleavers in the local replica only
   auto local_rep = config_->local_replica();
@@ -240,6 +238,5 @@ void Sequencer::MaybeSendDelayedBatches() {
     }
   }
 }
-#endif /* ENABLE_REPLICATION_DELAY */
 
 }  // namespace slog

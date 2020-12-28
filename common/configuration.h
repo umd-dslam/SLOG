@@ -51,10 +51,8 @@ class Configuration {
   uint32_t master_of_key(uint32_t key) const;
   const internal::SimplePartitioning* simple_partitioning() const;
 
-#ifdef ENABLE_REPLICATION_DELAY
   uint32_t replication_delay_percent() const;
   uint32_t replication_delay_amount() const;
-#endif /* ENABLE_REPLICATION_DELAY */
 
  private:
   internal::Configuration config_;
