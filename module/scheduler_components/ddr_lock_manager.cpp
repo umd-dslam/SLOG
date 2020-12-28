@@ -30,10 +30,18 @@ bool DDRLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
+
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   auto& txn_info = txn_info_[txn_id];
-  txn_info.pending_parts += txn->internal().num_masters();
+  if (txn->procedure_case() == Transaction::kRemaster) {
+    // A remaster txn only has one key K but it acquires locks on
+    // (K, RO) and (K, RN) where RO and RN are the old and new regions
+    // respectively.
+    txn_info.unarrived_lock_requests += 2;
+  } else {
+    txn_info.unarrived_lock_requests += txn_holder.keys_in_partition().size();
+  }
   return txn_info.is_ready();
 }
 
@@ -45,7 +53,6 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   auto& txn_info = txn_info_[txn_id];
-  txn_info.pending_parts--;
 
   // Enumerate all locks to be requested
   vector<pair<KeyReplica, LockMode>> locks_to_request;
@@ -70,6 +77,8 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
       locks_to_request.emplace_back(move(key_replica), mode);
     }
   }
+
+  txn_info.unarrived_lock_requests -= locks_to_request.size();
 
   vector<TxnId> blocking_txns;
   for (auto& pair : locks_to_request) {

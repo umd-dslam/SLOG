@@ -153,7 +153,7 @@ TEST_F(E2ETest, RemasterTxn) {
 }
 #endif
 
-TEST_F(E2ETest, AbortTxn) {
+TEST_F(E2ETest, AbortTxnBadCommand) {
   // Multi-partition transaction where one of the partition will abort
   auto aborted_txn = MakeTransaction({"A"},                  /* read_set */
                                      {"B"},                  /* write_set */
@@ -175,6 +175,16 @@ TEST_F(E2ETest, AbortTxn) {
   ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
   // Value of B must not change because the previous txn was aborted
   ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+}
+
+TEST_F(E2ETest, AbortTxnEmptyKeySets) {
+  // Multi-partition transaction where one of the partition will abort
+  auto aborted_txn = MakeTransaction({}, {});
+
+  test_slogs[1]->SendTxn(aborted_txn);
+  auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
+  ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
+  ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
 }
 
 int main(int argc, char* argv[]) {

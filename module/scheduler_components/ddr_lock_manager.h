@@ -53,9 +53,9 @@ class LockQueueTail {
 struct TxnInfo {
   vector<TxnId> waited_by;
   int waiting_for_cnt = 0;
-  int pending_parts = 0;
+  int unarrived_lock_requests = 0;
 
-  bool is_ready() const { return waiting_for_cnt == 0 && pending_parts == 0; }
+  bool is_ready() const { return waiting_for_cnt == 0 && unarrived_lock_requests == 0; }
 };
 
 /**

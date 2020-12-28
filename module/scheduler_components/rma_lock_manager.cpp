@@ -109,6 +109,9 @@ bool RMALockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
   if (txn->procedure_case() == Transaction::kRemaster) {
+    // A remaster txn only has one key K but it acquires locks on
+    // (K, RO) and (K, RN) where RO and RN are the old and new region
+    // respectively.
     num_locks_waited_[txn_id] += 2;
   } else {
     num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();

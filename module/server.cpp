@@ -9,6 +9,25 @@ using std::move;
 
 namespace slog {
 
+void ValidateTransaction(Transaction* txn) {
+  txn->set_status(TransactionStatus::ABORTED);
+  if (txn->read_set_size() + txn->write_set_size() == 0) {
+    txn->set_abort_reason("Txn accesses no key");
+    return;
+  }
+  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
+    if (txn->read_set_size() > 0) {
+      txn->set_abort_reason("Remaster txns should not read anything");
+      return;
+    }
+    if (txn->write_set_size() != 1) {
+      txn->set_abort_reason("Remaster txns should write to 1 key");
+      return;
+    }
+  }
+  txn->set_status(TransactionStatus::NOT_STARTED);
+}
+
 Server::Server(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Server", broker, kServerChannel, poll_timeout), config_(config), txn_id_counter_(0) {}
 
@@ -63,24 +82,17 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
 
-      if (ValidateTransaction(txn)) {
-        // Send to forwarder
-        internal::Request forward_request;
-        forward_request.mutable_forward_txn()->set_allocated_txn(txn);
-        RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
-        Send(forward_request, kForwarderChannel);
-      } else {
-        // Return abort to client
-        txn->set_status(TransactionStatus::ABORTED);
-
-        auto r = NewRequest();
-        auto completed_subtxn = r.get()->mutable_completed_subtxn();
-        completed_subtxn->set_allocated_txn(txn);
-        // Txn only exists in single, local partition
-        completed_subtxn->set_partition(0);
-        completed_subtxn->set_num_involved_partitions(1);
-        ProcessCompletedSubtxn(move(r));
+      ValidateTransaction(txn);
+      if (txn->status() == TransactionStatus::ABORTED) {
+        SendTxnToClient(txn);
+        break;
       }
+
+      // Send to forwarder
+      internal::Request forward_request;
+      forward_request.mutable_forward_txn()->set_allocated_txn(txn);
+      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
+      Send(forward_request, kForwarderChannel);
       break;
     }
     case api::Request::kStats: {
@@ -134,22 +146,9 @@ void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
   }
 
   auto res = completed_txns_.try_emplace(txn_id, config_, completed_subtxn->num_involved_partitions());
-
   auto& completed_txn = res.first->second;
   if (completed_txn.AddSubTxn(std::move(req))) {
-    api::Response response;
-    auto txn_response = response.mutable_txn();
-    auto txn = completed_txn.txn();
-
-    RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
-
-    // This is ony temporary, "txn" is still owned by the request inside completed_txn
-    txn_response->set_allocated_txn(txn);
-    // Send back to the client
-    SendAPIResponse(txn_id, move(response));
-    // Release the txn so that it won't be freed along with the Response object
-    txn_response->release_txn();
-
+    SendTxnToClient(completed_txn.ReleaseTxn());
     completed_txns_.erase(txn_id);
   }
 }
@@ -201,39 +200,37 @@ void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
   api::Response response;
   auto stats_response = response.mutable_stats();
   stats_response->set_allocated_stats_json(res.get()->mutable_stats()->release_stats_json());
-  SendAPIResponse(res.get()->stats().id(), std::move(response));
+  SendResponseToClient(res.get()->stats().id(), std::move(response));
 }
 
 /***********************************************
                     Helpers
 ***********************************************/
 
-void Server::SendAPIResponse(TxnId txn_id, api::Response&& res) {
+void Server::SendTxnToClient(Transaction* txn) {
+  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
+
+  api::Response response;
+  auto txn_response = response.mutable_txn();
+  txn_response->set_allocated_txn(txn);
+  SendResponseToClient(txn->internal().id(), move(response));
+}
+
+void Server::SendResponseToClient(TxnId txn_id, api::Response&& res) {
   auto it = pending_responses_.find(txn_id);
   if (it == pending_responses_.end()) {
     LOG(ERROR) << "Cannot find info to response back to client for txn: " << txn_id;
     return;
   }
-  auto& pr = it->second;
   auto& socket = GetCustomSocket(0);
-
-  res.set_stream_id(pr.stream_id);
-
-  socket.send(pr.identity, zmq::send_flags::sndmore);
+  // Stream id is for the client to match request/response
+  res.set_stream_id(it->second.stream_id);
+  // Send identity to the socket to select the client to response to
+  socket.send(it->second.identity, zmq::send_flags::sndmore);
+  // Send the actual message
   SendProtoWithEmptyDelimiter(socket, res);
 
   pending_responses_.erase(txn_id);
-}
-
-bool Server::ValidateTransaction(const Transaction* txn) {
-  CHECK_NE(txn->read_set_size() + txn->write_set_size(), 0) << "Txn accesses no keys: " << txn->internal().id();
-
-  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-    CHECK_EQ(txn->read_set_size(), 0) << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
-    CHECK_EQ(txn->write_set_size(), 1) << "Remaster txns should write to 1 key, txn id: " << txn->internal().id();
-  }
-
-  return true;
 }
 
 TxnId Server::NextTxnId() {

@@ -23,7 +23,6 @@ class DDRLockManagerTest : public ::testing::Test {
 TEST_F(DDRLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn = FillMetadata(MakeTransaction({"readA", "readB"}, {"writeC"}));
-  txn->mutable_internal()->set_num_masters(1);
   TransactionHolder holder = MakeHolder(configs[0], txn);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder), AcquireLocksResult::ACQUIRED);
   auto result = lock_manager.ReleaseLocks(holder);
@@ -34,12 +33,10 @@ TEST_F(DDRLockManagerTest, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"readA", "readB"}, {}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readB", "readC"}, {}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -52,12 +49,10 @@ TEST_F(DDRLockManagerTest, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -72,19 +67,15 @@ TEST_F(DDRLockManagerTest, ReleaseLocksAndReturnMultipleNewLockHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"B"}, {"A"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({}, {"A"}));
   txn3->mutable_internal()->set_id(300);
-  txn3->mutable_internal()->set_num_masters(1);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
   auto txn4 = FillMetadata(MakeTransaction({"C"}, {}));
   txn4->mutable_internal()->set_id(400);
-  txn4->mutable_internal()->set_num_masters(1);
   TransactionHolder holder4 = MakeHolder(configs[0], txn4);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -110,15 +101,12 @@ TEST_F(DDRLockManagerTest, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({}, {"A", "C"}));
   txn3->mutable_internal()->set_id(300);
-  txn3->mutable_internal()->set_num_masters(1);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -138,11 +126,9 @@ TEST_F(DDRLockManagerTest, PrioritizeWriteLock) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"A"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -157,11 +143,9 @@ TEST_F(DDRLockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(2);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
@@ -185,11 +169,9 @@ TEST_F(DDRLockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(2);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
@@ -213,11 +195,9 @@ TEST_F(DDRLockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {"B"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(2);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({}, {"B"}));
   txn2_lockonly1->mutable_internal()->set_id(200);
@@ -242,11 +222,9 @@ TEST_F(DDRLockManagerTest, MultiEdgeBetweenTwoTxns) {
 
   auto txn1 = FillMetadata(MakeTransaction({}, {"A", "B"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A", "B"}, {}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(2);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn2_lockonly1 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2_lockonly1->mutable_internal()->set_id(200);
@@ -272,12 +250,10 @@ TEST_F(DDRLockManagerTest, KeyReplicaLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"writeA", "writeB"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
 
   auto txn2 = FillMetadata(MakeTransaction({"readA"}, {"writeA"}), 1);
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -289,7 +265,6 @@ TEST_F(DDRLockManagerTest, RemasterTxn) {
   auto txn = FillMetadata(MakeTransaction({}, {"A"}));
   txn->mutable_internal()->set_id(100);
   txn->mutable_remaster()->set_new_master(1);
-  txn->mutable_internal()->set_num_masters(2);
   TransactionHolder holder = MakeHolder(configs[0], txn);
   auto txn_lockonly1 = FillMetadata(MakeTransaction({}, {"A"}));
   txn_lockonly1->mutable_internal()->set_id(100);
@@ -321,15 +296,12 @@ TEST_F(DDRLockManagerTest, EnsureStateIsClean) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({"A"}, {"B", "C"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"B"}, {"A"}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({}, {"C"}));
   txn3->mutable_internal()->set_id(300);
-  txn3->mutable_internal()->set_num_masters(1);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);
@@ -345,23 +317,18 @@ TEST_F(DDRLockManagerTest, LongChain) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = FillMetadata(MakeTransaction({}, {"A"}));
   txn1->mutable_internal()->set_id(100);
-  txn1->mutable_internal()->set_num_masters(1);
   TransactionHolder holder1 = MakeHolder(configs[0], txn1);
   auto txn2 = FillMetadata(MakeTransaction({"A"}, {}));
   txn2->mutable_internal()->set_id(200);
-  txn2->mutable_internal()->set_num_masters(1);
   TransactionHolder holder2 = MakeHolder(configs[0], txn2);
   auto txn3 = FillMetadata(MakeTransaction({"A"}, {}));
   txn3->mutable_internal()->set_id(300);
-  txn3->mutable_internal()->set_num_masters(1);
   TransactionHolder holder3 = MakeHolder(configs[0], txn3);
   auto txn4 = FillMetadata(MakeTransaction({}, {"A"}));
   txn4->mutable_internal()->set_id(400);
-  txn4->mutable_internal()->set_num_masters(1);
   TransactionHolder holder4 = MakeHolder(configs[0], txn4);
   auto txn5 = FillMetadata(MakeTransaction({"A"}, {}));
   txn5->mutable_internal()->set_id(500);
-  txn5->mutable_internal()->set_num_masters(1);
   TransactionHolder holder5 = MakeHolder(configs[0], txn5);
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(holder1), AcquireLocksResult::ACQUIRED);

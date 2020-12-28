@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 
 using std::string;
@@ -91,19 +92,19 @@ TransactionType SetTransactionType(Transaction& txn) {
     return txn_internal->type();
   }
 
-  vector<uint32_t> masters;
+  bool is_single_home = true;
+  std::optional<uint32_t> first_master;
   for (const auto& pair : master_metadata) {
-    masters.push_back(pair.second.master());
+    if (first_master.has_value() && pair.second.master() != first_master.value()) {
+      is_single_home = false;
+      break;
+    }
+    first_master = pair.second.master();
   }
-  std::sort(masters.begin(), masters.end());
-  auto last = std::unique(masters.begin(), masters.end());
-  txn_internal->set_num_masters(last - masters.begin());
-  bool is_single_home = txn_internal->num_masters() == 1;
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
   // Remaster txn will become multi-home
   if (txn.procedure_case() == Transaction::kRemaster) {
-    txn_internal->set_num_masters(2);
     is_single_home = false;
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */

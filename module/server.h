@@ -55,9 +55,9 @@ class CompletedTransaction {
     return replicating_partitions_ == 0;
   }
 
-  Transaction* txn() {
+  Transaction* ReleaseTxn() {
     if (req_.get() == nullptr) return nullptr;
-    return req_.get()->mutable_completed_subtxn()->mutable_txn();
+    return req_.get()->mutable_completed_subtxn()->release_txn();
   }
 
  private:
@@ -104,9 +104,8 @@ class Server : public NetworkedModule {
   void ProcessCompletedSubtxn(ReusableRequest&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
-  void SendAPIResponse(TxnId txn_id, api::Response&& res);
-
-  bool ValidateTransaction(const Transaction* txn);
+  void SendTxnToClient(Transaction* txn);
+  void SendResponseToClient(TxnId txn_id, api::Response&& res);
 
   TxnId NextTxnId();
 
