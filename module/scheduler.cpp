@@ -15,16 +15,12 @@ using std::move;
 
 namespace slog {
 
-namespace {
-inline uint32_t SelectWorkerForTxn(TxnId txn_id, uint32_t num_workers) { return txn_id % num_workers; }
-}  // namespace
-
 using internal::Request;
 using internal::Response;
 
 Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                      const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config) {
+    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config), current_worker_(0) {
   for (size_t i = 0; i < config->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(config, broker, kWorkerChannelOffset + i, storage, poll_timeout));
   }
@@ -520,7 +516,8 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   }
 
   // Select a worker for this transaction
-  txn_holder->SetWorker(SelectWorkerForTxn(txn_id, config_->num_workers()));
+  txn_holder->SetWorker(current_worker_);
+  current_worker_ = (current_worker_ + 1) % workers_.size();
 
   RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::DISPATCHED);
 
