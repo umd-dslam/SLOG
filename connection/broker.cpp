@@ -5,8 +5,8 @@
 #include <sstream>
 #include <unordered_set>
 
-#include "common/cpu.h"
 #include "common/proto_utils.h"
+#include "common/thread_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 

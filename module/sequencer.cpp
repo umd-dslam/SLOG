@@ -95,7 +95,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
 
   if (config_->replication_delay_percent()) {
     // Maybe delay current batch
-    std::uniform_int_distribution dis(0, 100);
+    std::uniform_int_distribution<uint32_t> dis(0, 100);
     if (dis(rg_) <= config_->replication_delay_percent()) {
       VLOG(4) << "Delay batch " << batch_->id();
       // Completely release the batch because its lifetime is now tied with the

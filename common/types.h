@@ -42,7 +42,6 @@ struct Record {
 
 using Clock = system_clock;
 using TimePoint = Clock::time_point;
-using Duration = Clock::duration;
 
 enum class LockMode { UNLOCKED, READ, WRITE };
 enum class AcquireLocksResult { ACQUIRED, WAITING, ABORT };

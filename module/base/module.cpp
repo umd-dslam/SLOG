@@ -3,7 +3,7 @@
 #include <glog/logging.h>
 
 #include "common/constants.h"
-#include "common/cpu.h"
+#include "common/thread_utils.h"
 
 using std::shared_ptr;
 using std::unique_ptr;

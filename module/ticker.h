@@ -9,7 +9,7 @@ namespace slog {
 
 class Ticker : public Module {
  public:
-  const static std::string ENDPOINT;
+  const static std::string kEndpoint;
   static zmq::socket_t Subscribe(zmq::context_t& context);
 
   Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms);
@@ -19,8 +19,9 @@ class Ticker : public Module {
   void Loop() final;
 
  private:
+  using DurationFloatMs = duration<float, std::milli>;
   zmq::socket_t socket_;
-  Duration sleep_us_;
+  DurationFloatMs sleep_ms_;
 };
 
 }  // namespace slog

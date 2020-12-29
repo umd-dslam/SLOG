@@ -3,7 +3,6 @@ target_sources(slog-core
     configuration.cpp
     configuration.h
     constants.h
-    cpu.h
     csv_writer.cpp
     csv_writer.h
     json_utils.h
@@ -15,6 +14,7 @@ target_sources(slog-core
     proto_utils.h
     string_utils.cpp
     string_utils.h
+    thread_utils.h
     transaction_holder.cpp
     transaction_holder.h
     types.h)
