@@ -90,7 +90,6 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   // this is only temporary
   forward_batch->set_allocated_batch_data(batch_.get());
 
-  // Replicate batch to all machines
   RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
   if (config_->replication_delay_percent()) {

@@ -149,11 +149,8 @@ int main(int argc, char* argv[]) {
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
-  // Create the server module. This is not added to the "modules"
-  // list below because it starts differently.
-  auto server = MakeRunnerFor<slog::Server>(config, broker);
-
   vector<unique_ptr<slog::ModuleRunner>> modules;
+  modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->batch_duration())));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
@@ -174,24 +171,17 @@ int main(int argc, char* argv[]) {
   pthread_sigmask(SIG_BLOCK, &signal_set, nullptr);
 
   // New modules cannot be bound to the broker after it starts so start
-  // the Broker only after it is used to initialized all modules.
+  // the Broker only after it is used to initialized all modules above.
   broker->StartInNewThread();
-
-  // Start modules in their own threads
   for (auto& module : modules) {
     module->StartInNewThread();
   }
-
-  // Run the server in the current main thread so that the whole process
-  // does not immediately terminate after this line.
-  server->StartInNewThread();
 
   // Suspense this thread until receiving SIGINT
   int sig;
   sigwait(&signal_set, &sig);
 
   // Shutdown all threads
-  server->Stop();
   for (auto& module : modules) {
     module->Stop();
   }

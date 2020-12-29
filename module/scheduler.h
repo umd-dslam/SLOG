@@ -137,10 +137,10 @@ class Scheduler : public NetworkedModule {
    */
   std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
 
+  uint32_t current_worker_;
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed
   std::vector<unique_ptr<ModuleRunner>> workers_;
-  uint32_t current_worker_;
 };
 
 }  // namespace slog
