@@ -64,7 +64,7 @@ class Broker {
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
   ~Broker();
 
-  void StartInNewThread(int cpu = -1);
+  void StartInNewThread(std::optional<uint32_t> cpu = {});
 
   void Stop();
 

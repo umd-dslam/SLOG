@@ -40,13 +40,15 @@ Broker::~Broker() {
   thread_.join();
 }
 
-void Broker::StartInNewThread(int cpu) {
+void Broker::StartInNewThread(std::optional<uint32_t> cpu) {
   if (running_) {
     return;
   }
   running_ = true;
   thread_ = std::thread(&Broker::Run, this);
-  PinToCpu(pthread_self(), cpu);
+  if (cpu.has_value()) {
+    PinToCpu(pthread_self(), cpu.value());
+  }
 }
 
 void Broker::Stop() { running_ = false; }

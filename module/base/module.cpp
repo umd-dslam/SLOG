@@ -18,21 +18,25 @@ ModuleRunner::~ModuleRunner() {
   thread_.join();
 }
 
-void ModuleRunner::StartInNewThread(int cpu) {
+void ModuleRunner::StartInNewThread(std::optional<uint32_t> cpu) {
   if (running_) {
     throw std::runtime_error("The module has already started");
   }
   running_ = true;
   thread_ = std::thread(&ModuleRunner::Run, this);
-  PinToCpu(thread_.native_handle(), cpu);
+  if (cpu.has_value()) {
+    PinToCpu(thread_.native_handle(), cpu.value());
+  }
 }
 
-void ModuleRunner::Start(int cpu) {
+void ModuleRunner::Start(std::optional<uint32_t> cpu) {
   if (running_) {
     throw std::runtime_error("The module has already started");
   }
   running_ = true;
-  PinToCpu(pthread_self(), cpu);
+  if (cpu.has_value()) {
+    PinToCpu(pthread_self(), cpu.value());
+  }
   Run();
 }
 

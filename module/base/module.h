@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -44,8 +45,8 @@ class ModuleRunner {
   ModuleRunner(const std::shared_ptr<Module>& module);
   ~ModuleRunner();
 
-  void Start(int cpu = -1);
-  void StartInNewThread(int cpu = -1);
+  void Start(std::optional<uint32_t> cpu = {});
+  void StartInNewThread(std::optional<uint32_t> cpu = {});
 
   void Stop();
 
