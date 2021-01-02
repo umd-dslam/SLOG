@@ -18,12 +18,10 @@ zmq::socket_t Ticker::Subscribe(zmq::context_t& context) {
 
 Ticker::Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms)
     : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  socket_.set(zmq::sockopt::linger, 0);
   sleep_ms_ = duration_cast<DurationFloatMs>(tick_period_ms);
 }
 
 Ticker::Ticker(zmq::context_t& context, uint32_t ticks_per_sec) : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  socket_.set(zmq::sockopt::linger, 0);
   sleep_ms_ = DurationFloatMs(1000.0 / ticks_per_sec);
 }
 

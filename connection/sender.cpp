@@ -23,7 +23,6 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
   if (it == machine_id_to_socket_.end()) {
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
-      new_socket.set(zmq::sockopt::linger, 0);
       new_socket.set(zmq::sockopt::sndhwm, 0);
       new_socket.connect(br->GetEndpointByMachineId(to_machine_id));
       auto res = machine_id_to_socket_.insert_or_assign(to_machine_id, move(new_socket));
@@ -44,7 +43,6 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
     if (auto br = broker_.lock()) {
       zmq::socket_t new_socket(*context_, ZMQ_PUSH);
       new_socket.connect("inproc://channel_" + std::to_string(to_channel));
-      new_socket.set(zmq::sockopt::linger, 0);
       new_socket.set(zmq::sockopt::sndhwm, 0);
       auto res = local_channel_to_socket_.insert_or_assign(to_channel, move(new_socket));
       it = res.first;

@@ -20,7 +20,6 @@ using internal::Response;
 zmq::socket_t MakePullSocket(zmq::context_t& context, Channel chan) {
   zmq::socket_t socket(context, ZMQ_PULL);
   socket.bind("inproc://channel_" + to_string(chan));
-  socket.set(zmq::sockopt::linger, 0);
   return socket;
 }
 

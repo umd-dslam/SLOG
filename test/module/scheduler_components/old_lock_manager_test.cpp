@@ -14,13 +14,13 @@ using testing::UnorderedElementsAre;
 MessagePool<internal::Request> pool;
 
 TransactionHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const unordered_set<Key>& read_set,
-                                  const unordered_set<Key>& write_set) {
-    auto txn = MakeTransaction(read_set, write_set);
-    txn->mutable_internal()->set_id(id);
-    ReusableRequest req(&pool);
-    req.get()->mutable_forward_txn()->set_allocated_txn(txn);
-    return {config, move(req)};
-  }
+                                const unordered_set<Key>& write_set) {
+  auto txn = MakeTransaction(read_set, write_set);
+  txn->mutable_internal()->set_id(id);
+  ReusableRequest req(&pool);
+  req.get()->mutable_forward_txn()->set_allocated_txn(txn);
+  return {config, move(req)};
+}
 
 TEST(OldLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);

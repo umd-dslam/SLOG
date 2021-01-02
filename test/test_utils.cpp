@@ -93,6 +93,8 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
       broker_(new Broker(config, context_, kTestModuleTimeout)),
       client_context_(1),
       client_socket_(client_context_, ZMQ_DEALER) {
+  context_->set(zmq::ctxopt::blocky, false);
+  client_context_.set(zmq::ctxopt::blocky, false);
   ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
 }
 
@@ -124,7 +126,6 @@ void TestSlog::AddOutputChannel(Channel channel) {
   broker_->AddChannel(channel);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
-  socket.set(zmq::sockopt::linger, 0);
   socket.bind("inproc://channel_" + to_string(channel));
   channels_.insert_or_assign(channel, std::move(socket));
 }

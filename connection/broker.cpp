@@ -27,9 +27,6 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
       socket_(*context, ZMQ_PULL),
       running_(false),
       is_synchronized_(false) {
-  // Set ZMQ_LINGER to 0 to discard all pending messages on shutdown.
-  // Otherwise, it would hang indefinitely until the messages are sent.
-  socket_.set(zmq::sockopt::linger, 0);
   // Remove all limits on the message queue
   socket_.set(zmq::sockopt::rcvhwm, 0);
 }
@@ -58,7 +55,6 @@ void Broker::AddChannel(Channel chan) {
   CHECK(channels_.count(chan) == 0) << "Channel \"" << chan << "\" already exists";
 
   zmq::socket_t new_channel(*context_, ZMQ_PUSH);
-  new_channel.set(zmq::sockopt::linger, 0);
   new_channel.set(zmq::sockopt::sndhwm, 0);
   new_channel.connect("inproc://channel_" + std::to_string(chan));
   channels_.insert_or_assign(chan, move(new_channel));
@@ -118,7 +114,6 @@ bool Broker::InitializeConnection() {
   // Connect to all other machines and send the READY message
   for (const auto& addr : config_->all_addresses()) {
     zmq::socket_t tmp_socket(*context_, ZMQ_PUSH);
-    tmp_socket.set(zmq::sockopt::linger, 0);
 
     auto endpoint = MakeEndpoint(addr);
     tmp_socket.connect(endpoint);

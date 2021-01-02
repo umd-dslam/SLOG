@@ -137,6 +137,8 @@ int main(int argc, char* argv[]) {
       << "Partition number must be within number of partitions";
 
   auto context = make_shared<zmq::context_t>(1);
+  context->set(zmq::ctxopt::blocky, false);
+
   auto broker = make_shared<Broker>(config, context);
 
   // Create and initialize storage layer

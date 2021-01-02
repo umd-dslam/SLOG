@@ -38,7 +38,6 @@ Server::Server(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
 std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
   string endpoint = "tcp://*:" + std::to_string(config_->server_port());
   zmq::socket_t client_socket(*context(), ZMQ_ROUTER);
-  client_socket.set(zmq::sockopt::linger, 0);
   client_socket.set(zmq::sockopt::rcvhwm, 0);
   client_socket.set(zmq::sockopt::sndhwm, 0);
   client_socket.bind(endpoint);

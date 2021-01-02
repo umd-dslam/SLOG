@@ -28,7 +28,6 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
       response_pool_(response_pool_size) {
   broker->AddChannel(channel);
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
-  pull_socket_.set(zmq::sockopt::linger, 0);
   // Remove limit on the zmq message queues
   pull_socket_.set(zmq::sockopt::rcvhwm, 0);
 
