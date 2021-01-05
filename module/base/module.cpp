@@ -43,7 +43,9 @@ void ModuleRunner::Start(std::optional<uint32_t> cpu) {
 void ModuleRunner::Run() {
   module_->SetUp();
   while (running_) {
-    module_->Loop();
+    if (module_->Loop()) {
+      break;
+    }
   }
 }
 

@@ -1,13 +1,13 @@
 #include "workload/basic_workload.h"
 
+#include <fcntl.h>
+#include <glog/logging.h>
+
 #include <algorithm>
 #include <iomanip>
-#include <fcntl.h>
 #include <random>
 #include <sstream>
 #include <unordered_set>
-
-#include <glog/logging.h>
 
 #include "common/offline_data_reader.h"
 #include "common/proto_utils.h"
@@ -28,7 +28,7 @@ constexpr char MP_PCT[] = "mp";
 // Number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_NUM_PARTS[] = "mp_parts";
 // Number of hot keys across the key space. The actual number of
-// hot keys won't match exactly the specified number but will be close. 
+// hot keys won't match exactly the specified number but will be close.
 // Precisely, it will be:
 //        floor(hot / num_key_lists) * num_key_lists
 //  where: num_key_lists = total_num_replicas * total_num_partitions
@@ -50,41 +50,27 @@ constexpr char SH_REGION[] = "sh_region";
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";
 
-const RawParamMap DEFAULT_PARAMS = {
-  { MH_PCT, "0" },
-  { MH_NUM_HOMES, "2" },
-  { MP_PCT, "0" },
-  { MP_NUM_PARTS, "2" },
-  { HOT, "1000" },
-  { NUM_RECORDS, "10" },
-  { NUM_HOT_RECORDS, "2" },
-  { NUM_WRITES, "2" },
-  { VALUE_SIZE, "100" },
-  { SH_REGION, "-1" },
-  { SP_PARTITION, "-1" }
-};
+const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},          {MH_NUM_HOMES, "2"}, {MP_PCT, "0"},
+                                    {MP_NUM_PARTS, "2"},    {HOT, "1000"},       {NUM_RECORDS, "10"},
+                                    {NUM_HOT_RECORDS, "2"}, {NUM_WRITES, "2"},   {VALUE_SIZE, "100"},
+                                    {SH_REGION, "-1"},      {SP_PARTITION, "-1"}};
 
-} // namespace
+}  // namespace
 
-BasicWorkload::BasicWorkload(
-    const ConfigurationPtr config,
-    const string& data_dir,
-    const string& params_str,
-    const RawParamMap extra_default_params)
-  : WorkloadGenerator(
-        MergeParams(extra_default_params, DEFAULT_PARAMS),
-        params_str),
-    config_(config),
-    partition_to_key_lists_(config->num_partitions()),
-    rg_(std::random_device()()),
-    client_txn_id_counter_(0) {
+BasicWorkload::BasicWorkload(const ConfigurationPtr config, const string& data_dir, const string& params_str,
+                             const RawParamMap extra_default_params)
+    : Workload(MergeParams(extra_default_params, DEFAULT_PARAMS), params_str),
+      config_(config),
+      partition_to_key_lists_(config->num_partitions()),
+      rg_(std::random_device()()),
+      client_txn_id_counter_(0) {
   auto num_replicas = config->num_replicas();
   auto num_partitions = config->num_partitions();
   auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / (num_replicas * num_partitions));
   auto simple_partitioning = config->simple_partitioning();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      // Initialize hot keys limit for each key list. When keys are added to a list, 
+      // Initialize hot keys limit for each key list. When keys are added to a list,
       // the first keys are considered hot keys until this limit is reached and any new
       // keys from there are cold keys.
       if (simple_partitioning) {
@@ -108,8 +94,7 @@ BasicWorkload::BasicWorkload(
       LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums from " << data_file;
       while (reader.HasNextDatum()) {
         auto datum = reader.GetNextDatum();
-        CHECK_LT(datum.master(), num_replicas)
-            << "Master number exceeds number of replicas";
+        CHECK_LT(datum.master(), num_replicas) << "Master number exceeds number of replicas";
 
         partition_to_key_lists_[partition][datum.master()].AddKey(datum.key());
       }
@@ -118,8 +103,7 @@ BasicWorkload::BasicWorkload(
   }
 }
 
-std::pair<Transaction*, TransactionProfile>
-BasicWorkload::NextTransaction() {
+std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   TransactionProfile pro;
 
   pro.client_txn_id = client_txn_id_counter_;
@@ -162,8 +146,7 @@ BasicWorkload::NextTransaction() {
     if (sh_region < 0) {
       candidate_homes = Choose(num_replicas, 1, rg_);
     } else {
-      CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas)
-          << "Selected single-home region does not exist";
+      CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas) << "Selected single-home region does not exist";
       candidate_homes.push_back(sh_region);
     }
   }
@@ -177,17 +160,15 @@ BasicWorkload::NextTransaction() {
   auto num_records = params_.GetUInt32(NUM_RECORDS);
   auto value_size = params_.GetUInt32(VALUE_SIZE);
 
-  CHECK_LE(num_writes, num_records)
-      << "Number of writes cannot exceed number of records in a transaction!";
-  CHECK_LE(num_hot_records, num_records)
-      << "Number of hot records cannot exceed number of records in a transaction!";
+  CHECK_LE(num_writes, num_records) << "Number of writes cannot exceed number of records in a transaction!";
+  CHECK_LE(num_hot_records, num_records) << "Number of hot records cannot exceed number of records in a transaction!";
 
   // Randomly pick some records to be hot records (can be either read or write records)
   auto hot_indices = Choose(num_records, num_hot_records, rg_);
   for (size_t i = 0; i < num_records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
-    
+
     Key key;
     // Decide whether to pick a hot or cold key
     if (std::find(hot_indices.begin(), hot_indices.end(), i) != hot_indices.end()) {
@@ -222,4 +203,4 @@ BasicWorkload::NextTransaction() {
   return {txn, pro};
 }
 
-} // namespace slog
+}  // namespace slog

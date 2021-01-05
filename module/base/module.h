@@ -26,9 +26,10 @@ class Module {
   virtual void SetUp(){};
 
   /**
-   * Contains the actions to be perform in one iteration of the main loop
+   * Contains the actions to be perform in one iteration of the main loop.
+   * If this method returns true, the loop will stop.
    */
-  virtual void Loop() = 0;
+  virtual bool Loop() = 0;
 
   const std::string& name() const { return name_; }
 
@@ -49,6 +50,8 @@ class ModuleRunner {
   void StartInNewThread(std::optional<uint32_t> cpu = {});
 
   void Stop();
+
+  std::shared_ptr<Module> module() { return module_; }
 
  private:
   void Run();

@@ -95,7 +95,6 @@ class Worker : public NetworkedModule {
   ConfigurationPtr config_;
   std::shared_ptr<Storage<Key, Record>> storage_;
   std::unique_ptr<Commands> commands_;
-  zmq::pollitem_t poll_item_;
 
   std::unordered_map<TxnId, TransactionState> txn_states_;
 };

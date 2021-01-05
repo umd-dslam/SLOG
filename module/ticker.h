@@ -16,7 +16,7 @@ class Ticker : public Module {
   Ticker(zmq::context_t& context, uint32_t ticks_per_sec);
 
   void SetUp() final;
-  void Loop() final;
+  bool Loop() final;
 
  private:
   using DurationFloatMs = duration<float, std::milli>;

@@ -27,12 +27,14 @@ Ticker::Ticker(zmq::context_t& context, uint32_t ticks_per_sec) : Module("Ticker
 
 void Ticker::SetUp() { socket_.bind(kEndpoint); }
 
-void Ticker::Loop() {
+bool Ticker::Loop() {
   zmq::message_t msg;
   auto deadline = std::chrono::high_resolution_clock::now() + sleep_ms_;
 
   socket_.send(msg, zmq::send_flags::dontwait);
   std::this_thread::sleep_until(deadline);
+
+  return false;
 }
 
 }  // namespace slog

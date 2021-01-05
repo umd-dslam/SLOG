@@ -1,4 +1,5 @@
 #include "workload/remastering_workload.h"
+
 #include "common/proto_utils.h"
 
 using std::discrete_distribution;
@@ -10,24 +11,15 @@ namespace {
 // Number of normal transactions to send between each remastering
 constexpr char REMASTER_GAP[] = "remaster_gap";
 
-const RawParamMap DEFAULT_PARAMS = {
-  { REMASTER_GAP, "50" }
-};
+const RawParamMap DEFAULT_PARAMS = {{REMASTER_GAP, "50"}};
 
-} // namespace
+}  // namespace
 
-RemasteringWorkload::RemasteringWorkload(
-    const ConfigurationPtr config,
-    const string& data_dir,
-    const string& params_str)
-  : BasicWorkload(
-      config,
-      data_dir,
-      params_str,
-      DEFAULT_PARAMS) {}
+RemasteringWorkload::RemasteringWorkload(const ConfigurationPtr config, const string& data_dir,
+                                         const string& params_str)
+    : BasicWorkload(config, data_dir, params_str, DEFAULT_PARAMS) {}
 
-std::pair<Transaction*, TransactionProfile>
-RemasteringWorkload::NextTransaction() {
+std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextTransaction() {
   if (client_txn_id_counter_ % params_.GetUInt32(REMASTER_GAP) == 0) {
     return NextRemasterTransaction();
   } else {
@@ -35,9 +27,7 @@ RemasteringWorkload::NextTransaction() {
   }
 }
 
-std::pair<Transaction*, TransactionProfile>
-RemasteringWorkload::NextRemasterTransaction() {
-
+std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTransaction() {
   TransactionProfile pro;
 
   pro.client_txn_id = client_txn_id_counter_;
@@ -60,13 +50,7 @@ RemasteringWorkload::NextRemasterTransaction() {
   pro.key_to_home[key] = home;
   pro.key_to_partition[key] = partition;
 
-  auto txn = MakeTransaction(
-    read_set,
-    write_set,
-    "",
-    metadata,
-    0,
-    new_master);
+  auto txn = MakeTransaction(read_set, write_set, "", metadata, 0, new_master);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 
   client_txn_id_counter_++;
@@ -74,4 +58,4 @@ RemasteringWorkload::NextRemasterTransaction() {
   return std::make_pair(txn, pro);
 }
 
-};
+};  // namespace slog

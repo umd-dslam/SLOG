@@ -2,26 +2,23 @@
 
 #include <vector>
 
-#include "workload/workload_generator.h"
 #include "common/configuration.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
+#include "workload/workload.h"
 
 using std::vector;
 
 namespace slog {
 
-class BasicWorkload : public WorkloadGenerator {
-public:
-  BasicWorkload(
-      const ConfigurationPtr config,
-      const std::string& data_dir,
-      const std::string& params_str,
-      const RawParamMap extra_default_params = {});
+class BasicWorkload : public Workload {
+ public:
+  BasicWorkload(const ConfigurationPtr config, const std::string& data_dir, const std::string& params_str,
+                const RawParamMap extra_default_params = {});
 
   std::pair<Transaction*, TransactionProfile> NextTransaction();
 
-protected:
+ protected:
   ConfigurationPtr config_;
 
   // This is an index of keys by their partition and home.
@@ -34,4 +31,4 @@ protected:
   TxnId client_txn_id_counter_;
 };
 
-} // namespace slog
+}  // namespace slog

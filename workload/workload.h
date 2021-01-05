@@ -1,24 +1,22 @@
 #pragma once
 
 #include <map>
-#include <sstream>
 #include <random>
+#include <sstream>
 #include <unordered_map>
 
 #include "common/configuration.h"
-#include "common/types.h"
 #include "common/string_utils.h"
+#include "common/types.h"
 #include "proto/transaction.pb.h"
 
 namespace slog {
 
-using RawParamMap = std::unordered_map<std::string, std::string>; 
+using RawParamMap = std::unordered_map<std::string, std::string>;
 
 class WorkloadParams {
-public:
-  WorkloadParams(const RawParamMap& default_params) {
-    raw_params_ = default_params;
-  }
+ public:
+  WorkloadParams(const RawParamMap& default_params) { raw_params_ = default_params; }
 
   void Update(const std::string& params_str) {
     auto new_params_ = Parse(params_str);
@@ -27,8 +25,7 @@ public:
       // If did an insertion instead of an assignment
       if (res.second) {
         std::ostringstream ss;
-        ss << "Unknown param for current workload: " << pair.first
-           << ". Default params: " << ToString();
+        ss << "Unknown param for current workload: " << pair.first << ". Default params: " << ToString();
         throw std::runtime_error(ss.str());
       }
     }
@@ -67,8 +64,7 @@ public:
     return ss.str();
   }
 
-private:
-
+ private:
   RawParamMap Parse(const std::string& params_str) {
     RawParamMap map;
     std::string token;
@@ -107,11 +103,9 @@ struct TransactionProfile {
 /**
  * Base class for a workload generator
  */
-class WorkloadGenerator {
-public:
-  WorkloadGenerator(
-      const RawParamMap& default_params,
-      const std::string& params_str) : params_(default_params) {
+class Workload {
+ public:
+  Workload(const RawParamMap& default_params, const std::string& params_str) : params_(default_params) {
     params_.Update(params_str);
   }
 
@@ -120,9 +114,7 @@ public:
    */
   virtual std::pair<Transaction*, TransactionProfile> NextTransaction() = 0;
 
-  std::string GetParamsStr() {
-    return params_.ToString();
-  }
+  std::string GetParamsStr() { return params_.ToString(); }
 
   static const RawParamMap MergeParams(const RawParamMap& p1, const RawParamMap& p2) {
     RawParamMap params;
@@ -131,7 +123,7 @@ public:
     return params;
   }
 
-protected:
+ protected:
   WorkloadParams params_;
 };
 
@@ -157,10 +149,7 @@ inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& rg) {
 /**
  * Randomly picks an element from a vector uniformly
  */
-template<
-    template <typename, typename...> class Container,
-    typename T, 
-    typename... Args>
+template <template <typename, typename...> class Container, typename T, typename... Args>
 T PickOne(const Container<T, Args...>& v, std::mt19937& rg) {
   if (v.empty()) {
     throw std::runtime_error("Cannot pick from an empty container");
@@ -183,26 +172,20 @@ inline std::string RandomString(size_t n, std::mt19937& rg) {
 }
 
 class KeyList {
-public:
-  KeyList(size_t num_hot_keys = 0)
-    : is_simple_(false),
-      num_hot_keys_(num_hot_keys) {}
+ public:
+  KeyList(size_t num_hot_keys = 0) : is_simple_(false), num_hot_keys_(num_hot_keys) {}
 
-  KeyList(
-      const ConfigurationPtr config,
-      int partition,
-      int master,
-      size_t num_hot_keys = 0)
-    : is_simple_(true),
-      partition_(partition),
-      master_(master),
-      num_hot_keys_(num_hot_keys),
-      rg_(std::random_device()()) {
+  KeyList(const ConfigurationPtr config, int partition, int master, size_t num_hot_keys = 0)
+      : is_simple_(true),
+        partition_(partition),
+        master_(master),
+        num_hot_keys_(num_hot_keys),
+        rg_(std::random_device()()) {
     auto simple_partitioning = config->simple_partitioning();
     auto num_records = simple_partitioning->num_records();
     num_partitions_ = config->num_partitions();
     num_replicas_ = config->num_replicas();
-    num_keys_ =  ((num_records - partition) / num_partitions_ - master) / num_replicas_;
+    num_keys_ = ((num_records - partition) / num_partitions_ - master) / num_replicas_;
   }
 
   void AddKey(Key key) {
@@ -221,9 +204,7 @@ public:
       throw std::runtime_error("There is no hot key to pick from. Please check your params.");
     }
     if (is_simple_) {
-      std::uniform_int_distribution<uint64_t> dis(
-        0,
-        std::min(num_hot_keys_, num_keys_) - 1);
+      std::uniform_int_distribution<uint64_t> dis(0, std::min(num_hot_keys_, num_keys_) - 1);
       uint64_t key = num_partitions_ * (dis(rg_) * num_replicas_ + master_) + partition_;
       return std::to_string(key);
     }
@@ -245,7 +226,7 @@ public:
     return PickOne(cold_keys_, rg_);
   }
 
-private:
+ private:
   bool is_simple_;
   int partition_;
   int master_;
@@ -259,4 +240,4 @@ private:
   std::mt19937 rg_;
 };
 
-} // namespace slog
+}  // namespace slog

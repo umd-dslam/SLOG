@@ -188,7 +188,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS
 #            Library
 #========================================
 
-set(SLOG_CORE_SRC_DIRS common connection data_structure module paxos)
+set(SLOG_CORE_SRC_DIRS common connection data_structure module paxos workload)
 add_library(slog-core STATIC "")
 foreach (DIR ${SLOG_CORE_SRC_DIRS})
   add_subdirectory(${DIR})
@@ -238,9 +238,7 @@ target_link_libraries(slog PRIVATE slog-core gflags::gflags)
 
 add_executable(benchmark
   service/benchmark.cpp
-  service/service_utils.h
-  workload/basic_workload.cpp
-  workload/remastering_workload.cpp)
+  service/service_utils.h)
 target_link_libraries(benchmark
   PRIVATE
     slog-core

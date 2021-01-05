@@ -61,6 +61,7 @@ std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata);
 
 template <typename TxnOrBatch>
 inline void RecordTxnEvent(const ConfigurationPtr& config, TxnOrBatch txn, TransactionEvent event) {
+  using Clock = std::chrono::system_clock;
   txn->mutable_events()->Add(event);
   txn->mutable_event_times()->Add(duration_cast<microseconds>(Clock::now().time_since_epoch()).count());
   txn->mutable_event_machines()->Add(config->local_machine_id());

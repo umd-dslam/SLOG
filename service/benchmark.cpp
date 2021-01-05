@@ -47,6 +47,9 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
+using Clock = std::chrono::system_clock;
+using TimePoint = Clock::time_point;
+
 template <typename T>
 uint64_t TimeElapsedSince(TimePoint tp) {
   return duration_cast<T>(Clock::now() - tp).count();
@@ -94,7 +97,7 @@ unique_ptr<ModuleRunner> ticker;
 /**
  * Selected workload
  */
-unique_ptr<WorkloadGenerator> workload;
+unique_ptr<Workload> workload;
 
 /**
  * Random generator
