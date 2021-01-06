@@ -794,6 +794,10 @@ class BenchmarkCommand(Command):
             help="Environment variables to pass to the container. For example, "
                  "use -e GLOG_v=1 to turn on verbose logging at level 1."
         )
+        parser.add_argument(
+            "--cleanup", action="store_true",
+            help="Clean up all running benchmarks then exit"
+        )
 
     def init_remote_processes(self, args):
         """
@@ -871,10 +875,16 @@ class BenchmarkCommand(Command):
 
         with Pool(processes=len(self.remote_procs)) as pool:
             pool.map(clean_up, self.remote_procs)
+        
+        if args.cleanup:
+            return
 
-        def run_benchmark(proc_and_params):
+        def benchmark_runner(proc_and_params):
             proc, num_txns, duration = proc_and_params
             client, addr, rep, _, procnum = proc
+
+            if num_txns is None:
+                num_txns = args.rate * duration
 
             out_dir = os.path.join(parent_dir, str(procnum))
             mkdir_cmd = f"mkdir -p {out_dir}"
@@ -887,11 +897,8 @@ class BenchmarkCommand(Command):
                 f"--wl {args.workload} "
                 f'--params "{args.params}" '
                 f"--rate {args.rate} "
+                f"--txns {num_txns} "
             )
-            if num_txns:
-                shell_cmd += f"--num_txns {num_txns} "
-            else:
-                shell_cmd += f"--duration {duration} "
             container = client.containers.run(
                 args.image,
                 name=f'{BENCHMARK_CONTAINER_NAME}_{procnum}',
@@ -929,10 +936,10 @@ class BenchmarkCommand(Command):
             proc_and_params = zip(
                 batch,
                 itertools.repeat(args.num_txns),
-                itertools.repeat(duration + remaining_steps * COMPENSATE),
+                itertools.repeat(duration + remaining_steps * COMPENSATE if duration else None),
             )
             with Pool(processes=len(batch)) as pool:
-                containers += pool.map(run_benchmark, proc_and_params)
+                containers += pool.map(benchmark_runner, proc_and_params)
             LOG.info("Step %d: started %d clients", s + 1, len(batch))
 
             if duration:

@@ -1,387 +1,176 @@
-#include <iomanip>
-#include <iostream>
-#include <random>
-#include <sstream>
+#include <chrono>
+#include <optional>
+#include <unordered_map>
 
 #include "common/configuration.h"
 #include "common/csv_writer.h"
 #include "common/proto_utils.h"
-#include "common/types.h"
-#include "connection/zmq_utils.h"
-#include "module/ticker.h"
-#include "proto/api.pb.h"
+#include "module/txn_generator.h"
 #include "service/service_utils.h"
 #include "workload/basic_workload.h"
 #include "workload/remastering_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
+DEFINE_int32(workers, 1, "Number of worker threads");
 DEFINE_uint32(r, 0, "The region where the current machine is located");
-DEFINE_int32(p, -1,
-             "The partition the transactions are sent to. "
-             "Set to a negative number to randomly send to any partiton");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_string(out_dir, "", "Directory containing output data");
 DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
-DEFINE_uint32(duration, 0,
-              "How long the benchmark is run in seconds. "
-              "This is mutually exclusive with \"num_txns\"");
-DEFINE_uint32(num_txns, 0,
-              "Total number of txns being sent. "
-              "This is mutually exclusive with \"duration\"");
+DEFINE_uint32(txns, 100, "Total number of txns being sent. ");
 DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
-DEFINE_bool(print_txn, false, "Print each generated transaction");
-DEFINE_bool(print_txn_result, false, "Print the result of each transaction");
-DEFINE_bool(print_profile, false, "Print the profile of each transaction");
 
 using namespace slog;
 
-using std::cout;
-using std::endl;
-using std::fixed;
-using std::make_unique;
-using std::move;
-using std::string;
-using std::unique_ptr;
-using std::unordered_map;
-using std::vector;
+struct ResultWriters {
+  const vector<string> kTxnColumns = {"client_txn_id", "txn_id", "is_mh", "is_mp",
+                                      "sent_at",       // microseconds since epoch
+                                      "received_at"};  // microseconds since epoch
 
-using Clock = std::chrono::system_clock;
-using TimePoint = Clock::time_point;
+  const vector<string> kEventsColumns = {"txn_id", "event_id",
+                                         "time",  // microseconds since epoch
+                                         "machine"};
+  const vector<string> kEventNamesColumns = {"id", "event"};
+  const vector<string> kThroughputColumns = {"time", "txns_per_sec"};
 
-template <typename T>
-uint64_t TimeElapsedSince(TimePoint tp) {
-  return duration_cast<T>(Clock::now() - tp).count();
-}
+  ResultWriters()
+      : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
+        events(FLAGS_out_dir + "/events.csv", kEventsColumns),
+        event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns),
+        throughput(FLAGS_out_dir + "/throughput.csv", kThroughputColumns) {}
 
-const uint32_t STATS_PRINT_EVERY_MS = 1000;
-const uint32_t ESTIMATED_OVERHEAD = 111;
-
-const string TXNS_FILE = "transactions.csv";
-const vector<string> TXN_COLUMNS = {"client_txn_id", "txn_id", "is_mh", "is_mp",
-                                    "sent_at",       // microseconds since epoch
-                                    "received_at"};  // microseconds since epoch
-
-const string EVENTS_FILE = "events.csv";
-const vector<string> EVENTS_COLUMNS = {"txn_id", "event_id",
-                                       "time",  // microseconds since epoch
-                                       "machine"};
-
-const string EVENT_NAMES_FILE = "event_names.csv";
-const vector<string> EVENT_NAMES_COLUMNS = {"id", "event"};
-
-const string THROUGHPUT_FILE = "throughput.csv";
-const vector<string> THROUGHPUT_COLUMNS = {"time", "txns_per_sec"};
-
-/**
- * Connection stuff
- */
-zmq::context_t context(1);
-vector<unique_ptr<zmq::socket_t>> server_sockets;
-unique_ptr<zmq::socket_t> ticker_socket;
-vector<zmq::pollitem_t> poll_items;
-
-/**
- * Configuration
- */
-ConfigurationPtr config;
-
-/**
- * Used for controlling rate
- * Note: This must be declared after `context` so that
- *       it is destructed before `context`.
- */
-unique_ptr<ModuleRunner> ticker;
-
-/**
- * Selected workload
- */
-unique_ptr<Workload> workload;
-
-/**
- * Random generator
- */
-std::random_device rd;
-std::mt19937 gen(rd());
-
-/**
- * Data structure for keeping track of the transactions
- */
-struct TransactionInfo {
-  TransactionProfile profile;
-  TimePoint sent_at;
+  CSVWriter txns;
+  CSVWriter events;
+  CSVWriter event_names;
+  CSVWriter throughput;
 };
-unordered_map<uint64_t, TransactionInfo> outstanding_txns;
-unordered_map<int, string> event_names;
-std::unique_ptr<CSVWriter> txn_writer;
-std::unique_ptr<CSVWriter> events_writer;
-std::unique_ptr<CSVWriter> event_names_writer;
-std::unique_ptr<CSVWriter> throughput_writer;
 
-/**
- * Statistics
- */
-struct Statistics {
-  TimePoint start_time;
-  uint64_t txn_counter = 0;
-  uint32_t resp_counter = 0;
-
-  void MaybePrint() {
-    if (TimeElapsedSince<milliseconds>(time_last_print_) < STATS_PRINT_EVERY_MS) {
-      return;
-    }
-    Print();
-    time_last_print_ = Clock::now();
-  }
-
-  void FinalPrint() {
-    Print();
-    cout << "Elapsed time: " << TimeElapsedSince<seconds>(start_time) << " seconds" << endl;
-  }
-
- private:
-  TimePoint time_last_print_;
-
-  TimePoint time_last_throughput_;
-  uint32_t resp_last_throughput_ = 0;
-
-  double Throughput() {
-    double time_since_last_compute_sec = TimeElapsedSince<milliseconds>(time_last_throughput_) / 1000.0;
-    double throughput = (resp_counter - resp_last_throughput_) / time_since_last_compute_sec;
-    time_last_throughput_ = Clock::now();
-    resp_last_throughput_ = resp_counter;
-    return throughput;
-  }
-
-  void Print() {
-    double tp = Throughput();
-    cout.precision(1);
-    cout << "\nTransactions sent: " << txn_counter << "\n";
-    cout << "Responses received: " << resp_counter << "\n";
-    cout << "Throughput: " << fixed << tp << " txns/s" << endl;
-
-    if (throughput_writer != nullptr) {
-      (*throughput_writer) << duration_cast<microseconds>(time_last_throughput_.time_since_epoch()).count() << tp
-                           << csvendl;
-    }
-  }
-
-} stats;
-
-void InitializeBenchmark() {
-  if (FLAGS_duration > 0 && FLAGS_num_txns > 0) {
-    LOG(FATAL) << "Only either \"duration\" or \"num_txns\" can be set";
-  }
-
-  // Potentially speed up execution
-  std::ios_base::sync_with_stdio(false);
-
-  // Create a ticker and subscribe to it
-  if (FLAGS_rate > 2000) {
-    LOG(WARNING) << "The maximum possible rate is 2000 txns/sec.";
-    FLAGS_rate = 2000;
-  }
-  // Compensate for the overhead of other computation
-  uint32_t rate = 1000000 / (1000000 / FLAGS_rate - ESTIMATED_OVERHEAD);
-  ticker = MakeRunnerFor<Ticker>(context, rate);
-  ticker->StartInNewThread();
-  ticker_socket = make_unique<zmq::socket_t>(Ticker::Subscribe(context));
-  // This has to be pushed to poll_items before the server sockets
-  poll_items.push_back({static_cast<void*>(*ticker_socket), 0, /* fd */
-                        ZMQ_POLLIN, 0 /* revent */});
-
-  config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
-
-  if (FLAGS_p >= 0 && static_cast<uint32_t>(FLAGS_p) >= config->num_partitions()) {
-    LOG(FATAL) << "Invalid partition: " << FLAGS_p << ". Number of partition is: " << config->num_partitions();
-  }
-
-  // Connect to all server in the same region
-  for (uint32_t p = 0; p < config->num_partitions(); p++) {
-    std::ostringstream endpoint_s;
-    if (config->protocol() == "ipc") {
-      endpoint_s << "tcp://localhost:" << config->server_port();
-    } else {
-      endpoint_s << "tcp://" << config->address(FLAGS_r, p) << ":" << config->server_port();
-    }
-    auto endpoint = endpoint_s.str();
-
-    LOG(INFO) << "Connecting to " << endpoint;
-    auto socket = make_unique<zmq::socket_t>(context, ZMQ_DEALER);
-    socket->set(zmq::sockopt::sndhwm, 0);
-    socket->set(zmq::sockopt::rcvhwm, 0);
-    socket->connect(endpoint);
-    poll_items.push_back({static_cast<void*>(*socket), 0, /* fd */
-                          ZMQ_POLLIN, 0 /* revent */});
-
-    server_sockets.push_back(move(socket));
-  }
-
-  if (FLAGS_wl == "basic") {
-    workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
-  } else if (FLAGS_wl == "remastering") {
-    workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
-  } else {
-    LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
-  }
-  if (FLAGS_out_dir.empty()) {
-    LOG(WARNING) << "Results will not be written to files because output directory is not provided";
-  } else {
-    txn_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + TXNS_FILE, TXN_COLUMNS);
-    events_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENTS_FILE, EVENTS_COLUMNS);
-    event_names_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + EVENT_NAMES_FILE, EVENT_NAMES_COLUMNS);
-    throughput_writer = make_unique<CSVWriter>(FLAGS_out_dir + "/" + THROUGHPUT_FILE, THROUGHPUT_COLUMNS);
-  }
-}
-
-bool StopConditionMet();
-void SendNextTransaction();
-void ReceiveResult(int from_socket);
-
-void RunBenchmark() {
-  LOG(INFO) << workload->GetParamsStr();
-
-  stats.start_time = Clock::now();
-  while (!StopConditionMet() || !outstanding_txns.empty()) {
-    if (zmq::poll(poll_items, 10ms)) {
-      // Check if the ticker ticks
-      if (!StopConditionMet() && poll_items[0].revents & ZMQ_POLLIN) {
-        // Receive the empty message then throw away
-        zmq::message_t msg;
-        (void)ticker_socket->recv(msg);
-
-        SendNextTransaction();
-      }
-      // Check if we received a response from the server
-      for (size_t i = 1; i < poll_items.size(); i++) {
-        if (poll_items[i].revents & ZMQ_POLLIN) {
-          ReceiveResult(i - 1);
-        }
-      }
-    }
-    stats.MaybePrint();
-  }
-  stats.FinalPrint();
-
-  for (auto e : event_names) {
-    (*event_names_writer) << e.first << e.second << csvendl;
-  }
-}
-
-bool StopConditionMet() {
-  if (FLAGS_duration > 0) {
-    return TimeElapsedSince<seconds>(stats.start_time) >= FLAGS_duration;
-  } else if (FLAGS_num_txns > 0) {
-    return stats.txn_counter >= FLAGS_num_txns;
-  }
-  return false;
-}
-
-void SendNextTransaction() {
-  auto txn_and_profile = workload->NextTransaction();
-  auto txn = txn_and_profile.first;
-  auto profile = txn_and_profile.second;
-
-  if (FLAGS_print_txn) {
-    LOG(INFO) << *txn;
-  }
-
-  if (FLAGS_print_profile) {
-    std::ostringstream log;
-    log << "partition: ";
-    for (const auto& p : profile.key_to_partition) {
-      log << std::setw(2) << p.second << " ";
-    }
-    log << "\n" << std::setw(11) << "home: ";
-    for (const auto& p : profile.key_to_home) {
-      log << std::setw(2) << p.second << " ";
-    }
-    log << "\n" << std::setw(11) << "is_write: ";
-    for (const auto& p : profile.is_write_record) {
-      log << std::setw(2) << p.second << " ";
-    }
-    log << "\n" << std::setw(11) << "is_hot: ";
-    for (const auto& p : profile.is_hot_record) {
-      log << std::setw(2) << p.second << " ";
-    }
-    LOG(INFO) << "Transaction profile:\n" << log.str();
-  }
-
-  stats.txn_counter++;
-
-  if (FLAGS_dry_run) {
-    return;
-  }
-
-  api::Request req;
-  req.mutable_txn()->set_allocated_txn(txn);
-  req.set_stream_id(stats.txn_counter);
-
-  if (FLAGS_p < 0) {
-    std::uniform_int_distribution<> dis(0, config->num_partitions() - 1);
-    SendProtoWithEmptyDelimiter(*server_sockets[dis(gen)], req);
-  } else {
-    SendProtoWithEmptyDelimiter(*server_sockets[FLAGS_p], req);
-  }
-
-  auto& txn_info = outstanding_txns[stats.txn_counter];
-  txn_info.sent_at = Clock::now();
-  txn_info.profile = profile;
-}
-
-void ReceiveResult(int from_socket) {
-  const auto& recv_at = Clock::now();
-
-  api::Response res;
-  if (!ReceiveProtoWithEmptyDelimiter(*server_sockets[from_socket], res)) {
-    LOG(ERROR) << "Malformed response";
-    return;
-  }
-
-  if (outstanding_txns.find(res.stream_id()) == outstanding_txns.end()) {
-    auto txn_id = res.txn().txn().internal().id();
-    LOG(ERROR) << "Received response for a non-outstanding txn "
-               << "(stream_id = " << res.stream_id() << ", txn_id = " << txn_id << "). Dropping...";
-  }
-
-  stats.resp_counter++;
-
-  // Write txn info to csv file
-  const auto& txn = res.txn().txn();
-  const auto& txn_internal = txn.internal();
-  const auto& txn_info = outstanding_txns[res.stream_id()];
-  const auto& sent_at = txn_info.sent_at;
-
-  if (FLAGS_print_txn_result) {
-    LOG(INFO) << txn;
-  }
-
-  if (txn_writer != nullptr) {
-    (*txn_writer) << txn_info.profile.client_txn_id << txn_internal.id() << txn_info.profile.is_multi_home
-                  << txn_info.profile.is_multi_partition
-                  << duration_cast<microseconds>(sent_at.time_since_epoch()).count()
-                  << duration_cast<microseconds>(recv_at.time_since_epoch()).count() << csvendl;
-  }
-
-  if (events_writer != nullptr) {
-    for (int i = 0; i < txn_internal.events_size(); i++) {
-      auto event = txn_internal.events(i);
-      event_names[event] = ENUM_NAME(event, TransactionEvent);
-      (*events_writer) << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
-                       << txn_internal.event_machines(i) << csvendl;
-    }
-  }
-
-  outstanding_txns.erase(res.stream_id());
-}
+using std::cout;
+using std::make_unique;
+using std::unique_ptr;
 
 int main(int argc, char* argv[]) {
   InitializeService(&argc, &argv);
 
-  InitializeBenchmark();
+  std::optional<ResultWriters> writers;
+  if (FLAGS_out_dir.empty()) {
+    LOG(WARNING) << "Results will not be written to files because output directory is not provided";
+  } else {
+    writers.emplace();
+  }
 
-  RunBenchmark();
+  // Load the config
+  auto config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
+
+  // Setup zmq context
+  zmq::context_t context;
+  context.set(zmq::ctxopt::blocky, false);
+
+  // Initialize the workers
+  auto tps_per_worker = FLAGS_rate / FLAGS_workers + ((FLAGS_rate % FLAGS_workers) > 0);
+  auto remaining_txns = FLAGS_txns;
+  auto num_txns_per_worker = FLAGS_txns / FLAGS_workers;
+  vector<std::unique_ptr<ModuleRunner>> workers;
+  for (int i = 0; i < FLAGS_workers; i++) {
+    // Select the workload
+    unique_ptr<Workload> workload;
+    if (FLAGS_wl == "basic") {
+      workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
+    } else if (FLAGS_wl == "remastering") {
+      workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
+    } else {
+      LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
+    }
+    if (i < FLAGS_workers - 1) {
+      remaining_txns -= num_txns_per_worker;
+    } else {
+      num_txns_per_worker = remaining_txns;
+    }
+    workers.push_back(MakeRunnerFor<TxnGenerator>(config, context, std::move(workload), FLAGS_r, num_txns_per_worker,
+                                                  tps_per_worker, FLAGS_dry_run));
+  }
+
+  // Run the workers
+  for (auto& w : workers) {
+    w->StartInNewThread();
+  }
+
+  // Wait until all workers finish the setting up phase
+  for (;;) {
+    std::this_thread::sleep_for(1s);
+    bool setup = true;
+    for (auto& w : workers) setup &= w->set_up();
+    if (setup) break;
+  }
+
+  // Status report until all workers finish running
+  size_t last_num_sent_txns = 0;
+  size_t last_num_recv_txns = 0;
+  auto last_print_time = steady_clock::now();
+  for (;;) {
+    std::this_thread::sleep_for(1s);
+
+    bool running = false;
+    size_t num_sent_txns = 0;
+    size_t num_recv_txns = 0;
+    for (auto& w : workers) {
+      running |= w->is_running();
+      auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
+      num_sent_txns += gen->num_sent_txns();
+      num_recv_txns += gen->num_recv_txns();
+    }
+    auto now = steady_clock::now();
+    auto t = duration_cast<milliseconds>(now - last_print_time);
+    auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
+    auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
+
+    LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps << "\n";
+    if (writers) {
+      writers->throughput << duration_cast<microseconds>(last_print_time.time_since_epoch()).count() << recv_tps
+                          << csvendl;
+    }
+
+    last_num_sent_txns = num_sent_txns;
+    last_num_recv_txns = num_recv_txns;
+    last_print_time = now;
+
+    if (!running) {
+      break;
+    }
+  }
+
+  // Dump benchmark data to files
+  if (writers) {
+    vector<TxnGenerator::TxnInfo> txn_infos;
+    for (auto& w : workers) {
+      auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
+      txn_infos.insert(txn_infos.end(), gen->txns().begin(), gen->txns().end());
+    }
+
+    std::unordered_map<int, string> event_names;
+    for (auto& info : txn_infos) {
+      CHECK(info.txn != nullptr);
+      auto& txn_internal = info.txn->internal();
+      writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
+                    << info.profile.is_multi_partition
+                    << duration_cast<microseconds>(info.sent_at.time_since_epoch()).count()
+                    << duration_cast<microseconds>(info.recv_at.time_since_epoch()).count() << csvendl;
+
+      for (int i = 0; i < txn_internal.events_size(); i++) {
+        auto event = txn_internal.events(i);
+        event_names[event] = ENUM_NAME(event, TransactionEvent);
+        writers->events << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
+                        << txn_internal.event_machines(i) << csvendl;
+      }
+    }
+
+    for (auto e : event_names) {
+      writers->event_names << e.first << e.second << csvendl;
+    }
+
+    LOG(INFO) << "Results were written to \"" << FLAGS_out_dir << "\"";
+  }
 
   return 0;
 }
