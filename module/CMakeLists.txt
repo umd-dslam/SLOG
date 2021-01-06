@@ -34,4 +34,6 @@ target_sources(slog-core
     server.cpp
     server.h
     ticker.cpp
-    ticker.h)
+    ticker.h
+    txn_generator.cpp
+    txn_generator.h)

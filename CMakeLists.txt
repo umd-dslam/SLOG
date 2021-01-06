@@ -236,10 +236,15 @@ endif()
 add_executable(slog service/slog.cpp service/service_utils.h)
 target_link_libraries(slog PRIVATE slog-core gflags::gflags)
 
-add_executable(benchmark
-  service/benchmark.cpp
-  service/service_utils.h)
+add_executable(benchmark service/benchmark.cpp service/service_utils.h)
 target_link_libraries(benchmark
+  PRIVATE
+    slog-core
+    gflags::gflags
+)
+
+add_executable(benchmark2 service/benchmark2.cpp service/service_utils.h)
+target_link_libraries(benchmark2
   PRIVATE
     slog-core
     gflags::gflags

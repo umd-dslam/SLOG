@@ -1,0 +1,176 @@
+#include <chrono>
+#include <optional>
+#include <unordered_map>
+
+#include "common/configuration.h"
+#include "common/csv_writer.h"
+#include "common/proto_utils.h"
+#include "module/txn_generator.h"
+#include "service/service_utils.h"
+#include "workload/basic_workload.h"
+#include "workload/remastering_workload.h"
+
+DEFINE_string(config, "slog.conf", "Path to the configuration file");
+DEFINE_int32(workers, 1, "Number of worker threads");
+DEFINE_uint32(r, 0, "The region where the current machine is located");
+DEFINE_string(data_dir, "", "Directory containing intial data");
+DEFINE_string(out_dir, "", "Directory containing output data");
+DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
+DEFINE_uint32(txns, 100, "Total number of txns being sent. ");
+DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
+DEFINE_string(params, "", "Parameters of the workload");
+DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
+
+using namespace slog;
+
+struct ResultWriters {
+  const vector<string> kTxnColumns = {"client_txn_id", "txn_id", "is_mh", "is_mp",
+                                      "sent_at",       // microseconds since epoch
+                                      "received_at"};  // microseconds since epoch
+
+  const vector<string> kEventsColumns = {"txn_id", "event_id",
+                                         "time",  // microseconds since epoch
+                                         "machine"};
+  const vector<string> kEventNamesColumns = {"id", "event"};
+  const vector<string> kThroughputColumns = {"time", "txns_per_sec"};
+
+  ResultWriters()
+      : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
+        events(FLAGS_out_dir + "/events.csv", kEventsColumns),
+        event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns),
+        throughput(FLAGS_out_dir + "/throughput.csv", kThroughputColumns) {}
+
+  CSVWriter txns;
+  CSVWriter events;
+  CSVWriter event_names;
+  CSVWriter throughput;
+};
+
+using std::cout;
+using std::make_unique;
+using std::unique_ptr;
+
+int main(int argc, char* argv[]) {
+  InitializeService(&argc, &argv);
+
+  std::optional<ResultWriters> writers;
+  if (FLAGS_out_dir.empty()) {
+    LOG(WARNING) << "Results will not be written to files because output directory is not provided";
+  } else {
+    writers.emplace();
+  }
+
+  // Load the config
+  auto config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
+
+  // Setup zmq context
+  zmq::context_t context;
+  context.set(zmq::ctxopt::blocky, false);
+
+  // Initialize the workers
+  auto tps_per_worker = FLAGS_rate / FLAGS_workers + ((FLAGS_rate % FLAGS_workers) > 0);
+  auto remaining_txns = FLAGS_txns;
+  auto num_txns_per_worker = FLAGS_txns / FLAGS_workers;
+  vector<std::unique_ptr<ModuleRunner>> workers;
+  for (int i = 0; i < FLAGS_workers; i++) {
+    // Select the workload
+    unique_ptr<Workload> workload;
+    if (FLAGS_wl == "basic") {
+      workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
+    } else if (FLAGS_wl == "remastering") {
+      workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
+    } else {
+      LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
+    }
+    if (i < FLAGS_workers - 1) {
+      remaining_txns -= num_txns_per_worker;
+    } else {
+      num_txns_per_worker = remaining_txns;
+    }
+    workers.push_back(MakeRunnerFor<TxnGenerator>(config, context, std::move(workload), FLAGS_r, num_txns_per_worker,
+                                                  tps_per_worker, FLAGS_dry_run));
+  }
+
+  // Run the workers
+  for (auto& w : workers) {
+    w->StartInNewThread();
+  }
+
+  // Wait until all workers finish the setting up phase
+  for (;;) {
+    std::this_thread::sleep_for(1s);
+    bool setup = true;
+    for (auto& w : workers) setup &= w->set_up();
+    if (setup) break;
+  }
+
+  // Status report until all workers finish running
+  size_t last_num_sent_txns = 0;
+  size_t last_num_recv_txns = 0;
+  auto last_print_time = steady_clock::now();
+  for (;;) {
+    std::this_thread::sleep_for(1s);
+
+    bool running = false;
+    size_t num_sent_txns = 0;
+    size_t num_recv_txns = 0;
+    for (auto& w : workers) {
+      running |= w->is_running();
+      auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
+      num_sent_txns += gen->num_sent_txns();
+      num_recv_txns += gen->num_recv_txns();
+    }
+    auto now = steady_clock::now();
+    auto t = duration_cast<milliseconds>(now - last_print_time);
+    auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
+    auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
+
+    LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps << "\n";
+    if (writers) {
+      writers->throughput << duration_cast<microseconds>(last_print_time.time_since_epoch()).count() << recv_tps
+                          << csvendl;
+    }
+
+    last_num_sent_txns = num_sent_txns;
+    last_num_recv_txns = num_recv_txns;
+    last_print_time = now;
+
+    if (!running) {
+      break;
+    }
+  }
+
+  // Dump benchmark data to files
+  if (writers) {
+    vector<TxnGenerator::TxnInfo> txn_infos;
+    for (auto& w : workers) {
+      auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
+      txn_infos.insert(txn_infos.end(), gen->txns().begin(), gen->txns().end());
+    }
+
+    std::unordered_map<int, string> event_names;
+    for (auto& info : txn_infos) {
+      CHECK(info.txn != nullptr);
+      auto& txn_internal = info.txn->internal();
+      writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
+                    << info.profile.is_multi_partition
+                    << duration_cast<microseconds>(info.sent_at.time_since_epoch()).count()
+                    << duration_cast<microseconds>(info.recv_at.time_since_epoch()).count() << csvendl;
+
+      for (int i = 0; i < txn_internal.events_size(); i++) {
+        auto event = txn_internal.events(i);
+        event_names[event] = ENUM_NAME(event, TransactionEvent);
+        writers->events << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
+                        << txn_internal.event_machines(i) << csvendl;
+      }
+    }
+
+    for (auto e : event_names) {
+      writers->event_names << e.first << e.second << csvendl;
+    }
+
+    LOG(INFO) << "Results were written to \"" << FLAGS_out_dir << "\"";
+  }
+
+  return 0;
+}

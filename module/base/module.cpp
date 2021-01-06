@@ -10,22 +10,13 @@ using std::unique_ptr;
 
 namespace slog {
 
-ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) : module_(module), running_(false) {}
+ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) : module_(module), running_(false), setup_(false) {}
 
 ModuleRunner::~ModuleRunner() {
   running_ = false;
   LOG(INFO) << "Stopping " << module_->name();
-  thread_.join();
-}
-
-void ModuleRunner::StartInNewThread(std::optional<uint32_t> cpu) {
-  if (running_) {
-    throw std::runtime_error("The module has already started");
-  }
-  running_ = true;
-  thread_ = std::thread(&ModuleRunner::Run, this);
-  if (cpu.has_value()) {
-    PinToCpu(thread_.native_handle(), cpu.value());
+  if (thread_.joinable()) {
+    thread_.join();
   }
 }
 
@@ -40,12 +31,36 @@ void ModuleRunner::Start(std::optional<uint32_t> cpu) {
   Run();
 }
 
+void ModuleRunner::StartInNewThread(std::optional<uint32_t> cpu) {
+  if (running_) {
+    throw std::runtime_error("The module has already started");
+  }
+  running_ = true;
+  thread_ = std::thread(&ModuleRunner::Run, this);
+  if (cpu.has_value()) {
+    PinToCpu(thread_.native_handle(), cpu.value());
+  }
+}
+
+void ModuleRunner::StartOnce() {
+  if (running_) {
+    throw std::runtime_error("The module has already started");
+  }
+  SetUpOnce();
+  module_->Loop();
+}
+
 void ModuleRunner::Run() {
-  module_->SetUp();
+  SetUpOnce();
   while (running_) {
-    if (module_->Loop()) {
-      break;
-    }
+    if (module_->Loop()) Stop();
+  }
+}
+
+void ModuleRunner::SetUpOnce() {
+  if (!setup_) {
+    module_->SetUp();
+    setup_ = true;
   }
 }
 

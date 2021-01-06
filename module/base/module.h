@@ -48,17 +48,22 @@ class ModuleRunner {
 
   void Start(std::optional<uint32_t> cpu = {});
   void StartInNewThread(std::optional<uint32_t> cpu = {});
+  void StartOnce();
 
   void Stop();
 
   std::shared_ptr<Module> module() { return module_; }
+  bool is_running() const { return running_; }
+  bool set_up() const { return setup_; }
 
  private:
   void Run();
+  void SetUpOnce();
 
   std::shared_ptr<Module> module_;
   std::thread thread_;
   std::atomic<bool> running_;
+  std::atomic<bool> setup_;
 };
 
 /**
