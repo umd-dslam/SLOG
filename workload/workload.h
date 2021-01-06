@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <map>
 #include <random>
 #include <sstream>
@@ -94,10 +95,14 @@ struct TransactionProfile {
   bool is_multi_home;
   bool is_multi_partition;
 
-  std::map<Key, uint32_t> key_to_partition;
-  std::map<Key, uint32_t> key_to_home;
-  std::map<Key, bool> is_hot_record;
-  std::map<Key, bool> is_write_record;
+  struct Record {
+    uint32_t partition;
+    uint32_t home;
+    bool is_hot;
+    bool is_write;
+  };
+
+  std::map<Key, Record> records;
 };
 
 /**
@@ -127,46 +132,16 @@ class Workload {
   WorkloadParams params_;
 };
 
-/**
- * Chooses without replacement k elements from [0, n)
- */
-inline std::vector<uint32_t> Choose(uint32_t n, uint32_t k, std::mt19937& rg) {
-  if (n == 0) {
-    return {};
-  }
-  if (k == 1) {
-    // For k = 1, it is faster to pick a random key than shuffling
-    // the whole vector and pick the first key.
-    std::uniform_int_distribution<uint32_t> dis(0, n - 1);
-    return {dis(rg)};
-  }
-  std::vector<uint32_t> a(n);
-  std::iota(a.begin(), a.end(), 0);
-  shuffle(a.begin(), a.end(), rg);
-  return {a.begin(), a.begin() + std::min(n, k)};
-}
-
-/**
- * Randomly picks an element from a vector uniformly
- */
-template <template <typename, typename...> class Container, typename T, typename... Args>
-T PickOne(const Container<T, Args...>& v, std::mt19937& rg) {
-  if (v.empty()) {
-    throw std::runtime_error("Cannot pick from an empty container");
-  }
-  auto i = Choose(v.size(), 1, rg)[0];
-  return v[i];
-}
-
-const std::string CHARACTERS("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-
+const std::string kCharacters("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
 /**
  * Generates a random string of length n
  */
 inline std::string RandomString(size_t n, std::mt19937& rg) {
+  std::uniform_int_distribution<uint32_t> dis(0, kCharacters.size() - 1);
   std::string s;
+  s.reserve(n);
   for (size_t i = 0; i < n; i++) {
-    s += PickOne(CHARACTERS, rg);
+    s += kCharacters[dis(rg)];
   }
   return s;
 }
@@ -176,11 +151,7 @@ class KeyList {
   KeyList(size_t num_hot_keys = 0) : is_simple_(false), num_hot_keys_(num_hot_keys) {}
 
   KeyList(const ConfigurationPtr config, int partition, int master, size_t num_hot_keys = 0)
-      : is_simple_(true),
-        partition_(partition),
-        master_(master),
-        num_hot_keys_(num_hot_keys),
-        rg_(std::random_device()()) {
+      : is_simple_(true), partition_(partition), master_(master), num_hot_keys_(num_hot_keys) {
     auto simple_partitioning = config->simple_partitioning();
     auto num_records = simple_partitioning->num_records();
     num_partitions_ = config->num_partitions();
@@ -199,31 +170,33 @@ class KeyList {
     cold_keys_.push_back(key);
   }
 
-  Key GetRandomHotKey() {
+  Key GetRandomHotKey(std::mt19937& rg) {
     if (num_hot_keys_ == 0) {
       throw std::runtime_error("There is no hot key to pick from. Please check your params.");
     }
     if (is_simple_) {
       std::uniform_int_distribution<uint64_t> dis(0, std::min(num_hot_keys_, num_keys_) - 1);
-      uint64_t key = num_partitions_ * (dis(rg_) * num_replicas_ + master_) + partition_;
+      uint64_t key = num_partitions_ * (dis(rg) * num_replicas_ + master_) + partition_;
       return std::to_string(key);
     }
-    return PickOne(hot_keys_, rg_);
+    std::uniform_int_distribution<uint32_t> dis(0, hot_keys_.size() - 1);
+    return hot_keys_[dis(rg)];
   }
 
-  Key GetRandomColdKey() {
+  Key GetRandomColdKey(std::mt19937& rg) {
     if (is_simple_) {
       if (num_hot_keys_ >= num_keys_) {
         throw std::runtime_error("There is no cold key to pick from. Please check your params.");
       }
       std::uniform_int_distribution<uint64_t> dis(num_hot_keys_, num_keys_ - 1);
-      uint64_t key = num_partitions_ * (dis(rg_) * num_replicas_ + master_) + partition_;
+      uint64_t key = num_partitions_ * (dis(rg) * num_replicas_ + master_) + partition_;
       return std::to_string(key);
     }
     if (cold_keys_.empty()) {
       throw std::runtime_error("There is no cold key to pick from. Please check your params.");
     }
-    return PickOne(cold_keys_, rg_);
+    std::uniform_int_distribution<uint32_t> dis(0, cold_keys_.size() - 1);
+    return cold_keys_[dis(rg)];
   }
 
  private:
@@ -236,8 +209,6 @@ class KeyList {
   uint64_t num_hot_keys_;
   std::vector<Key> cold_keys_;
   std::vector<Key> hot_keys_;
-
-  std::mt19937 rg_;
 };
 
 }  // namespace slog

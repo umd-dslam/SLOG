@@ -1,5 +1,7 @@
 #include <chrono>
+#include <iomanip>
 #include <optional>
+#include <random>
 #include <unordered_map>
 
 #include "common/configuration.h"
@@ -20,6 +22,11 @@ DEFINE_uint32(txns, 100, "Total number of txns being sent. ");
 DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
+DEFINE_double(sample, 100, "Percent of sampled transactions to be written to result files");
+DEFINE_int32(
+    seed, -1,
+    "Seed for any randomization in the benchmark. If set to negative, seed will be picked from std::random_device()");
+DEFINE_bool(txn_profiles, false, "Output transaction profiles");
 
 using namespace slog;
 
@@ -48,10 +55,13 @@ struct ResultWriters {
 
 using std::cout;
 using std::make_unique;
+using std::setw;
 using std::unique_ptr;
 
 int main(int argc, char* argv[]) {
   InitializeService(&argc, &argv);
+
+  const uint32_t seed = (FLAGS_seed < 0) ? std::random_device()() : FLAGS_seed;
 
   std::optional<ResultWriters> writers;
   if (FLAGS_out_dir.empty()) {
@@ -76,9 +86,9 @@ int main(int argc, char* argv[]) {
     // Select the workload
     unique_ptr<Workload> workload;
     if (FLAGS_wl == "basic") {
-      workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params);
+      workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "remastering") {
-      workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params);
+      workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params, seed + i);
     } else {
       LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
     }
@@ -125,7 +135,8 @@ int main(int argc, char* argv[]) {
     auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
     auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
 
-    LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps << "\n";
+    LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps
+              << "\n";
     if (writers) {
       writers->throughput << duration_cast<microseconds>(last_print_time.time_since_epoch()).count() << recv_tps
                           << csvendl;
@@ -148,6 +159,12 @@ int main(int argc, char* argv[]) {
       txn_infos.insert(txn_infos.end(), gen->txns().begin(), gen->txns().end());
     }
 
+    // Sample a subset of the result
+    std::mt19937 rg(seed);
+    std::shuffle(txn_infos.begin(), txn_infos.end(), rg);
+    auto sample_size = static_cast<size_t>(txn_infos.size() * FLAGS_sample / 100);
+    txn_infos.resize(sample_size);
+
     std::unordered_map<int, string> event_names;
     for (auto& info : txn_infos) {
       CHECK(info.txn != nullptr);
@@ -167,6 +184,31 @@ int main(int argc, char* argv[]) {
 
     for (auto e : event_names) {
       writers->event_names << e.first << e.second << csvendl;
+    }
+
+    if (FLAGS_txn_profiles) {
+      auto file_name = FLAGS_out_dir + "/txn_profiles.txt";
+      std::ofstream profiles(file_name, std::ios::out);
+      if (!profiles) {
+        throw std::runtime_error(std::string("Cannot open file: ") + file_name);
+      }
+      const int kCellWidth = 11;
+      for (auto& info : txn_infos) {
+        profiles << *info.txn;
+        profiles << "Multi-Home: " << info.profile.is_multi_home << "\n";
+        profiles << "Multi-Partition: " << info.profile.is_multi_partition << "\n";
+        profiles << "Profile:\n";
+        profiles << setw(6) << "Key" << setw(kCellWidth) << "Home" << setw(kCellWidth) << "Partition"
+                 << setw(kCellWidth) << "Hot" << setw(kCellWidth) << "Write"
+                 << "\n";
+        for (const auto& pair : info.profile.records) {
+          const auto& key = pair.first;
+          const auto& record = pair.second;
+          profiles << setw(6) << key << setw(kCellWidth) << record.home << setw(kCellWidth) << record.partition
+                   << setw(kCellWidth) << record.is_hot << setw(kCellWidth) << record.is_write << "\n";
+        }
+        profiles << "\n" << std::endl;
+      }
     }
 
     LOG(INFO) << "Results were written to \"" << FLAGS_out_dir << "\"";

@@ -13,7 +13,9 @@
 #include "common/proto_utils.h"
 #include "proto/offline_data.pb.h"
 
-using std::discrete_distribution;
+using std::bernoulli_distribution;
+using std::iota;
+using std::sample;
 using std::unordered_set;
 
 namespace slog {
@@ -22,11 +24,11 @@ namespace {
 // Percentage of multi-home transactions
 constexpr char MH_PCT[] = "mh";
 // Number of regions selected as homes in a multi-home transaction
-constexpr char MH_NUM_HOMES[] = "mh_homes";
+constexpr char MH_HOMES[] = "mh_homes";
 // Percentage of multi-partition transactions
 constexpr char MP_PCT[] = "mp";
 // Number of partitions selected as parts of a multi-partition transaction
-constexpr char MP_NUM_PARTS[] = "mp_parts";
+constexpr char MP_PARTS[] = "mp_parts";
 // Number of hot keys across the key space. The actual number of
 // hot keys won't match exactly the specified number but will be close.
 // Precisely, it will be:
@@ -34,11 +36,11 @@ constexpr char MP_NUM_PARTS[] = "mp_parts";
 //  where: num_key_lists = total_num_replicas * total_num_partitions
 constexpr char HOT[] = "hot";
 // Number of records in a transaction
-constexpr char NUM_RECORDS[] = "records";
+constexpr char RECORDS[] = "records";
 // Number of hot records in a transaction
-constexpr char NUM_HOT_RECORDS[] = "hot_records";
+constexpr char HOT_RECORDS[] = "hot_records";
 // Number of write records in a transaction
-constexpr char NUM_WRITES[] = "writes";
+constexpr char WRITES[] = "writes";
 // Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
 // Region that is home to a single-home transaction.
@@ -50,19 +52,18 @@ constexpr char SH_REGION[] = "sh_region";
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";
 
-const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},          {MH_NUM_HOMES, "2"}, {MP_PCT, "0"},
-                                    {MP_NUM_PARTS, "2"},    {HOT, "1000"},       {NUM_RECORDS, "10"},
-                                    {NUM_HOT_RECORDS, "2"}, {NUM_WRITES, "2"},   {VALUE_SIZE, "100"},
-                                    {SH_REGION, "-1"},      {SP_PARTITION, "-1"}};
+const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"},   {MP_PCT, "0"},       {MP_PARTS, "2"},
+                                    {HOT, "1000"},       {RECORDS, "10"},   {HOT_RECORDS, "2"},  {WRITES, "2"},
+                                    {VALUE_SIZE, "100"}, {SH_REGION, "-1"}, {SP_PARTITION, "-1"}};
 
 }  // namespace
 
 BasicWorkload::BasicWorkload(const ConfigurationPtr config, const string& data_dir, const string& params_str,
-                             const RawParamMap extra_default_params)
+                             const uint32_t seed, const RawParamMap extra_default_params)
     : Workload(MergeParams(extra_default_params, DEFAULT_PARAMS), params_str),
       config_(config),
       partition_to_key_lists_(config->num_partitions()),
-      rg_(std::random_device()()),
+      rg_(seed),
       client_txn_id_counter_(0) {
   auto num_replicas = config->num_replicas();
   auto num_partitions = config->num_partitions();
@@ -111,18 +112,22 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   // Decide if this is a multi-partition txn or not
   auto num_partitions = config_->num_partitions();
   auto multi_partition_pct = params_.GetDouble(MP_PCT);
-  discrete_distribution<> spmp({100 - multi_partition_pct, multi_partition_pct});
-  pro.is_multi_partition = spmp(rg_);
+  bernoulli_distribution is_mp(multi_partition_pct / 100);
+  pro.is_multi_partition = is_mp(rg_);
 
   // Select a number of partitions to choose from for each record
   vector<uint32_t> candidate_partitions;
   if (pro.is_multi_partition) {
-    auto mp_num_partitions = params_.GetUInt32(MP_NUM_PARTS);
-    candidate_partitions = Choose(num_partitions, mp_num_partitions, rg_);
+    candidate_partitions.resize(num_partitions);
+    iota(candidate_partitions.begin(), candidate_partitions.end(), 0);
+    shuffle(candidate_partitions.begin(), candidate_partitions.end(), rg_);
+    auto mp_num_partitions = params_.GetUInt32(MP_PARTS);
+    candidate_partitions.resize(mp_num_partitions);
   } else {
     auto sp_partition = params_.GetInt(SP_PARTITION);
     if (sp_partition < 0) {
-      candidate_partitions = Choose(num_partitions, 1, rg_);
+      std::uniform_int_distribution<uint32_t> dis(0, num_partitions - 1);
+      candidate_partitions.push_back(dis(rg_));
     } else {
       CHECK_LT(static_cast<uint32_t>(sp_partition), num_partitions)
           << "Selected single-partition partition does not exist";
@@ -133,18 +138,22 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   // Decide if this is a multi-home txn or not
   auto num_replicas = config_->num_replicas();
   auto multi_home_pct = params_.GetDouble(MH_PCT);
-  discrete_distribution<> shmh({100 - multi_home_pct, multi_home_pct});
-  pro.is_multi_home = shmh(rg_);
+  bernoulli_distribution is_mh(multi_home_pct / 100);
+  pro.is_multi_home = is_mh(rg_);
 
   // Select a number of homes to choose from for each record
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
-    auto mh_num_homes = params_.GetUInt32(MH_NUM_HOMES);
-    candidate_homes = Choose(num_replicas, mh_num_homes, rg_);
+    candidate_homes.resize(num_replicas);
+    iota(candidate_homes.begin(), candidate_homes.end(), 0);
+    shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
+    auto mp_num_homes = params_.GetUInt32(MH_HOMES);
+    candidate_homes.resize(mp_num_homes);
   } else {
     auto sh_region = params_.GetInt(SH_REGION);
     if (sh_region < 0) {
-      candidate_homes = Choose(num_replicas, 1, rg_);
+      std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
+      candidate_homes.push_back(dis(rg_));
     } else {
       CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas) << "Selected single-home region does not exist";
       candidate_homes.push_back(sh_region);
@@ -155,43 +164,47 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   unordered_set<Key> write_set;
   std::ostringstream code;
 
-  auto num_writes = params_.GetUInt32(NUM_WRITES);
-  auto num_hot_records = params_.GetUInt32(NUM_HOT_RECORDS);
-  auto num_records = params_.GetUInt32(NUM_RECORDS);
+  auto writes = params_.GetUInt32(WRITES);
+  auto hot_records = params_.GetUInt32(HOT_RECORDS);
+  auto records = params_.GetUInt32(RECORDS);
   auto value_size = params_.GetUInt32(VALUE_SIZE);
 
-  CHECK_LE(num_writes, num_records) << "Number of writes cannot exceed number of records in a transaction!";
-  CHECK_LE(num_hot_records, num_records) << "Number of hot records cannot exceed number of records in a transaction!";
+  CHECK_LE(writes, records) << "Number of writes cannot exceed number of records in a transaction!";
+  CHECK_LE(hot_records, records) << "Number of hot records cannot exceed number of records in a transaction!";
 
   // Randomly pick some records to be hot records (can be either read or write records)
-  auto hot_indices = Choose(num_records, num_hot_records, rg_);
-  for (size_t i = 0; i < num_records; i++) {
+  vector<bool> is_hot(hot_records, true);
+  is_hot.resize(records);
+  shuffle(is_hot.begin(), is_hot.end(), rg_);
+  for (size_t i = 0; i < records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
 
     Key key;
     // Decide whether to pick a hot or cold key
-    if (std::find(hot_indices.begin(), hot_indices.end(), i) != hot_indices.end()) {
-      key = partition_to_key_lists_[partition][home].GetRandomHotKey();
-      pro.is_hot_record[key] = true;
+    if (is_hot[i]) {
+      key = partition_to_key_lists_[partition][home].GetRandomHotKey(rg_);
     } else {
-      key = partition_to_key_lists_[partition][home].GetRandomColdKey();
-      pro.is_hot_record[key] = false;
+      key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
     }
 
-    // Decide whether this is a read or a write record
-    if (i < num_writes) {
-      code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
-      write_set.insert(key);
-      pro.is_write_record[key] = true;
-    } else {
-      code << "GET " << key << " ";
-      read_set.insert(key);
-      pro.is_write_record[key] = false;
+    auto ins = pro.records.try_emplace(key, TransactionProfile::Record());
+    if (ins.second) {
+      auto& record = ins.first->second;
+      record.is_hot = is_hot[i];
+      // Decide whether this is a read or a write record
+      if (i < writes) {
+        code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
+        write_set.insert(key);
+        record.is_write = true;
+      } else {
+        code << "GET " << key << " ";
+        read_set.insert(key);
+        record.is_write = false;
+      }
+      record.home = home;
+      record.partition = partition;
     }
-
-    pro.key_to_home[key] = home;
-    pro.key_to_partition[key] = partition;
   }
 
   // Construct a new transaction

@@ -2,7 +2,7 @@
 
 #include "common/proto_utils.h"
 
-using std::discrete_distribution;
+using std::uniform_int_distribution;
 using std::unordered_set;
 
 namespace slog {
@@ -16,8 +16,8 @@ const RawParamMap DEFAULT_PARAMS = {{REMASTER_GAP, "50"}};
 }  // namespace
 
 RemasteringWorkload::RemasteringWorkload(const ConfigurationPtr config, const string& data_dir,
-                                         const string& params_str)
-    : BasicWorkload(config, data_dir, params_str, DEFAULT_PARAMS) {}
+                                         const string& params_str, const uint32_t seed)
+    : BasicWorkload(config, data_dir, params_str, seed, DEFAULT_PARAMS) {}
 
 std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextTransaction() {
   if (client_txn_id_counter_ % params_.GetUInt32(REMASTER_GAP) == 0) {
@@ -39,16 +39,21 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
   unordered_set<Key> write_set;
   unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
 
-  auto home = Choose(config_->num_replicas(), 1, rg_)[0];
-  auto partition = Choose(config_->num_partitions(), 1, rg_)[0];
+  auto home = uniform_int_distribution<>(0, config_->num_replicas() - 1)(rg_);
+  auto partition = uniform_int_distribution<>(0, config_->num_partitions() - 1)(rg_);
 
   auto new_master = (home + 1) % config_->num_replicas();
 
-  auto key = partition_to_key_lists_[partition][home].GetRandomColdKey();
+  auto key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
   write_set.insert(key);
+  TransactionProfile::Record record{
+      .partition = static_cast<uint32_t>(partition),
+      .home = static_cast<uint32_t>(home),
+      .is_hot = false,
+      .is_write = true,
+  };
 
-  pro.key_to_home[key] = home;
-  pro.key_to_partition[key] = partition;
+  pro.records.insert({key, record});
 
   auto txn = MakeTransaction(read_set, write_set, "", metadata, 0, new_master);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
