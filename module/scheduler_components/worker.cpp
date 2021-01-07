@@ -8,6 +8,7 @@
 
 #include <thread>
 
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
 
@@ -55,7 +56,7 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
 
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_WORKER);
+  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_WORKER);
 
   // Create a state for the new transaction
   auto [iter, ok] = txn_states_.try_emplace(txn_id, txn_holder);
@@ -333,7 +334,7 @@ void Worker::Commit(TxnId txn_id) {
 void Worker::Finish(TxnId txn_id) {
   auto txn = TxnState(txn_id).txn_holder->transaction();
 
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // This must happen before the sending to scheduler below. Otherwise,
   // the scheduler may destroy the transaction holder before we can
@@ -357,7 +358,7 @@ void Worker::PreAbort(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->transaction();
 
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   SendToCoordinatingServer(txn_id);
 

@@ -2,6 +2,7 @@
 
 #include "common/constants.h"
 #include "common/json_utils.h"
+#include "common/monitor.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
@@ -77,7 +78,9 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
     case api::Request::kTxn: {
       auto txn = request.mutable_txn()->release_txn();
       auto txn_internal = txn->mutable_internal();
-      RecordTxnEvent(config_, txn_internal, TransactionEvent::ENTER_SERVER);
+
+      TRACE(txn_internal, TransactionEvent::ENTER_SERVER);
+
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
 
@@ -90,7 +93,9 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       // Send to forwarder
       internal::Request forward_request;
       forward_request.mutable_forward_txn()->set_allocated_txn(txn);
-      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
+
+      TRACE(txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
+
       Send(forward_request, kForwarderChannel);
       break;
     }
@@ -137,7 +142,8 @@ void Server::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) 
 
 void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
   auto completed_subtxn = req.get()->mutable_completed_subtxn();
-  RecordTxnEvent(config_, completed_subtxn->mutable_txn()->mutable_internal(), TransactionEvent::RETURN_TO_SERVER);
+
+  TRACE(completed_subtxn->mutable_txn()->mutable_internal(), TransactionEvent::RETURN_TO_SERVER);
 
   auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
@@ -207,7 +213,7 @@ void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
 ***********************************************/
 
 void Server::SendTxnToClient(Transaction* txn) {
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
+  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
 
   api::Response response;
   auto txn_response = response.mutable_txn();

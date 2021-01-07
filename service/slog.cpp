@@ -6,6 +6,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
+#include "common/monitor.h"
 #include "common/offline_data_reader.h"
 #include "common/types.h"
 #include "connection/broker.h"
@@ -135,6 +136,8 @@ int main(int argc, char* argv[]) {
   CHECK_LT(config->local_replica(), config->num_replicas()) << "Replica numbers must be within number of replicas";
   CHECK_LT(config->local_partition(), config->num_partitions())
       << "Partition number must be within number of partitions";
+
+  INIT_TRACING(config);
 
   auto context = make_shared<zmq::context_t>(1);
   context->set(zmq::ctxopt::blocky, false);

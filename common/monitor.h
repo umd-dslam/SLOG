@@ -1,22 +1,32 @@
-#include <glog/logging.h>
-
-#include "common/types.h"
+#include "common/configuration.h"
+#include "proto/internal.pb.h"
 
 namespace slog {
 
-inline void MonitorThroughput() {
-  using Clock = std::chrono::steady_clock;
-  static int64_t counter = 0;
-  static int64_t last_counter = 0;
-  static Clock::time_point last_time;
-  counter++;
-  auto span = Clock::now() - last_time;
-  if (span > 1s) {
-    LOG(INFO) << "Throughput: " << (counter - last_counter) / duration_cast<seconds>(span).count() << " txn/s";
+void MonitorThroughput();
 
-    last_counter = counter;
-    last_time = Clock::now();
+extern uint32_t gLocalMachineId;
+extern uint64_t gDisabledTracingEvents;
+
+void InitializeTracing(const ConfigurationPtr& config);
+
+template <typename TxnOrBatch>
+inline void TraceTxnEvent(TxnOrBatch txn, TransactionEvent event) {
+  if ((gDisabledTracingEvents >> event) & 1) {
+    return;
   }
+  using Clock = std::chrono::system_clock;
+  txn->mutable_events()->Add(event);
+  txn->mutable_event_times()->Add(duration_cast<microseconds>(Clock::now().time_since_epoch()).count());
+  txn->mutable_event_machines()->Add(gLocalMachineId);
 }
+
+#ifdef ENABLE_TRACING
+#define INIT_TRACING(config) InitializeTracing(config)
+#define TRACE(txn, event) TraceTxnEvent(txn, event)
+#else
+#define INIT_TRACING(config)
+#define TRACE(txn, event)
+#endif
 
 }  // namespace slog

@@ -8,6 +8,7 @@ target_sources(slog-core
     json_utils.h
     message_pool.h
     monitor.h
+    monitor.cpp
     offline_data_reader.cpp
     offline_data_reader.h
     proto_utils.cpp

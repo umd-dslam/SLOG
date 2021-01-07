@@ -11,6 +11,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from proto import transaction_pb2 as proto_dot_transaction__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -19,8 +20,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"D\n\x12SimplePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\xac\x03\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12@\n\x13simple_partitioning\x18\x07 \x01(\x0b\x32!.slog.internal.SimplePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\t \x01(\x04\x12\x1a\n\x12replication_factor\x18\n \x01(\r\x12\x44\n\x11replication_delay\x18\x0b \x01(\x0b\x32).slog.internal.ReplicationDelayExperimentB\x0e\n\x0cpartitioningb\x06proto3'
-)
+  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\x1a\x17proto/transaction.proto\"\x1c\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\"U\n\x1aReplicationDelayExperiment\x12\x1b\n\x13\x62\x61tch_delay_percent\x18\x01 \x01(\r\x12\x1a\n\x12\x62\x61tch_delay_amount\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"D\n\x12SimplePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\xe5\x03\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x13\n\x0b\x62roker_port\x18\x03 \x01(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12@\n\x13simple_partitioning\x18\x07 \x01(\x0b\x32!.slog.internal.SimplePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12\x16\n\x0e\x62\x61tch_duration\x18\t \x01(\x04\x12\x1a\n\x12replication_factor\x18\n \x01(\r\x12\x44\n\x11replication_delay\x18\x0b \x01(\x0b\x32).slog.internal.ReplicationDelayExperiment\x12\x37\n\x17\x64isabled_tracing_events\x18\x0c \x03(\x0e\x32\x16.slog.TransactionEventB\x0e\n\x0cpartitioningb\x06proto3'
+  ,
+  dependencies=[proto_dot_transaction__pb2.DESCRIPTOR,])
 
 
 
@@ -52,8 +54,8 @@ _REPLICA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=44,
-  serialized_end=72,
+  serialized_start=69,
+  serialized_end=97,
 )
 
 
@@ -91,8 +93,8 @@ _REPLICATIONDELAYEXPERIMENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=74,
-  serialized_end=159,
+  serialized_start=99,
+  serialized_end=184,
 )
 
 
@@ -123,8 +125,8 @@ _HASHPARTITIONING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=161,
-  serialized_end=212,
+  serialized_start=186,
+  serialized_end=237,
 )
 
 
@@ -162,8 +164,8 @@ _SIMPLEPARTITIONING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=214,
-  serialized_end=282,
+  serialized_start=239,
+  serialized_end=307,
 )
 
 
@@ -252,6 +254,13 @@ _CONFIGURATION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='disabled_tracing_events', full_name='slog.internal.Configuration.disabled_tracing_events', index=11,
+      number=12, type=14, cpp_type=8, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -269,14 +278,15 @@ _CONFIGURATION = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=285,
-  serialized_end=713,
+  serialized_start=310,
+  serialized_end=795,
 )
 
 _CONFIGURATION.fields_by_name['replicas'].message_type = _REPLICA
 _CONFIGURATION.fields_by_name['hash_partitioning'].message_type = _HASHPARTITIONING
 _CONFIGURATION.fields_by_name['simple_partitioning'].message_type = _SIMPLEPARTITIONING
 _CONFIGURATION.fields_by_name['replication_delay'].message_type = _REPLICATIONDELAYEXPERIMENT
+_CONFIGURATION.fields_by_name['disabled_tracing_events'].enum_type = proto_dot_transaction__pb2._TRANSACTIONEVENT
 _CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
   _CONFIGURATION.fields_by_name['hash_partitioning'])
 _CONFIGURATION.fields_by_name['hash_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']

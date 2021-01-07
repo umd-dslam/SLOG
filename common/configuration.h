@@ -53,6 +53,7 @@ class Configuration {
 
   uint32_t replication_delay_percent() const;
   uint32_t replication_delay_amount() const;
+  vector<TransactionEvent> disabled_tracing_events() const;
 
  private:
   internal::Configuration config_;

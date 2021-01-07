@@ -15,11 +15,13 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 option(BUILD_SLOG_CLIENT "Build the client" ON)
 option(BUILD_SLOG_TESTS "Build the tests" ON)
+option(ENABLE_TRACING "Enable transaction racing" ON)
 set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
 message(STATUS "Options:")
 message(STATUS "  BUILD_SLOG_CLIENT = ${BUILD_SLOG_CLIENT}")
+message(STATUS "  ENABLE_TRACING = ${ENABLE_TRACING}")
 message(STATUS "  REMASTER_PROTOCOL = ${REMASTER_PROTOCOL}")
 message(STATUS "  LOCK_MANAGER = ${LOCK_MANAGER}")
 
@@ -226,6 +228,10 @@ endif()
 
 if (ENABLE_REMASTER)
   target_compile_definitions(slog-core PUBLIC ENABLE_REMASTER)
+endif()
+
+if (ENABLE_TRACING)
+  target_compile_definitions(slog-core PUBLIC ENABLE_TRACING)
 endif()
 
 #========================================

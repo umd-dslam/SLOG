@@ -152,7 +152,7 @@ void Scheduler::ProcessTransaction(ReusableRequest&& req) {
   auto txn = req.get()->mutable_forward_txn()->mutable_txn();
   auto txn_internal = txn->mutable_internal();
 
-  RecordTxnEvent(config_, txn_internal, TransactionEvent::ENTER_SCHEDULER);
+  TRACE(txn_internal, TransactionEvent::ENTER_SCHEDULER);
 
   if (!AcceptTransaction(move(req))) {
     return;
@@ -325,7 +325,9 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
     case TransactionType::MULTI_HOME: {
       if (lock_manager_.AcceptTransaction(*txn_holder)) {
         // Note: this only records when MH arrives after lock-onlys
-        RecordTxnEvent(config_, txn_holder->transaction()->mutable_internal(), TransactionEvent::ACCEPTED);
+
+        TRACE(txn_holder->transaction()->mutable_internal(), TransactionEvent::ACCEPTED);
+
         Dispatch(txn_id);
       }
       break;
@@ -519,7 +521,7 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   txn_holder->SetWorker(current_worker_);
   current_worker_ = (current_worker_ + 1) % workers_.size();
 
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::DISPATCHED);
+  TRACE(txn->mutable_internal(), TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
   auto req = NewRequest();

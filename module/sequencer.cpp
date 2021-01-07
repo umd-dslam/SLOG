@@ -2,6 +2,7 @@
 
 #include <glog/logging.h>
 
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"
@@ -40,7 +41,7 @@ void Sequencer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from *
       // Received a single-home txn
       auto txn = req.get()->mutable_forward_txn()->release_txn();
 
-      RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
+      TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
       PutSingleHomeTransactionIntoBatch(txn);
       break;
@@ -90,7 +91,7 @@ void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index
   // this is only temporary
   forward_batch->set_allocated_batch_data(batch_.get());
 
-  RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+  TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
   if (config_->replication_delay_percent()) {
     // Maybe delay current batch
@@ -128,7 +129,7 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
     return;
   }
 
-  RecordTxnEvent(config_, batch, TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
+  TRACE(batch, TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
 
   auto local_rep = config_->local_replica();
   // For each multi-home txn, create a lock-only txn and put into
@@ -176,9 +177,9 @@ void Sequencer::ProcessMultiHomeBatch(ReusableRequest&& req) {
     }
   }
 
-  // Replicate the batch of multi-home txns to all machines in the same region
-  RecordTxnEvent(config_, batch, TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+  TRACE(batch, TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
+  // Replicate the batch of multi-home txns to all machines in the same region
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineId(local_rep, part);

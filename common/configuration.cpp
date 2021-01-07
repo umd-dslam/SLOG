@@ -144,4 +144,13 @@ uint32_t Configuration::replication_delay_percent() const { return config_.repli
 
 uint32_t Configuration::replication_delay_amount() const { return config_.replication_delay().batch_delay_amount(); }
 
+vector<TransactionEvent> Configuration::disabled_tracing_events() const {
+  vector<TransactionEvent> res;
+  res.reserve(config_.disabled_tracing_events_size());
+  for (auto e : config_.disabled_tracing_events()) {
+    res.push_back(TransactionEvent(e));
+  }
+  return res;
+};
+
 }  // namespace slog

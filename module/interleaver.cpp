@@ -6,6 +6,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
@@ -73,7 +74,7 @@ void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
       case internal::ForwardBatch::kBatchData: {
         auto batch = BatchPtr{forward_batch->release_batch_data()};
 
-        RecordTxnEvent(config_, batch.get(), TransactionEvent::ENTER_INTERLEAVER_IN_BATCH);
+        TRACE(batch.get(), TransactionEvent::ENTER_INTERLEAVER_IN_BATCH);
 
         switch (batch->transaction_type()) {
           case TransactionType::SINGLE_HOME:
@@ -183,7 +184,8 @@ void Interleaver::EmitBatch(BatchPtr&& batch) {
 
   while (!buffer.empty()) {
     auto txn = buffer.top();
-    RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::EXIT_INTERLEAVER);
+
+    TRACE(txn->mutable_internal(), TransactionEvent::EXIT_INTERLEAVER);
 
     auto request = NewRequest();
     auto forward_txn = request.get()->mutable_forward_txn();

@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "common/constants.h"
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
 #include "paxos/simple_multi_paxos.h"
@@ -39,7 +40,9 @@ void MultiHomeOrderer::HandleInternalRequest(ReusableRequest&& req, MachineId /*
     case Request::kForwardTxn: {
       // Received a new multi-home txn
       auto txn = req.get()->mutable_forward_txn()->release_txn();
-      RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
+
+      TRACE(txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
+
       batch_->mutable_transactions()->AddAllocated(txn);
       break;
     }
@@ -94,7 +97,9 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
-      RecordTxnEvent(config_, batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
+
+      TRACE(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
+
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
@@ -120,7 +125,7 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
     auto forward_batch = req.get()->mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());
 
-    RecordTxnEvent(config_, forward_batch->mutable_batch_data(), TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
+    TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
 
     // Send the newly ordered multi-home batch to the sequencer
     Send(*req.get(), kSequencerChannel);

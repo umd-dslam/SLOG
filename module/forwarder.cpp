@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "common/constants.h"
+#include "common/monitor.h"
 #include "common/proto_utils.h"
 
 using std::move;
@@ -44,7 +45,8 @@ void Forwarder::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
 
 void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   auto txn = req.get()->mutable_forward_txn()->mutable_txn();
-  RecordTxnEvent(config_, txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
+
+  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
   auto local_partition = config_->local_partition();
 
@@ -200,7 +202,9 @@ void Forwarder::Forward(Transaction* txn) {
     auto home_replica = master_metadata.begin()->second.master();
     if (home_replica == config_->local_replica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
-      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+
+      TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+
       Send(forward_txn, kSequencerChannel);
     } else {
       std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
@@ -210,7 +214,8 @@ void Forwarder::Forward(Transaction* txn) {
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: " << home_replica << ", part: " << partition
               << ")";
 
-      RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+      TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+
       Send(forward_txn, kSequencerChannel, random_machine_in_home_replica);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
@@ -219,7 +224,8 @@ void Forwarder::Forward(Transaction* txn) {
 
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
-    RecordTxnEvent(config_, txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
+    TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
+
     Send(forward_txn, kMultiHomeOrdererChannel, destination);
   }
   // Release txn so that it won't be freed by forward_txn and later double-freed
