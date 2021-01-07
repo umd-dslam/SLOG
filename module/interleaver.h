@@ -47,9 +47,6 @@ class LocalLog {
   std::queue<std::pair<SlotId, BatchId>> ready_batches_;
 };
 
-/**
- * ...
- */
 class Interleaver : public NetworkedModule {
  public:
   Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,

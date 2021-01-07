@@ -1,5 +1,0 @@
-{
-  "read_set": [],
-  "write_set": ["A", "B", "C", "D", "E", "F"],
-  "code": "SET A Hello SET B World SET C !!!!! SET D valD SET E valE SET F valF"
-}

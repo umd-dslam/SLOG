@@ -1,5 +1,0 @@
-{
-  "read_set": [],
-  "write_set": ["0", "3", "7"],
-  "code": "SET 0 aaaaaaaaaa SET 3 bbbbbbbbbbb SET 7 ccccccccccccc"
-}

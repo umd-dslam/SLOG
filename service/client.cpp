@@ -15,7 +15,6 @@
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
-DEFINE_uint32(level, 0, "Level of details for the \"stats\" command");
 DEFINE_uint32(repeat, 1, "Used with \"txn\" command. Send the txn multiple times");
 DEFINE_bool(no_wait, false, "Used with \"txn\" command. Don't wait for reply");
 
@@ -160,41 +159,6 @@ string LockModeStr(LockMode mode) {
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
-  /*
-    TODO: Fix this
-
-    Header("Local Log");
-    cout << "Buffered slots: " << stats[LOCAL_LOG_NUM_BUFFERED_SLOTS].GetUint() << "\n";
-    cout << "Buffered batches per queue:\n";
-    const auto& batches_per_queue = stats[LOCAL_LOG_NUM_BUFFERED_BATCHES_PER_QUEUE].GetArray();
-
-    for (size_t i = 0; i < batches_per_queue.Size(); i++) {
-      const auto& pair = batches_per_queue[i].GetArray();
-      cout << "\tQueue " << pair[0].GetUint() << ": " << pair[1].GetUint() << "\n";
-    }
-
-    Header("Global Log");
-    const auto& slots_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_SLOTS_PER_REGION].GetArray();
-    const auto& batches_per_region = stats[GLOBAL_LOG_NUM_BUFFERED_BATCHES_PER_REGION].GetArray();
-
-    // The last "region" is the log for multi-home txns
-    int num_regions = slots_per_region.Size() - 1;
-    cout << setw(12) << "Regions"
-         << setw(20) << "# buffered slots"
-         << setw(22) << "# buffered batches\n";
-    for (int i = 0; i < num_regions; i++) {
-      const auto& slots = slots_per_region[i].GetArray();
-      const auto& batches = batches_per_region[i].GetArray();
-      cout << setw(12) << slots[0].GetUint()
-           << setw(20) << slots[1].GetUint()
-           << setw(22) << batches[1].GetUint() << "\n";
-    }
-    if (num_regions >= 0) {
-      cout << setw(12) << "multi-home"
-          << setw(20) << slots_per_region[num_regions].GetArray()[1].GetUint()
-          << setw(22) << batches_per_region[num_regions].GetArray()[1].GetUint() << "\n";
-    }
-  */
   Header("Transactions");
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {
@@ -291,26 +255,30 @@ int main(int argc, char* argv[]) {
   string endpoint = "tcp://" + FLAGS_host + ":" + to_string(FLAGS_port);
   LOG(INFO) << "Connecting to " << endpoint;
   server_socket.connect(endpoint);
-
-  if (argc - 1 == 0) {
+  auto cmd_argc = argc - 1;
+  if (cmd_argc == 0) {
     LOG(ERROR) << "Please specify a command";
     return 1;
   }
 
   if (strcmp(argv[1], "txn") == 0) {
-    if (argc - 1 != 2) {
+    if (cmd_argc != 2) {
       LOG(ERROR) << "Invalid number of arguments for the \"txn\" command:\n"
                  << "Usage: txn <txn_file>";
       return 1;
     }
     ExecuteTxn(argv[2]);
   } else if (strcmp(argv[1], "stats") == 0) {
-    if (argc - 1 != 2) {
+    if (cmd_argc < 2 || cmd_argc > 3) {
       LOG(ERROR) << "Invalid number of arguments for the \"stats\" command:\n"
-                 << "Usage: stats <module>";
+                 << "Usage: stats <module> [<level>]";
       return 1;
     }
-    ExecuteStats(argv[2], FLAGS_level);
+    uint32_t level = 0;
+    if (cmd_argc == 3) {
+      level = std::stoul(argv[3]);
+    }
+    ExecuteStats(argv[2], level);
   } else {
     LOG(ERROR) << "Invalid command: " << argv[1];
   }
