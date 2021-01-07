@@ -118,7 +118,7 @@ bool Broker::InitializeConnection() {
     auto endpoint = MakeEndpoint(addr);
     tmp_socket.connect(endpoint);
 
-    SendProto(tmp_socket, request);
+    SendSerializedProto(tmp_socket, request);
 
     // See comment in class declaration
     tmp_sockets_.push_back(move(tmp_socket));
@@ -144,7 +144,7 @@ bool Broker::InitializeConnection() {
         continue;
       }
 
-      if (!ParseProto(request, msg) || !request.has_broker_ready()) {
+      if (!DeserializeProto(request, msg) || !request.has_broker_ready()) {
         LOG(INFO) << "Received a message while broker is not READY. "
                   << "Saving for later";
         unhandled_incoming_messages_.push_back(move(msg));

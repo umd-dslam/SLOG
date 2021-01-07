@@ -43,7 +43,7 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     // Wait for pong
     Response res;
-    ASSERT_TRUE(ReceiveProto(socket, res));
+    ASSERT_TRUE(RecvDeserializedProto(socket, res));
     ASSERT_EQ("pong", res.echo().data());
   });
 
@@ -60,7 +60,7 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     // Wait for ping
     Request req;
-    ASSERT_TRUE(ReceiveProto(socket, req));
+    ASSERT_TRUE(RecvDeserializedProto(socket, req));
     ASSERT_EQ("ping", req.echo().data());
 
     // Send pong
@@ -93,7 +93,7 @@ TEST(BrokerTest, LocalPingPong) {
 
     // Wait for pong
     Response res;
-    ASSERT_TRUE(ReceiveProto(socket, res));
+    ASSERT_TRUE(RecvDeserializedProto(socket, res));
     ASSERT_EQ("pong", res.echo().data());
   });
 
@@ -103,7 +103,7 @@ TEST(BrokerTest, LocalPingPong) {
 
     // Wait for ping
     Request req;
-    ASSERT_TRUE(ReceiveProto(socket, req));
+    ASSERT_TRUE(RecvDeserializedProto(socket, req));
     ASSERT_EQ("ping", req.echo().data());
 
     // Send pong

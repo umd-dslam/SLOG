@@ -54,7 +54,7 @@ class TestSlog {
   template <typename T>
   bool ReceiveFromOutputChannel(T& out, Channel channel) {
     CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
-    return ReceiveProto(channels_[channel], out);
+    return RecvDeserializedProto(channels_[channel], out);
   }
 
   unique_ptr<Sender> GetSender();

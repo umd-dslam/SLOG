@@ -177,12 +177,12 @@ void TestSlog::SendTxn(Transaction* txn) {
   api::Request request;
   auto txn_req = request.mutable_txn();
   txn_req->set_allocated_txn(txn);
-  SendProtoWithEmptyDelimiter(client_socket_, request);
+  SendSerializedProtoWithEmptyDelim(client_socket_, request);
 }
 
 Transaction TestSlog::RecvTxnResult() {
   api::Response res;
-  if (!ReceiveProtoWithEmptyDelimiter(client_socket_, res)) {
+  if (!RecvDeserializedProtoWithEmptyDelim(client_socket_, res)) {
     LOG(FATAL) << "Malformed response to client transaction.";
     return Transaction();
   }

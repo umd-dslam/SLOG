@@ -33,7 +33,7 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
     }
   }
 
-  SendProto(it->second, request_or_response, to_channel, local_machine_id_);
+  SendSerializedProto(it->second, request_or_response, to_channel, local_machine_id_);
 }
 
 void Sender::Send(const google::protobuf::Message& request_or_response, Channel to_channel) {
@@ -52,7 +52,7 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
     }
   }
 
-  SendProto(it->second, request_or_response, to_channel, local_machine_id_);
+  SendSerializedProto(it->second, request_or_response, to_channel, local_machine_id_);
 }
 
 }  // namespace slog

@@ -76,7 +76,7 @@ bool TxnGenerator::Loop() {
   auto res = poller_.Wait();
 
   if (res.num_zmq_events > 0) {
-    if (api::Response res; ReceiveProtoWithEmptyDelimiter(socket_, res)) {
+    if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       auto& info = txns_[res.stream_id()];
       if (info.finished) {
         LOG(ERROR) << "Received response for finished txn. Stream id: " << res.stream_id();
@@ -98,7 +98,7 @@ bool TxnGenerator::Loop() {
         api::Request req;
         req.mutable_txn()->set_allocated_txn(info.txn);
         req.set_stream_id(cur_txn_);
-        SendProtoWithEmptyDelimiter(socket_, req);
+        SendSerializedProtoWithEmptyDelim(socket_, req);
         info.txn = nullptr;
       }
       info.sent_at = system_clock::now();

@@ -9,11 +9,10 @@
 namespace slog {
 
 /**
- * The format of a message is:
+ * Serializes and send proto message. The sent buffer contains
  * <sender machine id> <receiver channel> <proto>
  */
-
-inline void SendProto(zmq::socket_t& socket, const google::protobuf::Message& proto, Channel chan = 0,
+inline void SendSerializedProto(zmq::socket_t& socket, const google::protobuf::Message& proto, Channel chan = 0,
                       MachineId machineId = -1) {
   google::protobuf::Any any;
   any.PackFrom(proto);
@@ -31,9 +30,9 @@ inline void SendProto(zmq::socket_t& socket, const google::protobuf::Message& pr
   socket.send(msg, zmq::send_flags::none);
 }
 
-inline void SendProtoWithEmptyDelimiter(zmq::socket_t& socket, const google::protobuf::Message& proto) {
+inline void SendSerializedProtoWithEmptyDelim(zmq::socket_t& socket, const google::protobuf::Message& proto) {
   socket.send(zmq::message_t{}, zmq::send_flags::sndmore);
-  SendProto(socket, proto);
+  SendSerializedProto(socket, proto);
 }
 
 inline bool ParseMachineId(MachineId& id, const zmq::message_t& msg) {
@@ -52,7 +51,7 @@ inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
   return true;
 }
 
-inline bool ParseAny(google::protobuf::Any& any, const zmq::message_t& msg) {
+inline bool DeserializeAny(google::protobuf::Any& any, const zmq::message_t& msg) {
   auto header_sz = sizeof(MachineId) + sizeof(Channel);
   if (msg.size() < header_sz) {
     return false;
@@ -67,30 +66,30 @@ inline bool ParseAny(google::protobuf::Any& any, const zmq::message_t& msg) {
 }
 
 template <typename T>
-inline bool ParseProto(T& out, const zmq::message_t& msg) {
+inline bool DeserializeProto(T& out, const zmq::message_t& msg) {
   google::protobuf::Any any;
-  if (!ParseAny(any, msg)) {
+  if (!DeserializeAny(any, msg)) {
     return false;
   }
   return any.UnpackTo(&out);
 }
 
 template <typename T>
-inline bool ReceiveProto(zmq::socket_t& socket, T& out, bool dont_wait = false) {
+inline bool RecvDeserializedProto(zmq::socket_t& socket, T& out, bool dont_wait = false) {
   zmq::message_t msg;
   auto flag = dont_wait ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
   if (!socket.recv(msg, flag)) {
     return false;
   }
-  return ParseProto(out, msg);
+  return DeserializeProto(out, msg);
 }
 
 template <typename T>
-inline bool ReceiveProtoWithEmptyDelimiter(zmq::socket_t& socket, T& out, bool dont_wait = false) {
+inline bool RecvDeserializedProtoWithEmptyDelim(zmq::socket_t& socket, T& out, bool dont_wait = false) {
   if (zmq::message_t empty; !socket.recv(empty) || !empty.more()) {
     return false;
   }
-  return ReceiveProto(socket, out, dont_wait);
+  return RecvDeserializedProto(socket, out, dont_wait);
 }
 
 }  // namespace slog

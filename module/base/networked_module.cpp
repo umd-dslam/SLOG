@@ -60,7 +60,7 @@ bool NetworkedModule::Loop() {
   for (int i = 0; i < recv_batch_; i++) {
     // Message from pull socket
     if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-      if (google::protobuf::Any any; ParseAny(any, msg)) {
+      if (google::protobuf::Any any; DeserializeAny(any, msg)) {
         if (MachineId from; ParseMachineId(from, msg)) {
           if (any.Is<Request>()) {
             auto req = NewRequest();

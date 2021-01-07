@@ -81,14 +81,14 @@ void ExecuteTxn(const char* txn_file) {
 
   // 3. Send to the server
   for (uint32_t i = 0; i < FLAGS_repeat; i++) {
-    SendProtoWithEmptyDelimiter(server_socket, req);
+    SendSerializedProtoWithEmptyDelim(server_socket, req);
   }
 
   // 4. Wait and print response
   if (!FLAGS_no_wait) {
     for (uint32_t i = 0; i < FLAGS_repeat; i++) {
       api::Response res;
-      if (!ReceiveProtoWithEmptyDelimiter(server_socket, res)) {
+      if (!RecvDeserializedProtoWithEmptyDelim(server_socket, res)) {
         LOG(FATAL) << "Malformed response";
       } else {
         const auto& txn = res.txn().txn();
@@ -247,11 +247,11 @@ void ExecuteStats(const char* module, uint32_t level) {
   req.mutable_stats()->set_level(level);
 
   // 2. Send to the server
-  SendProtoWithEmptyDelimiter(server_socket, req);
+  SendSerializedProtoWithEmptyDelim(server_socket, req);
 
   // 3. Wait and print response
   api::Response res;
-  if (!ReceiveProtoWithEmptyDelimiter(server_socket, res)) {
+  if (!RecvDeserializedProtoWithEmptyDelim(server_socket, res)) {
     LOG(FATAL) << "Malformed response";
   } else {
     rapidjson::Document stats;

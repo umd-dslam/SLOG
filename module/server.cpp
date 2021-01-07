@@ -64,7 +64,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
     return;
   }
   api::Request request;
-  if (!ReceiveProtoWithEmptyDelimiter(socket, request)) {
+  if (!RecvDeserializedProtoWithEmptyDelim(socket, request)) {
     LOG(ERROR) << "Invalid message from client: Body is not a proto";
     return;
   }
@@ -233,7 +233,7 @@ void Server::SendResponseToClient(TxnId txn_id, api::Response&& res) {
   // Send identity to the socket to select the client to response to
   socket.send(it->second.identity, zmq::send_flags::sndmore);
   // Send the actual message
-  SendProtoWithEmptyDelimiter(socket, res);
+  SendSerializedProtoWithEmptyDelim(socket, res);
 
   pending_responses_.erase(txn_id);
 }

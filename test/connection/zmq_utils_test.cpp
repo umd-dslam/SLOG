@@ -22,10 +22,10 @@ TEST(ZmqUtilsTest, SendAndReceiveProto) {
 
   Request req;
   req.mutable_echo()->set_data("test");
-  SendProto(push, req);
+  SendSerializedProto(push, req);
 
   Request req2;
-  ASSERT_TRUE(ReceiveProto(pull, req2));
+  ASSERT_TRUE(RecvDeserializedProto(pull, req2));
   ASSERT_EQ(req2.echo().data(), "test");
 }
 
@@ -40,20 +40,20 @@ TEST(ZmqUtilsTest, SendAndReceiveProtoDealerRouter) {
   // First send from dealer and receive at router
   Request req;
   req.mutable_echo()->set_data("test");
-  SendProtoWithEmptyDelimiter(dealer, req);
+  SendSerializedProtoWithEmptyDelim(dealer, req);
 
   zmq::message_t identity;
   (void)router.recv(identity);
   Request req2;
-  ASSERT_TRUE(ReceiveProtoWithEmptyDelimiter(router, req2));
+  ASSERT_TRUE(RecvDeserializedProtoWithEmptyDelim(router, req2));
   ASSERT_EQ(req2.echo().data(), "test");
 
   // Then send from router and receive at dealer
   req2.mutable_echo()->set_data("test2");
   router.send(identity, zmq::send_flags::sndmore);
-  SendProtoWithEmptyDelimiter(router, req2);
+  SendSerializedProtoWithEmptyDelim(router, req2);
 
-  ASSERT_TRUE(ReceiveProtoWithEmptyDelimiter(dealer, req));
+  ASSERT_TRUE(RecvDeserializedProtoWithEmptyDelim(dealer, req));
   ASSERT_EQ(req.echo().data(), "test2");
 }
 
@@ -67,10 +67,10 @@ TEST(ZmqUtilsTest, SendAndReceiveWrongProto) {
 
   Request req;
   req.mutable_echo()->set_data("test");
-  SendProto(push, req);
+  SendSerializedProto(push, req);
 
   Response res;
-  ASSERT_FALSE(ReceiveProto(pull, res));
+  ASSERT_FALSE(RecvDeserializedProto(pull, res));
 }
 
 TEST(ZmqUtilsTest, ReceiveProtoDontWait) {
@@ -82,7 +82,7 @@ TEST(ZmqUtilsTest, ReceiveProtoDontWait) {
   pull.connect("inproc://test");
 
   Response res;
-  ASSERT_FALSE(ReceiveProto(pull, res, true));
+  ASSERT_FALSE(RecvDeserializedProto(pull, res, true));
 }
 
 TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
@@ -95,7 +95,7 @@ TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
 
   Request req;
   req.mutable_echo()->set_data("test");
-  SendProto(push, req, 9, 1);
+  SendSerializedProto(push, req, 9, 1);
 
   zmq::message_t msg;
   (void)pull.recv(msg);
@@ -115,5 +115,5 @@ TEST(ZmqUtilsTest, FailedParsing) {
   Channel chan;
   ASSERT_FALSE(ParseChannel(chan, msg));
   Request req;
-  ASSERT_FALSE(ParseProto(req, msg));
+  ASSERT_FALSE(DeserializeProto(req, msg));
 }
