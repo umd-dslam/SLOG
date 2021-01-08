@@ -38,7 +38,7 @@ I1226 06:33:06.448783 11232 broker.cpp:172] Received READY message from /tmp/tes
 I1226 06:33:06.449044 11232 broker.cpp:172] Received READY message from /tmp/test_e2e0 (rep: 0, part: 0)
 I1226 06:33:06.450145 11232 broker.cpp:181] All READY messages received
 """
-
+import re
 import sys
 
 logs_per_thread = {}
@@ -46,7 +46,7 @@ max_len = 10
 for line in sys.stdin:
     log = line.strip()
     max_len = max(max_len, len(log))
-    tokens = log.split(' ')
+    tokens = re.split('\s+', log)
     if len(tokens) > 3:
         thread_id = tokens[2]
         logs_per_thread.setdefault(thread_id, []).append(log)
