@@ -77,6 +77,7 @@ class NetworkedModule : public Module {
   int recv_batch_;
   MessagePool<internal::Request> request_pool_;
   MessagePool<internal::Response> response_pool_;
+  std::string debug_info_;
 };
 
 }  // namespace slog

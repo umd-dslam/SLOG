@@ -71,10 +71,11 @@ class Broker {
   void AddChannel(Channel chan);
 
   const std::shared_ptr<zmq::context_t>& context() const;
+  const ConfigurationPtr& config() const;
 
   std::string GetEndpointByMachineId(MachineId machine_id);
 
-  MachineId GetLocalMachineId() const;
+  MachineId local_machine_id() const;
 
  private:
   string MakeEndpoint(const string& addr = "") const;

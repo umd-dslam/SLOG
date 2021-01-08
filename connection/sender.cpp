@@ -10,7 +10,7 @@ namespace slog {
 std::atomic<uint8_t> Sender::counter(1);
 
 Sender::Sender(const std::shared_ptr<Broker>& broker)
-    : context_(broker->context()), broker_(broker), local_machine_id_(broker->GetLocalMachineId()) {}
+    : context_(broker->context()), broker_(broker), local_machine_id_(broker->local_machine_id()) {}
 
 void Sender::Send(const google::protobuf::Message& request_or_response, Channel to_channel, MachineId to_machine_id) {
   // If sending to local module, use the other function to bypass the local broker

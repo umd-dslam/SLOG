@@ -61,6 +61,7 @@ void Broker::AddChannel(Channel chan) {
 }
 
 const std::shared_ptr<zmq::context_t>& Broker::context() const { return context_; }
+const ConfigurationPtr& Broker::config() const { return config_; }
 
 std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   std::unique_lock<std::mutex> lock(mutex_);
@@ -78,7 +79,7 @@ std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   return endpoint_it->second;
 }
 
-MachineId Broker::GetLocalMachineId() const { return config_->local_machine_id(); }
+MachineId Broker::local_machine_id() const { return config_->local_machine_id(); }
 
 string Broker::MakeEndpoint(const string& addr) const {
   std::stringstream endpoint;

@@ -1,5 +1,9 @@
 #include "module/base/networked_module.h"
 
+#include <sstream>
+
+#include <glog/logging.h>
+
 #include "common/constants.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
@@ -30,6 +34,11 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
   // Remove limit on the zmq message queues
   pull_socket_.set(zmq::sockopt::rcvhwm, 0);
+
+  auto& config = broker->config();
+  std::ostringstream os;
+  os << "rep = " << config->local_replica() << ", part = " << config->local_partition();
+  debug_info_ = os.str();
 }
 
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_[i]; }
@@ -42,6 +51,8 @@ void NetworkedModule::SetUp() {
   for (auto& socket : custom_sockets_) {
     poller_.PushSocket(socket);
   }
+
+  VLOG(1) << "Thread info: " << debug_info_;
 
   Initialize();
 }
