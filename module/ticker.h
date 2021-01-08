@@ -19,9 +19,8 @@ class Ticker : public Module {
   bool Loop() final;
 
  private:
-  using DurationFloatMs = duration<float, std::milli>;
   zmq::socket_t socket_;
-  DurationFloatMs sleep_ms_;
+  std::chrono::milliseconds sleep_ms_;
 };
 
 }  // namespace slog

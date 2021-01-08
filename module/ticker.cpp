@@ -1,7 +1,5 @@
 #include "ticker.h"
 
-#include <cmath>
-
 using std::string;
 
 namespace slog {
@@ -18,11 +16,11 @@ zmq::socket_t Ticker::Subscribe(zmq::context_t& context) {
 
 Ticker::Ticker(zmq::context_t& context, std::chrono::milliseconds tick_period_ms)
     : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  sleep_ms_ = duration_cast<DurationFloatMs>(tick_period_ms);
+  sleep_ms_ = tick_period_ms;
 }
 
 Ticker::Ticker(zmq::context_t& context, uint32_t ticks_per_sec) : Module("Ticker"), socket_(context, ZMQ_PUB) {
-  sleep_ms_ = DurationFloatMs(1000.0 / ticks_per_sec);
+  sleep_ms_ = milliseconds(1000 / ticks_per_sec);
 }
 
 void Ticker::SetUp() { socket_.bind(kEndpoint); }
