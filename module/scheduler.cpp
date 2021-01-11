@@ -41,29 +41,29 @@ void Scheduler::Initialize() {
         Internal Requests & Responses
 ***********************************************/
 
-void Scheduler::HandleInternalRequest(ReusableRequest&& req, MachineId) {
-  switch (req.get()->type_case()) {
+void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
+  switch (env->request().type_case()) {
     case Request::kForwardTxn:
-      ProcessTransaction(move(req));
+      ProcessTransaction(move(env));
       break;
     case Request::kRemoteReadResult:
-      ProcessRemoteReadResult(move(req));
+      ProcessRemoteReadResult(move(env));
       break;
     case Request::kStats:
-      ProcessStatsRequest(req.get()->stats());
+      ProcessStatsRequest(env->request().stats());
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
       break;
   }
 }
 
-void Scheduler::ProcessRemoteReadResult(ReusableRequest&& req) {
-  auto txn_id = req.get()->remote_read_result().txn_id();
-  auto& holder = all_txns_[txn_id];
-  if (holder.transaction() != nullptr && holder.worker()) {
+void Scheduler::ProcessRemoteReadResult(EnvelopePtr&& env) {
+  auto txn_id = env->request().remote_read_result().txn_id();
+  auto& txn_info = active_txns_[txn_id];
+  if (txn_info.holder.has_value() && txn_info.holder->worker().has_value()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
-    Send(*req.get(), kWorkerChannelOffset + *holder.worker());
+    Send(move(env), kWorkerChannelOffset + txn_info.holder->worker().value());
   } else {
     // Save the remote reads that come before the txn
     // is processed by this partition
@@ -74,8 +74,8 @@ void Scheduler::ProcessRemoteReadResult(ReusableRequest&& req) {
     // Consider garbage collecting them if that happens.
     VLOG(2) << "Got early remote read result for txn " << txn_id;
 
-    auto remote_abort = req.get()->remote_read_result().will_abort();
-    holder.early_remote_reads().emplace_back(move(req));
+    auto remote_abort = env->request().remote_read_result().will_abort();
+    txn_info.early_remote_reads.emplace_back(move(env));
 
     if (aborting_txns_.count(txn_id) > 0) {
       // Check if this is the last required remote read
@@ -96,11 +96,11 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   auto& alloc = stats.GetAllocator();
 
   // Add stats for current transactions in the system
-  stats.AddMember(StringRef(NUM_ALL_TXNS), all_txns_.size(), alloc);
+  stats.AddMember(StringRef(NUM_ALL_TXNS), active_txns_.size(), alloc);
   if (level >= 1) {
     stats.AddMember(StringRef(ALL_TXNS),
                     ToJsonArray(
-                        all_txns_, [](const auto& p) { return p.first; }, alloc),
+                        active_txns_, [](const auto& p) { return p.first; }, alloc),
                     alloc);
   }
 
@@ -112,17 +112,22 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
   stats.Accept(writer);
 
-  internal::Response res;
-  res.mutable_stats()->set_id(stats_request.id());
-  res.mutable_stats()->set_stats_json(buf.GetString());
-  Send(res, kServerChannel);
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
 }
 
-void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
-  auto txn_id = res.get()->worker().txn_id();
+void Scheduler::HandleInternalResponse(EnvelopePtr&& env) {
+  auto txn_id = env->response().worker().txn_id();
+  auto txn_info_it = active_txns_.find(txn_id);
+
+  DCHECK(txn_info_it != active_txns_.end());
+
+  auto& txn_holder = txn_info_it->second.holder.value();
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
@@ -130,8 +135,7 @@ void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
   VLOG(2) << "Released locks of txn " << txn_id;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  auto txn_holder = &all_txns_[txn_id];
-  auto txn = txn_holder->transaction();
+  auto txn = txn_holder.transaction();
   // If a remaster transaction, trigger any unblocked txns
   if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
     auto& key = txn->write_set().begin()->first;
@@ -141,25 +145,23 @@ void Scheduler::HandleInternalResponse(ReusableResponse&& res, MachineId) {
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  all_txns_.erase(txn_id);
+  active_txns_.erase(txn_id);
 }
 
 /***********************************************
               Transaction Processing
 ***********************************************/
 
-void Scheduler::ProcessTransaction(ReusableRequest&& req) {
-  auto txn = req.get()->mutable_forward_txn()->mutable_txn();
-  auto txn_internal = txn->mutable_internal();
-
-  TRACE(txn_internal, TransactionEvent::ENTER_SCHEDULER);
-
-  if (!AcceptTransaction(move(req))) {
+void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
+  auto txn = AcceptTransaction(move(env));
+  if (txn == nullptr) {
     return;
   }
 
-  auto txn_id = txn_internal->id();
-  auto txn_type = txn_internal->type();
+  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
+
+  auto txn_id = txn->internal().id();
+  auto txn_type = txn->internal().type();
   switch (txn_type) {
     case TransactionType::SINGLE_HOME: {
       VLOG(2) << "Accepted SINGLE-HOME transaction " << txn_id;
@@ -168,37 +170,51 @@ void Scheduler::ProcessTransaction(ReusableRequest&& req) {
         break;
       }
 
+      auto txn_info_it = active_txns_.find(txn_id);
+      DCHECK(txn_info_it != active_txns_.end());
+      DCHECK(txn_info_it->second.holder.has_value());
+
+      auto& txn_holder = txn_info_it->second.holder.value();
+
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
       if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
         if (MaybeAbortRemasterTransaction(txn)) {
           break;
         }
       }
-      SendToRemasterManager(&all_txns_[txn_id]);
+      SendToRemasterManager(txn_holder);
 #else
-      SendToLockManager(&all_txns_[txn_id]);
+      SendToLockManager(txn_holder);
 #endif
       break;
     }
     case TransactionType::LOCK_ONLY: {
-      auto txn_replica_id = TransactionHolder::transaction_id_replica_id(txn);
+      auto txn_replica_id = TxnHolder::transaction_id_replica_id(txn);
       VLOG(2) << "Accepted LOCK-ONLY transaction " << txn_replica_id.first << ", home = " << txn_replica_id.second;
 
       if (MaybeContinuePreDispatchAbortLockOnly(txn_replica_id)) {
         break;
       }
 
+      auto txn_holder_it = lock_only_txns_.find(txn_replica_id);
+      DCHECK(txn_holder_it != lock_only_txns_.end());
+
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-      SendToRemasterManager(&lock_only_txns_[txn_replica_id]);
+      SendToRemasterManager(txn_holder_it->second);
 #else
-      SendToLockManager(&lock_only_txns_[txn_replica_id]);
+      SendToLockManager(txn_holder_it->second);
 #endif
 
       break;
     }
     case TransactionType::MULTI_HOME: {
       VLOG(2) << "Accepted MULTI-HOME transaction " << txn_id;
-      auto txn_holder = &all_txns_[txn_id];
+
+      auto txn_info_it = active_txns_.find(txn_id);
+      DCHECK(txn_info_it != active_txns_.end());
+      DCHECK(txn_info_it->second.holder.has_value());
+
+      auto& txn_holder = txn_info_it->second.holder.value();
 
       if (aborting_txns_.count(txn_id)) {
         MaybeContinuePreDispatchAbort(txn_id);
@@ -206,10 +222,8 @@ void Scheduler::ProcessTransaction(ReusableRequest&& req) {
       }
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
-      if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster) {
-        if (MaybeAbortRemasterTransaction(txn)) {
-          break;
-        }
+      if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster && MaybeAbortRemasterTransaction(txn)) {
+        break;
       }
 #endif
 
@@ -235,42 +249,45 @@ bool Scheduler::MaybeAbortRemasterTransaction(Transaction* txn) {
 }
 #endif
 
-bool Scheduler::AcceptTransaction(ReusableRequest&& req) {
-  auto& txn = req.get()->forward_txn().txn();
-  switch (txn.internal().type()) {
+Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
+  auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
+  switch (txn->internal().type()) {
     case TransactionType::SINGLE_HOME:
     case TransactionType::MULTI_HOME: {
-      auto txn_id = txn.internal().id();
-      auto& holder = all_txns_[txn_id];
-
-      holder.SetTxnRequest(config_, move(req));
-      if (holder.keys_in_partition().empty()) {
-        all_txns_.erase(txn_id);
-        return false;
+      auto txn_id = txn->internal().id();
+      auto& txn_info = active_txns_[txn_id];
+      txn_info.holder.emplace(config_, txn);
+      if (txn_info.holder->keys_in_partition().empty()) {
+        active_txns_.erase(txn_id);
+        return nullptr;
       }
       break;
     }
     case TransactionType::LOCK_ONLY: {
-      auto txn_replica_id = TransactionHolder::transaction_id_replica_id(&txn);
-      auto& holder = lock_only_txns_[txn_replica_id];
+      auto txn_replica_id = TxnHolder::transaction_id_replica_id(txn);
+      auto ins = lock_only_txns_.try_emplace(txn_replica_id, config_, txn);
+      if (!ins.second) {
+        LOG(ERROR) << "Already received LOCK-ONLY txn: " << txn_replica_id.first;
+        return nullptr;
+      }
 
-      holder.SetTxnRequest(config_, move(req));
-      if (holder.keys_in_partition().empty()) {
-        lock_only_txns_.erase(txn_replica_id);
-        return false;
+      auto& txn_holder = ins.first->second;
+      if (txn_holder.keys_in_partition().empty()) {
+        lock_only_txns_.erase(ins.first);
+        return nullptr;
       }
       break;
     }
     default:
       LOG(ERROR) << "Unknown transaction type";
-      return false;
+      return nullptr;
   }
-  return true;
+  return txn;
 }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
-  auto txn = txn_holder->transaction();
+void Scheduler::SendToRemasterManager(const TxnHolder& txn_holder) {
+  auto txn = txn_holder.transaction();
   auto txn_type = txn->internal().type();
   CHECK(txn_type == TransactionType::SINGLE_HOME || txn_type == TransactionType::LOCK_ONLY)
       << "MH aren't sent to the remaster manager";
@@ -297,7 +314,7 @@ void Scheduler::SendToRemasterManager(TransactionHolder* txn_holder) {
 
 void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
   for (auto unblocked_txn_holder : result.unblocked) {
-    SendToLockManager(unblocked_txn_holder);
+    SendToLockManager(*unblocked_txn_holder);
   }
   // Check for duplicates
   // TODO: remove this set and check
@@ -313,20 +330,19 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
-void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
-  auto txn_id = txn_holder->transaction()->internal().id();
-  auto txn_type = txn_holder->transaction()->internal().type();
+void Scheduler::SendToLockManager(const TxnHolder& txn_holder) {
+  auto txn_id = txn_holder.transaction()->internal().id();
+  auto txn_type = txn_holder.transaction()->internal().type();
   switch (txn_type) {
     case TransactionType::SINGLE_HOME: {
-      lock_manager_.AcceptTransaction(*txn_holder);
+      lock_manager_.AcceptTransaction(txn_holder);
       AcquireLocksAndProcessResult(txn_holder);
       break;
     }
     case TransactionType::MULTI_HOME: {
-      if (lock_manager_.AcceptTransaction(*txn_holder)) {
+      if (lock_manager_.AcceptTransaction(txn_holder)) {
         // Note: this only records when MH arrives after lock-onlys
-
-        TRACE(txn_holder->transaction()->mutable_internal(), TransactionEvent::ACCEPTED);
+        TRACE(txn_holder.transaction()->mutable_internal(), TransactionEvent::ACCEPTED);
 
         Dispatch(txn_id);
       }
@@ -342,10 +358,10 @@ void Scheduler::SendToLockManager(const TransactionHolder* txn_holder) {
   }
 }
 
-void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder) {
-  auto txn_id = txn_holder->transaction()->internal().id();
+void Scheduler::AcquireLocksAndProcessResult(const TxnHolder& txn_holder) {
+  auto txn_id = txn_holder.transaction()->internal().id();
   VLOG(2) << "Trying to acquires locks of txn " << txn_id;
-  switch (lock_manager_.AcquireLocks(*txn_holder)) {
+  switch (lock_manager_.AcquireLocks(txn_holder)) {
     case AcquireLocksResult::ACQUIRED:
       Dispatch(txn_id);
       break;
@@ -366,11 +382,15 @@ void Scheduler::AcquireLocksAndProcessResult(const TransactionHolder* txn_holder
 ***********************************************/
 
 void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
-  CHECK(aborting_txns_.count(txn_id) == 0) << "Abort was triggered twice: " << txn_id;
+  DCHECK(aborting_txns_.count(txn_id) == 0) << "Abort was triggered twice: " << txn_id;
   VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
 
-  auto& txn_holder = all_txns_[txn_id];
-  CHECK(!txn_holder.worker()) << "Dispatched transactions are handled by the worker, txn " << txn_id;
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end());
+  DCHECK(it->second.holder.has_value());
+
+  auto& txn_holder = it->second.holder.value();
+  CHECK(!txn_holder.worker()) << "Dispatched transactions are handled by a worker, txn " << txn_id;
 
   aborting_txns_.insert(txn_id);
 
@@ -386,7 +406,12 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
     return false;
   }
 
-  auto& txn_holder = all_txns_[txn_id];
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end());
+  DCHECK(it->second.holder.has_value());
+
+  auto& txn_holder = it->second.holder.value();
+
   auto txn = txn_holder.transaction();
   auto txn_type = txn->internal().type();
   VLOG(3) << "Main txn of abort arrived: " << txn_id;
@@ -394,8 +419,10 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   // Let a worker handle notifying other partitions and
   // send back to the server. Use one-way dispatching to avoid
   // race condition between the scheduler and the worker.
-  txn->set_status(TransactionStatus::ABORTED);
-  Dispatch(txn_id, /* one-way */ true);
+  if (txn->status() != TransactionStatus::ABORTED) {
+    txn->set_status(TransactionStatus::ABORTED);
+    Dispatch(txn_id, /* one-way */ true);
+  }
 
   // Release txn from remaster manager and lock manager.
   //
@@ -405,19 +432,31 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   //
   // This also releases any lock-only transactions.
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  ProcessRemasterResult(remaster_manager_.ReleaseTransaction(&txn_holder));
+  ProcessRemasterResult(remaster_manager_.ReleaseTransaction(txn_holder));
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(all_txns_[txn_id]);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
 
+  // Collect lock only txn for abort
   if (txn_type == TransactionType::MULTI_HOME) {
-    CollectLockOnlyTransactionsForAbort(txn_id);
+    auto& involved_replicas = txn_holder.involved_replicas();
+    mh_abort_waiting_on_[txn_id] += involved_replicas.size();
+
+    // Erase the LOs that have already arrived - the same that have been released
+    // from remaster and lock managers
+    for (auto replica : involved_replicas) {
+      auto txn_replica_id = std::make_pair(txn_id, replica);
+      if (lock_only_txns_.count(txn_replica_id)) {
+        lock_only_txns_.erase(txn_replica_id);
+        mh_abort_waiting_on_[txn_id] -= 1;
+      }
+    }
   }
 
   MaybeFinishAbort(txn_id);
@@ -438,24 +477,12 @@ bool Scheduler::MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_rep
   return true;
 }
 
-void Scheduler::CollectLockOnlyTransactionsForAbort(TxnId txn_id) {
-  auto& txn_holder = all_txns_[txn_id];
-  auto& involved_replicas = txn_holder.involved_replicas();
-  mh_abort_waiting_on_[txn_id] += involved_replicas.size();
-
-  // Erase the LOs that have already arrived - the same that have been released
-  // from remaster and lock managers
-  for (auto replica : involved_replicas) {
-    auto txn_replica_id = std::make_pair(txn_id, replica);
-    if (lock_only_txns_.count(txn_replica_id)) {
-      lock_only_txns_.erase(txn_replica_id);
-      mh_abort_waiting_on_[txn_id] -= 1;
-    }
-  }
-}
-
 void Scheduler::MaybeFinishAbort(TxnId txn_id) {
-  auto& txn_holder = all_txns_[txn_id];
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end());
+  DCHECK(it->second.holder.has_value());
+  auto& txn_holder = it->second.holder.value();
+  auto& early_remote_reads = it->second.early_remote_reads;
   auto txn = txn_holder.transaction();
 
   VLOG(3) << "Attempting to finish abort: " << txn_id;
@@ -471,7 +498,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   auto local_partition_active = std::find(txn_holder.active_partitions().begin(), txn_holder.active_partitions().end(),
                                           local_partition) != txn_holder.active_partitions().end();
   if (num_remote_partitions > 0 && local_partition_active) {
-    if (txn_holder.early_remote_reads().size() < num_remote_partitions) {
+    if (early_remote_reads.size() < num_remote_partitions) {
       return;
     }
   }
@@ -487,7 +514,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   }
 
   aborting_txns_.erase(txn_id);
-  all_txns_.erase(txn_id);
+  active_txns_.erase(txn_id);
 
   VLOG(3) << "Finished abort: " << txn_id;
 }
@@ -497,13 +524,15 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
-  CHECK(all_txns_.count(txn_id) > 0) << "Txn not in all_txns_: " << txn_id;
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end()) << "Cannot dispatch unactive txn: " << txn_id;
+  DCHECK(it->second.holder.has_value());
 
-  TransactionHolder* txn_holder;
+  TxnHolder* txn_holder;
   if (one_way) {
-    txn_holder = new TransactionHolder(all_txns_[txn_id]);
+    txn_holder = new TxnHolder(it->second.holder.value());
   } else {
-    txn_holder = &all_txns_[txn_id];
+    txn_holder = &it->second.holder.value();
   }
 
   auto txn = txn_holder->transaction();
@@ -524,17 +553,18 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   TRACE(txn->mutable_internal(), TransactionEvent::DISPATCHED);
 
   // Prepare a request with the txn to be sent to the worker
-  auto req = NewRequest();
-  auto worker_request = req.get()->mutable_worker();
+  auto env = NewEnvelope();
+  auto worker_request = env->mutable_request()->mutable_worker();
   worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
   Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction
-  Send(*req.get(), worker_channel);
-  while (!txn_holder->early_remote_reads().empty()) {
-    Send(*txn_holder->early_remote_reads().back().get(), worker_channel);
-    txn_holder->early_remote_reads().pop_back();
+  auto& early_remote_reads = it->second.early_remote_reads;
+  Send(move(env), worker_channel);
+  while (!early_remote_reads.empty()) {
+    Send(move(early_remote_reads.back()), worker_channel);
+    early_remote_reads.pop_back();
   }
 
   VLOG(2) << "Dispatched txn " << txn_id;

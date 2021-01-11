@@ -14,7 +14,7 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/transaction_holder.h"
+#include "common/txn_holder.h"
 #include "common/types.h"
 
 using std::list;
@@ -83,7 +83,7 @@ class RMALockManager {
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  bool AcceptTransaction(const TransactionHolder& txn_holder);
+  bool AcceptTransaction(const TxnHolder& txn_holder);
 
   /**
    * Tries to acquire all locks for a given transaction. If not
@@ -94,13 +94,13 @@ class RMALockManager {
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  AcquireLocksResult AcquireLocks(const TransactionHolder& txn_holder);
+  AcquireLocksResult AcquireLocks(const TxnHolder& txn_holder);
 
   /**
    * Convenient method to perform txn registration and
    * lock acquisition at the same time.
    */
-  AcquireLocksResult AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder);
+  AcquireLocksResult AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -110,7 +110,7 @@ class RMALockManager {
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  vector<TxnId> ReleaseLocks(const TransactionHolder& txn_holder);
+  vector<TxnId> ReleaseLocks(const TxnHolder& txn_holder);
 
   /**
    * Gets current statistics of the lock manager

@@ -26,7 +26,7 @@ vector<TxnId> LockQueueTail::AcquireWriteLock(TxnId txn_id) {
   return deps;
 }
 
-bool DDRLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool DDRLockManager::AcceptTransaction(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -45,7 +45,7 @@ bool DDRLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   return txn_info.is_ready();
 }
 
-AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult DDRLockManager::AcquireLocks(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -135,12 +135,12 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TransactionHolder& txn_hol
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult DDRLockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult DDRLockManager::AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-vector<TxnId> DDRLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+vector<TxnId> DDRLockManager::ReleaseLocks(const TxnHolder& txn_holder) {
   vector<TxnId> result;
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();

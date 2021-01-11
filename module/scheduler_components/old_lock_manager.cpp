@@ -101,7 +101,7 @@ unordered_set<TxnId> OldLockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool OldLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool OldLockManager::AcceptTransaction(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     return false;
   }
@@ -115,7 +115,7 @@ bool OldLockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   return false;
 }
 
-AcquireLocksResult OldLockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult OldLockManager::AcquireLocks(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     return AcquireLocksResult::WAITING;
   }
@@ -158,12 +158,12 @@ AcquireLocksResult OldLockManager::AcquireLocks(const TransactionHolder& txn_hol
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult OldLockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult OldLockManager::AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-vector<TxnId> OldLockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+vector<TxnId> OldLockManager::ReleaseLocks(const TxnHolder& txn_holder) {
   vector<TxnId> result;
   auto txn_id = txn_holder.transaction()->internal().id();
 

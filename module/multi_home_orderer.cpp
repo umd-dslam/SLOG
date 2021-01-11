@@ -11,6 +11,7 @@
 namespace slog {
 
 using internal::Batch;
+using internal::Envelope;
 using internal::Request;
 
 MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
@@ -35,11 +36,12 @@ void MultiHomeOrderer::NewBatch() {
   batch_->set_transaction_type(TransactionType::MULTI_HOME);
 }
 
-void MultiHomeOrderer::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) {
-  switch (req.get()->type_case()) {
+void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
+  auto request = env->mutable_request();
+  switch (request->type_case()) {
     case Request::kForwardTxn: {
       // Received a new multi-home txn
-      auto txn = req.get()->mutable_forward_txn()->release_txn();
+      auto txn = request->mutable_forward_txn()->release_txn();
 
       TRACE(txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
 
@@ -48,10 +50,10 @@ void MultiHomeOrderer::HandleInternalRequest(ReusableRequest&& req, MachineId /*
     }
     case Request::kForwardBatch:
       // Received a batch of multi-home txn replicated from another region
-      ProcessForwardBatch(req.get()->mutable_forward_batch());
+      ProcessForwardBatch(request->mutable_forward_batch());
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request->type_case(), Request) << "\"";
       break;
   }
 }
@@ -72,21 +74,20 @@ void MultiHomeOrderer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socke
   VLOG(1) << "Finished multi-home batch " << batch_id << ". Sending out for ordering and replicating";
 
   // Make a proposal for multi-home batch ordering
-  auto paxos_req = NewRequest();
-  auto paxos_propose = paxos_req.get()->mutable_paxos_propose();
+  auto paxos_env = NewEnvelope();
+  auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
   paxos_propose->set_value(batch_id);
-  Send(*paxos_req.get(), kGlobalPaxos);
-
-  auto batch_req = NewRequest();
-  auto forward_batch = batch_req.get()->mutable_forward_batch();
-  forward_batch->set_allocated_batch_data(batch_.release());
+  Send(move(paxos_env), kGlobalPaxos);
 
   // Replicate new batch to other regions
+  Envelope batch_env;
+  auto forward_batch = batch_env.mutable_request()->mutable_forward_batch();
+  forward_batch->set_allocated_batch_data(batch_.release());
   auto part = config_->leader_partition_for_multi_home_ordering();
   auto num_replicas = config_->num_replicas();
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
     auto machine_id = config_->MakeMachineId(rep, part);
-    Send(*batch_req.get(), kMultiHomeOrdererChannel, machine_id);
+    Send(batch_env, machine_id, kMultiHomeOrdererChannel);
   }
   forward_batch->release_batch_data();
 
@@ -121,14 +122,14 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
     // easier to determine the batch order later on
     batch->set_id(slot);
 
-    auto req = NewRequest();
-    auto forward_batch = req.get()->mutable_forward_batch();
+    auto env = NewEnvelope();
+    auto forward_batch = env->mutable_request()->mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch.release());
 
     TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
 
     // Send the newly ordered multi-home batch to the sequencer
-    Send(*req.get(), kSequencerChannel);
+    Send(move(env), kSequencerChannel);
   }
 }
 

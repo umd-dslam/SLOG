@@ -15,19 +15,17 @@ SimpleMultiPaxos::SimpleMultiPaxos(Channel group_number, const shared_ptr<Broker
       leader_(*this, members, me),
       acceptor_(*this) {}
 
-void SimpleMultiPaxos::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
-  leader_.HandleRequest(*req.get());
-  acceptor_.HandleRequest(*req.get(), from);
+void SimpleMultiPaxos::HandleInternalRequest(EnvelopePtr&& req) {
+  leader_.HandleRequest(*req);
+  acceptor_.HandleRequest(*req);
 }
 
-void SimpleMultiPaxos::HandleInternalResponse(ReusableResponse&& res, MachineId from) {
-  leader_.HandleResponse(*res.get(), from);
-}
+void SimpleMultiPaxos::HandleInternalResponse(EnvelopePtr&& res) { leader_.HandleResponse(*res); }
 
 bool SimpleMultiPaxos::IsMember() const { return leader_.IsMember(); }
 
-void SimpleMultiPaxos::SendSameChannel(const google::protobuf::Message& msg, MachineId to_machine_id) {
-  Send(msg, channel(), to_machine_id);
+void SimpleMultiPaxos::SendSameChannel(const internal::Envelope& env, MachineId to_machine_id) {
+  Send(env, to_machine_id, channel());
 }
 
 }  // namespace slog

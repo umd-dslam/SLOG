@@ -25,9 +25,9 @@ class SimpleMultiPaxos : public NetworkedModule {
   bool IsMember() const;
 
  protected:
-  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
 
-  void HandleInternalResponse(ReusableResponse&& res, MachineId from) final;
+  void HandleInternalResponse(EnvelopePtr&& env) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
 
@@ -35,7 +35,7 @@ class SimpleMultiPaxos : public NetworkedModule {
   Leader leader_;
   Acceptor acceptor_;
 
-  void SendSameChannel(const google::protobuf::Message& request_or_response, MachineId to_machine_id);
+  void SendSameChannel(const internal::Envelope& env, MachineId to_machine_id);
 
   friend class Leader;
   friend class Acceptor;

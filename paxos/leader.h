@@ -36,9 +36,9 @@ class Leader {
    */
   Leader(SimpleMultiPaxos& paxos, const vector<MachineId>& members, MachineId me);
 
-  void HandleRequest(const internal::Request& req);
+  void HandleRequest(const internal::Envelope& req);
 
-  void HandleResponse(const internal::Response& res, MachineId from);
+  void HandleResponse(const internal::Envelope& res);
 
   bool IsMember() const;
 
@@ -51,7 +51,7 @@ class Leader {
   void StartNewCommit(SlotId slot);
   void CommitStateChanged(const CommitTracker* commit);
 
-  void SendToAllMembers(const internal::Request& request);
+  void SendToAllMembers(const internal::Envelope& env);
 
   SimpleMultiPaxos& paxos_;
 

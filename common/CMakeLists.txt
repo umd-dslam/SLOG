@@ -16,6 +16,6 @@ target_sources(slog-core
     string_utils.cpp
     string_utils.h
     thread_utils.h
-    transaction_holder.cpp
-    transaction_holder.h
+    txn_holder.cpp
+    txn_holder.h
     types.h)

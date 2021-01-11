@@ -11,22 +11,8 @@ using namespace slog;
 using testing::ElementsAre;
 using testing::UnorderedElementsAre;
 
-class RMALockManagerTest : public ::testing::Test {
- protected:
+TEST(RMALockManagerTest, GetAllLocksOnFirstTry) {
   RMALockManager lock_manager;
-  MessagePool<internal::Request> pool;
-
-  TransactionHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const unordered_set<Key>& read_set,
-                                  const unordered_set<Key>& write_set, uint32_t master = 0, uint32_t counter = 0) {
-    auto txn = FillMetadata(MakeTransaction(read_set, write_set), master, counter);
-    txn->mutable_internal()->set_id(id);
-    ReusableRequest req(&pool);
-    req.get()->mutable_forward_txn()->set_allocated_txn(txn);
-    return {config, move(req)};
-  }
-};
-
-TEST_F(RMALockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn = MakeTxnHolder(configs[0], 100, {"readA", "readB"}, {"writeC"});
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(txn), AcquireLocksResult::ACQUIRED);
@@ -34,7 +20,8 @@ TEST_F(RMALockManagerTest, GetAllLocksOnFirstTry) {
   ASSERT_TRUE(result.empty());
 }
 
-TEST_F(RMALockManagerTest, ReadLocks) {
+TEST(RMALockManagerTest, ReadLocks) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"readA", "readB"}, {});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"readB", "readC"}, {});
@@ -44,7 +31,8 @@ TEST_F(RMALockManagerTest, ReadLocks) {
   ASSERT_TRUE(lock_manager.ReleaseLocks(txn2).empty());
 }
 
-TEST_F(RMALockManagerTest, WriteLocks) {
+TEST(RMALockManagerTest, WriteLocks) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {}, {"writeA", "writeB"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"readA"}, {"writeA"});
@@ -57,7 +45,8 @@ TEST_F(RMALockManagerTest, WriteLocks) {
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(txn1), AcquireLocksResult::WAITING);
 }
 
-TEST_F(RMALockManagerTest, ReleaseLocksAndGetManyNewHolders) {
+TEST(RMALockManagerTest, ReleaseLocksAndGetManyNewHolders) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B", "C"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"B"}, {"A"});
@@ -77,7 +66,8 @@ TEST_F(RMALockManagerTest, ReleaseLocksAndGetManyNewHolders) {
   ASSERT_THAT(result, UnorderedElementsAre(200, 400));
 }
 
-TEST_F(RMALockManagerTest, PartiallyAcquiredLocks) {
+TEST(RMALockManagerTest, PartiallyAcquiredLocks) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B", "C"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {"B"});
@@ -94,7 +84,8 @@ TEST_F(RMALockManagerTest, PartiallyAcquiredLocks) {
   ASSERT_THAT(result, ElementsAre(300));
 }
 
-TEST_F(RMALockManagerTest, PrioritizeWriteLock) {
+TEST(RMALockManagerTest, PrioritizeWriteLock) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"A"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {});
@@ -106,7 +97,8 @@ TEST_F(RMALockManagerTest, PrioritizeWriteLock) {
   ASSERT_THAT(result, ElementsAre(200));
 }
 
-TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxn1) {
+TEST(RMALockManagerTest, AcquireLocksWithLockOnlyTxn1) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B", "C"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {"B"});
@@ -123,7 +115,8 @@ TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxn1) {
   ASSERT_THAT(result, ElementsAre(100));
 }
 
-TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxn2) {
+TEST(RMALockManagerTest, AcquireLocksWithLockOnlyTxn2) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B", "C"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {"B"});
@@ -140,7 +133,8 @@ TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxn2) {
   ASSERT_THAT(result, ElementsAre(100));
 }
 
-TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
+TEST(RMALockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B", "C"});
   auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {"B"});
@@ -157,7 +151,8 @@ TEST_F(RMALockManagerTest, AcquireLocksWithLockOnlyTxnOutOfOrder) {
   ASSERT_THAT(result, ElementsAre(100));
 }
 
-TEST_F(RMALockManagerTest, BlockedLockOnlyTxn) {
+TEST(RMALockManagerTest, BlockedLockOnlyTxn) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
 
   auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B"});
@@ -167,16 +162,18 @@ TEST_F(RMALockManagerTest, BlockedLockOnlyTxn) {
   ASSERT_EQ(lock_manager.AcquireLocks(txn2), AcquireLocksResult::WAITING);
 }
 
-TEST_F(RMALockManagerTest, KeyReplicaLocks) {
+TEST(RMALockManagerTest, KeyReplicaLocks) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 1, 1);
   auto txn1 = MakeTxnHolder(configs[0], 100, {}, {"writeA", "writeB"});
-  auto txn2 = MakeTxnHolder(configs[0], 200, {"readA"}, {"writeA"}, 1);
+  auto txn2 = MakeTxnHolder(configs[0], 200, {"readA"}, {"writeA"}, {{"readA", {1, 0}}, {"writeA", {1, 0}}});
 
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(txn1), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcceptTxnAndAcquireLocks(txn2), AcquireLocksResult::ACQUIRED);
 }
 
-TEST_F(RMALockManagerTest, RemasterTxn) {
+TEST(RMALockManagerTest, RemasterTxn) {
+  RMALockManager lock_manager;
   auto configs = MakeTestConfigurations("locking", 2, 1);
   auto txn = MakeTxnHolder(configs[0], 100, {}, {"A"});
   txn.transaction()->mutable_remaster()->set_new_master(1);

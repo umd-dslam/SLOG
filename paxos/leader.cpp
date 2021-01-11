@@ -8,6 +8,7 @@
 
 namespace slog {
 
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
@@ -29,19 +30,19 @@ Leader::Leader(SimpleMultiPaxos& paxos, const vector<MachineId>& members, Machin
   elected_leader_ = members[kPaxosDefaultLeaderPosition];
 }
 
-void Leader::HandleRequest(const Request& req) {
-  switch (req.type_case()) {
+void Leader::HandleRequest(const Envelope& req) {
+  switch (req.request().type_case()) {
     case Request::TypeCase::kPaxosPropose:
       // If elected as true leader, send accept request to the acceptors
       // Otherwise, forward the request to the true leader
       if (is_elected_) {
-        StartNewAcceptance(req.paxos_propose().value());
+        StartNewAcceptance(req.request().paxos_propose().value());
       } else {
         paxos_.SendSameChannel(req, elected_leader_);
       }
       break;
     case Request::TypeCase::kPaxosCommit:
-      ProcessCommitRequest(req.paxos_commit());
+      ProcessCommitRequest(req.request().paxos_commit());
       break;
     default:
       break;
@@ -80,13 +81,13 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
   }
 }
 
-void Leader::HandleResponse(const Response& res, MachineId from) {
+void Leader::HandleResponse(const Envelope& res) {
   // Iterate using indices instead of iterator because we may add new trackers to
   // this list, which would validate the iterator.
   auto num_quorum_trackers = quorum_trackers_.size();
   for (size_t i = 0; i < num_quorum_trackers; i++) {
     auto& tracker = quorum_trackers_[i];
-    bool state_changed = tracker->HandleResponse(res, from);
+    bool state_changed = tracker->HandleResponse(res);
     if (state_changed) {
       const auto raw_tracker = tracker.get();
 
@@ -108,14 +109,14 @@ void Leader::StartNewAcceptance(uint32_t value) {
   proposals_[next_empty_slot_] = Proposal(ballot_, value);
   quorum_trackers_.emplace_back(new AcceptanceTracker(members_.size(), ballot_, next_empty_slot_));
 
-  Request request;
-  auto paxos_accept = request.mutable_paxos_accept();
+  Envelope env;
+  auto paxos_accept = env.mutable_request()->mutable_paxos_accept();
   paxos_accept->set_ballot(ballot_);
   paxos_accept->set_slot(next_empty_slot_);
   paxos_accept->set_value(value);
   next_empty_slot_++;
 
-  SendToAllMembers(request);
+  SendToAllMembers(env);
 }
 
 void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
@@ -132,21 +133,21 @@ void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
 void Leader::StartNewCommit(SlotId slot) {
   quorum_trackers_.emplace_back(new CommitTracker(members_.size(), slot));
 
-  Request request;
-  auto paxos_commit = request.mutable_paxos_commit();
+  Envelope env;
+  auto paxos_commit = env.mutable_request()->mutable_paxos_commit();
   paxos_commit->set_slot(slot);
   paxos_commit->set_value(proposals_[slot].value);
 
-  SendToAllMembers(request);
+  SendToAllMembers(env);
 }
 
 void Leader::CommitStateChanged(const CommitTracker* /* commit */) {
   // TODO: Retransmit request after we implement heartbeat
 }
 
-void Leader::SendToAllMembers(const Request& request) {
+void Leader::SendToAllMembers(const Envelope& env) {
   for (const auto& member : members_) {
-    paxos_.SendSameChannel(request, member);
+    paxos_.SendSameChannel(env, member);
   }
 }
 

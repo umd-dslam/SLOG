@@ -22,11 +22,11 @@ GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker
     : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
 void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
-  Request req;
-  auto order = req.mutable_forward_batch()->mutable_batch_order();
+  auto env = NewEnvelope();
+  auto order = env->mutable_request()->mutable_forward_batch()->mutable_batch_order();
   order->set_slot(slot);
   order->set_batch_id(value);
-  Send(req, kMultiHomeOrdererChannel);
+  Send(std::move(env), kMultiHomeOrdererChannel);
 }
 
 vector<MachineId> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
@@ -44,11 +44,11 @@ LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>&
     : SimpleMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
-  Request req;
-  auto order = req.mutable_local_queue_order();
+  auto env = NewEnvelope();
+  auto order = env->mutable_request()->mutable_local_queue_order();
   order->set_queue_id(value);
   order->set_slot(slot);
-  Send(req, kInterleaverChannel);
+  Send(std::move(env), kInterleaverChannel);
 }
 
 }  // namespace slog

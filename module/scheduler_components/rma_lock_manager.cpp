@@ -101,7 +101,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool RMALockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
+bool RMALockManager::AcceptTransaction(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -124,7 +124,7 @@ bool RMALockManager::AcceptTransaction(const TransactionHolder& txn_holder) {
   return false;
 }
 
-AcquireLocksResult RMALockManager::AcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult RMALockManager::AcquireLocks(const TxnHolder& txn_holder) {
   if (txn_holder.keys_in_partition().empty()) {
     LOG(FATAL) << "Empty txn should not have reached lock manager";
   }
@@ -192,12 +192,12 @@ AcquireLocksResult RMALockManager::AcquireLocks(const TransactionHolder& txn_hol
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult RMALockManager::AcceptTxnAndAcquireLocks(const TransactionHolder& txn_holder) {
+AcquireLocksResult RMALockManager::AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder) {
   AcceptTransaction(txn_holder);
   return AcquireLocks(txn_holder);
 }
 
-vector<TxnId> RMALockManager::ReleaseLocks(const TransactionHolder& txn_holder) {
+vector<TxnId> RMALockManager::ReleaseLocks(const TxnHolder& txn_holder) {
   auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
 

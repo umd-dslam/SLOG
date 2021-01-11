@@ -4,7 +4,7 @@
 
 #include <list>
 
-#include "common/transaction_holder.h"
+#include "common/txn_holder.h"
 #include "common/types.h"
 #include "storage/storage.h"
 
@@ -15,8 +15,8 @@ namespace slog {
 
 enum class VerifyMasterResult { VALID, WAITING, ABORT };
 struct RemasterOccurredResult {
-  list<const TransactionHolder*> unblocked;
-  list<const TransactionHolder*> should_abort;
+  list<const TxnHolder*> unblocked;
+  list<const TxnHolder*> should_abort;
 };
 
 /**
@@ -40,7 +40,7 @@ class RemasterManager {
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  virtual VerifyMasterResult VerifyMaster(const TransactionHolder* txn_holder) = 0;
+  virtual VerifyMasterResult VerifyMaster(const TxnHolder& txn_holder) = 0;
 
   /**
    * Updates the queue of transactions waiting for remasters,
@@ -60,19 +60,19 @@ class RemasterManager {
    * @param txn_id Transaction to be checked
    * @return Transactions that are now unblocked
    */
-  virtual RemasterOccurredResult ReleaseTransaction(const TransactionHolder* txn_holder) = 0;
+  virtual RemasterOccurredResult ReleaseTransaction(const TxnHolder& txn_holder) = 0;
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
    * transaction to any queues
    */
-  static VerifyMasterResult CheckCounters(const TransactionHolder* txn_holder,
+  static VerifyMasterResult CheckCounters(const TxnHolder& txn_holder,
                                           const shared_ptr<const Storage<Key, Record>>& storage) {
-    auto& keys = txn_holder->keys_in_partition();
-    auto& txn_master_metadata = txn_holder->transaction()->internal().master_metadata();
+    auto& keys = txn_holder.keys_in_partition();
+    auto& txn_master_metadata = txn_holder.transaction()->internal().master_metadata();
 
     if (txn_master_metadata.empty()) {  // This should only be the case for testing
-      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder->transaction()->internal().id();
+      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder.transaction()->internal().id();
       return VerifyMasterResult::VALID;
     }
 

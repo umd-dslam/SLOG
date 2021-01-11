@@ -4,18 +4,15 @@
 #include <zmq.hpp>
 
 #include "common/constants.h"
-#include "common/message_pool.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "connection/poller.h"
 #include "connection/sender.h"
+#include "connection/zmq_utils.h"
 #include "module/base/module.h"
 #include "proto/internal.pb.h"
 
 namespace slog {
-
-using ReusableRequest = ReusableMessage<internal::Request>;
-using ReusableResponse = ReusableMessage<internal::Response>;
 
 /**
  * Base class for modules that can send and receive in internal messages.
@@ -23,17 +20,16 @@ using ReusableResponse = ReusableMessage<internal::Response>;
 class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
-                  std::chrono::milliseconds poll_timeout, int recv_batch = 5000, size_t request_pool_size = 5000,
-                  size_t response_pool_size = 5000);
+                  std::chrono::milliseconds poll_timeout, int recv_batch = 5000);
 
  protected:
   virtual std::vector<zmq::socket_t> InitializeCustomSockets() { return {}; }
 
   virtual void Initialize(){};
 
-  virtual void HandleInternalRequest(ReusableRequest&& req, MachineId from) = 0;
+  virtual void HandleInternalRequest(EnvelopePtr&& env) = 0;
 
-  virtual void HandleInternalResponse(ReusableResponse&& /* res */, MachineId /* from */) {}
+  virtual void HandleInternalResponse(EnvelopePtr&& /* env */) {}
 
   virtual void HandleTimeEvent(void* /* data */) {}
 
@@ -42,21 +38,9 @@ class NetworkedModule : public Module {
 
   zmq::socket_t& GetCustomSocket(size_t i);
 
-  ReusableRequest NewRequest() {
-    ReusableMessage msg{&request_pool_};
-    msg.get()->Clear();
-    return msg;
-  }
-
-  ReusableResponse NewResponse() {
-    ReusableMessage msg{&response_pool_};
-    msg.get()->Clear();
-    return msg;
-  }
-
-  void Send(const google::protobuf::Message& request_or_response, Channel to_channel, MachineId to_machine_id);
-
-  void Send(const google::protobuf::Message& request_or_response, Channel to_channel);
+  inline static EnvelopePtr NewEnvelope() { return std::make_unique<internal::Envelope>(); }
+  void Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel);
+  void Send(EnvelopePtr&& env, Channel to_channel);
 
   void NewTimeEvent(microseconds timeout, void* data);
 
@@ -75,8 +59,6 @@ class NetworkedModule : public Module {
   Sender sender_;
   Poller poller_;
   int recv_batch_;
-  MessagePool<internal::Request> request_pool_;
-  MessagePool<internal::Response> response_pool_;
   std::string debug_info_;
 };
 

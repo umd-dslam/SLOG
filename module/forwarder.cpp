@@ -11,9 +11,9 @@ using std::string;
 
 namespace slog {
 
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
-
 namespace {
 
 inline bool TransactionContainsKey(const Transaction& txn, const Key& key) {
@@ -30,29 +30,29 @@ Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& b
       lookup_master_index_(lookup_master_index),
       rg_(std::random_device()()) {}
 
-void Forwarder::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
-  switch (req.get()->type_case()) {
-    case internal::Request::kForwardTxn:
-      ProcessForwardTxn(move(req));
+void Forwarder::HandleInternalRequest(EnvelopePtr&& env) {
+  switch (env->request().type_case()) {
+    case Request::kForwardTxn:
+      ProcessForwardTxn(move(env));
       break;
-    case internal::Request::kLookupMaster:
-      ProcessLookUpMasterRequest(move(req), from);
+    case Request::kLookupMaster:
+      ProcessLookUpMasterRequest(move(env));
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
   }
 }
 
-void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
-  auto txn = req.get()->mutable_forward_txn()->mutable_txn();
+void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
+  auto txn = env->mutable_request()->mutable_forward_txn()->mutable_txn();
 
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
   auto local_partition = config_->local_partition();
 
   // Prepare a lookup master request just in case
-  auto lookup_master_request = NewRequest();
-  auto lookup_master = lookup_master_request.get()->mutable_lookup_master();
+  Envelope lookup_env;
+  auto lookup_master = lookup_env.mutable_request()->mutable_lookup_master();
 
   // This function will be called on the read and write set of the current txn
   auto LocalMasterLookupFn = [this, txn, local_partition,
@@ -101,28 +101,30 @@ void Forwarder::ProcessForwardTxn(ReusableRequest&& req) {
   // forward the txn immediately
   if (lookup_master->keys().empty()) {
     auto txn_type = SetTransactionType(*txn);
-    if (txn_type != TransactionType::UNKNOWN) {
-      Forward(txn);
-    }
+    VLOG(3) << "Determine txn " << txn->internal().id() << " to be " << ENUM_NAME(txn_type, TransactionType)
+            << " without remote master lookup";
+    DCHECK(txn_type != TransactionType::UNKNOWN);
+    Forward(move(env));
     return;
   }
 
-  pending_transactions_.insert_or_assign(txn->internal().id(), move(req));
+  VLOG(3) << "Remote master lookup needed to determine type of txn " << txn->internal().id();
+  pending_transactions_.insert_or_assign(txn->internal().id(), move(env));
 
   // Send a look up master request to each partition in the same region
   auto local_rep = config_->local_replica();
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     if (part != local_partition) {
-      Send(*lookup_master_request.get(), kForwarderChannel, config_->MakeMachineId(local_rep, part));
+      Send(lookup_env, config_->MakeMachineId(local_rep, part), kForwarderChannel);
     }
   }
 }
 
-void Forwarder::ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from) {
-  const auto& lookup_master = req.get()->lookup_master();
-  internal::Response response;
-  auto lookup_response = response.mutable_lookup_master();
+void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
+  const auto& lookup_master = env->request().lookup_master();
+  Envelope lookup_env;
+  auto lookup_response = lookup_env.mutable_response()->mutable_lookup_master();
   auto metadata_map = lookup_response->mutable_master_metadata();
 
   lookup_response->set_txn_id(lookup_master.txn_id());
@@ -142,16 +144,16 @@ void Forwarder::ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from
       }
     }
   }
-  Send(response, kForwarderChannel, from);
+  Send(lookup_env, env->from(), kForwarderChannel);
 }
 
-void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from */) {
+void Forwarder::HandleInternalResponse(EnvelopePtr&& env) {
   // The forwarder only cares about lookup master responses
-  if (res.get()->type_case() != Response::kLookupMaster) {
-    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(res.get()->type_case(), Response) << "\"";
+  if (env->response().type_case() != Response::kLookupMaster) {
+    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(env->response().type_case(), Response) << "\"";
   }
 
-  const auto& lookup_master = res.get()->lookup_master();
+  const auto& lookup_master = env->response().lookup_master();
   auto txn_id = lookup_master.txn_id();
   auto pending_txn_it = pending_transactions_.find(txn_id);
   if (pending_txn_it == pending_transactions_.end()) {
@@ -159,7 +161,8 @@ void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from
   }
 
   // Transfer master info from the lookup response to its intended transaction
-  auto txn = pending_txn_it->second.get()->mutable_forward_txn()->mutable_txn();
+  auto& pending_env = pending_txn_it->second;
+  auto txn = pending_env->mutable_request()->mutable_forward_txn()->mutable_txn();
   auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
   for (const auto& pair : lookup_master.master_metadata()) {
     if (TransactionContainsKey(*txn, pair.first)) {
@@ -175,26 +178,19 @@ void Forwarder::HandleInternalResponse(ReusableResponse&& res, MachineId /* from
     }
   }
 
-  // If a transaction can be determined to be either SINGLE_HOME or MULTI_HOME,
-  // forward it to the appropriate sequencer
   auto txn_type = SetTransactionType(*txn);
   if (txn_type != TransactionType::UNKNOWN) {
-    Forward(txn);
+    VLOG(3) << "Determine txn " << txn->internal().id() << " to be " << ENUM_NAME(txn_type, TransactionType);
+    Forward(move(pending_env));
     pending_transactions_.erase(txn_id);
   }
 }
 
-void Forwarder::Forward(Transaction* txn) {
-  auto txn_internal = txn->mutable_internal();
+void Forwarder::Forward(EnvelopePtr&& env) {
+  auto txn_internal = env->mutable_request()->mutable_forward_txn()->mutable_txn()->mutable_internal();
   auto txn_id = txn_internal->id();
   auto txn_type = txn_internal->type();
   auto& master_metadata = txn_internal->master_metadata();
-
-  // Prepare a request to be forwarded to a sequencer
-  Request forward_txn;
-  // The transaction still belongs to the request. This is only temporary and will
-  // be released at the end
-  forward_txn.mutable_forward_txn()->set_allocated_txn(txn);
 
   if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
@@ -205,7 +201,7 @@ void Forwarder::Forward(Transaction* txn) {
 
       TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
 
-      Send(forward_txn, kSequencerChannel);
+      Send(move(env), kSequencerChannel);
     } else {
       std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
       auto partition = RandomPartition(rg_);
@@ -216,7 +212,7 @@ void Forwarder::Forward(Transaction* txn) {
 
       TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
 
-      Send(forward_txn, kSequencerChannel, random_machine_in_home_replica);
+      Send(*env, random_machine_in_home_replica, kSequencerChannel);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
     auto destination =
@@ -226,11 +222,8 @@ void Forwarder::Forward(Transaction* txn) {
 
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
-    Send(forward_txn, kMultiHomeOrdererChannel, destination);
+    Send(*env, destination, kMultiHomeOrdererChannel);
   }
-  // Release txn so that it won't be freed by forward_txn and later double-freed
-  // by the request
-  forward_txn.mutable_forward_txn()->release_txn();
 }
 
 }  // namespace slog

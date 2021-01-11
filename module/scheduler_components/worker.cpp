@@ -14,6 +14,7 @@
 
 namespace slog {
 
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
@@ -25,16 +26,17 @@ Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
       // TODO: change this dynamically based on selected experiment
       commands_(new KeyValueCommands()) {}
 
-void Worker::HandleInternalRequest(ReusableRequest&& req, MachineId) {
+void Worker::HandleInternalRequest(EnvelopePtr&& env) {
+  auto& request = env->request();
   std::optional<TxnId> txn_id = {};
   bool valid_request = true;
-  switch (req.get()->type_case()) {
+  switch (request.type_case()) {
     case Request::kWorker: {
-      txn_id = ProcessWorkerRequest(req.get()->worker());
+      txn_id = ProcessWorkerRequest(request.worker());
       break;
     }
     case Request::kRemoteReadResult: {
-      txn_id = ProcessRemoteReadResult(req.get()->remote_read_result());
+      txn_id = ProcessRemoteReadResult(request.remote_read_result());
       break;
     }
     default:
@@ -51,7 +53,7 @@ void Worker::HandleInternalRequest(ReusableRequest&& req, MachineId) {
 }
 
 std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
-  auto txn_holder = reinterpret_cast<TransactionHolder*>(worker_request.txn_holder_ptr());
+  auto txn_holder = reinterpret_cast<TxnHolder*>(worker_request.txn_holder_ptr());
   auto txn = txn_holder->transaction();
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
@@ -181,7 +183,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   auto will_abort = false;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  switch (RemasterManager::CheckCounters(txn_holder, storage_)) {
+  switch (RemasterManager::CheckCounters(*txn_holder, storage_)) {
     case VerifyMasterResult::VALID: {
       break;
     }
@@ -332,9 +334,7 @@ void Worker::Commit(TxnId txn_id) {
 }
 
 void Worker::Finish(TxnId txn_id) {
-  auto txn = TxnState(txn_id).txn_holder->transaction();
-
-  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(TxnState(txn_id).txn_holder->transaction()->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // This must happen before the sending to scheduler below. Otherwise,
   // the scheduler may destroy the transaction holder before we can
@@ -342,9 +342,9 @@ void Worker::Finish(TxnId txn_id) {
   SendToCoordinatingServer(txn_id);
 
   // Notify the scheduler that we're done
-  auto res = NewResponse();
-  res.get()->mutable_worker()->set_txn_id(txn_id);
-  Send(*res.get(), kSchedulerChannel);
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_worker()->set_txn_id(txn_id);
+  Send(move(env), kSchedulerChannel);
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
@@ -356,9 +356,8 @@ void Worker::PreAbort(TxnId txn_id) {
   NotifyOtherPartitions(txn_id);
 
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->transaction();
 
-  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(state.txn_holder->transaction()->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   SendToCoordinatingServer(txn_id);
 
@@ -386,8 +385,8 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   auto aborted = txn->status() == TransactionStatus::ABORTED;
 
   // Send abort result and local reads to all remote active partitions
-  auto request = NewRequest();
-  auto rrr = request.get()->mutable_remote_read_result();
+  Envelope env;
+  auto rrr = env.mutable_request()->mutable_remote_read_result();
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
   rrr->set_will_abort(aborted);
@@ -402,7 +401,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   for (auto p : txn_holder->active_partitions()) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineId(local_replica, p);
-      Send(*request.get(), kSchedulerChannel, std::move(machine_id));
+      Send(env, std::move(machine_id), kSchedulerChannel);
     }
   }
 }
@@ -413,13 +412,13 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto txn = txn_holder->transaction();
 
   // Send the txn back to the coordinating server
-  auto req = NewRequest();
-  auto completed_sub_txn = req.get()->mutable_completed_subtxn();
+  Envelope env;
+  auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
   completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());
   completed_sub_txn->set_num_involved_partitions(txn_holder->num_involved_partitions());
 
-  Send(*req.get(), kServerChannel, txn->internal().coordinating_server());
+  Send(env, txn->internal().coordinating_server(), kServerChannel);
   completed_sub_txn->release_txn();
 }
 

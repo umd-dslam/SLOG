@@ -73,12 +73,12 @@ class SchedulerTest : public ::testing::Test {
   }
 
   void SendTransaction(Transaction* txn, const vector<size_t>& partitions) {
-    internal::Request req;
-    req.mutable_forward_txn()->set_allocated_txn(txn);
+    internal::Envelope env;
+    env.mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
     for (auto partition : partitions) {
       // This message is sent from machine 0:0, so it will be queued up in queue 0.
       // 'partition' just happens to be the same as machine id here.
-      sender_[0]->Send(req, kSchedulerChannel, partition);
+      sender_[0]->SendSerialized(env, partition, kSchedulerChannel);
     }
   }
 
@@ -86,10 +86,10 @@ class SchedulerTest : public ::testing::Test {
     Transaction txn;
     bool first_time = true;
     for (uint32_t i = 0; i < num_partitions; i++) {
-      internal::Request req;
-      CHECK(test_slogs_[receiver]->ReceiveFromOutputChannel(req, kServerChannel));
-      CHECK_EQ(req.type_case(), internal::Request::kCompletedSubtxn);
-      auto completed_subtxn = req.completed_subtxn();
+      auto req_env = test_slogs_[receiver]->ReceiveFromOutputChannel(kServerChannel);
+      CHECK(req_env != nullptr);
+      CHECK_EQ(req_env->request().type_case(), internal::Request::kCompletedSubtxn);
+      auto completed_subtxn = req_env->request().completed_subtxn();
       CHECK_EQ(completed_subtxn.num_involved_partitions(), num_partitions);
       auto sub_txn = completed_subtxn.txn();
 

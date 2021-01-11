@@ -7,7 +7,7 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
-#include "common/transaction_holder.h"
+#include "common/txn_holder.h"
 #include "common/types.h"
 #include "module/base/networked_module.h"
 #include "module/scheduler_components/commands.h"
@@ -20,9 +20,9 @@ namespace slog {
 struct TransactionState {
   enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, COMMIT, FINISH, PRE_ABORT };
 
-  TransactionState(TransactionHolder* txn_holder)
+  TransactionState(TxnHolder* txn_holder)
       : txn_holder(txn_holder), remote_reads_waiting_on(0), phase(Phase::READ_LOCAL_STORAGE) {}
-  TransactionHolder* txn_holder;
+  TxnHolder* txn_holder;
   uint32_t remote_reads_waiting_on;
   Phase phase;
 };
@@ -40,7 +40,7 @@ class Worker : public NetworkedModule {
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
 
  private:
   /**

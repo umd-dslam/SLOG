@@ -2,9 +2,11 @@
 
 #include <glog/logging.h>
 
+#include <unordered_set>
 #include <vector>
 
 #include "common/configuration.h"
+#include "common/txn_holder.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "connection/zmq_utils.h"
@@ -21,13 +23,14 @@ const auto kTestModuleTimeout = 5ms;
 
 using ConfigVec = std::vector<ConfigurationPtr>;
 
-internal::Request MakeEchoRequest(const string& data);
-internal::Response MakeEchoResponse(const string& data);
-
 ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_partitions,
                                  internal::Configuration common_config = {});
 
-Transaction* FillMetadata(Transaction* txn, uint32_t master = 0, uint32_t counter = 0);
+Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter);
+
+TxnHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const std::unordered_set<Key>& read_set,
+                        const std::unordered_set<Key>& write_set,
+                        const std::unordered_map<Key, std::pair<uint32_t, uint32_t>>& master_metadata = {});
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 
@@ -51,10 +54,9 @@ class TestSlog {
   void AddOutputChannel(Channel channel);
   zmq::pollitem_t GetPollItemForChannel(Channel channel);
 
-  template <typename T>
-  bool ReceiveFromOutputChannel(T& out, Channel channel) {
+  EnvelopePtr ReceiveFromOutputChannel(Channel channel) {
     CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
-    return RecvDeserializedProto(channels_[channel], out);
+    return RecvEnvelope(channels_[channel]);
   }
 
   unique_ptr<Sender> GetSender();

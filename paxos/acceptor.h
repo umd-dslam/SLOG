@@ -16,7 +16,7 @@ class Acceptor {
    */
   Acceptor(SimpleMultiPaxos& sender);
 
-  void HandleRequest(const internal::Request& req, MachineId from);
+  void HandleRequest(const internal::Envelope& req);
 
  private:
   void ProcessAcceptRequest(const internal::PaxosAcceptRequest& req, MachineId from_machine_id);

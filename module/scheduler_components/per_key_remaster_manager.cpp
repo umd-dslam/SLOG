@@ -9,9 +9,9 @@ namespace slog {
 PerKeyRemasterManager::PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
     : storage_(storage) {}
 
-VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const TransactionHolder* txn_holder) {
-  auto txn = txn_holder->transaction();
-  auto& keys = txn_holder->keys_in_partition();
+VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const TxnHolder& txn_holder) {
+  auto txn = txn_holder.transaction();
+  auto& keys = txn_holder.keys_in_partition();
   if (keys.empty()) {
     // None of the keys in this txn are in this partition
     return VerifyMasterResult::VALID;
@@ -61,10 +61,10 @@ VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const TransactionHolder* 
   return VerifyMasterResult::WAITING;
 }
 
-RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const TransactionHolder* txn_holder) {
-  auto txn = txn_holder->transaction();
+RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const TxnHolder& txn_holder) {
+  auto txn = txn_holder.transaction();
   auto txn_id = txn->internal().id();
-  for (auto& key_pair : txn_holder->keys_in_partition()) {
+  for (auto& key_pair : txn_holder.keys_in_partition()) {
     auto& key = key_pair.first;
     if (blocked_queue_.count(key) > 0) {
       auto& queue = blocked_queue_[key];
@@ -81,7 +81,7 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
   }
 
   RemasterOccurredResult result;
-  for (auto& key_pair : txn_holder->keys_in_partition()) {
+  for (auto& key_pair : txn_holder.keys_in_partition()) {
     auto& key = key_pair.first;
     TryToUnblock(key, result);
   }
@@ -89,8 +89,8 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
 }
 
 void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter,
-                                                   const TransactionHolder* txn_holder) {
-  auto entry = make_pair(txn_holder, counter);
+                                                   const TxnHolder& txn_holder) {
+  auto entry = make_pair(&txn_holder, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
   auto& q = blocked_queue_[key];
@@ -123,10 +123,10 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
   auto& txn_pair = q_it->second.front();
   auto& txn_holder = txn_pair.first;
 
-  switch (CheckCounters(txn_holder, storage_)) {
+  switch (CheckCounters(*txn_holder, storage_)) {
     case VerifyMasterResult::ABORT: {
       result.should_abort.push_back(txn_holder);
-      auto release_result = ReleaseTransaction(txn_holder);
+      auto release_result = ReleaseTransaction(*txn_holder);
       // Newly unblocked txns are added to the end of the list
       result.unblocked.splice(result.unblocked.end(), release_result.unblocked);
       result.should_abort.splice(result.should_abort.end(), release_result.should_abort);

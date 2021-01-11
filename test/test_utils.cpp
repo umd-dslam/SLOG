@@ -20,20 +20,6 @@ using std::to_string;
 
 namespace slog {
 
-internal::Request MakeEchoRequest(const std::string& data) {
-  internal::Request request;
-  auto echo = request.mutable_echo();
-  echo->set_data(data);
-  return request;
-}
-
-internal::Response MakeEchoResponse(const std::string& data) {
-  internal::Response response;
-  auto echo = response.mutable_echo();
-  echo->set_data(data);
-  return response;
-}
-
 ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_partitions,
                                  internal::Configuration common_config) {
   std::random_device rd;
@@ -84,6 +70,21 @@ Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter) {
     m.set_counter(counter);
   }
   return txn;
+}
+
+TxnHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const unordered_set<Key>& read_set,
+                        const unordered_set<Key>& write_set,
+                        const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata) {
+  Transaction* txn;
+  if (master_metadata.empty()) {
+    // Some tests need to read the metadata. While it does not matter to those tests, they throw
+    // errors if the metadata does not exist
+    txn = FillMetadata(MakeTransaction(read_set, write_set, ""), 0, 0);
+  } else {
+    txn = MakeTransaction(read_set, write_set, "", master_metadata);
+  }
+  txn->mutable_internal()->set_id(id);
+  return {config, txn};
 }
 
 TestSlog::TestSlog(const ConfigurationPtr& config)

@@ -17,7 +17,7 @@ using std::unordered_set;
 
 namespace slog {
 
-using internal::Request;
+using internal::Envelope;
 
 Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
                std::chrono::milliseconds poll_timeout_ms)
@@ -107,8 +107,8 @@ bool Broker::InitializeConnection() {
   LOG(INFO) << "Bound Broker to: " << MakeEndpoint();
 
   // Prepare a READY message
-  Request request;
-  auto ready = request.mutable_broker_ready();
+  Envelope env;
+  auto ready = env.mutable_request()->mutable_broker_ready();
   ready->set_ip_address(config_->local_address());
   ready->set_machine_id(config_->local_machine_id());
 
@@ -119,7 +119,7 @@ bool Broker::InitializeConnection() {
     auto endpoint = MakeEndpoint(addr);
     tmp_socket.connect(endpoint);
 
-    SendSerializedProto(tmp_socket, request);
+    SendSerializedProto(tmp_socket, env);
 
     // See comment in class declaration
     tmp_sockets_.push_back(move(tmp_socket));
@@ -145,7 +145,8 @@ bool Broker::InitializeConnection() {
         continue;
       }
 
-      if (!DeserializeProto(request, msg) || !request.has_broker_ready()) {
+      Envelope env;
+      if (!DeserializeProto(env, msg) || !env.has_request() || !env.request().has_broker_ready()) {
         LOG(INFO) << "Received a message while broker is not READY. "
                   << "Saving for later";
         unhandled_incoming_messages_.push_back(move(msg));
@@ -153,7 +154,7 @@ bool Broker::InitializeConnection() {
       }
 
       // Use the information in each READY message to build up the translation maps
-      const auto& ready = request.broker_ready();
+      const auto& ready = env.request().broker_ready();
       const auto& addr = ready.ip_address();
       const auto machine_id = ready.machine_id();
       const auto [replica, partition] = config_->UnpackMachineId(machine_id);
@@ -222,7 +223,17 @@ void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
     LOG(ERROR) << "Unknown channel: \"" << chan_id << "\". Dropping message";
     return;
   }
-  chan_it->second.send(msg, zmq::send_flags::none);
+  MachineId machine_id = -1;
+  ParseMachineId(machine_id, msg);
+
+  auto env = std::make_unique<Envelope>();
+  if (DeserializeProto(*env, msg)) {
+    // This must be set AFTER deserializing otherwise it will be overwritten by the deserialization function
+    env->set_from(machine_id);
+    SendEnvelope(chan_it->second, std::move(env));
+  } else {
+    LOG(ERROR) << "Malformed message";
+  }
 }
 
 zmq::pollitem_t Broker::GetSocketPollItem() { return {static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0}; }

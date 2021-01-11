@@ -33,7 +33,7 @@ class Sequencer : public NetworkedModule {
  protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
@@ -41,17 +41,17 @@ class Sequencer : public NetworkedModule {
   void NewBatch();
   BatchId NextBatchId();
 
-  void ProcessMultiHomeBatch(ReusableRequest&& request);
+  void ProcessMultiHomeBatch(EnvelopePtr&& env);
   void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
   ConfigurationPtr config_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
 
-  void DelaySingleHomeBatch(ReusableRequest&& request);
+  void DelaySingleHomeBatch(EnvelopePtr&& env);
   void MaybeSendDelayedBatches();
   std::mt19937 rg_;
-  std::list<ReusableRequest> delayed_batches_;
+  std::list<EnvelopePtr> delayed_batches_;
 };
 
 }  // namespace slog

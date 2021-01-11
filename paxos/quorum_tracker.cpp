@@ -6,15 +6,15 @@ using internal::Response;
 
 QuorumTracker::QuorumTracker(uint32_t num_members) : num_members_(num_members), state_(QuorumState::INCOMPLETE) {}
 
-bool QuorumTracker::HandleResponse(const Response& res, MachineId from) {
+bool QuorumTracker::HandleResponse(const internal::Envelope& res) {
   if (state_ == QuorumState::COMPLETE || state_ == QuorumState::ABORTED) {
     return false;
   }
-  if (!ResponseIsValid(res)) {
+  if (!ResponseIsValid(res.response())) {
     return false;
   }
 
-  machine_responded_.insert(from);
+  machine_responded_.insert(res.from());
 
   auto sz = machine_responded_.size();
   if (sz == num_members_) {

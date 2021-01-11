@@ -4,39 +4,26 @@
 #include <vector>
 
 #include "common/configuration.h"
-#include "common/message_pool.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
 
 namespace slog {
 
 using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
-using ReusableRequest = ReusableMessage<internal::Request>;
+using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
-class TransactionHolder {
+class TxnHolder {
  public:
-  TransactionHolder();
-  TransactionHolder(const ConfigurationPtr& config, ReusableRequest&& req);
+  TxnHolder(const ConfigurationPtr& config, Transaction* txn);
 
-  void SetTxnRequest(const ConfigurationPtr& config, ReusableRequest&& req);
-  ReusableRequest& request() { return txn_request_; }
-  Transaction* transaction() const {
-    if (txn_request_.get() == nullptr) {
-      return nullptr;
-    }
-    return txn_request_.get()->mutable_forward_txn()->mutable_txn();
-  }
-
-  void SetWorker(uint32_t worker) { worker_ = worker; }
-
-  std::optional<uint32_t> worker() const { return worker_; }
-
+  Transaction* transaction() const { return txn_; }
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
   uint32_t num_involved_partitions() const;
   const std::vector<uint32_t>& active_partitions() const;
   const std::vector<uint32_t>& involved_replicas() const;
 
-  std::vector<ReusableRequest>& early_remote_reads();
+  void SetWorker(uint32_t worker) { worker_ = worker; }
+  std::optional<uint32_t> worker() const { return worker_; }
 
   /**
    * Get the id of the replica where this transaction was added to the local log.
@@ -52,9 +39,8 @@ class TransactionHolder {
   static const TxnIdReplicaIdPair transaction_id_replica_id(const Transaction*);
 
  private:
-  ReusableRequest txn_request_;
+  Transaction* txn_;
   std::optional<uint32_t> worker_;
-  std::vector<ReusableRequest> early_remote_reads_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   uint32_t num_involved_partitions_;
   std::vector<uint32_t> active_partitions_;

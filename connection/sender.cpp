@@ -1,7 +1,5 @@
 #include "sender.h"
 
-#include "connection/zmq_utils.h"
-
 using std::move;
 
 namespace slog {
@@ -12,12 +10,7 @@ std::atomic<uint8_t> Sender::counter(1);
 Sender::Sender(const std::shared_ptr<Broker>& broker)
     : context_(broker->context()), broker_(broker), local_machine_id_(broker->local_machine_id()) {}
 
-void Sender::Send(const google::protobuf::Message& request_or_response, Channel to_channel, MachineId to_machine_id) {
-  // If sending to local module, use the other function to bypass the local broker
-  if (to_machine_id == local_machine_id_) {
-    Send(request_or_response, to_channel);
-    return;
-  }
+void Sender::SendSerialized(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel) {
   // Lazily establish a new connection when necessary
   auto it = machine_id_to_socket_.find(to_machine_id);
   if (it == machine_id_to_socket_.end()) {
@@ -33,10 +26,10 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
     }
   }
 
-  SendSerializedProto(it->second, request_or_response, to_channel, local_machine_id_);
+  SendSerializedProto(it->second, envelope, local_machine_id_, to_channel);
 }
 
-void Sender::Send(const google::protobuf::Message& request_or_response, Channel to_channel) {
+void Sender::SendLocal(EnvelopePtr&& envelope, Channel to_channel) {
   // Lazily establish a new connection when necessary
   auto it = local_channel_to_socket_.find(to_channel);
   if (it == local_channel_to_socket_.end()) {
@@ -52,7 +45,7 @@ void Sender::Send(const google::protobuf::Message& request_or_response, Channel 
     }
   }
 
-  SendSerializedProto(it->second, request_or_response, to_channel, local_machine_id_);
+  SendEnvelope(it->second, move(envelope));
 }
 
 }  // namespace slog

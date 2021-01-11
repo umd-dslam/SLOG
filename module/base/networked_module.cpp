@@ -1,35 +1,29 @@
 #include "module/base/networked_module.h"
 
-#include <sstream>
-
 #include <glog/logging.h>
+
+#include <sstream>
 
 #include "common/constants.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
-#include "connection/zmq_utils.h"
 
+using std::make_unique;
 using std::move;
 using std::unique_ptr;
 using std::vector;
 
 namespace slog {
 
-using internal::Request;
-using internal::Response;
-
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
-                                 std::chrono::milliseconds poll_timeout, int recv_batch, size_t request_pool_size,
-                                 size_t response_pool_size)
+                                 std::chrono::milliseconds poll_timeout, int recv_batch)
     : Module(name),
       context_(broker->context()),
       channel_(channel),
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker),
       poller_(poll_timeout),
-      recv_batch_(recv_batch),
-      request_pool_(request_pool_size),
-      response_pool_(response_pool_size) {
+      recv_batch_(recv_batch) {
   broker->AddChannel(channel);
   pull_socket_.bind("inproc://channel_" + std::to_string(channel));
   // Remove limit on the zmq message queues
@@ -37,7 +31,8 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
 
   auto& config = broker->config();
   std::ostringstream os;
-  os << "rep = " << config->local_replica() << ", part = " << config->local_partition();
+  os << "module = " << name << ", rep = " << config->local_replica() << ", part = " << config->local_partition()
+     << ", machine_id = " << config->local_machine_id();
   debug_info_ = os.str();
 }
 
@@ -46,13 +41,13 @@ zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_socket
 const std::shared_ptr<zmq::context_t> NetworkedModule::context() const { return context_; }
 
 void NetworkedModule::SetUp() {
+  VLOG(1) << "Thread info: " << debug_info_;
+
   poller_.PushSocket(pull_socket_);
   custom_sockets_ = InitializeCustomSockets();
   for (auto& socket : custom_sockets_) {
     poller_.PushSocket(socket);
   }
-
-  VLOG(1) << "Thread info: " << debug_info_;
 
   Initialize();
 }
@@ -70,19 +65,11 @@ bool NetworkedModule::Loop() {
 
   for (int i = 0; i < recv_batch_; i++) {
     // Message from pull socket
-    if (zmq::message_t msg; pull_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-      if (google::protobuf::Any any; DeserializeAny(any, msg)) {
-        if (MachineId from; ParseMachineId(from, msg)) {
-          if (any.Is<Request>()) {
-            auto req = NewRequest();
-            any.UnpackTo(req.get());
-            HandleInternalRequest(move(req), from);
-          } else if (any.Is<Response>()) {
-            auto res = NewResponse();
-            any.UnpackTo(res.get());
-            HandleInternalResponse(move(res), from);
-          }
-        }
+    if (auto env = RecvEnvelope(pull_socket_, true /* dont_wait */); env != nullptr) {
+      if (env->has_request()) {
+        HandleInternalRequest(move(env));
+      } else if (env->has_response()) {
+        HandleInternalResponse(move(env));
       }
     }
 
@@ -94,14 +81,11 @@ bool NetworkedModule::Loop() {
   return false;
 }
 
-void NetworkedModule::Send(const google::protobuf::Message& request_or_response, Channel to_channel,
-                           MachineId to_machine_id) {
-  sender_.Send(request_or_response, to_channel, to_machine_id);
+void NetworkedModule::Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel) {
+  sender_.SendSerialized(env, to_machine_id, to_channel);
 }
 
-void NetworkedModule::Send(const google::protobuf::Message& request_or_response, Channel to_channel) {
-  sender_.Send(request_or_response, to_channel);
-}
+void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.SendLocal(move(env), to_channel); }
 
 void NetworkedModule::NewTimeEvent(microseconds timeout, void* data) { poller_.AddTimeEvent(timeout, data); }
 

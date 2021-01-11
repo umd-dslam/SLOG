@@ -19,7 +19,7 @@ class QuorumTracker {
   QuorumTracker(uint32_t num_members);
   virtual ~QuorumTracker() = default;
 
-  bool HandleResponse(const internal::Response& res, MachineId from);
+  bool HandleResponse(const internal::Envelope& res);
 
   QuorumState GetState() const;
 

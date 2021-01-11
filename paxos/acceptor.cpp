@@ -4,18 +4,19 @@
 
 namespace slog {
 
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
 Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 
-void Acceptor::HandleRequest(const Request& req, MachineId from) {
-  switch (req.type_case()) {
+void Acceptor::HandleRequest(const internal::Envelope& req) {
+  switch (req.request().type_case()) {
     case Request::TypeCase::kPaxosAccept:
-      ProcessAcceptRequest(req.paxos_accept(), from);
+      ProcessAcceptRequest(req.request().paxos_accept(), req.from());
       break;
     case Request::TypeCase::kPaxosCommit:
-      ProcessCommitRequest(req.paxos_commit(), from);
+      ProcessCommitRequest(req.request().paxos_commit(), req.from());
       break;
     default:
       break;
@@ -27,20 +28,20 @@ void Acceptor::ProcessAcceptRequest(const internal::PaxosAcceptRequest& req, Mac
     return;
   }
   ballot_ = req.ballot();
-  Response res;
-  auto accept_response = res.mutable_paxos_accept();
+  Envelope env;
+  auto accept_response = env.mutable_response()->mutable_paxos_accept();
   accept_response->set_ballot(ballot_);
   accept_response->set_slot(req.slot());
-  sender_.SendSameChannel(res, from_machine_id);
+  sender_.SendSameChannel(env, from_machine_id);
 }
 
 void Acceptor::ProcessCommitRequest(const internal::PaxosCommitRequest& req, MachineId from_machine_id) {
   // TODO: If leader election is implemented, this is where we erase
   //       memory about an accepted value
-  Response res;
-  auto commit_response = res.mutable_paxos_commit();
+  Envelope env;
+  auto commit_response = env.mutable_response()->mutable_paxos_commit();
   commit_response->set_slot(req.slot());
-  sender_.SendSameChannel(res, from_machine_id);
+  sender_.SendSameChannel(env, from_machine_id);
 }
 
 }  // namespace slog

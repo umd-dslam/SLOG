@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "common/configuration.h"
-#include "common/transaction_holder.h"
+#include "common/txn_holder.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
@@ -39,13 +39,13 @@ class Scheduler : public NetworkedModule {
  protected:
   void Initialize() final;
 
-  void HandleInternalRequest(ReusableRequest&& req, MachineId) final;
-  void HandleInternalResponse(ReusableResponse&& res, MachineId) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void HandleInternalResponse(EnvelopePtr&& env) final;
 
  private:
-  void ProcessRemoteReadResult(ReusableRequest&& req);
+  void ProcessRemoteReadResult(EnvelopePtr&& env);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
-  void ProcessTransaction(ReusableRequest&& txn);
+  void ProcessTransaction(EnvelopePtr&& env);
 
 #ifdef ENABLE_REMASTER
   // Check that remaster txn doesn't keep key at same master
@@ -53,18 +53,18 @@ class Scheduler : public NetworkedModule {
 #endif
 
   // Place a transaction in a holder if it has keys in this partition
-  bool AcceptTransaction(ReusableRequest&& req);
+  Transaction* AcceptTransaction(EnvelopePtr&& env);
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking
-  void SendToRemasterManager(TransactionHolder* txn_holder);
+  void SendToRemasterManager(const TxnHolder& txn_holder);
   // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
   // Send all transactions for locks, multi-home transactions are only registered
-  void SendToLockManager(const TransactionHolder* txn_holder);
-  void AcquireLocksAndProcessResult(const TransactionHolder* txn_holder);
+  void SendToLockManager(const TxnHolder& txn_holder);
+  void AcquireLocksAndProcessResult(const TxnHolder& txn_holder);
 
   // Send txn to worker. If this is a one-way dispatch, a copy of the txn
   // holder will be created and owned by the worker.
@@ -94,8 +94,6 @@ class Scheduler : public NetworkedModule {
   bool MaybeContinuePreDispatchAbort(TxnId txn_id);
   // Add a lock-only transaction to an abort that started before it arrived
   bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
-  // Abort lock-only transactions from the remaster manager and lock manager
-  void CollectLockOnlyTransactionsForAbort(TxnId txn_id);
   // Return the transaction to the server if lock-only transactions and
   // remote reads are received
   void MaybeFinishAbort(TxnId txn_id);
@@ -117,14 +115,18 @@ class Scheduler : public NetworkedModule {
   RMALockManager lock_manager_;
 #endif
 
-  std::unordered_map<TxnId, TransactionHolder> all_txns_;
+  struct TxnInfo {
+    std::optional<TxnHolder> holder;
+    std::vector<EnvelopePtr> early_remote_reads;
+  };
+  std::unordered_map<TxnId, TxnInfo> active_txns_;
 
   /**
    * Lock-only transactions are kept here during remaster checking and locking.
    * This map is also used to track which LOs have arrived during an abort, which means
    * that LOs should not be removed until the txn is dispatched.
    */
-  std::map<TxnIdReplicaIdPair, TransactionHolder> lock_only_txns_;
+  std::map<TxnIdReplicaIdPair, TxnHolder> lock_only_txns_;
 
   /**
    * Transactions that are in the process of aborting

@@ -34,22 +34,22 @@ class Forwarder : public NetworkedModule {
             std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
-  void HandleInternalResponse(ReusableResponse&& res, MachineId from) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void HandleInternalResponse(EnvelopePtr&& env) final;
 
  private:
-  void ProcessForwardTxn(ReusableRequest&& req);
-  void ProcessLookUpMasterRequest(ReusableRequest&& req, MachineId from);
+  void ProcessForwardTxn(EnvelopePtr&& env);
+  void ProcessLookUpMasterRequest(EnvelopePtr&& env);
 
   /**
    * Pre-condition: transaction type is not UNKNOWN
    */
-  void Forward(Transaction* txn);
+  void Forward(EnvelopePtr&& env);
 
   ConfigurationPtr config_;
   std::shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
 
-  std::unordered_map<TxnId, ReusableRequest> pending_transactions_;
+  std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
 
   std::mt19937 rg_;
 };

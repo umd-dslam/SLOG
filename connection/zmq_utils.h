@@ -5,15 +5,38 @@
 #include <zmq.hpp>
 
 #include "common/types.h"
+#include "proto/internal.pb.h"
 
 namespace slog {
+
+using EnvelopePtr = std::unique_ptr<internal::Envelope>;
+
+/**
+ * Sends an envelope
+ */
+inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
+  auto env = envelope.release();
+  size_t sz = sizeof(env);
+  zmq::message_t msg(sz);
+  *(msg.data<internal::Envelope*>()) = env;
+  socket.send(msg, zmq::send_flags::none);
+}
+
+inline EnvelopePtr RecvEnvelope(zmq::socket_t& socket, bool dont_wait = false) {
+  zmq::message_t msg;
+  auto flag = dont_wait ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
+  if (!socket.recv(msg, flag)) {
+    return nullptr;
+  }
+  return EnvelopePtr(*(msg.data<internal::Envelope*>()));
+}
 
 /**
  * Serializes and send proto message. The sent buffer contains
  * <sender machine id> <receiver channel> <proto>
  */
-inline void SendSerializedProto(zmq::socket_t& socket, const google::protobuf::Message& proto, Channel chan = 0,
-                      MachineId machineId = -1) {
+inline void SendSerializedProto(zmq::socket_t& socket, const google::protobuf::Message& proto,
+                                MachineId from_machine_id = -1, Channel to_chan = 0) {
   google::protobuf::Any any;
   any.PackFrom(proto);
 
@@ -21,9 +44,9 @@ inline void SendSerializedProto(zmq::socket_t& socket, const google::protobuf::M
   zmq::message_t msg(sz);
 
   auto data = msg.data<char>();
-  memcpy(data, &machineId, sizeof(MachineId));
+  memcpy(data, &from_machine_id, sizeof(MachineId));
   data += sizeof(MachineId);
-  memcpy(data, &chan, sizeof(Channel));
+  memcpy(data, &to_chan, sizeof(Channel));
   data += sizeof(Channel);
   any.SerializeToArray(data, any.ByteSizeLong());
 

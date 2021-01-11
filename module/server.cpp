@@ -90,29 +90,26 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
         break;
       }
 
-      // Send to forwarder
-      internal::Request forward_request;
-      forward_request.mutable_forward_txn()->set_allocated_txn(txn);
-
       TRACE(txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
 
-      Send(forward_request, kForwarderChannel);
+      // Send to forwarder
+      auto env = NewEnvelope();
+      env->mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
+      Send(move(env), kForwarderChannel);
       break;
     }
     case api::Request::kStats: {
-      internal::Request stats_request;
-
-      auto level = request.stats().level();
-      stats_request.mutable_stats()->set_id(txn_id);
-      stats_request.mutable_stats()->set_level(level);
+      auto env = NewEnvelope();
+      env->mutable_request()->mutable_stats()->set_id(txn_id);
+      env->mutable_request()->mutable_stats()->set_level(request.stats().level());
 
       // Send to appropriate module based on provided information
       switch (request.stats().module()) {
         case api::StatsModule::SERVER:
-          ProcessStatsRequest(stats_request.stats());
+          ProcessStatsRequest(env->request().stats());
           break;
         case api::StatsModule::SCHEDULER:
-          Send(stats_request, kSchedulerChannel);
+          Send(move(env), kSchedulerChannel);
           break;
         default:
           LOG(ERROR) << "Invalid module for stats request";
@@ -131,17 +128,17 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
               Internal Requests
 ***********************************************/
 
-void Server::HandleInternalRequest(ReusableRequest&& req, MachineId /* from */) {
-  if (req.get()->type_case() != internal::Request::kCompletedSubtxn) {
-    LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(req.get()->type_case(), internal::Request)
+void Server::HandleInternalRequest(EnvelopePtr&& env) {
+  if (env->request().type_case() != internal::Request::kCompletedSubtxn) {
+    LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), internal::Request)
                << "\"";
     return;
   }
-  ProcessCompletedSubtxn(move(req));
+  ProcessCompletedSubtxn(move(env));
 }
 
-void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
-  auto completed_subtxn = req.get()->mutable_completed_subtxn();
+void Server::ProcessCompletedSubtxn(EnvelopePtr&& env) {
+  auto completed_subtxn = env->mutable_request()->mutable_completed_subtxn();
 
   TRACE(completed_subtxn->mutable_txn()->mutable_internal(), TransactionEvent::RETURN_TO_SERVER);
 
@@ -152,7 +149,7 @@ void Server::ProcessCompletedSubtxn(ReusableRequest&& req) {
 
   auto res = completed_txns_.try_emplace(txn_id, config_, completed_subtxn->num_involved_partitions());
   auto& completed_txn = res.first->second;
-  if (completed_txn.AddSubTxn(std::move(req))) {
+  if (completed_txn.AddSubTxn(std::move(env))) {
     SendTxnToClient(completed_txn.ReleaseTxn());
     completed_txns_.erase(txn_id);
   }
@@ -187,25 +184,25 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
   stats.Accept(writer);
 
-  auto res = NewResponse();
-  res.get()->mutable_stats()->set_id(stats_request.id());
-  res.get()->mutable_stats()->set_stats_json(buf.GetString());
-  HandleInternalResponse(move(res), 0);
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  HandleInternalResponse(move(env));
 }
 
 /***********************************************
               Internal Responses
 ***********************************************/
 
-void Server::HandleInternalResponse(ReusableResponse&& res, MachineId) {
-  if (res.get()->type_case() != internal::Response::kStats) {
-    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(res.get()->type_case(), internal::Response)
+void Server::HandleInternalResponse(EnvelopePtr&& env) {
+  if (env->response().type_case() != internal::Response::kStats) {
+    LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(env->response().type_case(), internal::Response)
                << "\"";
   }
   api::Response response;
   auto stats_response = response.mutable_stats();
-  stats_response->set_allocated_stats_json(res.get()->mutable_stats()->release_stats_json());
-  SendResponseToClient(res.get()->stats().id(), std::move(response));
+  stats_response->set_allocated_stats_json(env->mutable_response()->mutable_stats()->release_stats_json());
+  SendResponseToClient(env->response().stats().id(), move(response));
 }
 
 /***********************************************

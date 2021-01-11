@@ -34,17 +34,17 @@ class CompletedTransaction {
     partition_counters_.resize(config->num_partitions());
   }
 
-  bool AddSubTxn(ReusableRequest&& new_req) {
-    DCHECK(new_req.get() != nullptr);
-    auto subtxn = new_req.get()->completed_subtxn();
+  bool AddSubTxn(EnvelopePtr&& new_req) {
+    DCHECK(new_req != nullptr);
+    auto& subtxn = new_req->request().completed_subtxn();
 
     DCHECK(subtxn.partition() < partition_counters_.size());
     auto counter = ++partition_counters_[subtxn.partition()];
     if (counter == 1) {
-      if (req_.get() == nullptr) {
+      if (req_ == nullptr) {
         req_ = std::move(new_req);
       } else {
-        auto txn = req_.get()->mutable_completed_subtxn()->mutable_txn();
+        auto txn = req_->mutable_request()->mutable_completed_subtxn()->mutable_txn();
         MergeTransaction(*txn, subtxn.txn());
       }
     }
@@ -56,12 +56,12 @@ class CompletedTransaction {
   }
 
   Transaction* ReleaseTxn() {
-    if (req_.get() == nullptr) return nullptr;
-    return req_.get()->mutable_completed_subtxn()->release_txn();
+    if (req_ == nullptr) return nullptr;
+    return req_->mutable_request()->mutable_completed_subtxn()->release_txn();
   }
 
  private:
-  ReusableRequest req_;
+  EnvelopePtr req_;
   uint32_t required_copies_;
   // Number of partitions that are still not fully replicated
   size_t replicating_partitions_;
@@ -94,14 +94,14 @@ class Server : public NetworkedModule {
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void HandleInternalRequest(ReusableRequest&& req, MachineId from) final;
+  void HandleInternalRequest(EnvelopePtr&& env) final;
 
-  void HandleInternalResponse(ReusableResponse&& res, MachineId /* from */) final;
+  void HandleInternalResponse(EnvelopePtr&& env) final;
 
   void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
  private:
-  void ProcessCompletedSubtxn(ReusableRequest&& req);
+  void ProcessCompletedSubtxn(EnvelopePtr&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void SendTxnToClient(Transaction* txn);

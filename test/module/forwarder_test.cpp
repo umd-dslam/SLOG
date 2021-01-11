@@ -53,38 +53,39 @@ class ForwarderTest : public ::testing::Test {
     for (auto i : indices) {
       poll_items.push_back(test_slogs[i]->GetPollItemForChannel(kSequencerChannel));
     }
-    auto rc = zmq::poll(poll_items, 1s);
-    if (rc == 0) return nullptr;
+    auto rc = zmq::poll(poll_items);
+    if (rc <= 0) return nullptr;
 
     for (size_t i = 0; i < poll_items.size(); i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        internal::Request req;
-        if (!test_slogs[indices[i]]->ReceiveFromOutputChannel(req, kSequencerChannel)) {
+        auto req_env = test_slogs[indices[i]]->ReceiveFromOutputChannel(kSequencerChannel);
+        if (req_env == nullptr) {
           return nullptr;
         }
-        return ExtractTxn(req);
+        return ExtractTxn(req_env);
       }
     }
+
     return nullptr;
   }
 
   Transaction* ReceiveOnOrdererChannel(size_t index) {
-    internal::Request req;
-    if (!test_slogs[index]->ReceiveFromOutputChannel(req, kMultiHomeOrdererChannel)) {
+    auto req_env = test_slogs[index]->ReceiveFromOutputChannel(kMultiHomeOrdererChannel);
+    if (req_env == nullptr) {
       return nullptr;
     }
-    return ExtractTxn(req);
+    return ExtractTxn(req_env);
   }
 
   unique_ptr<TestSlog> test_slogs[NUM_MACHINES];
   ConfigVec configs;
 
  private:
-  Transaction* ExtractTxn(internal::Request& req) {
-    if (req.type_case() != internal::Request::kForwardTxn) {
+  Transaction* ExtractTxn(EnvelopePtr& req) {
+    if (req->request().type_case() != internal::Request::kForwardTxn) {
       return nullptr;
     }
-    return req.mutable_forward_txn()->release_txn();
+    return req->mutable_request()->mutable_forward_txn()->release_txn();
   }
 };
 
@@ -94,11 +95,9 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   // Send to partition 0 of replica 0
   test_slogs[0]->SendTxn(txn);
   auto forwarded_txn = ReceiveOnSequencerChannel({0});
-  // The txn should be forwarded to the sequencer of the same machine
-  if (forwarded_txn == nullptr) {
-    FAIL() << "Message was not received before timing out";
-  }
 
+  // The txn should be forwarded to the sequencer of the same machine
+  ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   const auto& master_metadata = forwarded_txn->internal().master_metadata();
   ASSERT_EQ(2U, master_metadata.size());
@@ -121,9 +120,7 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     auto forwarded_txn = ReceiveOnSequencerChannel({2, 3});
     // A txn should be forwarded to one of the two schedulers in
     // replica 1
-    if (forwarded_txn == nullptr) {
-      FAIL() << "Message was not received before timing out";
-    }
+    ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     const auto& master_metadata = forwarded_txn->internal().master_metadata();
     ASSERT_EQ(2U, master_metadata.size());
@@ -137,9 +134,7 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     auto forwarded_txn = ReceiveOnSequencerChannel({0, 1});
     // A txn should be forwarded to one of the two schedulers in
     // replica 0
-    if (forwarded_txn == nullptr) {
-      FAIL() << "Message was not received before timing out";
-    }
+    ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     const auto& master_metadata = forwarded_txn->internal().master_metadata();
     ASSERT_EQ(1U, master_metadata.size());
@@ -156,9 +151,7 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
 
   auto forwarded_txn = ReceiveOnSequencerChannel({0, 1, 2, 3});
   // The txn should be forwarded to the scheduler of the same machine
-  if (forwarded_txn == nullptr) {
-    FAIL() << "Message was not received before timing out";
-  }
+  ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   const auto& master_metadata = forwarded_txn->internal().master_metadata();
   ASSERT_EQ(2U, master_metadata.size());
@@ -179,10 +172,7 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
 
   auto forwarded_txn = ReceiveOnOrdererChannel(leader);
   // The txn should be forwarded to the multihome orderer module of the leader
-  if (forwarded_txn == nullptr) {
-    FAIL() << "Message was not received before timing out";
-  }
-
+  ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::MULTI_HOME, forwarded_txn->internal().type());
   const auto& master_metadata = forwarded_txn->internal().master_metadata();
   ASSERT_EQ(2U, master_metadata.size());

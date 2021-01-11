@@ -10,7 +10,7 @@
 using namespace std;
 using namespace slog;
 
-using internal::Request;
+using internal::Envelope;
 
 TEST(LocalLogTest, InOrder) {
   LocalLog interleaver;
@@ -137,19 +137,19 @@ class InterleaverTest : public ::testing::Test {
     }
   }
 
-  void SendToInterleaver(int from, int to, const internal::Request& req) {
-    senders_[from]->Send(req, kInterleaverChannel, to);
+  void SendToInterleaver(int from, int to, const Envelope& req) {
+    senders_[from]->SendSerialized(req, to, kInterleaverChannel);
   }
 
   Transaction* ReceiveTxn(int i) {
-    Request req;
-    if (!slogs_[i]->ReceiveFromOutputChannel(req, kSchedulerChannel)) {
+    auto req_env = slogs_[i]->ReceiveFromOutputChannel(kSchedulerChannel);
+    if (req_env == nullptr) {
       return nullptr;
     }
-    if (req.type_case() != Request::kForwardTxn) {
+    if (req_env->request().type_case() != internal::Request::kForwardTxn) {
       return nullptr;
     }
-    return req.mutable_forward_txn()->release_txn();
+    return req_env->mutable_request()->mutable_forward_txn()->release_txn();
   }
 
   unique_ptr<Sender> senders_[4];
@@ -173,8 +173,8 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
 
   // Replicate batch data to all machines
   {
-    Request req;
-    auto forward_batch = req.mutable_forward_batch();
+    Envelope req;
+    auto forward_batch = req.mutable_request()->mutable_forward_batch();
     forward_batch->mutable_batch_data()->CopyFrom(*batch);
     forward_batch->set_same_origin_position(0);
 
@@ -185,8 +185,8 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
 
   // Then send local ordering
   {
-    Request req;
-    auto local_queue_order = req.mutable_local_queue_order();
+    Envelope req;
+    auto local_queue_order = req.mutable_request()->mutable_local_queue_order();
     local_queue_order->set_queue_id(0);
     local_queue_order->set_slot(0);
     SendToInterleaver(0, 0, req);
@@ -213,8 +213,8 @@ TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
 
   // Then send local ordering
   {
-    Request req;
-    auto local_queue_order = req.mutable_local_queue_order();
+    Envelope req;
+    auto local_queue_order = req.mutable_request()->mutable_local_queue_order();
     local_queue_order->set_queue_id(0);
     local_queue_order->set_slot(0);
     SendToInterleaver(0, 0, req);
@@ -223,8 +223,8 @@ TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
 
   // Replicate batch data to all machines
   {
-    Request req;
-    auto forward_batch = req.mutable_forward_batch();
+    Envelope req;
+    auto forward_batch = req.mutable_request()->mutable_forward_batch();
     forward_batch->mutable_batch_data()->CopyFrom(*batch);
     forward_batch->set_same_origin_position(0);
 
@@ -258,18 +258,18 @@ TEST_F(InterleaverTest, ThreeBatches) {
 
   // Replicate batch data to all machines
   {
-    Request req1;
-    auto forward_batch1 = req1.mutable_forward_batch();
+    Envelope req1;
+    auto forward_batch1 = req1.mutable_request()->mutable_forward_batch();
     forward_batch1->mutable_batch_data()->CopyFrom(*sh_batch_1);
     forward_batch1->set_same_origin_position(0);
 
-    Request req2;
-    auto forward_batch2 = req2.mutable_forward_batch();
+    Envelope req2;
+    auto forward_batch2 = req2.mutable_request()->mutable_forward_batch();
     forward_batch2->mutable_batch_data()->CopyFrom(*sh_batch_2);
     forward_batch2->set_same_origin_position(0);
 
-    Request req3;
-    auto forward_batch3 = req3.mutable_forward_batch();
+    Envelope req3;
+    auto forward_batch3 = req3.mutable_request()->mutable_forward_batch();
     forward_batch3->mutable_batch_data()->CopyFrom(*mh_batch);
 
     for (int i = 0; i < NUM_MACHINES; i++) {
@@ -288,8 +288,8 @@ TEST_F(InterleaverTest, ThreeBatches) {
 
   // Then send local ordering. Txn 1 is ordered after txn 2
   {
-    Request req1;
-    auto local_queue_order1 = req1.mutable_local_queue_order();
+    Envelope req1;
+    auto local_queue_order1 = req1.mutable_request()->mutable_local_queue_order();
     local_queue_order1->set_slot(0);
     local_queue_order1->set_queue_id(1);
     SendToInterleaver(0, 0, req1);
@@ -301,8 +301,8 @@ TEST_F(InterleaverTest, ThreeBatches) {
       delete txn;
     }
 
-    Request req2;
-    auto local_queue_order2 = req2.mutable_local_queue_order();
+    Envelope req2;
+    auto local_queue_order2 = req2.mutable_request()->mutable_local_queue_order();
     local_queue_order2->set_slot(1);
     local_queue_order2->set_queue_id(0);
     SendToInterleaver(0, 0, req2);

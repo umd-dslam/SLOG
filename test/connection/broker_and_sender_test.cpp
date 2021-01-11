@@ -14,6 +14,7 @@
 
 using namespace std;
 using namespace slog;
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
@@ -21,6 +22,20 @@ zmq::socket_t MakePullSocket(zmq::context_t& context, Channel chan) {
   zmq::socket_t socket(context, ZMQ_PULL);
   socket.bind("inproc://channel_" + to_string(chan));
   return socket;
+}
+
+EnvelopePtr MakeEchoRequest(const std::string& data) {
+  auto env = std::make_unique<internal::Envelope>();
+  auto echo = env->mutable_request()->mutable_echo();
+  echo->set_data(data);
+  return env;
+}
+
+EnvelopePtr MakeEchoResponse(const std::string& data) {
+  auto env = std::make_unique<internal::Envelope>();
+  auto echo = env->mutable_response()->mutable_echo();
+  echo->set_data(data);
+  return env;
 }
 
 TEST(BrokerAndSenderTest, PingPong) {
@@ -39,12 +54,14 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     Sender sender(broker);
     // Send ping
-    sender.Send(MakeEchoRequest("ping"), PONG, configs[0]->MakeMachineId(0, 1));
+    auto ping_req = MakeEchoRequest("ping");
+    sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
 
     // Wait for pong
-    Response res;
-    ASSERT_TRUE(RecvDeserializedProto(socket, res));
-    ASSERT_EQ("pong", res.echo().data());
+    auto res = RecvEnvelope(socket);
+    ASSERT_TRUE(res != nullptr);
+    ASSERT_TRUE(res->has_response());
+    ASSERT_EQ("pong", res->response().echo().data());
   });
 
   auto pong = thread([&]() {
@@ -59,12 +76,14 @@ TEST(BrokerAndSenderTest, PingPong) {
     Sender sender(broker);
 
     // Wait for ping
-    Request req;
-    ASSERT_TRUE(RecvDeserializedProto(socket, req));
-    ASSERT_EQ("ping", req.echo().data());
+    auto req = RecvEnvelope(socket);
+    ASSERT_TRUE(req != nullptr);
+    ASSERT_TRUE(req->has_request());
+    ASSERT_EQ("ping", req->request().echo().data());
 
     // Send pong
-    sender.Send(MakeEchoResponse("pong"), PING, configs[1]->MakeMachineId(0, 0));
+    auto pong_res = MakeEchoResponse("pong");
+    sender.SendSerialized(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
 
     this_thread::sleep_for(200ms);
   });
@@ -89,12 +108,12 @@ TEST(BrokerTest, LocalPingPong) {
     auto socket = MakePullSocket(*context, PING);
 
     // Send ping
-    sender.Send(MakeEchoRequest("ping"), PONG);
+    sender.SendLocal(MakeEchoRequest("ping"), PONG);
 
     // Wait for pong
-    Response res;
-    ASSERT_TRUE(RecvDeserializedProto(socket, res));
-    ASSERT_EQ("pong", res.echo().data());
+    auto res = RecvEnvelope(socket);
+    ASSERT_TRUE(res != nullptr);
+    ASSERT_EQ("pong", res->response().echo().data());
   });
 
   auto pong = thread([&]() {
@@ -102,12 +121,12 @@ TEST(BrokerTest, LocalPingPong) {
     auto socket = MakePullSocket(*context, PONG);
 
     // Wait for ping
-    Request req;
-    ASSERT_TRUE(RecvDeserializedProto(socket, req));
-    ASSERT_EQ("ping", req.echo().data());
+    auto req = RecvEnvelope(socket);
+    ASSERT_TRUE(req != nullptr);
+    ASSERT_EQ("ping", req->request().echo().data());
 
     // Send pong
-    sender.Send(MakeEchoResponse("pong"), PING);
+    sender.SendLocal(MakeEchoResponse("pong"), PING);
     this_thread::sleep_for(200ms);
   });
 

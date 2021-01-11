@@ -1,9 +1,24 @@
+#include <glog/logging.h>
+
+#include <chrono>
+
 #include "common/configuration.h"
 #include "proto/internal.pb.h"
 
 namespace slog {
 
-void MonitorThroughput();
+#define MONITOR_THROUGHPUT()                                                                                \
+  static int TP_COUNTER = 0;                                                                                \
+  static int TP_LAST_COUNTER = 0;                                                                           \
+  static std::chrono::steady_clock::time_point TP_LAST_LOG_TIME;                                            \
+  TP_COUNTER++;                                                                                             \
+  auto TP_LOG_SPAN = std::chrono::steady_clock::now() - TP_LAST_LOG_TIME;                                   \
+  if (TP_LOG_SPAN > 1s) {                                                                                   \
+    LOG(INFO) << "Throughput: "                                                                             \
+              << (TP_COUNTER - TP_LAST_COUNTER) / std::chrono::duration_cast<seconds>(TP_LOG_SPAN).count(); \
+    TP_LAST_COUNTER = TP_COUNTER;                                                                           \
+    TP_LAST_LOG_TIME = std::chrono::steady_clock::now();                                                    \
+  }
 
 extern uint32_t gLocalMachineId;
 extern uint64_t gDisabledTracingEvents;

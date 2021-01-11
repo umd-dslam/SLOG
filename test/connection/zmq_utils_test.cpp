@@ -95,7 +95,7 @@ TEST(ZmqUtilsTest, SendWithMachineIdAndChannel) {
 
   Request req;
   req.mutable_echo()->set_data("test");
-  SendSerializedProto(push, req, 9, 1);
+  SendSerializedProto(push, req, 1, 9);
 
   zmq::message_t msg;
   (void)pull.recv(msg);

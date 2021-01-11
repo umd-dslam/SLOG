@@ -15,6 +15,7 @@ using std::stack;
 
 namespace slog {
 
+using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
@@ -59,16 +60,17 @@ Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker
                          std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout), config_(config) {}
 
-void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
-  if (req.get()->type_case() == Request::kLocalQueueOrder) {
-    auto& order = req.get()->local_queue_order();
+void Interleaver::HandleInternalRequest(EnvelopePtr&& env) {
+  auto request = env->mutable_request();
+  if (request->type_case() == Request::kLocalQueueOrder) {
+    auto& order = request->local_queue_order();
     VLOG(1) << "Received local queue order. Slot id: " << order.slot() << ". Queue id: " << order.queue_id();
 
     local_log_.AddSlot(order.slot(), order.queue_id());
 
-  } else if (req.get()->type_case() == Request::kForwardBatch) {
-    auto forward_batch = req.get()->mutable_forward_batch();
-    auto [from_replica, from_partition] = config_->UnpackMachineId(from);
+  } else if (request->type_case() == Request::kForwardBatch) {
+    auto forward_batch = request->mutable_forward_batch();
+    auto [from_replica, from_partition] = config_->UnpackMachineId(env->from());
 
     switch (forward_batch->part_case()) {
       case internal::ForwardBatch::kBatchData: {
@@ -78,7 +80,7 @@ void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
 
         switch (batch->transaction_type()) {
           case TransactionType::SINGLE_HOME:
-            VLOG(1) << "Received data for SINGLE-HOME batch " << batch->id() << " from [" << from
+            VLOG(1) << "Received data for SINGLE-HOME batch " << batch->id() << " from [" << env->from()
                     << "]. Number of txns: " << batch->transactions_size();
 
             if (from_replica == config_->local_replica()) {
@@ -112,7 +114,7 @@ void Interleaver::HandleInternalRequest(ReusableRequest&& req, MachineId from) {
       case internal::ForwardBatch::kBatchOrder: {
         auto& batch_order = forward_batch->batch_order();
 
-        VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << from
+        VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
                 << "]. Slot: " << batch_order.slot();
 
         single_home_logs_[from_replica].AddSlot(batch_order.slot(), batch_order.batch_id());
@@ -136,14 +138,14 @@ void Interleaver::AdvanceLogs() {
     auto batch_id = next_batch.second;
 
     // Replicate the batch and slot id to the corresponding partition in other regions
-    Request request;
-    auto forward_batch_order = request.mutable_forward_batch()->mutable_batch_order();
+    Envelope env;
+    auto forward_batch_order = env.mutable_request()->mutable_forward_batch()->mutable_batch_order();
     forward_batch_order->set_batch_id(batch_id);
     forward_batch_order->set_slot(slot_id);
     auto num_replicas = config_->num_replicas();
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       if (rep != local_replica) {
-        Send(request, kInterleaverChannel, config_->MakeMachineId(rep, local_partition));
+        Send(env, config_->MakeMachineId(rep, local_partition), kInterleaverChannel);
       }
     }
     single_home_logs_[local_replica].AddSlot(slot_id, batch_id);
@@ -187,10 +189,11 @@ void Interleaver::EmitBatch(BatchPtr&& batch) {
 
     TRACE(txn->mutable_internal(), TransactionEvent::EXIT_INTERLEAVER);
 
-    auto request = NewRequest();
-    auto forward_txn = request.get()->mutable_forward_txn();
+    auto env = NewEnvelope();
+    auto forward_txn = env->mutable_request()->mutable_forward_txn();
     forward_txn->set_allocated_txn(txn);
-    Send(*request.get(), kSchedulerChannel);
+
+    Send(move(env), kSchedulerChannel);
     buffer.pop();
   }
 }

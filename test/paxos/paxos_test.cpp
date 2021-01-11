@@ -72,10 +72,9 @@ class PaxosTest : public ::testing::Test {
   }
 
   void Propose(int index, int value) {
-    internal::Request paxos_req;
-    auto paxos_propose = paxos_req.mutable_paxos_propose();
-    paxos_propose->set_value(value);
-    senders_[index]->Send(paxos_req, kTestChannel);
+    auto env = make_unique<internal::Envelope>();
+    env->mutable_request()->mutable_paxos_propose()->set_value(value);
+    senders_[index]->SendLocal(move(env), kTestChannel);
   }
 
   vector<shared_ptr<TestSimpleMultiPaxos>> paxi;

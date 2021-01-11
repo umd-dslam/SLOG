@@ -8,6 +8,7 @@
 using namespace std;
 using namespace slog;
 
+using internal::Envelope;
 using internal::Request;
 
 class SequencerTest : public ::testing::Test {
@@ -21,21 +22,21 @@ class SequencerTest : public ::testing::Test {
     slog_->StartInNewThreads();
   }
 
-  void SendToSequencer(internal::Request req) { sender_->Send(req, kSequencerChannel); }
+  void SendToSequencer(EnvelopePtr&& req) { sender_->SendLocal(std::move(req), kSequencerChannel); }
 
   internal::Batch* ReceiveBatch() {
-    Request req;
-    if (!slog_->ReceiveFromOutputChannel(req, kInterleaverChannel)) {
+    auto req_env = slog_->ReceiveFromOutputChannel(kInterleaverChannel);
+    if (req_env == nullptr) {
       return nullptr;
     }
-    if (req.type_case() != Request::kForwardBatch) {
+    if (req_env->request().type_case() != Request::kForwardBatch) {
       return nullptr;
     }
-    auto forward_batch = req.mutable_forward_batch();
+    auto forward_batch = req_env->mutable_request()->mutable_forward_batch();
     if (forward_batch->part_case() != internal::ForwardBatch::kBatchData) {
       return nullptr;
     }
-    auto batch = req.mutable_forward_batch()->release_batch_data();
+    auto batch = req_env->mutable_request()->mutable_forward_batch()->release_batch_data();
     return batch;
   }
 
@@ -46,10 +47,9 @@ class SequencerTest : public ::testing::Test {
 TEST_F(SequencerTest, SingleHomeTransaction) {
   auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
-  Request req;
-  req.mutable_forward_txn()->set_allocated_txn(txn);
-
-  SendToSequencer(req);
+  auto env = make_unique<Envelope>();
+  env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+  SendToSequencer(move(env));
 
   auto batch = ReceiveBatch();
   ASSERT_NE(batch, nullptr);
@@ -65,12 +65,12 @@ TEST_F(SequencerTest, MultiHomeTransaction) {
 
   auto txn2 = MakeTransaction({}, {"C", "D"}, "some code", {{"C", {1, 0}}, {"D", {0, 0}}});
 
-  Request req;
-  auto mh_batch = req.mutable_forward_batch()->mutable_batch_data();
+  auto env = make_unique<Envelope>();
+  auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
   mh_batch->add_transactions()->CopyFrom(*txn1);
   mh_batch->add_transactions()->CopyFrom(*txn2);
   mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
-  SendToSequencer(req);
+  SendToSequencer(move(env));
 
   for (int i = 0; i < 2; i++) {
     auto batch = ReceiveBatch();
@@ -140,31 +140,30 @@ TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   CustomSetUp(100, 3);
   auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
-  Request req;
-  req.mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
-
-  SendToSequencer(req);
+  auto env = make_unique<Envelope>();
+  env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+  SendToSequencer(move(env));
 
   {
-    Request req;
-    ASSERT_TRUE(slog_->ReceiveFromOutputChannel(req, kInterleaverChannel));
-    ASSERT_EQ(req.type_case(), Request::kForwardBatch);
-    auto forward_batch = req.mutable_forward_batch();
-    ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);
-    auto batch = req.mutable_forward_batch()->release_batch_data();
-    ASSERT_EQ(batch->transactions_size(), 1);
-    ASSERT_EQ(batch->transactions().at(0), *txn);
-    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
+    auto env = slog_->ReceiveFromOutputChannel(kInterleaverChannel);
+    ASSERT_TRUE(env != nullptr);
+    ASSERT_EQ(env->request().type_case(), Request::kForwardBatch);
+    auto& forward_batch = env->request().forward_batch();
+    ASSERT_EQ(forward_batch.part_case(), internal::ForwardBatch::kBatchData);
+    auto& batch = forward_batch.batch_data();
+    ASSERT_EQ(batch.transactions_size(), 1);
+    ASSERT_EQ(batch.transactions().at(0), *txn);
+    ASSERT_EQ(batch.transaction_type(), TransactionType::SINGLE_HOME);
   }
   {
-    Request req;
-    ASSERT_TRUE(slog_2_->ReceiveFromOutputChannel(req, kInterleaverChannel));
-    ASSERT_EQ(req.type_case(), Request::kForwardBatch);
-    auto forward_batch = req.mutable_forward_batch();
-    ASSERT_EQ(forward_batch->part_case(), internal::ForwardBatch::kBatchData);
-    auto batch = req.mutable_forward_batch()->release_batch_data();
-    ASSERT_EQ(batch->transactions_size(), 1);
-    ASSERT_EQ(batch->transactions().at(0), *txn);
-    ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
+    auto env = slog_2_->ReceiveFromOutputChannel(kInterleaverChannel);
+    ASSERT_TRUE(env != nullptr);
+    ASSERT_EQ(env->request().type_case(), Request::kForwardBatch);
+    auto& forward_batch = env->request().forward_batch();
+    ASSERT_EQ(forward_batch.part_case(), internal::ForwardBatch::kBatchData);
+    auto& batch = forward_batch.batch_data();
+    ASSERT_EQ(batch.transactions_size(), 1);
+    ASSERT_EQ(batch.transactions().at(0), *txn);
+    ASSERT_EQ(batch.transaction_type(), TransactionType::SINGLE_HOME);
   }
 }

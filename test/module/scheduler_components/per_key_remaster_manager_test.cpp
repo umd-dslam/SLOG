@@ -22,60 +22,49 @@ class PerKeyRemasterManagerTest : public ::testing::Test {
   ConfigVec configs;
   shared_ptr<Storage<Key, Record>> storage;
   unique_ptr<RemasterManager> remaster_manager;
-  MessagePool<internal::Request> pool;
-
-  TransactionHolder MakeHolder(Transaction* txn, uint32_t txn_id = 0) {
-    txn->mutable_internal()->set_id(txn_id);
-    ReusableRequest req(&pool);
-    req.get()->mutable_forward_txn()->set_allocated_txn(txn);
-    return TransactionHolder{configs[0], move(req)};
-  }
 };
 
 TEST_F(PerKeyRemasterManagerTest, CheckCounters) {
   storage->Write("A", Record("valueA", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 100);
-  auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 2}}}), 101);
-  auto txn3 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 0}}}), 102);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {}, {{"A", {0, 1}}});
+  auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {}, {{"A", {0, 2}}});
+  auto txn3 = MakeTxnHolder(configs[0], 300, {"A"}, {}, {{"A", {0, 0}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::VALID);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::ABORT);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
 }
 
 TEST_F(PerKeyRemasterManagerTest, CheckMultipleCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   storage->Write("C", Record("valueC", 0, 1));
-  auto txn1 =
-      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 1}}}), 100);
-  auto txn2 =
-      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}}), 101);
-  auto txn3 =
-      MakeHolder(MakeTransaction({"A", "C"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}}), 102);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A", "C"}, {"B"}, {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 1}}});
+  auto txn2 = MakeTxnHolder(configs[0], 200, {"A", "C"}, {"B"}, {{"A", {0, 1}}, {"B", {0, 1}}, {"C", {0, 2}}});
+  auto txn3 = MakeTxnHolder(configs[0], 300, {"A", "C"}, {"B"}, {{"A", {0, 1}}, {"B", {0, 0}}, {"C", {0, 2}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::VALID);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::ABORT);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::ABORT);
 }
 
 TEST_F(PerKeyRemasterManagerTest, CheckIndirectBlocking) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {0, 1}}, {"B", {0, 2}}}), 100);
-  auto txn2 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {0, 1}}}), 101);
-  auto txn3 = MakeHolder(MakeTransaction({"B"}, {}, "some code", {{"B", {0, 1}}}), 102);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B"}, {{"A", {0, 1}}, {"B", {0, 2}}});
+  auto txn2 = MakeTxnHolder(configs[0], 200, {"A"}, {}, {{"A", {0, 1}}});
+  auto txn3 = MakeTxnHolder(configs[0], 300, {"B"}, {}, {{"B", {0, 1}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn3), VerifyMasterResult::VALID);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn3), VerifyMasterResult::VALID);
 }
 
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueSingleKey) {
   storage->Write("A", Record("valueA", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {}, "some code", {{"A", {1, 2}}}), 100);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {}, {{"A", {1, 2}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
   storage->Write("A", Record("valueA", 1, 2));
   auto unblocked = remaster_manager->RemasterOccured("A", 2).unblocked;
   ASSERT_THAT(unblocked, ElementsAre(&txn1));
@@ -84,9 +73,9 @@ TEST_F(PerKeyRemasterManagerTest, RemasterQueueSingleKey) {
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleKeys) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {1, 2}}, {"B", {0, 3}}}), 100);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B"}, {{"A", {1, 2}}, {"B", {0, 3}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
   storage->Write("B", Record("valueB", 1, 2));
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2).unblocked, ElementsAre());
   storage->Write("A", Record("valueA", 1, 2));
@@ -98,11 +87,11 @@ TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleKeys) {
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleTxns) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
-  auto txn1 = MakeHolder(MakeTransaction({"A"}, {"B"}, "some code", {{"A", {1, 2}}, {"B", {1, 2}}}), 100);
-  auto txn2 = MakeHolder(MakeTransaction({}, {"B"}, "some code", {{"B", {1, 2}}}), 101);
+  auto txn1 = MakeTxnHolder(configs[0], 100, {"A"}, {"B"}, {{"A", {1, 2}}, {"B", {1, 2}}});
+  auto txn2 = MakeTxnHolder(configs[0], 200, {}, {"B"}, {{"B", {1, 2}}});
 
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn1), VerifyMasterResult::WAITING);
-  ASSERT_EQ(remaster_manager->VerifyMaster(&txn2), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn1), VerifyMasterResult::WAITING);
+  ASSERT_EQ(remaster_manager->VerifyMaster(txn2), VerifyMasterResult::WAITING);
   storage->Write("B", Record("valueB", 1, 2));
   ASSERT_THAT(remaster_manager->RemasterOccured("B", 2).unblocked, ElementsAre());
   storage->Write("A", Record("valueA", 1, 2));

@@ -23,6 +23,14 @@ message BatchOrder {
     uint32 slot = 2;
 }
 
+message Envelope {
+    oneof type {
+        Request request = 1;
+        Response response = 2;
+    }
+    uint32 from = 3;
+}
+
 /***********************************************
                     REQUESTS
 ***********************************************/
