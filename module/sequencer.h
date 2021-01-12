@@ -27,29 +27,25 @@ namespace slog {
  */
 class Sequencer : public NetworkedModule {
  public:
-  Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
-            std::chrono::milliseconds poll_timeout = kModuleTimeout);
+  Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
+            milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  std::vector<zmq::socket_t> InitializeCustomSockets() final;
-
   void HandleInternalRequest(EnvelopePtr&& env) final;
-
-  void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
  private:
   void NewBatch();
   BatchId NextBatchId();
+  void ScheduleBatch(Transaction* txn);
+  void SendBatch();
+  bool SendBatchDelayed(const EnvelopePtr& env);
 
   void ProcessMultiHomeBatch(EnvelopePtr&& env);
-  void PutSingleHomeTransactionIntoBatch(Transaction* txn);
 
   ConfigurationPtr config_;
+  milliseconds batch_timeout_;
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
-
-  void DelaySingleHomeBatch(EnvelopePtr&& env);
-  void MaybeSendDelayedBatches();
   std::mt19937 rg_;
   std::list<EnvelopePtr> delayed_batches_;
 };

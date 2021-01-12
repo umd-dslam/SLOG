@@ -14,9 +14,9 @@ message Replica {
 
 message ReplicationDelayExperiment {
     // Percent of batches that are delayed
-    uint32 batch_delay_percent = 1;
-    // Average duration of delay in ticks (module/Ticker)
-    uint32 batch_delay_amount = 2;
+    uint32 delay_pct = 1;
+    // Average duration of delay in milliseconds
+    uint32 delay_amount_ms = 2;
 }
 
 /**

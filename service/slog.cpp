@@ -156,10 +156,10 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Ticker>(*context, milliseconds(config->batch_duration())));
+  modules.push_back(MakeRunnerFor<slog::Ticker>(*context, config->batch_duration()));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
-  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker));
+  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->batch_duration()));
   modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
 

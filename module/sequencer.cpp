@@ -15,16 +15,13 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
-                     std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout), config_(config), batch_id_counter_(0) {
+Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
+                     milliseconds poll_timeout)
+    : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
+      config_(config),
+      batch_timeout_(batch_timeout),
+      batch_id_counter_(0) {
   NewBatch();
-}
-
-vector<zmq::socket_t> Sequencer::InitializeCustomSockets() {
-  vector<zmq::socket_t> ticker_socket;
-  ticker_socket.push_back(Ticker::Subscribe(*context()));
-  return ticker_socket;
 }
 
 void Sequencer::NewBatch() {
@@ -33,6 +30,8 @@ void Sequencer::NewBatch() {
   }
   batch_->Clear();
   batch_->set_transaction_type(TransactionType::SINGLE_HOME);
+  ++batch_id_counter_;
+  batch_->set_id(batch_id_counter_ * kMaxNumMachines + config_->local_machine_id());
 }
 
 void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
@@ -43,7 +42,7 @@ void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
 
       TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
-      PutSingleHomeTransactionIntoBatch(txn);
+      ScheduleBatch(txn);
       break;
     }
     case Request::kForwardBatch: {
@@ -57,63 +56,6 @@ void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
       LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
       break;
   }
-}
-
-// Ticker socket
-void Sequencer::HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) {
-  // Remove the dummy message out of the queue
-  if (zmq::message_t msg; !socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return;
-  }
-
-  MaybeSendDelayedBatches();
-
-  // Do nothing if there is nothing to send
-  if (batch_->transactions().empty()) {
-    return;
-  }
-
-  auto batch_id = NextBatchId();
-  batch_->set_id(batch_id);
-
-  VLOG(3) << "Finished batch " << batch_id << " of size " << batch_->transactions().size()
-          << ". Sending out for ordering and replicating";
-
-  auto paxos_env = NewEnvelope();
-  auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
-  paxos_propose->set_value(config_->local_partition());
-  Send(move(paxos_env), kLocalPaxos);
-
-  auto batch_env = NewEnvelope();
-  auto forward_batch = batch_env->mutable_request()->mutable_forward_batch();
-  // Minus 1 so that batch id counter starts from 0
-  forward_batch->set_same_origin_position(batch_id_counter_ - 1);
-  forward_batch->set_allocated_batch_data(batch_.release());
-
-  TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
-
-  if (config_->replication_delay_percent()) {
-    // Maybe delay current batch
-    std::uniform_int_distribution<uint32_t> dis(0, 100);
-    if (dis(rg_) <= config_->replication_delay_percent()) {
-      VLOG(4) << "Delay batch " << batch_id;
-      DelaySingleHomeBatch(move(batch_env));
-      NewBatch();
-      return;
-    }
-  }
-
-  // Replicate batch to all machines
-  auto num_partitions = config_->num_partitions();
-  auto num_replicas = config_->num_replicas();
-  for (uint32_t part = 0; part < num_partitions; part++) {
-    for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      auto machine_id = config_->MakeMachineId(rep, part);
-      Send(*batch_env, machine_id, kInterleaverChannel);
-    }
-  }
-
-  NewBatch();
 }
 
 void Sequencer::ProcessMultiHomeBatch(EnvelopePtr&& env) {
@@ -167,7 +109,7 @@ void Sequencer::ProcessMultiHomeBatch(EnvelopePtr&& env) {
     lock_only_txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
 
     if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
-      PutSingleHomeTransactionIntoBatch(lock_only_txn);
+      ScheduleBatch(lock_only_txn);
     }
   }
 
@@ -181,56 +123,92 @@ void Sequencer::ProcessMultiHomeBatch(EnvelopePtr&& env) {
   }
 }
 
-void Sequencer::PutSingleHomeTransactionIntoBatch(Transaction* txn) {
+void Sequencer::ScheduleBatch(Transaction* txn) {
   DCHECK(txn->internal().type() == TransactionType::SINGLE_HOME || txn->internal().type() == TransactionType::LOCK_ONLY)
       << "Sequencer batch can only contain single-home or lock-only txn. "
       << "Multi-home txn or unknown txn type received instead.";
+
   batch_->mutable_transactions()->AddAllocated(txn);
+  // If this is the first txn of the batch, start the timer to send the batch
+  if (batch_->transactions_size() == 1) {
+    NewTimedCallback(batch_timeout_, [this]() {
+      SendBatch();
+      NewBatch();
+    });
+  }
 }
 
-BatchId Sequencer::NextBatchId() {
-  batch_id_counter_++;
-  return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id();
+void Sequencer::SendBatch() {
+  VLOG(3) << "Finished batch " << batch_->id() << " of size " << batch_->transactions().size()
+              << ". Sending out for ordering and replicating";
+
+  auto paxos_env = NewEnvelope();
+  auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
+  paxos_propose->set_value(config_->local_partition());
+  Send(move(paxos_env), kLocalPaxos);
+
+  auto batch_env = NewEnvelope();
+  auto forward_batch = batch_env->mutable_request()->mutable_forward_batch();
+  // Minus 1 so that batch id counter starts from 0
+  forward_batch->set_same_origin_position(batch_id_counter_ - 1);
+  forward_batch->set_allocated_batch_data(batch_.release());
+
+  TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+
+  if (!SendBatchDelayed(batch_env)) {
+    auto num_partitions = config_->num_partitions();
+    auto num_replicas = config_->num_replicas();
+    for (uint32_t part = 0; part < num_partitions; part++) {
+      for (uint32_t rep = 0; rep < num_replicas; rep++) {
+        auto machine_id = config_->MakeMachineId(rep, part);
+        if (machine_id != config_->local_machine_id()) {
+          Send(*batch_env, machine_id, kInterleaverChannel);
+        }
+      }
+    }
+  }
+  // Forward to the next module in the same machine
+  Send(move(batch_env), kInterleaverChannel);
 }
 
-void Sequencer::DelaySingleHomeBatch(EnvelopePtr&& env) {
-  // Send the batch to interleavers in the local replica only
+bool Sequencer::SendBatchDelayed(const EnvelopePtr& env) {
+  if (!config_->replication_delay_pct()) {
+    return false;
+  }
+
+  std::bernoulli_distribution is_delayed(config_->replication_delay_pct() / 100.0);
+  if (!is_delayed(rg_)) {
+    return false;
+  }
+
   auto local_rep = config_->local_replica();
   auto num_partitions = config_->num_partitions();
   for (uint32_t part = 0; part < num_partitions; part++) {
     auto machine_id = config_->MakeMachineId(local_rep, part);
     Send(*env, machine_id, kInterleaverChannel);
   }
-  delayed_batches_.emplace_back(move(env));
-}
+  
+  auto delay_ms = config_->replication_delay_amount_ms();
 
-void Sequencer::MaybeSendDelayedBatches() {
-  for (auto itr = delayed_batches_.begin(); itr != delayed_batches_.end();) {
-    // Create a geometric distribution of delay. Each batch has 1 / DelayAmount chance
-    // of being sent at every tick
-    if (rand() % config_->replication_delay_amount() == 0) {
-      VLOG(4) << "Sending delayed batch";
-      auto& request = *itr;
+  VLOG(4) << "Delay batch " << env->request().forward_batch().batch_data().id() << " for " << delay_ms << " ms";
 
-      // Replicate batch to all machines EXCEPT local replica
-      auto num_replicas = config_->num_replicas();
-      auto num_partitions = config_->num_partitions();
-      for (uint32_t rep = 0; rep < num_replicas; rep++) {
-        if (rep == config_->local_replica()) {
-          // Already sent to local replica
-          continue;
-        }
+  NewTimedCallback(milliseconds(delay_ms), [this, delayed_batch = internal::Envelope(*env)]() {
+    VLOG(4) << "Sending delayed batch " << delayed_batch.request().forward_batch().batch_data().id();
+    // Replicate batch to all machines EXCEPT local replica
+    auto num_replicas = config_->num_replicas();
+    auto num_partitions = config_->num_partitions();
+    for (uint32_t rep = 0; rep < num_replicas; rep++) {
+      // Already sent to local replica
+      if (rep != config_->local_replica()) {
         for (uint32_t part = 0; part < num_partitions; part++) {
           auto machine_id = config_->MakeMachineId(rep, part);
-          Send(*request, machine_id, kInterleaverChannel);
+          Send(delayed_batch, machine_id, kInterleaverChannel);
         }
       }
-
-      itr = delayed_batches_.erase(itr);
-    } else {
-      itr++;
     }
-  }
+  });
+
+  return true;
 }
 
 }  // namespace slog

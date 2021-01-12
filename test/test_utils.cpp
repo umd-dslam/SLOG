@@ -96,7 +96,7 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
       client_socket_(client_context_, ZMQ_DEALER) {
   context_->set(zmq::ctxopt::blocky, false);
   client_context_.set(zmq::ctxopt::blocky, false);
-  ticker_ = MakeRunnerFor<Ticker>(*context_, milliseconds(config->batch_duration()));
+  ticker_ = MakeRunnerFor<Ticker>(*context_, config_->batch_duration());
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {
@@ -109,7 +109,9 @@ void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, b
 
 void TestSlog::AddForwarder() { forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeout); }
 
-void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddSequencer() {
+  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, config_->batch_duration(), kTestModuleTimeout);
+}
 
 void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeout); }
 

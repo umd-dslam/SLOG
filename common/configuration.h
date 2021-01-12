@@ -32,13 +32,13 @@ class Configuration {
   uint32_t num_partitions() const;
   uint32_t num_workers() const;
   vector<MachineId> all_machine_ids() const;
-  long batch_duration() const;
+  milliseconds batch_duration() const;
   uint32_t replication_factor() const;
 
   const string& local_address() const;
   uint32_t local_replica() const;
   uint32_t local_partition() const;
-  uint32_t local_machine_id() const;
+  MachineId local_machine_id() const;
   MachineId MakeMachineId(uint32_t replica, uint32_t partition) const;
   std::pair<uint32_t, uint32_t> UnpackMachineId(MachineId machine_id) const;
 
@@ -51,8 +51,8 @@ class Configuration {
   uint32_t master_of_key(uint32_t key) const;
   const internal::SimplePartitioning* simple_partitioning() const;
 
-  uint32_t replication_delay_percent() const;
-  uint32_t replication_delay_amount() const;
+  uint32_t replication_delay_pct() const;
+  uint32_t replication_delay_amount_ms() const;
   vector<TransactionEvent> disabled_tracing_events() const;
   bool return_dummy_txn() const;
 

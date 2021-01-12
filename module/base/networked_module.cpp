@@ -53,13 +53,7 @@ void NetworkedModule::SetUp() {
 }
 
 bool NetworkedModule::Loop() {
-  auto poll_res = poller_.Wait();
-
-  for (auto time_ev : poll_res.time_events) {
-    HandleTimeEvent(time_ev);
-  }
-
-  if (poll_res.num_zmq_events == 0) {
+  if (poller_.Wait() <= 0) {
     return false;
   }
 
@@ -92,6 +86,8 @@ void NetworkedModule::Send(const internal::Envelope& env, const std::vector<Mach
 
 void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.SendLocal(move(env), to_channel); }
 
-void NetworkedModule::NewTimeEvent(microseconds timeout, void* data) { poller_.AddTimeEvent(timeout, data); }
+void NetworkedModule::NewTimedCallback(microseconds timeout, const std::function<void()>& cb) {
+  poller_.AddTimedCallback(timeout, cb);
+}
 
 }  // namespace slog

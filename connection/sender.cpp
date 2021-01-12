@@ -57,7 +57,7 @@ void Sender::SendLocal(EnvelopePtr&& envelope, Channel to_channel) {
       return;
     }
   }
-
+  envelope->set_from(local_machine_id_);
   SendEnvelope(it->second, move(envelope));
 }
 

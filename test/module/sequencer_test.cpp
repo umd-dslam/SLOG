@@ -117,8 +117,8 @@ class SequencerReplicationDelayTest : public SequencerTest {
   void SetUp() {}
   void CustomSetUp(uint32_t delay_percent, uint32_t delay_amount) {
     internal::Configuration extra_config;
-    extra_config.mutable_replication_delay()->set_batch_delay_percent(delay_percent);
-    extra_config.mutable_replication_delay()->set_batch_delay_amount(delay_amount);
+    extra_config.mutable_replication_delay()->set_delay_pct(delay_percent);
+    extra_config.mutable_replication_delay()->set_delay_amount_ms(delay_amount);
     auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, extra_config);
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
@@ -137,7 +137,7 @@ class SequencerReplicationDelayTest : public SequencerTest {
 };
 
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
-  CustomSetUp(100, 3);
+  CustomSetUp(100, 10);
   auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
 
   auto env = make_unique<Envelope>();

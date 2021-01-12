@@ -14,8 +14,6 @@ using std::chrono::system_clock;
 
 namespace slog {
 
-const uint32_t kOverheadEstimate = 20;
-
 TxnGenerator::TxnGenerator(const ConfigurationPtr& config, zmq::context_t& context, unique_ptr<Workload>&& workload,
                            uint32_t region, uint32_t num_txns, uint32_t tps, bool dry_run)
     : Module("Txn-Generator"),
@@ -31,8 +29,9 @@ TxnGenerator::TxnGenerator(const ConfigurationPtr& config, zmq::context_t& conte
   CHECK(workload_ != nullptr) << "Must provide a valid workload";
 
   CHECK_LT(tps, 1000000) << "Transaction/sec is too high (max. 1000000)";
-  if (1000000 / tps > kOverheadEstimate) {
-    interval_ = std::chrono::microseconds(1000000 / tps - kOverheadEstimate);
+  uint32_t overhead_estimate = !dry_run_ * 10;
+  if (1000000 / tps > overhead_estimate) {
+    interval_ = std::chrono::microseconds(1000000 / tps - overhead_estimate);
   } else {
     interval_ = 0us;
   }
@@ -67,16 +66,37 @@ void TxnGenerator::SetUp() {
       socket_.connect(endpoint);
     }
     poller_.PushSocket(socket_);
-  }
-  poller_.AddTimeEvent(interval_, nullptr);
+  }  
+
+  // Schedule sending new txns
+  poller_.AddTimedCallback(interval_, [this](){ SendTxn(); });
 
   start_time_ = steady_clock::now();
 }
 
-bool TxnGenerator::Loop() {
-  auto res = poller_.Wait();
+void TxnGenerator::SendTxn() {
+  if (cur_txn_ >= txns_.size()) {
+    return;
+  }
+  auto& info = txns_[cur_txn_];
 
-  if (res.num_zmq_events > 0) {
+  // Send current txn
+  if (!dry_run_) {
+    api::Request req;
+    req.mutable_txn()->set_allocated_txn(info.txn);
+    req.set_stream_id(cur_txn_);
+    SendSerializedProtoWithEmptyDelim(socket_, req);
+    info.txn = nullptr;
+  }
+  info.sent_at = system_clock::now();
+
+  // Schedule for next txn
+  ++cur_txn_;
+  poller_.AddTimedCallback(interval_, [this](){ SendTxn(); });  
+}
+
+bool TxnGenerator::Loop() {
+  if (poller_.Wait() > 0) {
     if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       auto& info = txns_[res.stream_id()];
       if (info.finished) {
@@ -87,26 +107,6 @@ bool TxnGenerator::Loop() {
         info.finished = true;
         ++num_recv_txns_;
       }
-    }
-  }
-
-  if (!res.time_events.empty()) {
-    if (cur_txn_ < txns_.size()) {
-      auto& info = txns_[cur_txn_];
-
-      // Send current txn
-      if (!dry_run_) {
-        api::Request req;
-        req.mutable_txn()->set_allocated_txn(info.txn);
-        req.set_stream_id(cur_txn_);
-        SendSerializedProtoWithEmptyDelim(socket_, req);
-        info.txn = nullptr;
-      }
-      info.sent_at = system_clock::now();
-
-      // Schedule for next txn
-      ++cur_txn_;
-      poller_.AddTimeEvent(interval_, nullptr);
     }
   }
 

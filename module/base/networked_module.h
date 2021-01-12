@@ -31,8 +31,6 @@ class NetworkedModule : public Module {
 
   virtual void HandleInternalResponse(EnvelopePtr&& /* env */) {}
 
-  virtual void HandleTimeEvent(void* /* data */) {}
-
   // The implementation of this function must never block
   virtual void HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */){};
 
@@ -43,7 +41,7 @@ class NetworkedModule : public Module {
   void Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
   void Send(EnvelopePtr&& env, Channel to_channel);
 
-  void NewTimeEvent(microseconds timeout, void* data);
+  void NewTimedCallback(microseconds timeout, const std::function<void()>& cb);
 
   const std::shared_ptr<zmq::context_t> context() const;
 

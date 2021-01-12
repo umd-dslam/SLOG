@@ -77,7 +77,7 @@ uint32_t Configuration::broker_port() const { return config_.broker_port(); }
 
 uint32_t Configuration::server_port() const { return config_.server_port(); }
 
-long Configuration::batch_duration() const { return config_.batch_duration(); }
+milliseconds Configuration::batch_duration() const { return milliseconds(config_.batch_duration()); }
 
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 
@@ -100,7 +100,7 @@ uint32_t Configuration::local_replica() const { return local_replica_; }
 
 uint32_t Configuration::local_partition() const { return local_partition_; }
 
-uint32_t Configuration::local_machine_id() const { return MakeMachineId(local_replica_, local_partition_); }
+MachineId Configuration::local_machine_id() const { return MakeMachineId(local_replica_, local_partition_); }
 
 MachineId Configuration::MakeMachineId(uint32_t replica, uint32_t partition) const {
   return replica * num_partitions() + partition;
@@ -140,9 +140,9 @@ const internal::SimplePartitioning* Configuration::simple_partitioning() const {
   return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
-uint32_t Configuration::replication_delay_percent() const { return config_.replication_delay().batch_delay_percent(); }
+uint32_t Configuration::replication_delay_pct() const { return config_.replication_delay().delay_pct(); }
 
-uint32_t Configuration::replication_delay_amount() const { return config_.replication_delay().batch_delay_amount(); }
+uint32_t Configuration::replication_delay_amount_ms() const { return config_.replication_delay().delay_amount_ms(); }
 
 vector<TransactionEvent> Configuration::disabled_tracing_events() const {
   vector<TransactionEvent> res;

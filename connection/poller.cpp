@@ -15,11 +15,11 @@ void Poller::PushSocket(zmq::socket_t& socket) {
   });
 }
 
-PollResult Poller::Wait() {
+int Poller::Wait() {
   // Compute the time that we need to wait until the next event
   auto shortest_timeout = poll_timeout_;
   auto now = Clock::now();
-  for (auto& ev : time_events_) {
+  for (auto& ev : timed_callbacks_) {
     if (ev.when <= now) {
       shortest_timeout = 0us;
       break;
@@ -29,27 +29,26 @@ PollResult Poller::Wait() {
   }
 
   // Wait until the next time event or some timeout
-  PollResult result;
-  result.num_zmq_events = zmq::poll(poll_items_, duration_cast<milliseconds>(shortest_timeout));
+  auto res = zmq::poll(poll_items_, duration_cast<milliseconds>(shortest_timeout));
 
-  // Process and clean up triggered time events
+  // Process and clean up triggered callbacks
   now = Clock::now();
-  for (auto it = time_events_.begin(); it != time_events_.end();) {
+  for (auto it = timed_callbacks_.begin(); it != timed_callbacks_.end();) {
     if (it->when <= now) {
-      result.time_events.push_back(it->data);
-      it = time_events_.erase(it);
+      it->callback();
+      it = timed_callbacks_.erase(it);
     } else {
       ++it;
     }
   }
 
-  return result;
+  return res;
 }
 
 bool Poller::is_socket_ready(size_t i) const { return poll_items_[i].revents & ZMQ_POLLIN; }
 
-void Poller::AddTimeEvent(microseconds timeout, void* data) {
-  time_events_.push_back({.when = Clock::now() + timeout, .data = data});
+void Poller::AddTimedCallback(microseconds timeout, const std::function<void()>& cb) {
+  timed_callbacks_.push_back({.when = Clock::now() + timeout, .callback = cb});
 }
 
 }  // namespace slog

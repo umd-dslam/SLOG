@@ -33,6 +33,8 @@ class TxnGenerator : public Module {
   const std::vector<TxnInfo>& txns() const { return txns_; }
 
  private:
+  void SendTxn();
+
   ConfigurationPtr config_;
   zmq::socket_t socket_;
   std::unique_ptr<Workload> workload_;
