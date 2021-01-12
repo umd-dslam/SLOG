@@ -23,27 +23,23 @@ namespace slog {
  */
 class MultiHomeOrderer : public NetworkedModule {
  public:
-  MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
-                   std::chrono::milliseconds poll_timeout = kModuleTimeout);
+  MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
+                   milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  std::vector<zmq::socket_t> InitializeCustomSockets() final;
-
   void HandleInternalRequest(EnvelopePtr&& env) final;
-
-  void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
  private:
   void NewBatch();
-  BatchId NextBatchId();
+  void ScheduleBatch(Transaction* txn);
+  void SendBatch();
 
   void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
 
   ConfigurationPtr config_;
+  milliseconds batch_timeout_;
   unique_ptr<internal::Batch> batch_;
-  BatchId local_batch_id_counter_;
   BatchId batch_id_counter_;
-
   BatchLog multi_home_batch_log_;
 };
 

@@ -96,7 +96,6 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
       client_socket_(client_context_, ZMQ_DEALER) {
   context_->set(zmq::ctxopt::blocky, false);
   client_context_.set(zmq::ctxopt::blocky, false);
-  ticker_ = MakeRunnerFor<Ticker>(*context_, config_->batch_duration());
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {
@@ -122,7 +121,8 @@ void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config
 void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeout); }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, kTestModuleTimeout);
+  multi_home_orderer_ =
+      MakeRunnerFor<MultiHomeOrderer>(config_, broker_, config_->batch_duration(), kTestModuleTimeout);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {
@@ -146,7 +146,6 @@ unique_ptr<Sender> TestSlog::GetSender() { return std::make_unique<Sender>(broke
 
 void TestSlog::StartInNewThreads() {
   broker_->StartInNewThread();
-  ticker_->StartInNewThread();
   if (server_) {
     server_->StartInNewThread();
     string endpoint = "tcp://localhost:" + to_string(config_->server_port());

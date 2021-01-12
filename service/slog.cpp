@@ -156,7 +156,6 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Ticker>(*context, config->batch_duration()));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
   modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->batch_duration()));
@@ -166,7 +165,7 @@ int main(int argc, char* argv[]) {
   // Only one partition per replica participates in the global paxos process
   if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
     modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
-    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
+    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->batch_duration()));
   }
 
   // Block SIGINT from here so that the new threads inherit the block mask

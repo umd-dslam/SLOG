@@ -35,7 +35,6 @@ class Sequencer : public NetworkedModule {
 
  private:
   void NewBatch();
-  BatchId NextBatchId();
   void ScheduleBatch(Transaction* txn);
   void SendBatch();
   bool SendBatchDelayed(const EnvelopePtr& env);
@@ -47,7 +46,6 @@ class Sequencer : public NetworkedModule {
   unique_ptr<internal::Batch> batch_;
   BatchId batch_id_counter_;
   std::mt19937 rg_;
-  std::list<EnvelopePtr> delayed_batches_;
 };
 
 }  // namespace slog

@@ -169,7 +169,8 @@ int main(int argc, char* argv[]) {
       return info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
     });
   }
-  LOG(INFO) << "Summary:\n" << "Avg. TPS: " << avg_tps << "\nAborted: " << aborted << "\nCommitted: " << committed
+  LOG(INFO) << "Summary:\n"
+            << "Avg. TPS: " << avg_tps << "\nAborted: " << aborted << "\nCommitted: " << committed
             << "\nSingle-home: " << single_home << "\nMulti-home: " << multi_home << "\nRemaster: " << remaster;
 
   // Dump benchmark data to files

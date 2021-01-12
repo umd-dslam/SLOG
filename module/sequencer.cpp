@@ -140,7 +140,7 @@ void Sequencer::ScheduleBatch(Transaction* txn) {
 
 void Sequencer::SendBatch() {
   VLOG(3) << "Finished batch " << batch_->id() << " of size " << batch_->transactions().size()
-              << ". Sending out for ordering and replicating";
+          << ". Sending out for ordering and replicating";
 
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
@@ -187,7 +187,7 @@ bool Sequencer::SendBatchDelayed(const EnvelopePtr& env) {
     auto machine_id = config_->MakeMachineId(local_rep, part);
     Send(*env, machine_id, kInterleaverChannel);
   }
-  
+
   auto delay_ms = config_->replication_delay_amount_ms();
 
   VLOG(4) << "Delay batch " << env->request().forward_batch().batch_data().id() << " for " << delay_ms << " ms";

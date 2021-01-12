@@ -66,10 +66,10 @@ void TxnGenerator::SetUp() {
       socket_.connect(endpoint);
     }
     poller_.PushSocket(socket_);
-  }  
+  }
 
   // Schedule sending new txns
-  poller_.AddTimedCallback(interval_, [this](){ SendTxn(); });
+  poller_.AddTimedCallback(interval_, [this]() { SendTxn(); });
 
   start_time_ = steady_clock::now();
 }
@@ -92,7 +92,7 @@ void TxnGenerator::SendTxn() {
 
   // Schedule for next txn
   ++cur_txn_;
-  poller_.AddTimedCallback(interval_, [this](){ SendTxn(); });  
+  poller_.AddTimedCallback(interval_, [this]() { SendTxn(); });
 }
 
 bool TxnGenerator::Loop() {
