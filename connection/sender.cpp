@@ -11,6 +11,20 @@ Sender::Sender(const std::shared_ptr<Broker>& broker)
     : context_(broker->context()), broker_(broker), local_machine_id_(broker->local_machine_id()) {}
 
 void Sender::SendSerialized(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel) {
+  SendSerializedProto(*GetRemoteSocket(to_machine_id), envelope, local_machine_id_, to_channel);
+}
+
+void Sender::MultiSendSerialized(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids,
+                                 Channel to_channel) {
+  auto serialized = SerializeProto(envelope);
+  for (auto dest : to_machine_ids) {
+    zmq::message_t copied;
+    copied.copy(serialized);
+    SendAddressedBuffer(*GetRemoteSocket(dest), move(copied), local_machine_id_, to_channel);
+  }
+}
+
+zmq::socket_t* Sender::GetRemoteSocket(MachineId to_machine_id) {
   // Lazily establish a new connection when necessary
   auto it = machine_id_to_socket_.find(to_machine_id);
   if (it == machine_id_to_socket_.end()) {
@@ -22,11 +36,10 @@ void Sender::SendSerialized(const internal::Envelope& envelope, MachineId to_mac
       it = res.first;
     } else {
       // Broker has been destroyed. This can only happen during cleaning up
-      return;
+      return nullptr;
     }
   }
-
-  SendSerializedProto(it->second, envelope, local_machine_id_, to_channel);
+  return &it->second;
 }
 
 void Sender::SendLocal(EnvelopePtr&& envelope, Channel to_channel) {

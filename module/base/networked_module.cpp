@@ -85,6 +85,11 @@ void NetworkedModule::Send(const internal::Envelope& env, MachineId to_machine_i
   sender_.SendSerialized(env, to_machine_id, to_channel);
 }
 
+void NetworkedModule::Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids,
+                           Channel to_channel) {
+  sender_.MultiSendSerialized(env, to_machine_ids, to_channel);
+}
+
 void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.SendLocal(move(env), to_channel); }
 
 void NetworkedModule::NewTimeEvent(microseconds timeout, void* data) { poller_.AddTimeEvent(timeout, data); }

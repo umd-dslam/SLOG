@@ -84,8 +84,6 @@ TEST(BrokerAndSenderTest, PingPong) {
     // Send pong
     auto pong_res = MakeEchoResponse("pong");
     sender.SendSerialized(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
-
-    this_thread::sleep_for(200ms);
   });
 
   ping.join();
@@ -127,9 +125,74 @@ TEST(BrokerTest, LocalPingPong) {
 
     // Send pong
     sender.SendLocal(MakeEchoResponse("pong"), PING);
-    this_thread::sleep_for(200ms);
   });
 
   ping.join();
   pong.join();
+}
+
+TEST(BrokerTest, MultiSendSerialized) {
+  const Channel PING = 10;
+  const Channel PONG = 11;
+  const int NUM_PONGS = 3;
+  ConfigVec configs = MakeTestConfigurations("pingpong", 1, NUM_PONGS + 1);
+
+  auto ping = thread([&]() {
+    auto context = make_shared<zmq::context_t>(1);
+
+    auto socket = MakePullSocket(*context, PING);
+
+    auto broker = make_shared<Broker>(configs[0], context);
+    broker->AddChannel(PING);
+    broker->StartInNewThread();
+
+    Sender sender(broker);
+    // Send ping
+    auto ping_req = MakeEchoRequest("ping");
+    vector<MachineId> dests;
+    for (int i = 0; i < NUM_PONGS; i++) {
+      dests.push_back(configs[0]->MakeMachineId(0, i + 1));
+    }
+    sender.MultiSendSerialized(*ping_req, dests, PONG);
+
+    // Wait for pongs
+    for (int i = 0; i < NUM_PONGS; i++) {
+      auto res = RecvEnvelope(socket);
+      ASSERT_TRUE(res != nullptr);
+      ASSERT_TRUE(res->has_response());
+      ASSERT_EQ("pong", res->response().echo().data());
+    }
+  });
+
+  thread pongs[NUM_PONGS];
+  for (int i = 0; i < NUM_PONGS; i++) {
+    pongs[i] = thread([&configs, i]() {
+      auto context = std::make_shared<zmq::context_t>(1);
+
+      auto socket = MakePullSocket(*context, PONG);
+
+      auto broker = make_shared<Broker>(configs[i + 1], context);
+      broker->AddChannel(PONG);
+      broker->StartInNewThread();
+
+      Sender sender(broker);
+
+      // Wait for ping
+      auto req = RecvEnvelope(socket);
+      ASSERT_TRUE(req != nullptr);
+      ASSERT_TRUE(req->has_request());
+      ASSERT_EQ("ping", req->request().echo().data());
+
+      // Send pong
+      auto pong_res = MakeEchoResponse("pong");
+      sender.SendSerialized(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
+
+      this_thread::sleep_for(200ms);
+    });
+  }
+
+  ping.join();
+  for (int i = 0; i < NUM_PONGS; i++) {
+    pongs[i].join();
+  }
 }

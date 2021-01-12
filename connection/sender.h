@@ -26,6 +26,16 @@ class Sender {
   void SendSerialized(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel);
 
   /**
+   * Send a request or response to a given channel of a list of machines.
+   * Use this to serialize the message only once.
+   * @param request_or_response Request or response to be sent
+   * @param to_machine_ids Ids of the machines that this message is sent to
+   * @param to_channel Channel on the machine that this message is sent to
+   */
+  void MultiSendSerialized(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids,
+                           Channel to_channel);
+
+  /**
    * Send a request or response to the same machine given a channel
    * @param request_or_response Request or response to be sent
    * @param to_channel Channel on the machine that this message is sent to
@@ -33,6 +43,8 @@ class Sender {
   void SendLocal(EnvelopePtr&& envelope, Channel to_channel);
 
  private:
+  zmq::socket_t* GetRemoteSocket(MachineId to_machine_id);
+
   // To make a unique identity for a Sender
   static std::atomic<uint8_t> counter;
 

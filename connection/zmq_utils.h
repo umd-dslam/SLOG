@@ -12,7 +12,7 @@ namespace slog {
 using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
 /**
- * Sends an envelope
+ * Sends a pointer to an envelope
  */
 inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
   auto env = envelope.release();
@@ -31,26 +31,35 @@ inline EnvelopePtr RecvEnvelope(zmq::socket_t& socket, bool dont_wait = false) {
   return EnvelopePtr(*(msg.data<internal::Envelope*>()));
 }
 
+inline zmq::message_t SerializeProto(const google::protobuf::Message& proto) {
+  google::protobuf::Any any;
+  any.PackFrom(proto);
+
+  size_t sz = sizeof(MachineId) + sizeof(Channel) + any.ByteSizeLong();
+  zmq::message_t msg(sz);
+  auto data = msg.data<char>() + sizeof(MachineId) + sizeof(Channel);
+  any.SerializeToArray(data, any.ByteSizeLong());
+
+  return msg;
+}
+
+inline void SendAddressedBuffer(zmq::socket_t& socket, zmq::message_t&& msg, MachineId from_machine_id = -1,
+                                Channel to_chan = 0) {
+  auto data = msg.data<char>();
+  memcpy(data, &from_machine_id, sizeof(MachineId));
+  data += sizeof(MachineId);
+  memcpy(data, &to_chan, sizeof(Channel));
+
+  socket.send(msg, zmq::send_flags::none);
+}
+
 /**
  * Serializes and send proto message. The sent buffer contains
  * <sender machine id> <receiver channel> <proto>
  */
 inline void SendSerializedProto(zmq::socket_t& socket, const google::protobuf::Message& proto,
                                 MachineId from_machine_id = -1, Channel to_chan = 0) {
-  google::protobuf::Any any;
-  any.PackFrom(proto);
-
-  size_t sz = sizeof(MachineId) + sizeof(Channel) + any.ByteSizeLong();
-  zmq::message_t msg(sz);
-
-  auto data = msg.data<char>();
-  memcpy(data, &from_machine_id, sizeof(MachineId));
-  data += sizeof(MachineId);
-  memcpy(data, &to_chan, sizeof(Channel));
-  data += sizeof(Channel);
-  any.SerializeToArray(data, any.ByteSizeLong());
-
-  socket.send(msg, zmq::send_flags::none);
+  SendAddressedBuffer(socket, SerializeProto(proto), from_machine_id, to_chan);
 }
 
 inline void SendSerializedProtoWithEmptyDelim(zmq::socket_t& socket, const google::protobuf::Message& proto) {
