@@ -57,7 +57,6 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   // This function will be called on the read and write set of the current txn
   auto LocalMasterLookupFn = [this, txn, local_partition,
                               lookup_master](const google::protobuf::Map<string, string>& keys) {
-    auto partitions = txn->mutable_internal()->mutable_partitions();
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
@@ -69,11 +68,6 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
       } catch (std::invalid_argument& e) {
         LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
         return;
-      }
-
-      // Add the partition of this key to the partition list of current txn if not exist
-      if (std::find(partitions->begin(), partitions->end(), partition) == partitions->end()) {
-        partitions->Add(partition);
       }
 
       // If this is a local partition, lookup the master info from the local storage

@@ -409,17 +409,33 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
 void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
-  auto txn = txn_holder->transaction();
 
   // Send the txn back to the coordinating server
   Envelope env;
   auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
-  completed_sub_txn->set_allocated_txn(txn);
   completed_sub_txn->set_partition(config_->local_partition());
   completed_sub_txn->set_num_involved_partitions(txn_holder->num_involved_partitions());
 
+  Transaction* txn = txn_holder->transaction();
+  if (!config_->return_dummy_txn()) {
+    completed_sub_txn->set_allocated_txn(txn);
+  } else {
+    auto dummy_txn = completed_sub_txn->mutable_txn();
+    dummy_txn->set_status(txn->status());
+    dummy_txn->set_abort_reason(txn->abort_reason());
+    dummy_txn->mutable_internal()->set_id(txn->internal().id());
+    dummy_txn->mutable_internal()->set_type(txn->internal().type());
+    dummy_txn->mutable_internal()->set_coordinating_server(txn->internal().coordinating_server());
+    dummy_txn->mutable_internal()->mutable_events()->CopyFrom(txn->internal().events());
+    dummy_txn->mutable_internal()->mutable_event_times()->CopyFrom(txn->internal().event_times());
+    dummy_txn->mutable_internal()->mutable_event_machines()->CopyFrom(txn->internal().event_machines());
+  }
+
   Send(env, txn->internal().coordinating_server(), kServerChannel);
-  completed_sub_txn->release_txn();
+
+  if (!config_->return_dummy_txn()) {
+    completed_sub_txn->release_txn();
+  }
 }
 
 TransactionState& Worker::TxnState(TxnId txn_id) {

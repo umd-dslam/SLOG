@@ -83,5 +83,8 @@ message Configuration {
     uint32 replication_factor = 10;
     // Replication of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 11;
+    // Do not record specified events
     repeated TransactionEvent disabled_tracing_events = 12;
+    // Return dummy txns back to the client instead of full results
+    bool return_dummy_txn = 13;
 }
