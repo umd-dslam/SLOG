@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <optional>
@@ -39,21 +40,21 @@ struct ResultWriters {
                                          "time",  // microseconds since epoch
                                          "machine"};
   const vector<string> kEventNamesColumns = {"id", "event"};
-  const vector<string> kThroughputColumns = {"time", "txns_per_sec"};
+  const vector<string> kSummaryColumns = {"avg_tps", "aborted", "committed", "single_home", "multi_home", "remaster"};
 
   ResultWriters()
       : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
         events(FLAGS_out_dir + "/events.csv", kEventsColumns),
         event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns),
-        throughput(FLAGS_out_dir + "/throughput.csv", kThroughputColumns) {}
+        summary(FLAGS_out_dir + "/summary.csv", kSummaryColumns) {}
 
   CSVWriter txns;
   CSVWriter events;
   CSVWriter event_names;
-  CSVWriter throughput;
+  CSVWriter summary;
 };
 
-using std::cout;
+using std::count_if;
 using std::make_unique;
 using std::setw;
 using std::unique_ptr;
@@ -137,10 +138,6 @@ int main(int argc, char* argv[]) {
 
     LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps
               << "\n";
-    if (writers) {
-      writers->throughput << duration_cast<microseconds>(last_print_time.time_since_epoch()).count() << recv_tps
-                          << csvendl;
-    }
 
     last_num_sent_txns = num_sent_txns;
     last_num_recv_txns = num_recv_txns;
@@ -151,8 +148,34 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // Aggregate results
+  int avg_tps = 0, aborted = 0, committed = 0, single_home = 0, multi_home = 0, remaster = 0;
+  for (auto& w : workers) {
+    auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
+    auto& txns = gen->txns();
+    avg_tps += 1000 * txns.size() / gen->elapsed_time().count();
+    aborted += count_if(txns.begin(), txns.end(),
+                        [](TxnGenerator::TxnInfo info) { return info.txn->status() == TransactionStatus::ABORTED; });
+    committed += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+      return info.txn->status() == TransactionStatus::COMMITTED;
+    });
+    single_home += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+      return info.txn->internal().type() == TransactionType::SINGLE_HOME;
+    });
+    multi_home += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+      return info.txn->internal().type() == TransactionType::MULTI_HOME;
+    });
+    remaster += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+      return info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
+    });
+  }
+  LOG(INFO) << "Summary:\n" << "Avg. TPS: " << avg_tps << "\nAborted: " << aborted << "\nCommitted: " << committed
+            << "\nSingle-home: " << single_home << "\nMulti-home: " << multi_home << "\nRemaster: " << remaster;
+
   // Dump benchmark data to files
   if (writers) {
+    writers->summary << avg_tps << aborted << committed << single_home << multi_home << remaster << csvendl;
+
     vector<TxnGenerator::TxnInfo> txn_infos;
     for (auto& w : workers) {
       auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());

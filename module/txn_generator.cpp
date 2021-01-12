@@ -68,8 +68,9 @@ void TxnGenerator::SetUp() {
     }
     poller_.PushSocket(socket_);
   }
-
   poller_.AddTimeEvent(interval_, nullptr);
+
+  start_time_ = steady_clock::now();
 }
 
 bool TxnGenerator::Loop() {
@@ -110,6 +111,7 @@ bool TxnGenerator::Loop() {
   }
 
   if (num_recv_txns_ == txns_.size() || (dry_run_ && cur_txn_ == txns_.size())) {
+    elapsed_time_ = duration_cast<milliseconds>(steady_clock::now() - start_time_);
     return true;
   }
   return false;

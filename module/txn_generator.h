@@ -19,6 +19,7 @@ class TxnGenerator : public Module {
 
   size_t num_sent_txns() const { return cur_txn_; }
   size_t num_recv_txns() const { return num_recv_txns_; }
+  milliseconds elapsed_time() const { return elapsed_time_; }
 
   using TimePoint = std::chrono::system_clock::time_point;
   struct TxnInfo {
@@ -40,10 +41,12 @@ class TxnGenerator : public Module {
   uint32_t region_;
   uint32_t num_txns_;
   bool dry_run_;
+  std::chrono::steady_clock::time_point start_time_;
 
   std::vector<TxnInfo> txns_;
   std::atomic<size_t> cur_txn_;
   std::atomic<size_t> num_recv_txns_;
+  std::atomic<milliseconds> elapsed_time_;
 };
 
 }  // namespace slog
