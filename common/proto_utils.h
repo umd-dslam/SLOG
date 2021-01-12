@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -21,7 +22,7 @@ namespace slog {
  * Creates a new transaction
  * @param read_set            Read set of the transaction
  * @param write_set           Write set of the transaction
- * @param code                Code of the transaction (not to be executed)
+ * @param proc                Code or new master
  * @param master_metadata     Metadata regarding its mastership. This is used for
  *                            testing purpose.
  * @param coordinating_server MachineId of the server in charge of responding the
@@ -29,10 +30,9 @@ namespace slog {
  * @return                    A new transaction having given properties
  */
 Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
-                             const string& code = "",
+                             const std::variant<string, int>& proc = "",
                              const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-                             const MachineId coordinating_server = 0,
-                             const int32_t new_master = -1);  // TODO: make this a union wtih code
+                             const MachineId coordinating_server = 0);
 
 /**
  * Inspects the internal metadata of a transaction then determines whether

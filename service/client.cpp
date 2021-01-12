@@ -69,12 +69,12 @@ void ExecuteTxn(const char* txn_file) {
     }
   }
 
-  int32_t new_master = -1;
+  Transaction* txn;
   if (d.HasMember("new_master")) {
-    new_master = d["new_master"].GetInt();
+    txn = MakeTransaction(read_set, write_set, d["new_master"].GetInt(), metadata, 0);
+  } else {
+    txn = MakeTransaction(read_set, write_set, d["code"].GetString(), metadata, 0);
   }
-
-  auto txn = MakeTransaction(read_set, write_set, d["code"].GetString(), metadata, 0, new_master);
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);

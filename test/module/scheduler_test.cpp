@@ -310,30 +310,27 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
-  auto remaster_txn = MakeTransaction({},                  /* read_set */
-                                      {"A"},               /* write_set */
-                                      "",                  /* code */
-                                      {{"A", {0, 0}}},     /* master metadata */
-                                      MakeMachineId(0, 1), /* coordinating server */
-                                      1 /* new master */);
+  auto remaster_txn = MakeTransaction({},              /* read_set */
+                                      {"A"},           /* write_set */
+                                      1,               /* new master */
+                                      {{"A", {0, 0}}}, /* master metadata */
+                                      MakeMachineId(0, 1) /* coordinating server */);
   remaster_txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
   remaster_txn->mutable_internal()->set_id(11);
 
-  auto remaster_txn_lo_0 = MakeTransaction({},                  /* read_set */
-                                           {"A"},               /* write_set */
-                                           "",                  /* code */
-                                           {{"A", {0, 0}}},     /* master metadata */
-                                           MakeMachineId(0, 1), /* coordinating server */
-                                           1 /* new master */);
+  auto remaster_txn_lo_0 = MakeTransaction({},              /* read_set */
+                                           {"A"},           /* write_set */
+                                           1,               /* new master */
+                                           {{"A", {0, 0}}}, /* master metadata */
+                                           MakeMachineId(0, 1) /* coordinating server */);
   remaster_txn_lo_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
   remaster_txn_lo_0->mutable_internal()->set_id(11);
 
-  auto remaster_txn_lo_1 = MakeTransaction({},                  /* read_set */
-                                           {"A"},               /* write_set */
-                                           "",                  /* code */
-                                           {{"A", {0, 0}}},     /* master metadata */
-                                           MakeMachineId(0, 1), /* coordinating server */
-                                           1 /* new master */);
+  auto remaster_txn_lo_1 = MakeTransaction({},              /* read_set */
+                                           {"A"},           /* write_set */
+                                           1,               /* new master */
+                                           {{"A", {0, 0}}}, /* master metadata */
+                                           MakeMachineId(0, 1) /* coordinating server */);
 
   remaster_txn_lo_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
   remaster_txn_lo_1->mutable_remaster()->set_is_new_master_lock_only(true);

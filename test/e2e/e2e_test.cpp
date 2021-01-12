@@ -126,9 +126,8 @@ TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
 TEST_F(E2ETest, RemasterTxn) {
   auto remaster_txn = MakeTransaction({},    /* read_set */
                                       {"A"}, /* write_set */
-                                      "",    /* code */
-                                      {},    /* master metadata */
-                                      0, 1 /* new master */);
+                                      1,     /* new master */
+                                      {} /* master metadata */);
 
   test_slogs[1]->SendTxn(remaster_txn);
   auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();

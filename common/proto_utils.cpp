@@ -6,8 +6,8 @@
 #include <optional>
 #include <sstream>
 
+using std::get_if;
 using std::string;
-
 namespace slog {
 
 namespace {
@@ -36,8 +36,9 @@ bool operator==(Map<K, V> map1, Map<K, V> map2) {
 }  // namespace
 
 Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
-                             const string& code, const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
-                             const MachineId coordinating_server, const int32_t new_master) {
+                             const std::variant<string, int>& proc,
+                             const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
+                             const MachineId coordinating_server) {
   Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
     txn->mutable_read_set()->insert({key, ""});
@@ -45,10 +46,10 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
   for (const auto& key : write_set) {
     txn->mutable_write_set()->insert({key, ""});
   }
-  if (new_master >= 0) {  // Not set as default
-    txn->mutable_remaster()->set_new_master(new_master);
+  if (auto code = get_if<string>(&proc); code) {
+    txn->set_code(*code);
   } else {
-    txn->set_code(code);
+    txn->mutable_remaster()->set_new_master(std::get<int>(proc));
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
 
