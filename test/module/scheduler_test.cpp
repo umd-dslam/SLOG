@@ -293,12 +293,11 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   txn->mutable_internal()->set_id(10);
 
-  auto remaster_txn = MakeTransaction({},                  /* read_set */
-                                      {"A"},               /* write_set */
-                                      "",                  /* code */
-                                      {{"A", {0, 1}}},     /* master metadata */
-                                      MakeMachineId(0, 1), /* coordinating server */
-                                      1 /* new master */);
+  auto remaster_txn = MakeTransaction({},              /* read_set */
+                                      {"A"},           /* write_set */
+                                      1,               /* remaster */
+                                      {{"A", {0, 1}}}, /* master metadata */
+                                      MakeMachineId(0, 1) /* coordinating server */);
   remaster_txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
   remaster_txn->mutable_internal()->set_id(11);
 
