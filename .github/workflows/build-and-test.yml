@@ -1,4 +1,4 @@
-name: CMake
+name: Build and Test
 
 on: [push]
 
@@ -16,8 +16,8 @@ jobs:
         lock: [OLD, RMA, DDR]
 
     steps:
-    - name: Get CMake v3.16.3
-      uses: lukka/get-cmake@v3.16.3
+    - name: Get CMake 3.17.1
+      uses: lukka/get-cmake@v3.17.1
 
     - uses: actions/checkout@v2
 
