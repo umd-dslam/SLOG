@@ -246,7 +246,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
   if (std::find(active_partitions.begin(), active_partitions.end(), config_->local_partition()) !=
       active_partitions.end()) {
     // Active partition needs remote reads from all partitions
-    state.remote_reads_waiting_on = txn_holder->num_involved_partitions() - 1;
+    state.remote_reads_waiting_on = txn->internal().involved_partitions_size() - 1;
   }
   if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
@@ -414,7 +414,6 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   Envelope env;
   auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
   completed_sub_txn->set_partition(config_->local_partition());
-  completed_sub_txn->set_num_involved_partitions(txn_holder->num_involved_partitions());
 
   Transaction* txn = txn_holder->transaction();
   if (!config_->return_dummy_txn()) {

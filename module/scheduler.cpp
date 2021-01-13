@@ -493,7 +493,7 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
   }
 
   // Active partitions must receive remote reads from all other partitions
-  auto num_remote_partitions = txn_holder.num_involved_partitions() - 1;
+  auto num_remote_partitions = txn->internal().involved_partitions_size() - 1;
   auto local_partition = config_->local_partition();
   auto local_partition_active = std::find(txn_holder.active_partitions().begin(), txn_holder.active_partitions().end(),
                                           local_partition) != txn_holder.active_partitions().end();

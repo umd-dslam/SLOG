@@ -134,7 +134,6 @@ message RemoteReadResult {
 message CompletedSubtransaction {
     Transaction txn = 1;
     uint32 partition = 2;
-    uint32 num_involved_partitions = 3;
 }
 
 message StatsRequest {

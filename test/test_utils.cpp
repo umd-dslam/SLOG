@@ -142,7 +142,7 @@ zmq::pollitem_t TestSlog::GetPollItemForChannel(Channel channel) {
           ZMQ_POLLIN, 0 /* revent */};
 }
 
-unique_ptr<Sender> TestSlog::GetSender() { return std::make_unique<Sender>(broker_); }
+unique_ptr<Sender> TestSlog::NewSender() { return std::make_unique<Sender>(broker_); }
 
 void TestSlog::StartInNewThreads() {
   broker_->StartInNewThread();

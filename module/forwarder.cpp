@@ -53,10 +53,11 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   // Prepare a lookup master request just in case
   Envelope lookup_env;
   auto lookup_master = lookup_env.mutable_request()->mutable_lookup_master();
+  vector<uint32_t> involved_partitions;
 
   // This function will be called on the read and write set of the current txn
   auto LocalMasterLookupFn = [this, txn, local_partition,
-                              lookup_master](const google::protobuf::Map<string, string>& keys) {
+                              lookup_master, &involved_partitions](const google::protobuf::Map<string, string>& keys) {
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
@@ -69,6 +70,8 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
         LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
         return;
       }
+
+      involved_partitions.push_back(partition);
 
       // If this is a local partition, lookup the master info from the local storage
       if (partition == local_partition) {
@@ -90,6 +93,10 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   LocalMasterLookupFn(txn->read_set());
   LocalMasterLookupFn(txn->write_set());
+
+  std::sort(involved_partitions.begin(), involved_partitions.end());
+  auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
+  *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last}; 
 
   // If there is no need to look master info from remote partitions,
   // forward the txn immediately

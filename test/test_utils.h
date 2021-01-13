@@ -59,11 +59,13 @@ class TestSlog {
     return RecvEnvelope(channels_[channel]);
   }
 
-  unique_ptr<Sender> GetSender();
+  unique_ptr<Sender> NewSender();
 
   void StartInNewThreads();
   void SendTxn(Transaction* txn);
   Transaction RecvTxnResult();
+
+  const ConfigurationPtr& config() const { return config_; }
 
  private:
   ConfigurationPtr config_;

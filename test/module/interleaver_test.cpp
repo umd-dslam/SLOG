@@ -132,7 +132,7 @@ class InterleaverTest : public ::testing::Test {
       slogs_[i] = make_unique<TestSlog>(configs[i]);
       slogs_[i]->AddInterleaver();
       slogs_[i]->AddOutputChannel(kSchedulerChannel);
-      senders_[i] = slogs_[i]->GetSender();
+      senders_[i] = slogs_[i]->NewSender();
       slogs_[i]->StartInNewThreads();
     }
   }

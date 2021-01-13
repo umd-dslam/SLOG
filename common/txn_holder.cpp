@@ -19,18 +19,14 @@ TxnHolder::TxnHolder(const ConfigurationPtr& config, Transaction* txn) : txn_(tx
   keys_in_partition_.clear();
   active_partitions_.clear();
   involved_replicas_.clear();
-  vector<uint32_t> involved_partitions;
 
-  // TODO: involved_partitions_ is only needed by MH and SH, could avoid computing for LO
   for (const auto& kv : txn_->read_set()) {
-    involved_partitions.push_back(config->partition_of_key(kv.first));
     // If this key is also in write_set, give it write lock instead
     if (config->key_is_in_local_partition(kv.first) && !txn_->write_set().contains(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::READ);
     }
   }
   for (const auto& kv : txn_->write_set()) {
-    involved_partitions.push_back(config->partition_of_key(kv.first));
     active_partitions_.push_back(config->partition_of_key(kv.first));
     if (config->key_is_in_local_partition(kv.first)) {
       keys_in_partition_.emplace_back(kv.first, LockMode::WRITE);
@@ -47,20 +43,12 @@ TxnHolder::TxnHolder(const ConfigurationPtr& config, Transaction* txn) : txn_(tx
   }
 #endif
 
-  // Deduplicate the involved partitions/replicas arrays
-
-  {
-    std::sort(involved_partitions.begin(), involved_partitions.end());
-    auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
-    num_involved_partitions_ = last - involved_partitions.begin();
-  }
-
+  // Deduplicate the vectors
   {
     std::sort(active_partitions_.begin(), active_partitions_.end());
     auto last = std::unique(active_partitions_.begin(), active_partitions_.end());
     active_partitions_.erase(last, active_partitions_.end());
   }
-
   {
     std::sort(involved_replicas_.begin(), involved_replicas_.end());
     auto last = std::unique(involved_replicas_.begin(), involved_replicas_.end());
@@ -69,8 +57,6 @@ TxnHolder::TxnHolder(const ConfigurationPtr& config, Transaction* txn) : txn_(tx
 }
 
 const vector<pair<Key, LockMode>>& TxnHolder::keys_in_partition() const { return keys_in_partition_; }
-
-uint32_t TxnHolder::num_involved_partitions() const { return num_involved_partitions_; }
 
 const std::vector<uint32_t>& TxnHolder::active_partitions() const { return active_partitions_; }
 

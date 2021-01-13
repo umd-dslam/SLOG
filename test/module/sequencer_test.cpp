@@ -18,7 +18,7 @@ class SequencerTest : public ::testing::Test {
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(kInterleaverChannel);
-    sender_ = slog_->GetSender();
+    sender_ = slog_->NewSender();
     slog_->StartInNewThreads();
   }
 
@@ -123,7 +123,7 @@ class SequencerReplicationDelayTest : public SequencerTest {
     slog_ = make_unique<TestSlog>(configs[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(kInterleaverChannel);
-    sender_ = slog_->GetSender();
+    sender_ = slog_->NewSender();
 
     // This machine has no sequencer, it only receives the messages in the kInterleaverChannel
     slog_2_ = make_unique<TestSlog>(configs[1]);

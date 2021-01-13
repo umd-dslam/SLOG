@@ -18,7 +18,6 @@ class TxnHolder {
 
   Transaction* transaction() const { return txn_; }
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
-  uint32_t num_involved_partitions() const;
   const std::vector<uint32_t>& active_partitions() const;
   const std::vector<uint32_t>& involved_replicas() const;
 
@@ -42,7 +41,6 @@ class TxnHolder {
   Transaction* txn_;
   std::optional<uint32_t> worker_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
-  uint32_t num_involved_partitions_;
   std::vector<uint32_t> active_partitions_;
   std::vector<uint32_t> involved_replicas_;
 };

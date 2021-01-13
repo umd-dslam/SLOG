@@ -38,7 +38,7 @@ class SchedulerTest : public ::testing::Test {
     for (size_t i = 0; i < kNumMachines; i++) {
       test_slogs_[i] = make_unique<TestSlog>(configs[i]);
       test_slogs_[i]->AddScheduler();
-      sender_[i] = test_slogs_[i]->GetSender();
+      sender_[i] = test_slogs_[i]->NewSender();
       test_slogs_[i]->AddOutputChannel(kServerChannel);
     }
     // Relica 0
@@ -73,6 +73,18 @@ class SchedulerTest : public ::testing::Test {
   }
 
   void SendTransaction(Transaction* txn, const vector<size_t>& partitions) {
+    vector<uint32_t> involved_partitions;
+    auto CollectPartitions = [this, &involved_partitions](const google::protobuf::Map<string, string>& keys) {
+      for (auto& pair : keys) {
+        involved_partitions.push_back(test_slogs_[0]->config()->partition_of_key(pair.first));
+      }
+    };
+    CollectPartitions(txn->read_set());
+    CollectPartitions(txn->write_set());
+    std::sort(involved_partitions.begin(), involved_partitions.end());
+    auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
+    *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last}; 
+
     internal::Envelope env;
     env.mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
     for (auto partition : partitions) {
@@ -90,8 +102,8 @@ class SchedulerTest : public ::testing::Test {
       CHECK(req_env != nullptr);
       CHECK_EQ(req_env->request().type_case(), internal::Request::kCompletedSubtxn);
       auto completed_subtxn = req_env->request().completed_subtxn();
-      CHECK_EQ(completed_subtxn.num_involved_partitions(), num_partitions);
       auto sub_txn = completed_subtxn.txn();
+      CHECK_EQ(sub_txn.internal().involved_partitions_size(), num_partitions);
 
       if (first_time) {
         txn = sub_txn;

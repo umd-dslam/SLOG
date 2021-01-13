@@ -139,15 +139,16 @@ void Server::HandleInternalRequest(EnvelopePtr&& env) {
 
 void Server::ProcessCompletedSubtxn(EnvelopePtr&& env) {
   auto completed_subtxn = env->mutable_request()->mutable_completed_subtxn();
+  auto txn_internal = completed_subtxn->mutable_txn()->mutable_internal();
 
-  TRACE(completed_subtxn->mutable_txn()->mutable_internal(), TransactionEvent::RETURN_TO_SERVER);
+  TRACE(txn_internal, TransactionEvent::RETURN_TO_SERVER);
 
   auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
     return;
   }
 
-  auto res = completed_txns_.try_emplace(txn_id, config_, completed_subtxn->num_involved_partitions());
+  auto res = completed_txns_.try_emplace(txn_id, config_, txn_internal->involved_partitions_size());
   auto& completed_txn = res.first->second;
   if (completed_txn.AddSubTxn(std::move(env))) {
     SendTxnToClient(completed_txn.ReleaseTxn());
