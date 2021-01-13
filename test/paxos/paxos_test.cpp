@@ -55,6 +55,8 @@ class PaxosTest : public ::testing::Test {
 
   void AddAndStartNewPaxos(const ConfigurationPtr& config, const vector<MachineId>& members, MachineId me) {
     auto context = make_shared<zmq::context_t>(1);
+    context->set(zmq::ctxopt::blocky, false);
+
     auto broker = make_shared<Broker>(config, context, kTestModuleTimeout);
     auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
     auto sender = make_unique<Sender>(broker);
