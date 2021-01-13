@@ -1,0 +1,48 @@
+name: CMake
+
+on: [push]
+
+env:
+  BUILD_TYPE: Release
+  GLOG_v: 4
+  GLOG_logtostderr: 1
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        remaster: [NONE, SIMPLE, PER_KEY, COUNTERLESS]
+        lock: [OLD, RMA, DDR]
+
+    steps:
+    - name: Get CMake v3.16.3
+      uses: lukka/get-cmake@v3.16.3
+
+    - uses: actions/checkout@v2
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{ github.workspace }}/build
+
+    - name: Configure CMake
+      shell: bash
+      env:
+        REMASTER_PROTOCOL: ${{ matrix.remaster }}
+        LOCK_MANAGER: ${{ matrix.lock }}
+      working-directory: ${{ github.workspace }}/build
+      run: cmake -S $GITHUB_WORKSPACE -B . 
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE 
+        -DBUILD_SLOG_CLIENT=OFF 
+        -DBUILD_SLOG_TESTS=ON
+        -DREMASTER_PROTOCOL=$REMASTER_PROTOCOL
+        -DLOCK_MANAGER=$LOCK_MANAGER
+
+    - name: Build
+      working-directory: ${{ github.workspace }}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE
+
+    - name: Test
+      working-directory: ${{ github.workspace }}/build
+      shell: bash
+      run: ctest -C $BUILD_TYPE --output-on-failure
