@@ -16,8 +16,8 @@ jobs:
         lock: [OLD, RMA, DDR]
 
     steps:
-    - name: Get CMake 3.17.1
-      uses: lukka/get-cmake@v3.17.1
+    - name: Get latest CMake
+      uses: lukka/get-cmake@latest
 
     - uses: actions/checkout@v2
 
