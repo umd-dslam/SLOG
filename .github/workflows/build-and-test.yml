@@ -11,6 +11,8 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     strategy:
+      # Allow other jobs to continue when one job fails
+      fail-fast: false
       matrix:
         remaster: [NONE, SIMPLE, PER_KEY, COUNTERLESS]
         lock: [OLD, RMA, DDR]
