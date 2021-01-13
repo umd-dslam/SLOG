@@ -20,10 +20,12 @@ class E2ETest : public ::testing::Test {
  protected:
   static const size_t NUM_MACHINES = 4;
 
+  virtual internal::Configuration CustomConfig() { return internal::Configuration(); }
+
   void SetUp() {
-    internal::Configuration config_proto;
-    config_proto.set_replication_factor(2);
-    configs = MakeTestConfigurations("e2e", 2 /* num_replicas */, 2 /* num_partitions */, config_proto);
+    auto custom_config = CustomConfig();
+    custom_config.set_replication_factor(2);
+    configs = MakeTestConfigurations("e2e", 2 /* num_replicas */, 2 /* num_partitions */, custom_config);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
@@ -184,6 +186,40 @@ TEST_F(E2ETest, AbortTxnEmptyKeySets) {
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
   ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
+}
+
+class E2ETestBypassMHOrderer : public E2ETest {
+  internal::Configuration CustomConfig() final {
+    internal::Configuration config;
+    config.set_bypass_mh_orderer(true);
+    return config;
+  }
+};
+
+TEST_F(E2ETestBypassMHOrderer, MultiHomeTxn) {
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction({"A", "C"} /* read_set */, {} /* write_set */);
+
+    test_slogs[i]->SendTxn(txn);
+    auto txn_resp = test_slogs[i]->RecvTxnResult();
+    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+    ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+  }
+}
+
+TEST_F(E2ETestBypassMHOrderer, MultiHomeMutliPartitionTxn) {
+  for (size_t i = 0; i < NUM_MACHINES; i++) {
+    auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
+
+    test_slogs[i]->SendTxn(txn);
+    auto txn_resp = test_slogs[i]->RecvTxnResult();
+    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
+    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
+    ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+  }
 }
 
 int main(int argc, char* argv[]) {

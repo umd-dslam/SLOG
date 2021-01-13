@@ -91,11 +91,11 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
     : config_(config),
       context_(new zmq::context_t(1)),
       storage_(new MemOnlyStorage<Key, Record, Metadata>()),
-      broker_(new Broker(config, context_, kTestModuleTimeout)),
-      client_context_(1),
-      client_socket_(client_context_, ZMQ_DEALER) {
+      client_context_(1) {
   context_->set(zmq::ctxopt::blocky, false);
   client_context_.set(zmq::ctxopt::blocky, false);
+  broker_ = std::make_shared<Broker>(config, context_, kTestModuleTimeout);
+  client_socket_ = zmq::socket_t(client_context_, ZMQ_DEALER);
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {

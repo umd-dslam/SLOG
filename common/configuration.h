@@ -55,6 +55,7 @@ class Configuration {
   uint32_t replication_delay_amount_ms() const;
   vector<TransactionEvent> disabled_tracing_events() const;
   bool return_dummy_txn() const;
+  bool bypass_mh_orderer() const;
 
  private:
   internal::Configuration config_;

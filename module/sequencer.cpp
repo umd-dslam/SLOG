@@ -15,6 +15,59 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
+namespace {
+
+// Return null if input txn is not multi-home or the resulting lock-only txn does not
+// contains any key
+Transaction* GenerateLockOnlyTxn(const Transaction& txn, uint32_t local_rep) {
+  if (txn.internal().type() != TransactionType::MULTI_HOME) {
+    return nullptr;
+  }
+  auto lock_only_txn = new Transaction();
+
+  const auto& metadata = txn.internal().master_metadata();
+  auto lock_only_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
+
+  // Copy keys and metadata in local replica
+  for (auto& key_value : txn.read_set()) {
+    auto master = metadata.at(key_value.first).master();
+    if (master == local_rep) {
+      lock_only_txn->mutable_read_set()->insert(key_value);
+      lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
+    }
+  }
+  for (auto& key_value : txn.write_set()) {
+    auto master = metadata.at(key_value.first).master();
+    if (master == local_rep) {
+      lock_only_txn->mutable_write_set()->insert(key_value);
+      lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
+    }
+  }
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+  // Add additional lock only at new replica
+  // TODO: refactor to remote metadata from lock-onlys. Requires
+  // changes in the scheduler
+  if (txn.procedure_case() == Transaction::kRemaster) {
+    lock_only_txn->mutable_remaster()->set_new_master((txn.remaster().new_master()));
+    if (txn.remaster().new_master() == local_rep) {
+      lock_only_txn->CopyFrom(txn);
+      lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
+    }
+  }
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
+  lock_only_txn->mutable_internal()->set_id(txn.internal().id());
+  lock_only_txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+
+  if (lock_only_txn->read_set().empty() && lock_only_txn->write_set().empty()) {
+    return nullptr;
+  }
+  return lock_only_txn;
+}
+
+}  // namespace
+
 Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
                      milliseconds poll_timeout)
     : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
@@ -71,44 +124,7 @@ void Sequencer::ProcessMultiHomeBatch(EnvelopePtr&& env) {
   // For each multi-home txn, create a lock-only txn and put into
   // the single-home batch to be sent to the local log
   for (auto& txn : batch->transactions()) {
-    auto lock_only_txn = new Transaction();
-
-    const auto& metadata = txn.internal().master_metadata();
-    auto lock_only_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
-
-    // Copy keys and metadata in local replica
-    for (auto& key_value : txn.read_set()) {
-      auto master = metadata.at(key_value.first).master();
-      if (master == local_rep) {
-        lock_only_txn->mutable_read_set()->insert(key_value);
-        lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
-      }
-    }
-    for (auto& key_value : txn.write_set()) {
-      auto master = metadata.at(key_value.first).master();
-      if (master == local_rep) {
-        lock_only_txn->mutable_write_set()->insert(key_value);
-        lock_only_metadata->insert({key_value.first, metadata.at(key_value.first)});
-      }
-    }
-
-#ifdef REMASTER_PROTOCOL_COUNTERLESS
-    // Add additional lock only at new replica
-    // TODO: refactor to remote metadata from lock-onlys. Requires
-    // changes in the scheduler
-    if (txn.procedure_case() == Transaction::kRemaster) {
-      lock_only_txn->mutable_remaster()->set_new_master((txn.remaster().new_master()));
-      if (txn.remaster().new_master() == local_rep) {
-        lock_only_txn->CopyFrom(txn);
-        lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
-      }
-    }
-#endif /* REMASTER_PROTOCOL_COUNTERLESS */
-
-    lock_only_txn->mutable_internal()->set_id(txn.internal().id());
-    lock_only_txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
-
-    if (!lock_only_txn->read_set().empty() || !lock_only_txn->write_set().empty()) {
+    if (auto lock_only_txn = GenerateLockOnlyTxn(txn, local_rep); lock_only_txn) {
       ScheduleBatch(lock_only_txn);
     }
   }
@@ -124,9 +140,21 @@ void Sequencer::ProcessMultiHomeBatch(EnvelopePtr&& env) {
 }
 
 void Sequencer::ScheduleBatch(Transaction* txn) {
-  DCHECK(txn->internal().type() == TransactionType::SINGLE_HOME || txn->internal().type() == TransactionType::LOCK_ONLY)
+  DCHECK(config_->bypass_mh_orderer() || txn->internal().type() == TransactionType::SINGLE_HOME ||
+         txn->internal().type() == TransactionType::LOCK_ONLY)
       << "Sequencer batch can only contain single-home or lock-only txn. "
       << "Multi-home txn or unknown txn type received instead.";
+
+  if (txn->internal().type() == TransactionType::MULTI_HOME) {
+    auto lock_only_txn = GenerateLockOnlyTxn(*txn, config_->local_replica());
+
+    delete txn;
+
+    if (!lock_only_txn) {
+      return;
+    }
+    txn = lock_only_txn;
+  }
 
   batch_->mutable_transactions()->AddAllocated(txn);
   // If this is the first txn of the batch, start the timer to send the batch

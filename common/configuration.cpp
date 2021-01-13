@@ -155,4 +155,6 @@ vector<TransactionEvent> Configuration::disabled_tracing_events() const {
 
 bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn(); }
 
+bool Configuration::bypass_mh_orderer() const { return config_.bypass_mh_orderer(); }
+
 }  // namespace slog

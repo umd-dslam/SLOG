@@ -2,12 +2,16 @@
 
 #include <glog/logging.h>
 
+#include <algorithm>
+
 #include "common/constants.h"
 #include "common/monitor.h"
 #include "common/proto_utils.h"
 
 using std::move;
+using std::sort;
 using std::string;
+using std::unique;
 
 namespace slog {
 
@@ -16,8 +20,13 @@ using internal::Request;
 using internal::Response;
 namespace {
 
-inline bool TransactionContainsKey(const Transaction& txn, const Key& key) {
+bool TransactionContainsKey(const Transaction& txn, const Key& key) {
   return txn.read_set().contains(key) || txn.write_set().contains(key);
+}
+
+uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
+  std::uniform_int_distribution<> idx(0, txn.internal().involved_partitions_size() - 1);
+  return txn.internal().involved_partitions(idx(rg));
 }
 
 }  // namespace
@@ -56,8 +65,8 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   vector<uint32_t> involved_partitions;
 
   // This function will be called on the read and write set of the current txn
-  auto LocalMasterLookupFn = [this, txn, local_partition,
-                              lookup_master, &involved_partitions](const google::protobuf::Map<string, string>& keys) {
+  auto LocalMasterLookupFn = [this, txn, local_partition, lookup_master,
+                              &involved_partitions](const google::protobuf::Map<string, string>& keys) {
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
@@ -94,9 +103,9 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   LocalMasterLookupFn(txn->read_set());
   LocalMasterLookupFn(txn->write_set());
 
-  std::sort(involved_partitions.begin(), involved_partitions.end());
-  auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
-  *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last}; 
+  sort(involved_partitions.begin(), involved_partitions.end());
+  auto last = unique(involved_partitions.begin(), involved_partitions.end());
+  *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
 
   // If there is no need to look master info from remote partitions,
   // forward the txn immediately
@@ -204,8 +213,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
 
       Send(move(env), kSequencerChannel);
     } else {
-      std::uniform_int_distribution<> RandomPartition(0, config_->num_partitions() - 1);
-      auto partition = RandomPartition(rg_);
+      auto partition = ChooseRandomPartition(env->request().forward_txn().txn(), rg_);
       auto random_machine_in_home_replica = config_->MakeMachineId(home_replica, partition);
 
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: " << home_replica << ", part: " << partition
@@ -216,14 +224,45 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       Send(*env, random_machine_in_home_replica, kSequencerChannel);
     }
   } else if (txn_type == TransactionType::MULTI_HOME) {
-    auto destination =
-        config_->MakeMachineId(config_->local_replica(), config_->leader_partition_for_multi_home_ordering());
-
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
+
+    // Compute involved replicas and store in the txn
+    vector<uint32_t> involved_replicas;
+    for (const auto& pair : master_metadata) {
+      involved_replicas.push_back(pair.second.master());
+    }
+    sort(involved_replicas.begin(), involved_replicas.end());
+    auto last = unique(involved_replicas.begin(), involved_replicas.end());
+    *txn_internal->mutable_involved_replicas() = {involved_replicas.begin(), last};
 
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
-    Send(*env, destination, kMultiHomeOrdererChannel);
+    if (config_->bypass_mh_orderer()) {
+      // Send the txn to sequencers of involved replicas to generate lock-only txns
+      auto part = ChooseRandomPartition(env->request().forward_txn().txn(), rg_);
+      for (auto rep : txn_internal->involved_replicas()) {
+        Send(*env, config_->MakeMachineId(rep, part), kSequencerChannel);
+      }
+      // Send the txn to schedulers of all partitions
+      bool send_local = false;
+      for (uint32_t part = 0; part < config_->num_partitions(); part++) {
+        for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
+          auto machine_id = config_->MakeMachineId(rep, part);
+          if (machine_id == config_->local_machine_id()) {
+            send_local = true;
+          } else {
+            Send(*env, machine_id, kSchedulerChannel);
+          }
+        }
+      }
+      if (send_local) {
+        Send(move(env), kSchedulerChannel);
+      }
+    } else {
+      auto mh_orderer =
+          config_->MakeMachineId(config_->local_replica(), config_->leader_partition_for_multi_home_ordering());
+      Send(*env, mh_orderer, kMultiHomeOrdererChannel);
+    }
   }
 }
 

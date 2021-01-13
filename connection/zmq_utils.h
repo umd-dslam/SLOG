@@ -19,7 +19,7 @@ inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
   size_t sz = sizeof(env);
   zmq::message_t msg(sz);
   *(msg.data<internal::Envelope*>()) = env;
-  socket.send(msg, zmq::send_flags::none);
+  socket.send(msg, zmq::send_flags::dontwait);
 }
 
 inline EnvelopePtr RecvEnvelope(zmq::socket_t& socket, bool dont_wait = false) {
@@ -50,7 +50,7 @@ inline void SendAddressedBuffer(zmq::socket_t& socket, zmq::message_t&& msg, Mac
   data += sizeof(MachineId);
   memcpy(data, &to_chan, sizeof(Channel));
 
-  socket.send(msg, zmq::send_flags::none);
+  socket.send(msg, zmq::send_flags::dontwait);
 }
 
 /**

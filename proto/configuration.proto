@@ -87,4 +87,6 @@ message Configuration {
     repeated TransactionEvent disabled_tracing_events = 12;
     // Return dummy txns back to the client instead of full results
     bool return_dummy_txn = 13;
+    // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
+    bool bypass_mh_orderer = 14;
 }

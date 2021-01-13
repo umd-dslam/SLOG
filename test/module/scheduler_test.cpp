@@ -83,7 +83,7 @@ class SchedulerTest : public ::testing::Test {
     CollectPartitions(txn->write_set());
     std::sort(involved_partitions.begin(), involved_partitions.end());
     auto last = std::unique(involved_partitions.begin(), involved_partitions.end());
-    *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last}; 
+    *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
 
     internal::Envelope env;
     env.mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
