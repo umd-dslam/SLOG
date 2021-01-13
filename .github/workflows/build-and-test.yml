@@ -16,6 +16,17 @@ jobs:
       matrix:
         remaster: [NONE, SIMPLE, PER_KEY, COUNTERLESS]
         lock: [OLD, RMA, DDR]
+        exclude:
+          - remaster: SIMPLE
+            lock: RMA
+          - remaster: SIMPLE
+            lock: DDR
+          - remaster: PER_KEY
+            lock: RMA
+          - remaster: PER_KEY
+            lock: DDR
+          - remaster: COUNTERLESS
+            lock: OLD
 
     steps:
     - name: Get latest CMake

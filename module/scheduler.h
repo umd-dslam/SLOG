@@ -14,18 +14,25 @@
 #include "storage/storage.h"
 
 #if defined(REMASTER_PROTOCOL_SIMPLE)
-#include "module/scheduler_components/simple_remaster_manager.h"
+# include "module/scheduler_components/simple_remaster_manager.h"
+# if !defined(LOCK_MANAGER_OLD)
+#   error "SIMPLE remaster protocol is only compatible with OLD lock manager"
+# endif
 #elif defined(REMASTER_PROTOCOL_PER_KEY)
-#include "module/scheduler_components/per_key_remaster_manager.h"
+# include "module/scheduler_components/per_key_remaster_manager.h"
+# if !defined(LOCK_MANAGER_OLD)
+#   error "PER_KEY remaster protocol is only compatible with OLD lock manager"
+# endif
+#elif defined(REMASTER_PROTOCOL_COUNTERLESS) && defined(LOCK_MANAGER_OLD)
+# error "COUNTERLESS remaster protocol is not compatible with OLD lock manager"
 #endif
 
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) || \
-    (defined(LOCK_MANAGER_OLD) && !defined(REMASTER_PROTOCOL_COUNTERLESS))
-#include "module/scheduler_components/old_lock_manager.h"
+#if defined(LOCK_MANAGER_OLD)
+# include "module/scheduler_components/old_lock_manager.h"
 #elif defined(LOCK_MANAGER_DDR)
-#include "module/scheduler_components/ddr_lock_manager.h"
+# include "module/scheduler_components/ddr_lock_manager.h"
 #else
-#include "module/scheduler_components/rma_lock_manager.h"
+# include "module/scheduler_components/rma_lock_manager.h"
 #endif
 
 namespace slog {

@@ -386,18 +386,15 @@ void Scheduler::TriggerPreDispatchAbort(TxnId) {}
 #else
 void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   DCHECK(aborting_txns_.count(txn_id) == 0) << "Abort was triggered twice: " << txn_id;
+
   VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
-
-  auto it = active_txns_.find(txn_id);
-  DCHECK(it != active_txns_.end());
-  DCHECK(it->second.holder.has_value());
-
-  auto& txn_holder = it->second.holder.value();
-  CHECK(!txn_holder.worker()) << "Dispatched transactions are handled by a worker, txn " << txn_id;
 
   aborting_txns_.insert(txn_id);
 
-  if (txn_holder.transaction() != nullptr) {
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end());
+  if (it->second.holder.has_value()) {
+    CHECK(!it->second.holder->worker()) << "Dispatched transactions are handled by a worker, txn " << txn_id;
     MaybeContinuePreDispatchAbort(txn_id);
   } else {
     VLOG(3) << "Defering abort until txn arrives: " << txn_id;
@@ -497,11 +494,12 @@ void Scheduler::MaybeFinishAbort(TxnId txn_id) {
 
   // Active partitions must receive remote reads from all other partitions
   auto num_remote_partitions = txn->internal().involved_partitions_size() - 1;
+  DCHECK(num_remote_partitions >= 0);
   auto local_partition = config_->local_partition();
   auto local_partition_active = std::find(txn_holder.active_partitions().begin(), txn_holder.active_partitions().end(),
                                           local_partition) != txn_holder.active_partitions().end();
   if (num_remote_partitions > 0 && local_partition_active) {
-    if (early_remote_reads.size() < num_remote_partitions) {
+    if (early_remote_reads.size() < static_cast<size_t>(num_remote_partitions)) {
       return;
     }
   }
