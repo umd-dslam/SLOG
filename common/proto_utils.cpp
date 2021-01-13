@@ -52,6 +52,7 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
     txn->mutable_remaster()->set_new_master(std::get<int>(proc));
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
+  txn->mutable_internal()->set_id(1000);
 
   vector<uint32_t> involved_replicas;
   for (const auto& pair : master_metadata) {

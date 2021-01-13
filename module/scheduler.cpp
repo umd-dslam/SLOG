@@ -216,8 +216,7 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
 
       auto& txn_holder = txn_info_it->second.holder.value();
 
-      if (aborting_txns_.count(txn_id)) {
-        MaybeContinuePreDispatchAbort(txn_id);
+      if (MaybeContinuePreDispatchAbort(txn_id)) {
         break;
       }
 
@@ -380,7 +379,11 @@ void Scheduler::AcquireLocksAndProcessResult(const TxnHolder& txn_holder) {
 /***********************************************
          Pre-Dispatch Abort Processing
 ***********************************************/
-
+// Disable pre-dispatch abort when DDR is used. Removing this method is sufficient to disable the
+// whole mechanism
+#ifdef LOCK_MANAGER_DDR
+void Scheduler::TriggerPreDispatchAbort(TxnId) {}
+#else
 void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   DCHECK(aborting_txns_.count(txn_id) == 0) << "Abort was triggered twice: " << txn_id;
   VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
@@ -400,6 +403,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
     VLOG(3) << "Defering abort until txn arrives: " << txn_id;
   }
 }
+#endif
 
 bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
   if (aborting_txns_.count(txn_id) == 0) {
