@@ -18,7 +18,6 @@ using internal::Request;
 TxnHolder::TxnHolder(const ConfigurationPtr& config, Transaction* txn) : txn_(txn) {
   keys_in_partition_.clear();
   active_partitions_.clear();
-  involved_replicas_.clear();
 
   for (const auto& kv : txn_->read_set()) {
     // If this key is also in write_set, give it write lock instead
@@ -33,34 +32,14 @@ TxnHolder::TxnHolder(const ConfigurationPtr& config, Transaction* txn) : txn_(tx
     }
   }
 
-  for (auto& pair : txn_->internal().master_metadata()) {
-    involved_replicas_.push_back(pair.second.master());
-  }
-
-#ifdef REMASTER_PROTOCOL_COUNTERLESS
-  if (txn_->internal().type() == TransactionType::MULTI_HOME && txn_->procedure_case() == Transaction::kRemaster) {
-    involved_replicas_.push_back(txn_->remaster().new_master());
-  }
-#endif
-
-  // Deduplicate the vectors
-  {
-    std::sort(active_partitions_.begin(), active_partitions_.end());
-    auto last = std::unique(active_partitions_.begin(), active_partitions_.end());
-    active_partitions_.erase(last, active_partitions_.end());
-  }
-  {
-    std::sort(involved_replicas_.begin(), involved_replicas_.end());
-    auto last = std::unique(involved_replicas_.begin(), involved_replicas_.end());
-    involved_replicas_.erase(last, involved_replicas_.end());
-  }
+  std::sort(active_partitions_.begin(), active_partitions_.end());
+  auto last = std::unique(active_partitions_.begin(), active_partitions_.end());
+  active_partitions_.erase(last, active_partitions_.end());
 }
 
 const vector<pair<Key, LockMode>>& TxnHolder::keys_in_partition() const { return keys_in_partition_; }
 
 const std::vector<uint32_t>& TxnHolder::active_partitions() const { return active_partitions_; }
-
-const std::vector<uint32_t>& TxnHolder::involved_replicas() const { return involved_replicas_; }
 
 uint32_t TxnHolder::replica_id() const { return replica_id(transaction()); }
 

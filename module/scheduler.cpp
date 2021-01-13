@@ -445,12 +445,11 @@ bool Scheduler::MaybeContinuePreDispatchAbort(TxnId txn_id) {
 
   // Collect lock only txn for abort
   if (txn_type == TransactionType::MULTI_HOME) {
-    auto& involved_replicas = txn_holder.involved_replicas();
-    mh_abort_waiting_on_[txn_id] += involved_replicas.size();
+    mh_abort_waiting_on_[txn_id] += txn->internal().involved_replicas_size();
 
     // Erase the LOs that have already arrived - the same that have been released
     // from remaster and lock managers
-    for (auto replica : involved_replicas) {
+    for (auto replica : txn->internal().involved_replicas()) {
       auto txn_replica_id = std::make_pair(txn_id, replica);
       if (lock_only_txns_.count(txn_replica_id)) {
         lock_only_txns_.erase(txn_replica_id);
@@ -541,7 +540,7 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   // TODO: Move this code out of this function since it causes a side effect
   //       Only execise this code if this is not a one-way dispatch for now.
   if (!one_way && txn->internal().type() == TransactionType::MULTI_HOME) {
-    for (auto replica : txn_holder->involved_replicas()) {
+    for (auto replica : txn->internal().involved_replicas()) {
       lock_only_txns_.erase(std::make_pair(txn->internal().id(), replica));
     }
   }

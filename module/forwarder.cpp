@@ -197,7 +197,8 @@ void Forwarder::HandleInternalResponse(EnvelopePtr&& env) {
 }
 
 void Forwarder::Forward(EnvelopePtr&& env) {
-  auto txn_internal = env->mutable_request()->mutable_forward_txn()->mutable_txn()->mutable_internal();
+  auto txn = env->mutable_request()->mutable_forward_txn()->mutable_txn();
+  auto txn_internal = txn->mutable_internal();
   auto txn_id = txn_internal->id();
   auto txn_type = txn_internal->type();
   auto& master_metadata = txn_internal->master_metadata();
@@ -213,7 +214,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
 
       Send(move(env), kSequencerChannel);
     } else {
-      auto partition = ChooseRandomPartition(env->request().forward_txn().txn(), rg_);
+      auto partition = ChooseRandomPartition(*txn, rg_);
       auto random_machine_in_home_replica = config_->MakeMachineId(home_replica, partition);
 
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: " << home_replica << ", part: " << partition
@@ -231,6 +232,12 @@ void Forwarder::Forward(EnvelopePtr&& env) {
     for (const auto& pair : master_metadata) {
       involved_replicas.push_back(pair.second.master());
     }
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+    if (txn->procedure_case() == Transaction::kRemaster) {
+      involved_replicas.push_back(txn->remaster().new_master());
+    }
+#endif
+
     sort(involved_replicas.begin(), involved_replicas.end());
     auto last = unique(involved_replicas.begin(), involved_replicas.end());
     *txn_internal->mutable_involved_replicas() = {involved_replicas.begin(), last};
@@ -239,7 +246,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
 
     if (config_->bypass_mh_orderer()) {
       // Send the txn to sequencers of involved replicas to generate lock-only txns
-      auto part = ChooseRandomPartition(env->request().forward_txn().txn(), rg_);
+      auto part = ChooseRandomPartition(*txn, rg_);
       for (auto rep : txn_internal->involved_replicas()) {
         Send(*env, config_->MakeMachineId(rep, part), kSequencerChannel);
       }

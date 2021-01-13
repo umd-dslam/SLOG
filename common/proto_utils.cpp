@@ -53,6 +53,7 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
 
+  vector<uint32_t> involved_replicas;
   for (const auto& pair : master_metadata) {
     const auto& key = pair.first;
     if (read_set.count(key) > 0 || write_set.count(key) > 0) {
@@ -60,8 +61,12 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
       metadata.set_master(pair.second.first);
       metadata.set_counter(pair.second.second);
       txn->mutable_internal()->mutable_master_metadata()->insert({pair.first, std::move(metadata)});
+      involved_replicas.push_back(pair.second.first);
     }
   }
+  sort(involved_replicas.begin(), involved_replicas.end());
+  auto last = unique(involved_replicas.begin(), involved_replicas.end());
+  *txn->mutable_internal()->mutable_involved_replicas() = {involved_replicas.begin(), last};
   txn->mutable_internal()->set_coordinating_server(coordinating_server);
 
   SetTransactionType(*txn);

@@ -69,6 +69,7 @@ Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter) {
     m.set_master(master);
     m.set_counter(counter);
   }
+  txn->mutable_internal()->add_involved_replicas(master);
   return txn;
 }
 

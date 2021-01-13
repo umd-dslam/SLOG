@@ -19,7 +19,6 @@ class TxnHolder {
   Transaction* transaction() const { return txn_; }
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
   const std::vector<uint32_t>& active_partitions() const;
-  const std::vector<uint32_t>& involved_replicas() const;
 
   void SetWorker(uint32_t worker) { worker_ = worker; }
   std::optional<uint32_t> worker() const { return worker_; }
@@ -42,7 +41,6 @@ class TxnHolder {
   std::optional<uint32_t> worker_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   std::vector<uint32_t> active_partitions_;
-  std::vector<uint32_t> involved_replicas_;
 };
 
 }  // namespace slog

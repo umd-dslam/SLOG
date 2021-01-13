@@ -70,18 +70,3 @@ TEST_F(TransactionHolderTest, active_partitions) {
     ASSERT_THAT(active_partitions, UnorderedElementsAre(0U, 2U));
   }
 }
-
-TEST_F(TransactionHolderTest, involved_replicas) {
-  for (uint32_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A"},                                          /* read_set */
-                               {"B", "D"},                                     /* write_set */
-                               "",                                             /* code */
-                               {{"A", {1, 3}}, {"B", {1, 0}}, {"D", {0, 0}}}); /* metadata */
-    txn->mutable_internal()->set_id(100);
-
-    TxnHolder holder(configs[i], txn);
-    const auto& involved_replicas = holder.involved_replicas();
-    ASSERT_EQ(involved_replicas.size(), 2U);
-    ASSERT_THAT(involved_replicas, UnorderedElementsAre(0U, 1U));
-  }
-}
