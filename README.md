@@ -1,6 +1,6 @@
 # SLOG
 
-[![Build Status](https://github.com/ctring/SLOG-private/workflows/Build%20and%20Test/badge.svg)](https://github.com/ctring/SLOG-private/actions)
+[![Build Status](https://github.com/ctring/SLOG/workflows/Build%20and%20Test/badge.svg)](https://github.com/ctring/SLOG/actions)
 
 # What is SLOG?
 
