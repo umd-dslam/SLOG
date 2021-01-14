@@ -60,14 +60,16 @@
         "short": "Simple",
         "long": "Simple remaster protocol",
         "settings": {
-          "REMASTER_PROTOCOL": "SIMPLE"
+          "REMASTER_PROTOCOL": "SIMPLE",
+          "LOCK_MANAGER": "OLD"
         }
       },
       "perkey": {
         "short": "PerKey",
         "long": "Per-key remaster protocol",
         "settings": {
-          "REMASTER_PROTOCOL": "PER_KEY"
+          "REMASTER_PROTOCOL": "PER_KEY",
+          "LOCK_MANAGER": "OLD"
         }
       },
       "counterless-rma": {

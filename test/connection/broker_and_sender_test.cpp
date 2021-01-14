@@ -95,6 +95,7 @@ TEST(BrokerTest, LocalPingPong) {
   const Channel PONG = 11;
   ConfigVec configs = MakeTestConfigurations("local_ping_pong", 1, 1);
   auto context = std::make_shared<zmq::context_t>(1);
+  context->set(zmq::ctxopt::blocky, false);
   auto broker = make_shared<Broker>(configs[0], context);
   broker->AddChannel(PING);
   broker->AddChannel(PONG);
