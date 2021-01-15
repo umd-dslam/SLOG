@@ -769,11 +769,6 @@ class BenchmarkCommand(Command):
             help="Tag of this benchmark run. Auto-generated if not provided"
         )
         parser.add_argument(
-            "--clients",
-            required=True,
-            help="Path to a json file containing lists of clients"
-        )
-        parser.add_argument(
             "--workload", "-wl",
             default="basic",
             help="Name of the workload to run benchmark with"
@@ -787,6 +782,16 @@ class BenchmarkCommand(Command):
             "--rate", type=int,
             default=1000,
             help="Maximum number of transactions sent per second"
+        )
+        parser.add_argument(
+            "--workers", type=int,
+            default=1,
+            help="Number of threads for each client"
+        )
+        parser.add_argument(
+            "--sample", type=int,
+            default=10,
+            help="Percent of sampled transactions to be written to result files"
         )
         parser.add_argument(
             "-e",
@@ -805,15 +810,12 @@ class BenchmarkCommand(Command):
         the addresses specified in a json file instead of from the configuration file
         """
         proc_lists = []
-        with open(args.clients, 'r') as f:
-            # Load the list of clients from the json file
-            client_config = json.load(f)
-            for rep, clients_in_rep in enumerate(client_config):
-                for addr, num_procs in clients_in_rep.items():
-                    # Create a list of processes per machine
-                    proc_lists.append([
-                        [None, addr, rep, None, procnum] for procnum in range(num_procs)
-                    ])
+        for rep, r in enumerate(self.config.replicas):
+            for c in r.clients:
+                # Create a list of processes per machine
+                proc_lists.append([
+                    [None, c.address.decode(), rep, None, procnum] for procnum in range(c.procs)
+                ])
         
         # Interleave the lists of processes across machines
         proc_lists = itertools.zip_longest(*proc_lists)
@@ -898,6 +900,9 @@ class BenchmarkCommand(Command):
                 f'--params "{args.params}" '
                 f"--rate {args.rate} "
                 f"--txns {num_txns} "
+                f"--workers {args.workers} "
+                f"--sample {args.sample} "
+                f"--txn_profiles"
             )
             container = client.containers.run(
                 args.image,
@@ -960,12 +965,13 @@ class CollectCommand(Command):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "tag",
-            help="Tag of the benchmark data"
+            "config",
+            metavar="config_file",
+            help="Path to a config file",
         )
         parser.add_argument(
-            "clients",
-            help="Path to a json file containing lists of clients."
+            "tag",
+            help="Tag of the benchmark data"
         )
         parser.add_argument(
             "--out-dir",
@@ -977,9 +983,6 @@ class CollectCommand(Command):
             default=USER,
             help="Username of the target machines"
         )
-
-    def load_config(self, args):
-        pass
 
     def init_remote_processes(self, args):
         pass
@@ -999,25 +1002,23 @@ class CollectCommand(Command):
         LOG.info(f"Created directory: {out_path}")
 
         commands = []
-        with open(args.clients, 'r') as f:
-            # Load the list of clients from the json file
-            benchmark_clients = json.load(f)
-            for addr_list in benchmark_clients:
-                for addr, _ in addr_list.items():
-                    data_path = os.path.join(HOST_DATA_DIR, name)
-                    data_tar_file = f'{addr}.tar.gz'
-                    data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
-                    out_tar_path = os.path.join(out_path, data_tar_file)
-                    out_addr_path = os.path.join(out_path, addr)
+        for r in self.config.replicas:
+            for c in r.clients:
+                addr = c.address.decode()
+                data_path = os.path.join(HOST_DATA_DIR, name)
+                data_tar_file = f'{addr}.tar.gz'
+                data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
+                out_tar_path = os.path.join(out_path, data_tar_file)
+                out_addr_path = os.path.join(out_path, addr)
 
-                    os.makedirs(out_addr_path, exist_ok=True)
-                    cmd = (
-                        f'ssh {args.user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
-                        f'rsync -vh --inplace {args.user}@{addr}:{data_tar_path} {out_path} && '
-                        f'tar -xzf {out_tar_path} -C {out_addr_path}'
-                    )
-                    commands.append(f'({cmd}) & ')
-        
+                os.makedirs(out_addr_path, exist_ok=True)
+                cmd = (
+                    f'ssh {args.user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
+                    f'rsync -vh --inplace {args.user}@{addr}:{data_tar_path} {out_path} && '
+                    f'tar -xzf {out_tar_path} -C {out_addr_path}'
+                )
+                commands.append(f'({cmd}) & ')
+    
         LOG.info("Executing commands:\n%s", '\n'.join(commands))
         os.system(''.join(commands) + ' wait')
 

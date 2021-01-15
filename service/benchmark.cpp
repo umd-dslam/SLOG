@@ -216,19 +216,19 @@ int main(int argc, char* argv[]) {
       if (!profiles) {
         throw std::runtime_error(std::string("Cannot open file: ") + file_name);
       }
-      const int kCellWidth = 11;
+      const int kCellWidth = 12;
       for (auto& info : txn_infos) {
         profiles << *info.txn;
         profiles << "Multi-Home: " << info.profile.is_multi_home << "\n";
         profiles << "Multi-Partition: " << info.profile.is_multi_partition << "\n";
         profiles << "Profile:\n";
-        profiles << setw(6) << "Key" << setw(kCellWidth) << "Home" << setw(kCellWidth) << "Partition"
+        profiles << setw(kCellWidth) << "Key" << setw(kCellWidth) << "Home" << setw(kCellWidth) << "Partition"
                  << setw(kCellWidth) << "Hot" << setw(kCellWidth) << "Write"
                  << "\n";
         for (const auto& pair : info.profile.records) {
           const auto& key = pair.first;
           const auto& record = pair.second;
-          profiles << setw(6) << key << setw(kCellWidth) << record.home << setw(kCellWidth) << record.partition
+          profiles << setw(kCellWidth) << key << setw(kCellWidth) << record.home << setw(kCellWidth) << record.partition
                    << setw(kCellWidth) << record.is_hot << setw(kCellWidth) << record.is_write << "\n";
         }
         profiles << "\n" << std::endl;

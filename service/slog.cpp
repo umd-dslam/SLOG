@@ -139,6 +139,10 @@ int main(int argc, char* argv[]) {
 
   INIT_TRACING(config);
 
+  if (config->return_dummy_txn()) {
+    LOG(WARNING) << "Dummy transactions will be returned";
+  }
+
   auto context = make_shared<zmq::context_t>(1);
   context->set(zmq::ctxopt::blocky, false);
 

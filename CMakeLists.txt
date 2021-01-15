@@ -16,7 +16,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 option(BUILD_SLOG_CLIENT "Build the client" ON)
 option(BUILD_SLOG_TESTS "Build the tests" ON)
 option(ENABLE_TRACING "Enable transaction racing" ON)
-set(REMASTER_PROTOCOL "SIMPLE" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
+set(REMASTER_PROTOCOL "COUNTERLESS" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
 message(STATUS "Options:")
@@ -147,7 +147,8 @@ target_link_libraries(proto PUBLIC protobuf::libprotobuf)
 # Generate python code
 protobuf_generate_python(PROTO_PY_SRCS
   ${PROTO_PREFIX}/configuration.proto
-  ${PROTO_PREFIX}/offline_data.proto)
+  ${PROTO_PREFIX}/offline_data.proto
+  ${PROTO_PREFIX}/transaction.proto)
 
 # Copy generated python code to the "tools" directory
 set(PROTO_PY_DEST_DIR ${CMAKE_SOURCE_DIR}/tools)

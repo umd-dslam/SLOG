@@ -28,7 +28,10 @@ int Poller::Wait() {
     }
   }
 
-  // Wait until the next time event or some timeout
+  // Wait until the next time event or some timeout.
+  // By casting the timeout from microseconds to milliseconds, if it is below 1ms,
+  // the casting result will be 0 and thus poll becomes non-blocking. This is intended
+  // so that we spin wait instead of sleeping, making waiting more accurate.
   auto res = zmq::poll(poll_items_, duration_cast<milliseconds>(shortest_timeout));
 
   // Process and clean up triggered callbacks

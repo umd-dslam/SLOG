@@ -37,6 +37,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--regions", nargs="*", help="Run this script on these regions only"
     )
+    parser.add_argument(
+        "--clients", type=int, default=1, help="Number of client machines"
+    )
+    parser.add_argument(
+        "--capacity", type=int, default=None, help="Overwrite target capacity in the config"
+    )
     args = parser.parse_args()
 
     all_configs = {}
@@ -55,7 +61,12 @@ if __name__ == "__main__":
             )
         )
     ]
+
+    if args.capacity is not None:
+        all_configs['default']['TargetCapacity'] = args.capacity
     
+    LOG.info('Requesting %d machines at: %s', all_configs['default']['TargetCapacity'], regions)
+
     # Request spot fleets
     spot_fleet_requests = {}
     for region in regions:        
@@ -179,22 +190,24 @@ if __name__ == "__main__":
     print(json.dumps(instance_ips, indent=2))
     ip_groups = instance_ips.values()
 
-    print("\n================== SLOG CONFIG ==================\n")
+    print("\n================== SLOG CONFIG FRAGMENT ==================\n")
     slog_configs = []
-    for ips in ip_groups:
-        addresses = [f'  addresses: "{ip}"' for ip in ips]
+    for rep, ips in enumerate(ip_groups):
+        client_ips, server_ips = ips[:args.clients], ips[args.clients:]
+        servers = [f'  addresses: "{ip}"' for ip in server_ips]
+        clients = [
+            '  clients: {\n'
+            f'    address: "{ip}"\n'
+            '    procs: 1\n'
+            '  }'
+            for ip in client_ips
+        ]
         slog_configs.append(
-            'replicas: {\n' +
-            '\n'.join(addresses) +
+            'replicas: {\n' + 
+                '\n'.join(servers) +
+                '\n' +
+                '\n'.join(clients) +
             '\n}'
         )
-    print('\n'.join(slog_configs))
 
-    print("\n================== CLIENT CONFIG ==================\n")
-    client_configs = []
-    for ips in ip_groups:
-        client_configs.append({
-            ip: 0 for ip in ips
-        })
-    print(json.dumps(client_configs, indent=2))
-    
+    print('\n'.join(slog_configs))
