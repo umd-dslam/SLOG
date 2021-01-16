@@ -19,7 +19,12 @@ class TxnGenerator : public Module {
 
   size_t num_sent_txns() const { return cur_txn_; }
   size_t num_recv_txns() const { return num_recv_txns_; }
-  milliseconds elapsed_time() const { return elapsed_time_; }
+  milliseconds elapsed_time() const {
+    if (elapsed_time_.load() == 0ms) {
+      return duration_cast<milliseconds>(steady_clock::now() - start_time_);
+    }
+    return elapsed_time_;
+  }
 
   using TimePoint = std::chrono::system_clock::time_point;
   struct TxnInfo {

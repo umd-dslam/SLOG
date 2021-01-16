@@ -102,6 +102,12 @@ int main(int argc, char* argv[]) {
                                                   tps_per_worker, FLAGS_dry_run));
   }
 
+  // Block SIGINT from here so that the new threads inherit the block mask
+  sigset_t signal_set;
+  sigemptyset(&signal_set);
+  sigaddset(&signal_set, SIGINT);
+  pthread_sigmask(SIG_BLOCK, &signal_set, nullptr);
+
   // Run the workers
   for (auto& w : workers) {
     w->StartInNewThread();
@@ -119,6 +125,7 @@ int main(int argc, char* argv[]) {
   size_t last_num_sent_txns = 0;
   size_t last_num_recv_txns = 0;
   auto last_print_time = steady_clock::now();
+  timespec sigpoll_time = { .tv_sec = 0, .tv_nsec = 0 };
   for (;;) {
     std::this_thread::sleep_for(1s);
 
@@ -136,14 +143,21 @@ int main(int argc, char* argv[]) {
     auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
     auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
 
-    LOG(INFO) << "Transactions sent: " << num_sent_txns << "; Sent tps: " << send_tps << "; Recv tps: " << recv_tps
-              << "\n";
+    LOG(INFO) << "Sent: " << num_sent_txns << "; Received: " << num_recv_txns << "; Sent tps: " << send_tps
+              << "; Recv tps: " << recv_tps << "\n";
 
     last_num_sent_txns = num_sent_txns;
     last_num_recv_txns = num_recv_txns;
     last_print_time = now;
 
     if (!running) {
+      break;
+    }
+
+    if (sigtimedwait(&signal_set, nullptr, &sigpoll_time) >= 0) {
+      if (!FLAGS_out_dir.empty()) {
+        LOG(WARNING) << "Benchmark interuptted. Partial results will be written out.";
+      }
       break;
     }
   }
@@ -235,7 +249,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    LOG(INFO) << "Results were written to \"" << FLAGS_out_dir << "\"";
+    LOG(INFO) << "Results were written to \"" << FLAGS_out_dir << "/\"";
   }
 
   return 0;

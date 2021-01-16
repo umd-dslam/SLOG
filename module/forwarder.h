@@ -30,8 +30,8 @@ namespace slog {
 class Forwarder : public NetworkedModule {
  public:
   Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-            const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-            std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
+            const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds batch_timeout,
+            milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
   void HandleInternalRequest(EnvelopePtr&& env) final;
@@ -48,8 +48,11 @@ class Forwarder : public NetworkedModule {
 
   ConfigurationPtr config_;
   std::shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
+  milliseconds batch_timeout_;
 
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
+  internal::Envelope lookup_request_;
+  bool lookup_request_scheduled_;
 
   std::mt19937 rg_;
 };

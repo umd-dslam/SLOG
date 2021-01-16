@@ -32,7 +32,8 @@ class Configuration {
   uint32_t num_partitions() const;
   uint32_t num_workers() const;
   vector<MachineId> all_machine_ids() const;
-  milliseconds batch_duration() const;
+  milliseconds forwarder_batch_duration() const;
+  milliseconds sequencer_batch_duration() const;
   uint32_t replication_factor() const;
 
   const string& local_address() const;

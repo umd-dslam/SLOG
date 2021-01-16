@@ -32,7 +32,8 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   common_config.set_broker_port(0);
   common_config.set_num_partitions(num_partitions);
   common_config.mutable_hash_partitioning()->set_partition_key_num_bytes(1);
-  common_config.set_batch_duration(1);
+  common_config.set_sequencer_batch_duration(1);
+  common_config.set_forwarder_batch_duration(1);
   for (int r = 0; r < num_replicas; r++) {
     auto replica = common_config.add_replicas();
     for (int p = 0; p < num_partitions; p++) {
@@ -107,10 +108,13 @@ void TestSlog::Data(Key&& key, Record&& record) {
 
 void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, broker_, kTestModuleTimeout); }
 
-void TestSlog::AddForwarder() { forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeout); }
+void TestSlog::AddForwarder() {
+  forwarder_ =
+      MakeRunnerFor<Forwarder>(config_, broker_, storage_, config_->forwarder_batch_duration(), kTestModuleTimeout);
+}
 
 void TestSlog::AddSequencer() {
-  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, config_->batch_duration(), kTestModuleTimeout);
+  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, config_->sequencer_batch_duration(), kTestModuleTimeout);
 }
 
 void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeout); }
@@ -123,7 +127,7 @@ void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(con
 
 void TestSlog::AddMultiHomeOrderer() {
   multi_home_orderer_ =
-      MakeRunnerFor<MultiHomeOrderer>(config_, broker_, config_->batch_duration(), kTestModuleTimeout);
+      MakeRunnerFor<MultiHomeOrderer>(config_, broker_, config_->sequencer_batch_duration(), kTestModuleTimeout);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {

@@ -81,7 +81,7 @@ message ForwardTransaction {
 }
 
 message LookupMasterRequest {
-    uint32 txn_id = 1;
+    repeated uint32 txn_ids = 1;
     repeated string keys = 2;
 }
 
@@ -166,11 +166,8 @@ message EchoResponse {
 }
 
 message LookupMasterResponse {
-    uint32 txn_id = 1;
+    repeated uint32 txn_ids = 1;
     map<string, MasterMetadata> master_metadata = 2;
-    // Keys belonging to the responding partition
-    // but without mastership info (because the key is new)
-    repeated string new_keys = 3;
 }
 
 message PaxosAcceptResponse {

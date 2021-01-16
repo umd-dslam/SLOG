@@ -20,10 +20,6 @@ using internal::Request;
 using internal::Response;
 namespace {
 
-bool TransactionContainsKey(const Transaction& txn, const Key& key) {
-  return txn.read_set().contains(key) || txn.write_set().contains(key);
-}
-
 uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
   std::uniform_int_distribution<> idx(0, txn.internal().involved_partitions_size() - 1);
   return txn.internal().involved_partitions(idx(rg));
@@ -33,10 +29,11 @@ uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
 
 Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-                     std::chrono::milliseconds poll_timeout)
+                     milliseconds batch_timeout, milliseconds poll_timeout)
     : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout),
       config_(config),
       lookup_master_index_(lookup_master_index),
+      batch_timeout_(batch_timeout),
       rg_(std::random_device()()) {}
 
 void Forwarder::HandleInternalRequest(EnvelopePtr&& env) {
@@ -57,18 +54,14 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
-  auto local_partition = config_->local_partition();
+  bool need_remote_lookup = false;
 
-  // Prepare a lookup master request just in case
-  Envelope lookup_env;
-  auto lookup_master = lookup_env.mutable_request()->mutable_lookup_master();
+  auto lookup_master = lookup_request_.mutable_request()->mutable_lookup_master();
   vector<uint32_t> involved_partitions;
-
   // This function will be called on the read and write set of the current txn
-  auto LocalMasterLookupFn = [this, txn, local_partition, lookup_master,
-                              &involved_partitions](const google::protobuf::Map<string, string>& keys) {
+  auto LocalMasterLookupFn = [this, txn, lookup_master, &involved_partitions,
+                              &need_remote_lookup](const google::protobuf::Map<string, string>& keys) -> bool {
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
-    lookup_master->set_txn_id(txn->internal().id());
     for (auto& pair : keys) {
       const auto& key = pair.first;
       uint32_t partition = 0;
@@ -77,13 +70,13 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
         partition = config_->partition_of_key(key);
       } catch (std::invalid_argument& e) {
         LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
-        return;
+        return false;
       }
 
       involved_partitions.push_back(partition);
 
       // If this is a local partition, lookup the master info from the local storage
-      if (partition == local_partition) {
+      if (partition == config_->local_partition()) {
         auto& new_metadata = (*txn_metadata)[key];
         Metadata metadata;
         if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
@@ -96,20 +89,27 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
       } else {
         // Otherwise, add the key to the remote lookup master request
         lookup_master->add_keys(key);
+        need_remote_lookup = true;
       }
     }
+    return true;
   };
 
-  LocalMasterLookupFn(txn->read_set());
-  LocalMasterLookupFn(txn->write_set());
+  if (!LocalMasterLookupFn(txn->read_set())) {
+    return;
+  }
+  if (!LocalMasterLookupFn(txn->write_set())) {
+    return;
+  }
 
+  // Deduplicate involved partition list and set it to the txn
   sort(involved_partitions.begin(), involved_partitions.end());
   auto last = unique(involved_partitions.begin(), involved_partitions.end());
   *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
 
   // If there is no need to look master info from remote partitions,
   // forward the txn immediately
-  if (lookup_master->keys().empty()) {
+  if (!need_remote_lookup) {
     auto txn_type = SetTransactionType(*txn);
     VLOG(3) << "Determine txn " << txn->internal().id() << " to be " << ENUM_NAME(txn_type, TransactionType)
             << " without remote master lookup";
@@ -119,15 +119,24 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   }
 
   VLOG(3) << "Remote master lookup needed to determine type of txn " << txn->internal().id();
+  lookup_master->add_txn_ids(txn->internal().id());
   pending_transactions_.insert_or_assign(txn->internal().id(), move(env));
 
-  // Send a look up master request to each partition in the same region
-  auto local_rep = config_->local_replica();
-  auto num_partitions = config_->num_partitions();
-  for (uint32_t part = 0; part < num_partitions; part++) {
-    if (part != local_partition) {
-      Send(lookup_env, config_->MakeMachineId(local_rep, part), kForwarderChannel);
-    }
+  // If the request is not scheduled to be sent yet, schedule one now
+  if (!lookup_request_scheduled_) {
+    NewTimedCallback(batch_timeout_, [this]() {
+      auto local_rep = config_->local_replica();
+      auto num_partitions = config_->num_partitions();
+      for (uint32_t part = 0; part < num_partitions; part++) {
+        if (part != config_->local_partition()) {
+          Send(lookup_request_, config_->MakeMachineId(local_rep, part), kForwarderChannel);
+        }
+      }
+      // Reset the lookup request
+      lookup_request_.Clear();
+      lookup_request_scheduled_ = false;
+    });
+    lookup_request_scheduled_ = true;
   }
 }
 
@@ -137,7 +146,7 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
   auto lookup_response = lookup_env.mutable_response()->mutable_lookup_master();
   auto metadata_map = lookup_response->mutable_master_metadata();
 
-  lookup_response->set_txn_id(lookup_master.txn_id());
+  lookup_response->mutable_txn_ids()->CopyFrom(lookup_master.txn_ids());
   for (int i = 0; i < lookup_master.keys_size(); i++) {
     const auto& key = lookup_master.keys(i);
 
@@ -149,8 +158,10 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
         response_metadata.set_master(metadata.master);
         response_metadata.set_counter(metadata.counter);
       } else {
-        // Otherwise, add it to the list indicating this is a new key
-        lookup_response->add_new_keys(key);
+        // Otherwise, assign it to the default region for new key
+        auto& new_metadata = (*metadata_map)[key];
+        new_metadata.set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
+        new_metadata.set_counter(0);
       }
     }
   }
@@ -164,35 +175,35 @@ void Forwarder::HandleInternalResponse(EnvelopePtr&& env) {
   }
 
   const auto& lookup_master = env->response().lookup_master();
-  auto txn_id = lookup_master.txn_id();
-  auto pending_txn_it = pending_transactions_.find(txn_id);
-  if (pending_txn_it == pending_transactions_.end()) {
-    return;
-  }
-
-  // Transfer master info from the lookup response to its intended transaction
-  auto& pending_env = pending_txn_it->second;
-  auto txn = pending_env->mutable_request()->mutable_forward_txn()->mutable_txn();
-  auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
-  for (const auto& pair : lookup_master.master_metadata()) {
-    if (TransactionContainsKey(*txn, pair.first)) {
-      txn_master_metadata->insert(pair);
+  for (auto txn_id : lookup_master.txn_ids()) {
+    auto pending_txn_it = pending_transactions_.find(txn_id);
+    if (pending_txn_it == pending_transactions_.end()) {
+      continue;
     }
-  }
-  // The master of new keys are set to a default region
-  for (const auto& new_key : lookup_master.new_keys()) {
-    if (TransactionContainsKey(*txn, new_key)) {
-      auto& new_metadata = (*txn_master_metadata)[new_key];
-      new_metadata.set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-      new_metadata.set_counter(0);
-    }
-  }
 
-  auto txn_type = SetTransactionType(*txn);
-  if (txn_type != TransactionType::UNKNOWN) {
-    VLOG(3) << "Determine txn " << txn->internal().id() << " to be " << ENUM_NAME(txn_type, TransactionType);
-    Forward(move(pending_env));
-    pending_transactions_.erase(txn_id);
+    // Transfer master info from the lookup response to its intended transaction
+    auto& pending_env = pending_txn_it->second;
+    auto txn = pending_env->mutable_request()->mutable_forward_txn()->mutable_txn();
+    auto txn_master_metadata = txn->mutable_internal()->mutable_master_metadata();
+    for (const auto& pair : txn->read_set()) {
+      auto it = lookup_master.master_metadata().find(pair.first);
+      if (it != lookup_master.master_metadata().end()) {
+        txn_master_metadata->insert(*it);
+      }
+    }
+    for (const auto& pair : txn->write_set()) {
+      auto it = lookup_master.master_metadata().find(pair.first);
+      if (it != lookup_master.master_metadata().end()) {
+        txn_master_metadata->insert(*it);
+      }
+    }
+
+    auto txn_type = SetTransactionType(*txn);
+    if (txn_type != TransactionType::UNKNOWN) {
+      VLOG(3) << "Determine txn " << txn->internal().id() << " to be " << ENUM_NAME(txn_type, TransactionType);
+      Forward(move(pending_env));
+      pending_transactions_.erase(txn_id);
+    }
   }
 }
 

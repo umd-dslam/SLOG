@@ -65,7 +65,7 @@ if __name__ == "__main__":
     if args.capacity is not None:
         all_configs['default']['TargetCapacity'] = args.capacity
     
-    LOG.info('Requesting %d machines at: %s', all_configs['default']['TargetCapacity'], regions)
+    LOG.info('Requesting %d spot instances at: %s', all_configs['default']['TargetCapacity'], regions)
 
     # Request spot fleets
     spot_fleet_requests = {}

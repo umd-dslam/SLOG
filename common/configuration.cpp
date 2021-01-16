@@ -77,7 +77,19 @@ uint32_t Configuration::broker_port() const { return config_.broker_port(); }
 
 uint32_t Configuration::server_port() const { return config_.server_port(); }
 
-milliseconds Configuration::batch_duration() const { return milliseconds(config_.batch_duration()); }
+milliseconds Configuration::forwarder_batch_duration() const {
+  if (config_.forwarder_batch_duration() == 0) {
+    return 5ms;
+  }
+  return milliseconds(config_.forwarder_batch_duration());
+}
+
+milliseconds Configuration::sequencer_batch_duration() const {
+  if (config_.sequencer_batch_duration() == 0) {
+    return 5ms;
+  }
+  return milliseconds(config_.sequencer_batch_duration());
+}
 
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 

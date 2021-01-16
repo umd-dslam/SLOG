@@ -182,10 +182,21 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   }
   os << "Type: " << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
   if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
-    os << "Code: " << txn.code() << std::endl;
+    os << "Code: " << txn.code() << "\n";
   } else {
-    os << "New master: " << txn.remaster().new_master() << std::endl;
+    os << "New master: " << txn.remaster().new_master() << "\n";
   }
+  os << "Coordinating server: " << txn.internal().coordinating_server() << "\n";
+  os << "Involved partitions: ";
+  for (auto p : txn.internal().involved_partitions()) {
+    os << p << " ";
+  }
+  os << "\n";
+  os << "Involved replicas: ";
+  for (auto r : txn.internal().involved_replicas()) {
+    os << r << " ";
+  }
+  os << std::endl;
   return os;
 }
 

@@ -1,6 +1,5 @@
 #include <fcntl.h>
 
-#include <csignal>
 #include <memory>
 #include <vector>
 
@@ -161,15 +160,15 @@ int main(int argc, char* argv[]) {
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
-  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->batch_duration()));
+  modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage, config->forwarder_batch_duration()));
+  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->sequencer_batch_duration()));
   modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
 
   // Only one partition per replica participates in the global paxos process
   if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
     modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
-    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->batch_duration()));
+    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration()));
   }
 
   // Block SIGINT from here so that the new threads inherit the block mask
