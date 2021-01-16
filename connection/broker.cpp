@@ -56,7 +56,7 @@ void Broker::AddChannel(Channel chan) {
 
   zmq::socket_t new_channel(*context_, ZMQ_PUSH);
   new_channel.set(zmq::sockopt::sndhwm, 0);
-  new_channel.connect("inproc://channel_" + std::to_string(chan));
+  new_channel.connect(MakeInProcChannelAddress(chan));
   channels_.insert_or_assign(chan, move(new_channel));
 }
 

@@ -11,6 +11,8 @@ namespace slog {
 
 using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
+inline std::string MakeInProcChannelAddress(Channel chan) { return "inproc://channel_" + std::to_string(chan); }
+
 /**
  * Sends a pointer to an envelope
  */

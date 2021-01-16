@@ -134,7 +134,7 @@ void TestSlog::AddOutputChannel(Channel channel) {
   broker_->AddChannel(channel);
 
   zmq::socket_t socket(*context_, ZMQ_PULL);
-  socket.bind("inproc://channel_" + to_string(channel));
+  socket.bind(MakeInProcChannelAddress(channel));
   channels_.insert_or_assign(channel, std::move(socket));
 }
 
