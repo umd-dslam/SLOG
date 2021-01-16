@@ -22,7 +22,7 @@ Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& b
                      const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config), current_worker_(0) {
   for (size_t i = 0; i < config->num_workers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(config, broker, kWorkerChannelOffset + i, storage, poll_timeout));
+    workers_.push_back(MakeRunnerFor<Worker>(config, broker, kMaxChannel + i, storage, poll_timeout));
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
@@ -63,7 +63,7 @@ void Scheduler::ProcessRemoteReadResult(EnvelopePtr&& env) {
   auto& txn_info = active_txns_[txn_id];
   if (txn_info.holder.has_value() && txn_info.holder->worker().has_value()) {
     VLOG(2) << "Got remote read result for txn " << txn_id;
-    Send(move(env), kWorkerChannelOffset + txn_info.holder->worker().value());
+    Send(move(env), kMaxChannel + txn_info.holder->worker().value());
   } else {
     // Save the remote reads that come before the txn
     // is processed by this partition
@@ -557,7 +557,7 @@ void Scheduler::Dispatch(TxnId txn_id, bool one_way) {
   auto env = NewEnvelope();
   auto worker_request = env->mutable_request()->mutable_worker();
   worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
-  Channel worker_channel = kWorkerChannelOffset + *txn_holder->worker();
+  Channel worker_channel = kMaxChannel + *txn_holder->worker();
 
   // The transaction need always be sent to a worker before
   // any remote reads is sent for that transaction

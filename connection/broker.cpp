@@ -5,9 +5,9 @@
 #include <sstream>
 #include <unordered_set>
 
+#include "common/constants.h"
 #include "common/proto_utils.h"
 #include "common/thread_utils.h"
-#include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
 using std::move;
@@ -24,11 +24,12 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
     : config_(config),
       context_(context),
       poll_timeout_ms_(poll_timeout_ms),
-      socket_(*context, ZMQ_PULL),
+      external_socket_(*context, ZMQ_PULL),
+      internal_socket_(*context, ZMQ_PULL),
       running_(false),
       is_synchronized_(false) {
   // Remove all limits on the message queue
-  socket_.set(zmq::sockopt::rcvhwm, 0);
+  external_socket_.set(zmq::sockopt::rcvhwm, 0);
 }
 
 Broker::~Broker() {
@@ -103,8 +104,10 @@ string Broker::MakeEndpoint(const string& addr) const {
 
 bool Broker::InitializeConnection() {
   // Bind the router to its endpoint
-  socket_.bind(MakeEndpoint());
+  external_socket_.bind(MakeEndpoint());
   LOG(INFO) << "Bound Broker to: " << MakeEndpoint();
+
+  internal_socket_.bind(MakeInProcChannelAddress(kBrokerChannel));
 
   // Prepare a READY message
   Envelope env;
@@ -137,11 +140,11 @@ bool Broker::InitializeConnection() {
   }
 
   LOG(INFO) << "Waiting for READY messages from other machines...";
-  zmq::pollitem_t item = GetSocketPollItem();
+  zmq::pollitem_t pollitem = {static_cast<void*>(external_socket_), 0, ZMQ_POLLIN, 0};
   while (running_) {
-    if (zmq::poll(&item, 1, poll_timeout_ms_)) {
+    if (zmq::poll(&pollitem, 1, poll_timeout_ms_)) {
       zmq::message_t msg;
-      if (!socket_.recv(msg, zmq::recv_flags::dontwait)) {
+      if (!external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
         continue;
       }
 
@@ -196,16 +199,36 @@ void Broker::Run() {
   }
   unhandled_incoming_messages_.clear();
 
-  auto poll_item = GetSocketPollItem();
+  vector<zmq::pollitem_t> pollitems = {{static_cast<void*>(external_socket_), 0, ZMQ_POLLIN, 0},
+                                       {static_cast<void*>(internal_socket_), 0, ZMQ_POLLIN, 0}};
   while (running_) {
     // Wait until a message arrived at one of the sockets
-    if (zmq::poll(&poll_item, 1, poll_timeout_ms_)) {
-      for (int i = 0; i < 100; i++) {
-        // Socket just received a message
-        if (zmq::message_t msg; socket_.recv(msg, zmq::recv_flags::dontwait)) {
+    if (zmq::poll(pollitems, poll_timeout_ms_)) {
+      for (int i = 0; i < 1000; i++) {
+        if (zmq::message_t msg; external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
           HandleIncomingMessage(move(msg));
-        } else {
-          break;
+        }
+        if (auto env = RecvEnvelope(internal_socket_, true /* dont_wait */); env != nullptr) {
+          if (!env->has_request() || !env->request().has_broker_redirect()) {
+            continue;
+          }
+          auto tag = env->request().broker_redirect().tag();
+          if (env->request().broker_redirect().stop()) {
+            redirect_.erase(tag);
+            continue;
+          }
+          auto channel = env->request().broker_redirect().channel();
+          auto chan_it = channels_.find(channel);
+          if (chan_it == channels_.end()) {
+            LOG(ERROR) << "Invalid channel to redirect to: \"" << channel << "\".";
+            continue;
+          }
+          auto& entry = redirect_[tag];
+          entry.to = channel;
+          for (auto& msg : entry.pending_msgs) {
+            ForwardMessage(chan_it->second, std::move(msg));
+          }
+          entry.pending_msgs.clear();
         }
       }
     }
@@ -213,16 +236,35 @@ void Broker::Run() {
 }
 
 void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
-  Channel chan_id;
-  if (!ParseChannel(chan_id, msg)) {
+  Channel tag_or_chan_id;
+  if (!ParseChannel(tag_or_chan_id, msg)) {
     LOG(ERROR) << "Message without channel info";
     return;
   }
+
+  auto chan_id = tag_or_chan_id;
+
+  // Check if this is a tag or a channel id.
+  // This condition effectively allows sending messages to a worker only via redirection since
+  // workers' channel ids are larger than kMaxChannel
+  if (tag_or_chan_id >= kMaxChannel) {
+    auto& entry = redirect_[tag_or_chan_id];
+    if (!entry.to.has_value()) {
+      entry.pending_msgs.push_back(move(msg));
+      return;
+    }
+    chan_id = entry.to.value();
+  }
+
   auto chan_it = channels_.find(chan_id);
   if (chan_it == channels_.end()) {
     LOG(ERROR) << "Unknown channel: \"" << chan_id << "\". Dropping message";
     return;
   }
+  ForwardMessage(chan_it->second, std::move(msg));
+}
+
+void Broker::ForwardMessage(zmq::socket_t& socket, zmq::message_t&& msg) {
   MachineId machine_id = -1;
   ParseMachineId(machine_id, msg);
 
@@ -230,12 +272,10 @@ void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
   if (DeserializeProto(*env, msg)) {
     // This must be set AFTER deserializing otherwise it will be overwritten by the deserialization function
     env->set_from(machine_id);
-    SendEnvelope(chan_it->second, std::move(env));
+    SendEnvelope(socket, std::move(env));
   } else {
     LOG(ERROR) << "Malformed message";
   }
 }
-
-zmq::pollitem_t Broker::GetSocketPollItem() { return {static_cast<void*>(socket_), 0, ZMQ_POLLIN, 0}; }
 
 }  // namespace slog

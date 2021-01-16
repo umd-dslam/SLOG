@@ -8,6 +8,7 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/types.h"
+#include "connection/zmq_utils.h"
 
 using std::shared_ptr;
 using std::string;
@@ -94,18 +95,19 @@ class Broker {
 
   void HandleIncomingMessage(zmq::message_t&& msg);
 
-  zmq::pollitem_t GetSocketPollItem();
+  void ForwardMessage(zmq::socket_t& socket, zmq::message_t&& msg);
 
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
   std::chrono::milliseconds poll_timeout_ms_;
-  zmq::socket_t socket_;
+  zmq::socket_t external_socket_;
+  zmq::socket_t internal_socket_;
 
   // Thread stuff
   std::atomic<bool> running_;
   std::thread thread_;
 
-  // Synchronization
+  // For synchronizing with the senders
   bool is_synchronized_;
   std::condition_variable cv_;
   std::mutex mutex_;
@@ -114,6 +116,12 @@ class Broker {
   vector<zmq::message_t> unhandled_incoming_messages_;
   // Map from channel name to the channel
   std::unordered_map<Channel, zmq::socket_t> channels_;
+
+  struct RedirectEntry {
+    std::optional<Channel> to;
+    std::vector<zmq::message_t> pending_msgs;
+  };
+  std::unordered_map<Channel, RedirectEntry> redirect_;
 
   // Map from serialized-to-string MachineIds to IP addresses
   // Used to translate the identities of outgoing messages

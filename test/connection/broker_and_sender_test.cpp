@@ -39,8 +39,8 @@ EnvelopePtr MakeEchoResponse(const std::string& data) {
 }
 
 TEST(BrokerAndSenderTest, PingPong) {
-  const Channel PING = 10;
-  const Channel PONG = 11;
+  const Channel PING = 1;
+  const Channel PONG = 2;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
   auto ping = thread([&]() {
@@ -91,8 +91,8 @@ TEST(BrokerAndSenderTest, PingPong) {
 }
 
 TEST(BrokerTest, LocalPingPong) {
-  const Channel PING = 10;
-  const Channel PONG = 11;
+  const Channel PING = 1;
+  const Channel PONG = 2;
   ConfigVec configs = MakeTestConfigurations("local_ping_pong", 1, 1);
   auto context = std::make_shared<zmq::context_t>(1);
   context->set(zmq::ctxopt::blocky, false);
@@ -133,8 +133,8 @@ TEST(BrokerTest, LocalPingPong) {
 }
 
 TEST(BrokerTest, MultiSendSerialized) {
-  const Channel PING = 10;
-  const Channel PONG = 11;
+  const Channel PING = 1;
+  const Channel PONG = 2;
   const int NUM_PONGS = 3;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, NUM_PONGS + 1);
 
@@ -196,4 +196,149 @@ TEST(BrokerTest, MultiSendSerialized) {
   for (int i = 0; i < NUM_PONGS; i++) {
     pongs[i].join();
   }
+}
+
+TEST(BrokerTest, CreateRedirection) {
+  const Channel PING = 1;
+  const Channel PONG = 2;
+  const Channel TAG = 11111;
+  ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
+
+  // Initialize ping machine
+  auto ping_context = make_shared<zmq::context_t>(1);
+  auto ping_socket = MakePullSocket(*ping_context, PING);
+  auto ping_broker = make_shared<Broker>(configs[0], ping_context);
+  ping_broker->AddChannel(PING);
+  ping_broker->StartInNewThread();
+  Sender ping_sender(ping_broker);
+
+  // Establish a redirection from TAG to the PING channel at the ping machine.
+  // We do it early so that hopefully the redirection is established by the time
+  // we receive the pong message
+  {
+    auto env = std::make_unique<internal::Envelope>();
+    auto redirect = env->mutable_request()->mutable_broker_redirect();
+    redirect->set_tag(TAG);
+    redirect->set_channel(PING);
+    ping_sender.SendLocal(move(env), kBrokerChannel);
+  }
+
+  // Initialize pong machine
+  auto pong_context = make_shared<zmq::context_t>(1);
+  auto pong_socket = MakePullSocket(*pong_context, PONG);
+  auto pong_broker = make_shared<Broker>(configs[1], pong_context);
+  pong_broker->AddChannel(PONG);
+  pong_broker->StartInNewThread();
+  Sender pong_sender(pong_broker);
+
+  // Send ping message with a tag of the pong machine.
+  {
+    auto ping_req = MakeEchoRequest("ping");
+    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+  }
+
+  // The pong machine does not know which channel to forward to yet at this point
+  // so the message will be queued up at the broker
+  this_thread::sleep_for(5ms);
+  ASSERT_EQ(RecvEnvelope(pong_socket, true), nullptr);
+
+  // Establish a redirection from TAG to the PONG channel at the pong machine
+  {
+    auto env = std::make_unique<internal::Envelope>();
+    auto redirect = env->mutable_request()->mutable_broker_redirect();
+    redirect->set_tag(TAG);
+    redirect->set_channel(PONG);
+    pong_sender.SendLocal(move(env), kBrokerChannel);
+  }
+
+  // Now we can receive the ping message
+  {
+    auto ping_req = RecvEnvelope(pong_socket);
+    ASSERT_TRUE(ping_req != nullptr);
+    ASSERT_TRUE(ping_req->has_request());
+    ASSERT_EQ("ping", ping_req->request().echo().data());
+  }
+
+  // Send pong
+  {
+    auto pong_res = MakeEchoResponse("pong");
+    pong_sender.SendSerialized(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
+  }
+
+  // We should be able to receive pong here since we already establish a redirection at
+  // the beginning for the ping machine
+  {
+    auto pong_res = RecvEnvelope(ping_socket);
+    ASSERT_TRUE(pong_res != nullptr);
+    ASSERT_TRUE(pong_res->has_response());
+    ASSERT_EQ("pong", pong_res->response().echo().data());
+  }
+}
+
+TEST(BrokerTest, RemoveRedirection) {
+  const Channel PING = 1;
+  const Channel PONG = 2;
+  const Channel TAG = 11111;
+  ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
+
+  // Initialize ping machine
+  auto ping_context = make_shared<zmq::context_t>(1);
+  auto ping_socket = MakePullSocket(*ping_context, PING);
+  auto ping_broker = make_shared<Broker>(configs[0], ping_context);
+  ping_broker->AddChannel(PING);
+  ping_broker->StartInNewThread();
+  Sender ping_sender(ping_broker);
+
+  // Initialize pong machine
+  auto pong_context = make_shared<zmq::context_t>(1);
+  auto pong_socket = MakePullSocket(*pong_context, PONG);
+  auto pong_broker = make_shared<Broker>(configs[1], pong_context);
+  pong_broker->AddChannel(PONG);
+  pong_broker->StartInNewThread();
+  Sender pong_sender(pong_broker);
+
+  // Establish a redirection from TAG to the PONG channel at the pong machine
+  {
+    auto env = std::make_unique<internal::Envelope>();
+    auto redirect = env->mutable_request()->mutable_broker_redirect();
+    redirect->set_tag(TAG);
+    redirect->set_channel(PONG);
+    pong_sender.SendLocal(move(env), kBrokerChannel);
+  }
+
+  // Send ping message with a tag of the pong machine.
+  {
+    auto ping_req = MakeEchoRequest("ping");
+    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+  }
+
+  // Now we can the ping message here
+  {
+    auto ping_req = RecvEnvelope(pong_socket);
+    ASSERT_TRUE(ping_req != nullptr);
+    ASSERT_TRUE(ping_req->has_request());
+    ASSERT_EQ("ping", ping_req->request().echo().data());
+  }
+
+  // Remove the redirection
+  {
+    auto env = std::make_unique<internal::Envelope>();
+    auto redirect = env->mutable_request()->mutable_broker_redirect();
+    redirect->set_tag(TAG);
+    redirect->set_stop(true);
+    pong_sender.SendLocal(move(env), kBrokerChannel);
+  }
+
+  // Send ping message again
+  {
+    auto ping_req = MakeEchoRequest("ping");
+    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+  }
+
+  // The redirection is removed so we shouldn't be able to receive anything here
+  // Theoretically, it is possible that the recv function is called before the
+  // pong broker removes the redirection, making the assertion to fail. However,
+  // it should be unlikely due to the sleep.
+  this_thread::sleep_for(5ms);
+  ASSERT_EQ(RecvEnvelope(pong_socket, true), nullptr);
 }

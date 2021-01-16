@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
   size_t last_num_sent_txns = 0;
   size_t last_num_recv_txns = 0;
   auto last_print_time = steady_clock::now();
-  timespec sigpoll_time = { .tv_sec = 0, .tv_nsec = 0 };
+  timespec sigpoll_time = {.tv_sec = 0, .tv_nsec = 0};
   for (;;) {
     std::this_thread::sleep_for(1s);
 
