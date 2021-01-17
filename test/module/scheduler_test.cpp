@@ -327,7 +327,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
                                       {{"A", {0, 0}}}, /* master metadata */
                                       MakeMachineId(0, 1) /* coordinating server */);
   remaster_txn->mutable_internal()->set_type(TransactionType::MULTI_HOME);
-  remaster_txn->mutable_internal()->set_id(11);
+  remaster_txn->mutable_internal()->set_id(1000);
 
   auto remaster_txn_lo_0 = MakeTransaction({},              /* read_set */
                                            {"A"},           /* write_set */
@@ -335,7 +335,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
                                            {{"A", {0, 0}}}, /* master metadata */
                                            MakeMachineId(0, 1) /* coordinating server */);
   remaster_txn_lo_0->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
-  remaster_txn_lo_0->mutable_internal()->set_id(11);
+  remaster_txn_lo_0->mutable_internal()->set_id(1000);
 
   auto remaster_txn_lo_1 = MakeTransaction({},              /* read_set */
                                            {"A"},           /* write_set */
@@ -345,14 +345,14 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
 
   remaster_txn_lo_1->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
   remaster_txn_lo_1->mutable_remaster()->set_is_new_master_lock_only(true);
-  remaster_txn_lo_1->mutable_internal()->set_id(11);
+  remaster_txn_lo_1->mutable_internal()->set_id(1000);
 
   auto txn = MakeTransaction({"A"},          /* read_set */
                              {},             /* write_set */
                              "GET A     \n", /* code */
                              {{"A", {1, 0}}}, MakeMachineId(0, 0) /* coordinating server */);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
-  txn->mutable_internal()->set_id(12);
+  txn->mutable_internal()->set_id(2000);
 
   SendTransaction(remaster_txn, {0});
   SendTransaction(remaster_txn_lo_1, {0});
@@ -361,12 +361,12 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
-  ASSERT_EQ(output_remaster_txn.internal().id(), 11U);
+  ASSERT_EQ(output_remaster_txn.internal().id(), 1000U);
   ASSERT_EQ(output_remaster_txn.status(), TransactionStatus::COMMITTED);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
-  ASSERT_EQ(output_txn.internal().id(), 12U);
+  ASSERT_EQ(output_txn.internal().id(), 2000U);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.read_set_size(), 1);
   ASSERT_EQ(output_txn.read_set().at("A"), "valueA");

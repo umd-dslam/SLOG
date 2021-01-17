@@ -66,7 +66,8 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
   DCHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
   if (txn->status() == TransactionStatus::ABORTED) {
-    iter->second.phase = TransactionState::Phase::PRE_ABORT;
+    NotifyOtherPartitions(txn_id);
+    iter->second.phase = TransactionState::Phase::FINISH;
   } else {
     iter->second.phase = TransactionState::Phase::READ_LOCAL_STORAGE;
     // Remove keys that will be filled in later by remote partitions.
@@ -94,6 +95,12 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
     }
   }
 
+  // Establish a redirection at broker for this txn so that we can receive remote reads
+  auto redirect_env = NewEnvelope();
+  redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
+  redirect_env->mutable_request()->mutable_broker_redirect()->set_channel(channel());
+  Send(move(redirect_env), kBrokerChannel);
+
   VLOG(3) << "Initialized state for txn " << txn_id;
 
   return txn_id;
@@ -106,6 +113,8 @@ std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadR
     VLOG(1) << "Transaction " << txn_id << " does not exist for remote read result";
     return {};
   }
+
+  VLOG(2) << "Got remote read result for txn " << txn_id;
 
   auto& state = state_it->second;
   auto txn = state.txn_holder->transaction();
@@ -163,12 +172,7 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
       }
       [[fallthrough]];
     case TransactionState::Phase::FINISH:
-    case TransactionState::Phase::PRE_ABORT:
-      if (state.phase == TransactionState::Phase::FINISH) {
-        Finish(txn_id);
-      } else if (state.phase == TransactionState::Phase::PRE_ABORT) {
-        PreAbort(txn_id);
-      }
+      Finish(txn_id);
       // Never fallthrough after this point because Finish and PreAbort
       // has already destroyed the state object
       break;
@@ -342,30 +346,17 @@ void Worker::Finish(TxnId txn_id) {
   SendToCoordinatingServer(txn_id);
 
   // Notify the scheduler that we're done
-  auto env = NewEnvelope();
-  env->mutable_response()->mutable_worker()->set_txn_id(txn_id);
-  Send(move(env), kSchedulerChannel);
+  auto sched_env = NewEnvelope();
+  sched_env->mutable_response()->mutable_worker()->set_txn_id(txn_id);
+  Send(move(sched_env), kSchedulerChannel);
+
+  // Remove the redirection at broker for this txn
+  auto redirect_env = NewEnvelope();
+  redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
+  redirect_env->mutable_request()->mutable_broker_redirect()->set_stop(true);
+  Send(move(redirect_env), kBrokerChannel);
 
   // Done with this txn. Remove it from the state map
-  txn_states_.erase(txn_id);
-
-  VLOG(3) << "Finished with txn " << txn_id;
-}
-
-void Worker::PreAbort(TxnId txn_id) {
-  NotifyOtherPartitions(txn_id);
-
-  auto& state = TxnState(txn_id);
-
-  TRACE(state.txn_holder->transaction()->mutable_internal(), TransactionEvent::EXIT_WORKER);
-
-  SendToCoordinatingServer(txn_id);
-
-  // The worker owns this holder for the case of pre-
-  // aborted txn so it must delete it
-  delete state.txn_holder;
-  state.txn_holder = nullptr;
-
   txn_states_.erase(txn_id);
 
   VLOG(3) << "Finished with txn " << txn_id;
@@ -401,7 +392,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   for (auto p : txn_holder->active_partitions()) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineId(local_replica, p);
-      Send(env, std::move(machine_id), kSchedulerChannel);
+      Send(env, std::move(machine_id), txn_id);
     }
   }
 }

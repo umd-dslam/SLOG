@@ -73,9 +73,8 @@ class Scheduler : public NetworkedModule {
   void SendToLockManager(const TxnHolder& txn_holder);
   void AcquireLocksAndProcessResult(const TxnHolder& txn_holder);
 
-  // Send txn to worker. If this is a one-way dispatch, a copy of the txn
-  // holder will be created and owned by the worker.
-  void Dispatch(TxnId txn_id, bool one_way = false);
+  // Send txn to worker
+  void Dispatch(TxnId txn_id);
 
   /**
    * Aborts
@@ -89,9 +88,7 @@ class Scheduler : public NetworkedModule {
    * arrives, it's returned to the coordinating server and remote read aborts
    * are sent to every active remote partition.
    *
-   * Before the transaction data is erased, we wait to collect all
-   * - lock-onlys (if multi-home)
-   * - remote reads (if multi-partition and an active partition)
+   * Before the transaction data is erased, we wait to collect all lock-onlys of a multi-home txn
    */
 
   // Start the abort. Only be called once per transaction
@@ -100,10 +97,7 @@ class Scheduler : public NetworkedModule {
   // arrived
   bool MaybeContinuePreDispatchAbort(TxnId txn_id);
   // Add a lock-only transaction to an abort that started before it arrived
-  bool MaybeContinuePreDispatchAbortLockOnly(TxnIdReplicaIdPair txn_replica_id);
-  // Return the transaction to the server if lock-only transactions and
-  // remote reads are received
-  void MaybeFinishAbort(TxnId txn_id);
+  bool MaybeContinuePreDispatchAbortLockOnly(TxnId txn_id);
 
   ConfigurationPtr config_;
 
@@ -122,29 +116,36 @@ class Scheduler : public NetworkedModule {
   RMALockManager lock_manager_;
 #endif
 
-  struct TxnInfo {
-    std::optional<TxnHolder> holder;
-    std::vector<EnvelopePtr> early_remote_reads;
+  struct ActiveTxn {
+    explicit ActiveTxn(const ConfigurationPtr& config, Transaction* new_txn) : aborting(false), done(false) {
+      auto txn_type = new_txn->internal().type();
+      if (txn_type == TransactionType::MULTI_HOME || txn_type == TransactionType::LOCK_ONLY) {
+        lock_only_txns.resize(new_txn->internal().involved_replicas_size());
+      }
+      if (txn_type == TransactionType::MULTI_HOME || txn_type == TransactionType::SINGLE_HOME) {
+        txn.emplace(config, new_txn);
+      } else {
+        lock_only_txns[TxnHolder::replica_id(new_txn)].emplace(config, new_txn);
+      }
+    }
+
+    bool is_ready_for_gc() const {
+      bool res = done;
+      for (auto& lo : lock_only_txns) {
+        res &= lo.has_value();
+      }
+      return res;
+    }
+
+    std::optional<TxnHolder> txn;
+    std::vector<std::optional<TxnHolder>> lock_only_txns;
+    bool aborting;
+    bool done;
   };
-  std::unordered_map<TxnId, TxnInfo> active_txns_;
+  std::unordered_map<TxnId, ActiveTxn> active_txns_;
 
-  /**
-   * Lock-only transactions are kept here during remaster checking and locking.
-   * This map is also used to track which LOs have arrived during an abort, which means
-   * that LOs should not be removed until the txn is dispatched.
-   */
-  std::map<TxnIdReplicaIdPair, TxnHolder> lock_only_txns_;
-
-  /**
-   * Transactions that are in the process of aborting
-   */
-  std::unordered_set<TxnId> aborting_txns_;
-  /**
-   * Stores how many lock-only transactions are yet to arrive during
-   * mutli-home abort
-   * Note: can be negative, if lock-onlys abort before the multi-home
-   */
-  std::unordered_map<TxnId, int32_t> mh_abort_waiting_on_;
+  TxnHolder& GetTxnHolder(TxnId txn_id);
+  TxnHolder& GetLockOnlyTxnHolder(TxnId txn_id, uint32_t rep_id);
 
   uint32_t current_worker_;
   // This must be defined at the end so that the workers exit before any resources

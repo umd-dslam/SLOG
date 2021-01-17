@@ -18,7 +18,7 @@
 namespace slog {
 
 struct TransactionState {
-  enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, COMMIT, FINISH, PRE_ABORT };
+  enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, COMMIT, FINISH };
 
   TransactionState(TxnHolder* txn_holder)
       : txn_holder(txn_holder), remote_reads_waiting_on(0), phase(Phase::READ_LOCAL_STORAGE) {}
@@ -79,11 +79,6 @@ class Worker : public NetworkedModule {
    * Returns the result back to the scheduler and cleans up the transaction state
    */
   void Finish(TxnId txn_id);
-
-  /**
-   * The txn has already been aborted by the scheduler
-   */
-  void PreAbort(TxnId txn_id);
 
   void NotifyOtherPartitions(TxnId txn_id);
 

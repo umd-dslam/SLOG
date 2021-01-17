@@ -53,27 +53,17 @@ uint32_t TxnHolder::replica_id(const Transaction* txn) {
     LOG(WARNING) << "Master metadata empty: txn id " << txn->internal().id();
     return 0;
   }
-  // Get the master of an element from the metadata. For single-home and lock-onlies, all masters
-  // will be the same in the metadata
-  return txn->internal().master_metadata().begin()->second.master();
-}
-
-const TxnIdReplicaIdPair TxnHolder::transaction_id_replica_id() const {
-  return transaction_id_replica_id(transaction());
-}
-
-const TxnIdReplicaIdPair TxnHolder::transaction_id_replica_id(const Transaction* txn) {
-  auto txn_id = txn->internal().id();
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
   if (txn->internal().type() == TransactionType::LOCK_ONLY && txn->procedure_case() == Transaction::kRemaster &&
       txn->remaster().is_new_master_lock_only()) {
-    return make_pair(txn_id, txn->remaster().new_master());
+    return txn->remaster().new_master();
   }
 #endif
 
-  auto local_log_id = replica_id(txn);
-  return make_pair(txn_id, local_log_id);
+  // Get the master of an element from the metadata. For single-home and lock-onlies, all masters
+  // will be the same in the metadata
+  return txn->internal().master_metadata().begin()->second.master();
 }
 
 }  // namespace slog

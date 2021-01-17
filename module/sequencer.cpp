@@ -59,6 +59,8 @@ Transaction* GenerateLockOnlyTxn(const Transaction& txn, uint32_t local_rep) {
 
   lock_only_txn->mutable_internal()->set_id(txn.internal().id());
   lock_only_txn->mutable_internal()->set_type(TransactionType::LOCK_ONLY);
+  lock_only_txn->mutable_internal()->mutable_involved_partitions()->CopyFrom(txn.internal().involved_partitions());
+  lock_only_txn->mutable_internal()->mutable_involved_replicas()->CopyFrom(txn.internal().involved_replicas());
 
   if (lock_only_txn->read_set().empty() && lock_only_txn->write_set().empty()) {
     return nullptr;

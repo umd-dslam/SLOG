@@ -35,6 +35,11 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
                              const MachineId coordinating_server = 0);
 
 /**
+ * Populate the involved_replicas field in the transaction
+ */
+void PopulateInvolvedReplicas(Transaction* txn);
+
+/**
  * Inspects the internal metadata of a transaction then determines whether
  * a transaction is SINGLE_HOME, MULTI_HOME, or UNKNOWN.
  * Pre-condition: all keys in master_metadata exist in either write set or

@@ -9,7 +9,6 @@
 
 namespace slog {
 
-using TxnIdReplicaIdPair = std::pair<uint32_t, uint32_t>;
 using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
 class TxnHolder {
@@ -29,12 +28,6 @@ class TxnHolder {
    */
   uint32_t replica_id() const;
   static uint32_t replica_id(const Transaction* txn);
-
-  /**
-   * Get a unique identifier for lock-only transactions
-   */
-  const TxnIdReplicaIdPair transaction_id_replica_id() const;
-  static const TxnIdReplicaIdPair transaction_id_replica_id(const Transaction*);
 
  private:
   Transaction* txn_;

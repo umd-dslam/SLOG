@@ -12,7 +12,7 @@ using namespace std;
 
 using Pair = pair<uint32_t, uint32_t>;
 
-const Channel kTestChannel = 100;
+const Channel kTestChannel = 1;
 
 class TestSimpleMultiPaxos : public SimpleMultiPaxos {
  public:

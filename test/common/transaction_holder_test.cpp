@@ -28,17 +28,6 @@ class TransactionHolderTest : public ::testing::Test {
   ConfigVec configs;
 };
 
-TEST_F(TransactionHolderTest, TxnReplicaId) {
-  auto txn = MakeTransaction({"A"},                           /* read_set */
-                             {"D"},                           /* write_set */
-                             "",                              /* code */
-                             {{"A", {1, 3}}, {"D", {1, 0}}}); /* metadata */
-  txn->mutable_internal()->set_id(100);
-
-  TxnHolder holder(configs[0], txn);
-  ASSERT_EQ(holder.transaction_id_replica_id(), make_pair(100u, 1u));
-}
-
 TEST_F(TransactionHolderTest, keys_in_partition) {
   auto txn = MakeTransaction({"A"},                           /* read_set */
                              {"D"},                           /* write_set */

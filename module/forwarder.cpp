@@ -238,20 +238,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
   } else if (txn_type == TransactionType::MULTI_HOME) {
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
-    // Compute involved replicas and store in the txn
-    vector<uint32_t> involved_replicas;
-    for (const auto& pair : master_metadata) {
-      involved_replicas.push_back(pair.second.master());
-    }
-#ifdef REMASTER_PROTOCOL_COUNTERLESS
-    if (txn->procedure_case() == Transaction::kRemaster) {
-      involved_replicas.push_back(txn->remaster().new_master());
-    }
-#endif
-
-    sort(involved_replicas.begin(), involved_replicas.end());
-    auto last = unique(involved_replicas.begin(), involved_replicas.end());
-    *txn_internal->mutable_involved_replicas() = {involved_replicas.begin(), last};
+    PopulateInvolvedReplicas(txn);
 
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 

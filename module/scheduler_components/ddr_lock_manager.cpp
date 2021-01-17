@@ -146,7 +146,6 @@ vector<TxnId> DDRLockManager::ReleaseLocks(const TxnHolder& txn_holder) {
   auto txn_id = txn->internal().id();
   auto txn_info_it = txn_info_.find(txn_id);
   if (txn_info_it == txn_info_.end()) {
-    LOG(ERROR) << "The released transaction does not exist";
     return result;
   }
   auto& txn_info = txn_info_it->second;
