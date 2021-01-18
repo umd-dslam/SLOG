@@ -53,10 +53,9 @@ message Request {
         PaxosAcceptRequest paxos_accept = 8;
         PaxosCommitRequest paxos_commit = 9;
         LocalQueueOrder local_queue_order = 10;
-        WorkerRequest worker = 11;
-        RemoteReadResult remote_read_result = 12;
-        CompletedSubtransaction completed_subtxn = 13;
-        StatsRequest stats = 14;
+        RemoteReadResult remote_read_result = 11;
+        CompletedSubtransaction completed_subtxn = 12;
+        StatsRequest stats = 13;
     }
 }
 
@@ -126,10 +125,6 @@ message LocalQueueOrder {
     uint32 slot = 2;
 }
 
-message WorkerRequest {
-    uint64 txn_holder_ptr = 1;
-}
-
 message RemoteReadResult {
     uint32 txn_id = 1;
     uint32 partition = 2;
@@ -160,7 +155,6 @@ message Response {
         LookupMasterResponse lookup_master = 2;
         PaxosAcceptResponse paxos_accept = 3;
         PaxosCommitResponse paxos_commit = 4;
-        WorkerResponse worker = 5;
         StatsResponse stats = 6;
     }
 }
@@ -184,10 +178,6 @@ message PaxosAcceptResponse {
 
 message PaxosCommitResponse {
     uint32 slot = 1;
-}
-
-message WorkerResponse {
-    uint32 txn_id = 2;
 }
 
 message StatsResponse {

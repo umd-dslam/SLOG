@@ -40,20 +40,19 @@ class Worker : public NetworkedModule {
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(EnvelopePtr&& env) final;
-
- private:
-  /**
-   * Initializes the state of a new transaction
-   */
-  std::optional<TxnId> ProcessWorkerRequest(const internal::WorkerRequest& req);
-
+  std::vector<zmq::socket_t> InitializeCustomSockets() final;
   /**
    * Applies remote read for transactions that are in the WAIT_REMOTE_READ phase.
    * When all remote reads are received, the transaction is moved to the EXECUTE phase.
    */
-  std::optional<TxnId> ProcessRemoteReadResult(const internal::RemoteReadResult& read_result);
+  void HandleInternalRequest(EnvelopePtr&& env) final;
 
+  /**
+   * Initializes the state of a new transaction
+   */
+  void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
+
+ private:
   /**
    * Drives most of the phase transition of a transaction
    */

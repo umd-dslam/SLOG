@@ -17,8 +17,9 @@ const Channel kInterleaverChannel = 5;
 const Channel kSchedulerChannel = 6;
 const Channel kLocalPaxos = 7;
 const Channel kGlobalPaxos = 8;
+const Channel kWorkerChannel = 9;
 // Always set to the last channel + 1
-const Channel kMaxChannel = 9;
+const Channel kMaxChannel = 10;
 
 const uint32_t kMaxNumMachines = 1000;
 

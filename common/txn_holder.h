@@ -19,9 +19,6 @@ class TxnHolder {
   const std::vector<std::pair<Key, LockMode>>& keys_in_partition() const;
   const std::vector<uint32_t>& active_partitions() const;
 
-  void SetWorker(uint32_t worker) { worker_ = worker; }
-  std::optional<uint32_t> worker() const { return worker_; }
-
   /**
    * Get the id of the replica where this transaction was added to the local log.
    * Should only be used for single-home and lock-only transactions.
@@ -31,7 +28,6 @@ class TxnHolder {
 
  private:
   Transaction* txn_;
-  std::optional<uint32_t> worker_;
   std::vector<std::pair<Key, LockMode>> keys_in_partition_;
   std::vector<uint32_t> active_partitions_;
 };

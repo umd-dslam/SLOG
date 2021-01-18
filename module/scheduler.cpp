@@ -20,7 +20,7 @@ using internal::Response;
 
 Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                      const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config), current_worker_(0) {
+    : NetworkedModule("Scheduler", broker, kSchedulerChannel, poll_timeout), config_(config) {
   for (size_t i = 0; i < config->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(config, broker, kMaxChannel + i, storage, poll_timeout));
   }
@@ -35,6 +35,17 @@ void Scheduler::Initialize() {
   for (auto& worker : workers_) {
     worker->StartInNewThread();
   }
+}
+
+std::vector<zmq::socket_t> Scheduler::InitializeCustomSockets() {
+  zmq::socket_t worker_socket(*context(), ZMQ_DEALER);
+  worker_socket.set(zmq::sockopt::rcvhwm, 0);
+  worker_socket.set(zmq::sockopt::sndhwm, 0);
+  worker_socket.bind(MakeInProcChannelAddress(kWorkerChannel));
+
+  vector<zmq::socket_t> sockets;
+  sockets.push_back(move(worker_socket));
+  return sockets;
 }
 
 /***********************************************
@@ -87,8 +98,13 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   Send(move(env), kServerChannel);
 }
 
-void Scheduler::HandleInternalResponse(EnvelopePtr&& env) {
-  auto txn_id = env->response().worker().txn_id();
+void Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
+  zmq::message_t msg;
+  if (!worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
+    return;
+  }
+
+  auto txn_id = *msg.data<TxnId>();
   auto& txn_holder = GetTxnHolder(txn_id);
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -435,21 +451,13 @@ bool Scheduler::MaybeContinuePreDispatchAbortLockOnly(TxnId txn_id) {
 ***********************************************/
 
 void Scheduler::Dispatch(TxnId txn_id) {
-  auto txn_holder = &GetTxnHolder(txn_id);
+  auto& txn_holder = GetTxnHolder(txn_id);
 
-  // Select a worker for this transaction
-  txn_holder->SetWorker(current_worker_);
-  current_worker_ = (current_worker_ + 1) % workers_.size();
+  TRACE(txn_holder.transaction()->mutable_internal(), TransactionEvent::DISPATCHED);
 
-  TRACE(txn_holder->transaction()->mutable_internal(), TransactionEvent::DISPATCHED);
-
-  // Prepare a request with the txn to be sent to the worker
-  auto env = NewEnvelope();
-  auto worker_request = env->mutable_request()->mutable_worker();
-  worker_request->set_txn_holder_ptr(reinterpret_cast<uint64_t>(txn_holder));
-  Channel worker_channel = kMaxChannel + *txn_holder->worker();
-
-  Send(move(env), worker_channel);
+  zmq::message_t msg(sizeof(TxnHolder*));
+  *msg.data<TxnHolder*>() = &txn_holder;
+  GetCustomSocket(0).send(msg, zmq::send_flags::none);
 
   VLOG(2) << "Dispatched txn " << txn_id;
 }

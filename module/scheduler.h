@@ -45,9 +45,10 @@ class Scheduler : public NetworkedModule {
 
  protected:
   void Initialize() final;
+  std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
   void HandleInternalRequest(EnvelopePtr&& env) final;
-  void HandleInternalResponse(EnvelopePtr&& env) final;
+  void HandleCustomSocket(zmq::socket_t& socket, size_t) final;
 
  private:
   void ProcessRemoteReadResult(EnvelopePtr&& env);
@@ -147,7 +148,6 @@ class Scheduler : public NetworkedModule {
   TxnHolder& GetTxnHolder(TxnId txn_id);
   TxnHolder& GetLockOnlyTxnHolder(TxnId txn_id, uint32_t rep_id);
 
-  uint32_t current_worker_;
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed
   std::vector<unique_ptr<ModuleRunner>> workers_;

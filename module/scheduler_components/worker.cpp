@@ -26,34 +26,71 @@ Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
       // TODO: change this dynamically based on selected experiment
       commands_(new KeyValueCommands()) {}
 
-void Worker::HandleInternalRequest(EnvelopePtr&& env) {
-  auto& request = env->request();
-  std::optional<TxnId> txn_id = {};
-  bool valid_request = true;
-  switch (request.type_case()) {
-    case Request::kWorker: {
-      txn_id = ProcessWorkerRequest(request.worker());
-      break;
-    }
-    case Request::kRemoteReadResult: {
-      txn_id = ProcessRemoteReadResult(request.remote_read_result());
-      break;
-    }
-    default:
-      valid_request = false;
-      break;
-  }
-  if (valid_request) {
-    if (txn_id) {
-      AdvanceTransaction(*txn_id);
-    }
-  } else {
-    LOG(FATAL) << "Invalid request for worker";
-  }
+vector<zmq::socket_t> Worker::InitializeCustomSockets() {
+  zmq::socket_t sched_socket(*context(), ZMQ_DEALER);
+  sched_socket.set(zmq::sockopt::rcvhwm, 0);
+  sched_socket.set(zmq::sockopt::sndhwm, 0);
+  sched_socket.connect(MakeInProcChannelAddress(kWorkerChannel));
+
+  vector<zmq::socket_t> sockets;
+  sockets.push_back(std::move(sched_socket));
+  return sockets;
 }
 
-std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest& worker_request) {
-  auto txn_holder = reinterpret_cast<TxnHolder*>(worker_request.txn_holder_ptr());
+void Worker::HandleInternalRequest(EnvelopePtr&& env) {
+  if (env->request().type_case() != Request::kRemoteReadResult) {
+    LOG(FATAL) << "Invalid request for worker";
+  }
+  auto& read_result = env->request().remote_read_result();
+  auto txn_id = read_result.txn_id();
+  auto state_it = txn_states_.find(txn_id);
+  if (state_it == txn_states_.end()) {
+    VLOG(1) << "Transaction " << txn_id << " does not exist for remote read result";
+    return;
+  }
+
+  VLOG(2) << "Got remote read result for txn " << txn_id;
+
+  auto& state = state_it->second;
+  auto txn = state.txn_holder->transaction();
+
+  if (txn->status() != TransactionStatus::ABORTED) {
+    if (read_result.will_abort()) {
+      // TODO: optimize by returning an aborting transaction to the scheduler immediately.
+      // later remote reads will need to be garbage collected.
+      txn->set_status(TransactionStatus::ABORTED);
+      txn->set_abort_reason(read_result.abort_reason());
+    } else {
+      // Apply remote reads. After this point, the transaction has all the data it needs to
+      // execute the code.
+      for (const auto& key_value : read_result.reads()) {
+        (*txn->mutable_read_set())[key_value.first] = key_value.second;
+      }
+    }
+  }
+
+  state.remote_reads_waiting_on -= 1;
+
+  // Move the transaction to a new phase if all remote reads arrive
+  if (state.remote_reads_waiting_on == 0) {
+    if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
+      state.phase = TransactionState::Phase::EXECUTE;
+      VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
+    } else {
+      LOG(FATAL) << "Invalid phase";
+    }
+  }
+
+  AdvanceTransaction(txn_id);
+}
+
+void Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
+  zmq::message_t msg;
+  if (!sched_socket.recv(msg, zmq::recv_flags::dontwait)) {
+    return;
+  }
+
+  auto txn_holder = *msg.data<TxnHolder*>();
   auto txn = txn_holder->transaction();
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
@@ -103,50 +140,7 @@ std::optional<TxnId> Worker::ProcessWorkerRequest(const internal::WorkerRequest&
 
   VLOG(3) << "Initialized state for txn " << txn_id;
 
-  return txn_id;
-}
-
-std::optional<TxnId> Worker::ProcessRemoteReadResult(const internal::RemoteReadResult& read_result) {
-  auto txn_id = read_result.txn_id();
-  auto state_it = txn_states_.find(txn_id);
-  if (state_it == txn_states_.end()) {
-    VLOG(1) << "Transaction " << txn_id << " does not exist for remote read result";
-    return {};
-  }
-
-  VLOG(2) << "Got remote read result for txn " << txn_id;
-
-  auto& state = state_it->second;
-  auto txn = state.txn_holder->transaction();
-
-  if (txn->status() != TransactionStatus::ABORTED) {
-    if (read_result.will_abort()) {
-      // TODO: optimize by returning an aborting transaction to the scheduler immediately.
-      // later remote reads will need to be garbage collected.
-      txn->set_status(TransactionStatus::ABORTED);
-      txn->set_abort_reason(read_result.abort_reason());
-    } else {
-      // Apply remote reads. After this point, the transaction has all the data it needs to
-      // execute the code.
-      for (const auto& key_value : read_result.reads()) {
-        (*txn->mutable_read_set())[key_value.first] = key_value.second;
-      }
-    }
-  }
-
-  state.remote_reads_waiting_on -= 1;
-
-  // Move the transaction to a new phase if all remote reads arrive
-  if (state.remote_reads_waiting_on == 0) {
-    if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
-      state.phase = TransactionState::Phase::EXECUTE;
-      VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
-    } else {
-      LOG(FATAL) << "Invalid phase";
-    }
-  }
-
-  return txn_id;
+  AdvanceTransaction(txn_id);
 }
 
 void Worker::AdvanceTransaction(TxnId txn_id) {
@@ -346,9 +340,9 @@ void Worker::Finish(TxnId txn_id) {
   SendToCoordinatingServer(txn_id);
 
   // Notify the scheduler that we're done
-  auto sched_env = NewEnvelope();
-  sched_env->mutable_response()->mutable_worker()->set_txn_id(txn_id);
-  Send(move(sched_env), kSchedulerChannel);
+  zmq::message_t msg(sizeof(TxnId));
+  *msg.data<TxnId>() = txn_id;
+  GetCustomSocket(0).send(msg, zmq::send_flags::none);
 
   // Remove the redirection at broker for this txn
   auto redirect_env = NewEnvelope();
