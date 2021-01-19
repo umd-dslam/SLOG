@@ -33,9 +33,7 @@ class NetworkedModule : public Module {
   virtual void HandleInternalResponse(EnvelopePtr&& /* env */) {}
 
   // The implementation of this function must never block
-  virtual bool HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */) {
-    return false;
-  };
+  virtual bool HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */) { return false; };
 
   zmq::socket_t& GetCustomSocket(size_t i);
 

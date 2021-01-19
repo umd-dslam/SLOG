@@ -237,7 +237,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         LOG(ERROR) << "Already received SINGLE-HOME txn: " << txn_id;
         return nullptr;
       }
-      DCHECK(!ins.first->second.txn->keys_in_partition().empty());
+      CHECK(!ins.first->second.txn->keys_in_partition().empty());
       break;
     }
     case TransactionType::MULTI_HOME: {
@@ -250,7 +250,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         }
         active_txn.txn.emplace(config_, txn);
       }
-      DCHECK(!active_txn.txn->keys_in_partition().empty());
+      CHECK(!active_txn.txn->keys_in_partition().empty());
       break;
     }
     case TransactionType::LOCK_ONLY: {
@@ -264,7 +264,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         }
         active_txn.lock_only_txns[rep_id].emplace(config_, txn);
       }
-      DCHECK(!active_txn.lock_only_txns[rep_id]->keys_in_partition().empty());
+      CHECK(!active_txn.lock_only_txns[rep_id]->keys_in_partition().empty());
       break;
     }
     default:
@@ -278,7 +278,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
 void Scheduler::SendToRemasterManager(const TxnHolder& txn_holder) {
   auto txn = txn_holder.transaction();
   auto txn_type = txn->internal().type();
-  CHECK(txn_type == TransactionType::SINGLE_HOME || txn_type == TransactionType::LOCK_ONLY)
+  DCHECK(txn_type == TransactionType::SINGLE_HOME || txn_type == TransactionType::LOCK_ONLY)
       << "MH aren't sent to the remaster manager";
 
   switch (remaster_manager_.VerifyMaster(txn_holder)) {
@@ -376,9 +376,9 @@ void Scheduler::TriggerPreDispatchAbort(TxnId) {}
 #else
 void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   auto active_txn_it = active_txns_.find(txn_id);
-  DCHECK(active_txn_it != active_txns_.end());
+  CHECK(active_txn_it != active_txns_.end());
   auto& active_txn = active_txn_it->second;
-  DCHECK(!active_txn.aborting) << "Abort was triggered twice: " << txn_id;
+  CHECK(!active_txn.aborting) << "Abort was triggered twice: " << txn_id;
 
   VLOG(2) << "Triggering pre-dispatch abort of txn " << txn_id;
 

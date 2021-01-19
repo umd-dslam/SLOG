@@ -206,7 +206,6 @@ void Broker::Run() {
     if (zmq::poll(pollitems, poll_timeout_ms_)) {
       for (int i = 0; i < 1000; i++) {
         if (zmq::message_t msg; external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-
 #ifdef ENABLE_WORK_MEASURING
           auto start = std::chrono::steady_clock::now();
 #endif
@@ -216,10 +215,8 @@ void Broker::Run() {
 #ifdef ENABLE_WORK_MEASURING
           work_ += (std::chrono::steady_clock::now() - start).count();
 #endif
-
         }
         if (auto env = RecvEnvelope(internal_socket_, true /* dont_wait */); env != nullptr) {
-
 #ifdef ENABLE_WORK_MEASURING
           auto start = std::chrono::steady_clock::now();
 #endif
