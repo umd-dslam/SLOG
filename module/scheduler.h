@@ -48,7 +48,7 @@ class Scheduler : public NetworkedModule {
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
   void HandleInternalRequest(EnvelopePtr&& env) final;
-  void HandleCustomSocket(zmq::socket_t& socket, size_t) final;
+  bool HandleCustomSocket(zmq::socket_t& socket, size_t) final;
 
  private:
   void ProcessRemoteReadResult(EnvelopePtr&& env);

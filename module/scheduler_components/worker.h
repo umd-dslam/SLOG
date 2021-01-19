@@ -50,7 +50,7 @@ class Worker : public NetworkedModule {
   /**
    * Initializes the state of a new transaction
    */
-  void HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
+  bool HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
 
  private:
   /**

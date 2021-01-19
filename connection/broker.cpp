@@ -34,8 +34,8 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
 
 Broker::~Broker() {
   running_ = false;
-  LOG(INFO) << "Stopping Broker";
   thread_.join();
+  LOG(INFO) << "Broker stopped. Work done: " << work_;
 }
 
 void Broker::StartInNewThread(std::optional<uint32_t> cpu) {
@@ -206,9 +206,24 @@ void Broker::Run() {
     if (zmq::poll(pollitems, poll_timeout_ms_)) {
       for (int i = 0; i < 1000; i++) {
         if (zmq::message_t msg; external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
+
+#ifdef ENABLE_WORK_MEASURING
+          auto start = std::chrono::steady_clock::now();
+#endif
+
           HandleIncomingMessage(move(msg));
+
+#ifdef ENABLE_WORK_MEASURING
+          work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+
         }
         if (auto env = RecvEnvelope(internal_socket_, true /* dont_wait */); env != nullptr) {
+
+#ifdef ENABLE_WORK_MEASURING
+          auto start = std::chrono::steady_clock::now();
+#endif
+
           if (!env->has_request() || !env->request().has_broker_redirect()) {
             continue;
           }
@@ -229,6 +244,10 @@ void Broker::Run() {
             ForwardMessage(chan_it->second, std::move(msg));
           }
           entry.pending_msgs.clear();
+
+#ifdef ENABLE_WORK_MEASURING
+          work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
         }
       }
     }

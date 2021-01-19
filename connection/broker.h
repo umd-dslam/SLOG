@@ -137,6 +137,8 @@ class Broker {
   // the READY message does not have enought time to be sent out.
   // Putting them here solves those problems but is not ideal.
   std::vector<zmq::socket_t> tmp_sockets_;
+
+  std::atomic<uint64_t> work_ = 0;
 };
 
 }  // namespace slog

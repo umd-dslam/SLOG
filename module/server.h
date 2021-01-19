@@ -98,7 +98,7 @@ class Server : public NetworkedModule {
 
   void HandleInternalResponse(EnvelopePtr&& env) final;
 
-  void HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
+  bool HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
 
  private:
   void ProcessCompletedSubtxn(EnvelopePtr&& req);

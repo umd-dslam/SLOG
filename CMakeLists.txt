@@ -13,9 +13,10 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 #               Options
 #========================================
 
-option(BUILD_SLOG_CLIENT "Build the client" ON)
-option(BUILD_SLOG_TESTS "Build the tests" ON)
-option(ENABLE_TRACING "Enable transaction racing" ON)
+option(BUILD_SLOG_CLIENT      "Build the client"                      ON)
+option(BUILD_SLOG_TESTS       "Build the tests"                       ON)
+option(ENABLE_TRACING         "Enable transaction racing"             ON)
+option(ENABLE_WORK_MEASURING  "Enable work measuring for each module" OFF)
 set(REMASTER_PROTOCOL "COUNTERLESS" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
@@ -242,6 +243,10 @@ endif()
 
 if (ENABLE_TRACING)
   target_compile_definitions(slog-core PUBLIC ENABLE_TRACING)
+endif()
+
+if (ENABLE_WORK_MEASURING)
+  target_compile_definitions(slog-core PUBLIC ENABLE_WORK_MEASURING)
 endif()
 
 #========================================

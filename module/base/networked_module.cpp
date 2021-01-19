@@ -36,6 +36,10 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
   debug_info_ = os.str();
 }
 
+NetworkedModule::~NetworkedModule() {
+  LOG(INFO) << name() << " stopped. Work done: " << work_;
+}
+
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_[i]; }
 
 const std::shared_ptr<zmq::context_t> NetworkedModule::context() const { return context_; }
@@ -60,15 +64,34 @@ bool NetworkedModule::Loop() {
   for (int i = 0; i < recv_batch_; i++) {
     // Message from pull socket
     if (auto env = RecvEnvelope(pull_socket_, true /* dont_wait */); env != nullptr) {
+
+#ifdef ENABLE_WORK_MEASURING
+      auto start = std::chrono::steady_clock::now();
+#endif
+
       if (env->has_request()) {
         HandleInternalRequest(move(env));
       } else if (env->has_response()) {
         HandleInternalResponse(move(env));
       }
+
+#ifdef ENABLE_WORK_MEASURING
+      work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+
     }
 
     for (size_t i = 0; i < custom_sockets_.size(); i++) {
+
+#ifdef ENABLE_WORK_MEASURING
+      auto start = std::chrono::steady_clock::now();
+      if (HandleCustomSocket(custom_sockets_[i], i)) {
+        work_ += (std::chrono::steady_clock::now() - start).count();
+      }
+#else
       HandleCustomSocket(custom_sockets_[i], i);
+#endif
+
     }
   }
 

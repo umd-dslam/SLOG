@@ -54,19 +54,19 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
                   API Requests
 ***********************************************/
 
-void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
+bool Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
   zmq::message_t identity;
   if (!socket.recv(identity, zmq::recv_flags::dontwait)) {
-    return;
+    return false;
   }
   if (!identity.more()) {
     LOG(ERROR) << "Invalid message from client: Only identity part is found";
-    return;
+    return false;
   }
   api::Request request;
   if (!RecvDeserializedProtoWithEmptyDelim(socket, request)) {
     LOG(ERROR) << "Invalid message from client: Body is not a proto";
-    return;
+    return false;
   }
 
   // While this is called txn id, we use it for any kind of request
@@ -122,6 +122,7 @@ void Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
       LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request.type_case(), api::Request) << "\"";
       break;
   }
+  return true;
 }
 
 /***********************************************

@@ -21,6 +21,7 @@ class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
                   std::chrono::milliseconds poll_timeout, int recv_batch = 5000);
+  ~NetworkedModule();
 
  protected:
   virtual std::vector<zmq::socket_t> InitializeCustomSockets() { return {}; }
@@ -32,7 +33,9 @@ class NetworkedModule : public Module {
   virtual void HandleInternalResponse(EnvelopePtr&& /* env */) {}
 
   // The implementation of this function must never block
-  virtual void HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */){};
+  virtual bool HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */) {
+    return false;
+  };
 
   zmq::socket_t& GetCustomSocket(size_t i);
 
@@ -60,6 +63,8 @@ class NetworkedModule : public Module {
   Poller poller_;
   int recv_batch_;
   std::string debug_info_;
+
+  std::atomic<uint64_t> work_ = 0;
 };
 
 }  // namespace slog

@@ -84,10 +84,10 @@ void Worker::HandleInternalRequest(EnvelopePtr&& env) {
   AdvanceTransaction(txn_id);
 }
 
-void Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
+bool Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
   zmq::message_t msg;
   if (!sched_socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return;
+    return false;
   }
 
   auto txn_holder = *msg.data<TxnHolder*>();
@@ -141,6 +141,8 @@ void Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
   VLOG(3) << "Initialized state for txn " << txn_id;
 
   AdvanceTransaction(txn_id);
+
+  return true;
 }
 
 void Worker::AdvanceTransaction(TxnId txn_id) {

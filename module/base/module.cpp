@@ -14,7 +14,6 @@ ModuleRunner::ModuleRunner(const shared_ptr<Module>& module) : module_(module), 
 
 ModuleRunner::~ModuleRunner() {
   running_ = false;
-  LOG(INFO) << "Stopping " << module_->name();
   if (thread_.joinable()) {
     thread_.join();
   }

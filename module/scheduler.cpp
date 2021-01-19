@@ -98,10 +98,10 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   Send(move(env), kServerChannel);
 }
 
-void Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
+bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   zmq::message_t msg;
   if (!worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return;
+    return false;
   }
 
   auto txn_id = *msg.data<TxnId>();
@@ -132,6 +132,7 @@ void Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   if (it->second.is_ready_for_gc()) {
     active_txns_.erase(it);
   }
+  return true;
 }
 
 /***********************************************
