@@ -245,24 +245,20 @@ void Forwarder::Forward(EnvelopePtr&& env) {
     if (config_->bypass_mh_orderer()) {
       // Send the txn to sequencers of involved replicas to generate lock-only txns
       auto part = ChooseRandomPartition(*txn, rg_);
+      vector<MachineId> destinations;
       for (auto rep : txn_internal->involved_replicas()) {
-        Send(*env, config_->MakeMachineId(rep, part), kSequencerChannel);
+        destinations.push_back(config_->MakeMachineId(rep, part));
       }
-      // Send the txn to schedulers of all partitions
-      bool send_local = false;
-      for (uint32_t part = 0; part < config_->num_partitions(); part++) {
+      Send(*env, destinations, kSequencerChannel);
+
+      // Send the txn to schedulers of involved partitions
+      destinations.clear();
+      for (auto part : txn->internal().involved_partitions()) {
         for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
-          auto machine_id = config_->MakeMachineId(rep, part);
-          if (machine_id == config_->local_machine_id()) {
-            send_local = true;
-          } else {
-            Send(*env, machine_id, kSchedulerChannel);
-          }
+          destinations.push_back(config_->MakeMachineId(rep, part));
         }
       }
-      if (send_local) {
-        Send(move(env), kSchedulerChannel);
-      }
+      Send(move(env), destinations, kSchedulerChannel);
     } else {
       auto mh_orderer =
           config_->MakeMachineId(config_->local_replica(), config_->leader_partition_for_multi_home_ordering());

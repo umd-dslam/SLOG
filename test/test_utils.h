@@ -27,6 +27,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
                                  internal::Configuration common_config = {});
 
 Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter);
+Transaction* ComputeInvolvedPartitions(Transaction* txn, const ConfigurationPtr& config);
 
 TxnHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const std::unordered_set<Key>& read_set,
                         const std::unordered_set<Key>& write_set,

@@ -35,16 +35,22 @@ class Sequencer : public NetworkedModule {
 
  private:
   void NewBatch();
+  BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id(); }
   void ScheduleBatch(Transaction* txn);
   void SendBatch();
-  bool SendBatchDelayed(const EnvelopePtr& env);
+  EnvelopePtr NewBatchRequest(internal::Batch* batch);
+  bool SendBatchDelayed();
 
   void ProcessMultiHomeBatch(EnvelopePtr&& env);
+  Transaction* GenerateLockOnlyTxn(const Transaction& txn) const;
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
-  unique_ptr<internal::Batch> batch_;
+  std::vector<unique_ptr<internal::Batch>> partitioned_batch_;
   BatchId batch_id_counter_;
+  int batch_size_;
+  bool batch_scheduled_;
+
   std::mt19937 rg_;
 };
 

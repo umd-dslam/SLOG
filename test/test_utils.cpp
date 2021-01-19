@@ -74,6 +74,26 @@ Transaction* FillMetadata(Transaction* txn, uint32_t master, uint32_t counter) {
   return txn;
 }
 
+Transaction* ComputeInvolvedPartitions(Transaction* txn, const ConfigurationPtr& config) {
+  vector<uint32_t> involved_partitions;
+  auto ExtractPartitions = [&involved_partitions, &config](const google::protobuf::Map<string, string>& keys) {
+    for (auto& pair : keys) {
+      const auto& key = pair.first;
+      uint32_t partition;
+      partition = config->partition_of_key(key);
+      involved_partitions.push_back(partition);
+    }
+  };
+  ExtractPartitions(txn->read_set());
+  ExtractPartitions(txn->write_set());
+
+  sort(involved_partitions.begin(), involved_partitions.end());
+  auto last = unique(involved_partitions.begin(), involved_partitions.end());
+  *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
+
+  return txn;
+}
+
 TxnHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const unordered_set<Key>& read_set,
                         const unordered_set<Key>& write_set,
                         const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata) {
@@ -85,6 +105,7 @@ TxnHolder MakeTxnHolder(const ConfigurationPtr& config, TxnId id, const unordere
   } else {
     txn = MakeTransaction(read_set, write_set, "", master_metadata);
   }
+  txn = ComputeInvolvedPartitions(txn, config);
   txn->mutable_internal()->set_id(id);
   return {config, txn};
 }

@@ -47,7 +47,7 @@ void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
     }
     case Request::kForwardBatch:
       // Received a batch of multi-home txn replicated from another region
-      ProcessForwardBatch(request->mutable_forward_batch());
+      ProcessForwardBatch(move(env));
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request->type_case(), Request) << "\"";
@@ -55,18 +55,26 @@ void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
   }
 }
 
-void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch) {
+void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
+  auto forward_batch = env->mutable_request()->mutable_forward_batch();
   switch (forward_batch->part_case()) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
 
       TRACE(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
 
+      VLOG(1) << "Received data for MULTI-HOME batch " << batch->id() << " from [" << env->from()
+              << "]. Number of txns: " << batch->transactions_size();
+
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
     case internal::ForwardBatch::kBatchOrder: {
       auto& batch_order = forward_batch->batch_order();
+
+      VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
+              << "]. Slot: " << batch_order.slot();
+
       multi_home_batch_log_.AddSlot(batch_order.slot(), batch_order.batch_id());
       break;
     }
@@ -78,6 +86,8 @@ void MultiHomeOrderer::ProcessForwardBatch(internal::ForwardBatch* forward_batch
     auto batch_and_slot = multi_home_batch_log_.NextBatch();
     auto slot = batch_and_slot.first;
     auto& batch = batch_and_slot.second;
+
+    VLOG(1) << "Processing batch " << batch->id();
 
     // Replace the batch id with its slot number so that it is
     // easier to determine the batch order later on
@@ -123,17 +133,11 @@ void MultiHomeOrderer::SendBatch() {
 
   auto part = config_->leader_partition_for_multi_home_ordering();
   auto num_replicas = config_->num_replicas();
+  vector<MachineId> destinations;
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
-    auto machine_id = config_->MakeMachineId(rep, part);
-    // If this is the same machine, we will send this batch later
-    if (machine_id != config_->local_machine_id()) {
-      Send(*batch_env, machine_id, kMultiHomeOrdererChannel);
-    }
+    destinations.push_back(config_->MakeMachineId(rep, part));
   }
-  // If this to forward to the same machine, send the batch via pointer passing
-  if (part == config_->local_partition()) {
-    Send(move(batch_env), kMultiHomeOrdererChannel);
-  }
+  Send(move(batch_env), destinations, kMultiHomeOrdererChannel);
 }
 
 }  // namespace slog

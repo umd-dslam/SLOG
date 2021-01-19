@@ -17,7 +17,7 @@ class Poller {
 
   bool is_socket_ready(size_t i) const;
 
-  void AddTimedCallback(std::chrono::microseconds timeout, const std::function<void()>& cb);
+  void AddTimedCallback(std::chrono::microseconds timeout, std::function<void()>&& cb);
 
  private:
   using Clock = std::chrono::steady_clock;

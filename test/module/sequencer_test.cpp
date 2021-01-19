@@ -14,8 +14,8 @@ using internal::Request;
 class SequencerTest : public ::testing::Test {
  public:
   void SetUp() {
-    auto configs = MakeTestConfigurations("sequencer", 1, 1);
-    slog_ = make_unique<TestSlog>(configs[0]);
+    configs_ = MakeTestConfigurations("sequencer", 1, 1);
+    slog_ = make_unique<TestSlog>(configs_[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(kInterleaverChannel);
     sender_ = slog_->NewSender();
@@ -42,10 +42,12 @@ class SequencerTest : public ::testing::Test {
 
   unique_ptr<Sender> sender_;
   unique_ptr<TestSlog> slog_;
+  ConfigVec configs_;
 };
 
 TEST_F(SequencerTest, SingleHomeTransaction) {
-  auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
+  auto txn = ComputeInvolvedPartitions(
+      MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}}), configs_[0]);
 
   auto env = make_unique<Envelope>();
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
@@ -61,9 +63,11 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
 }
 
 TEST_F(SequencerTest, MultiHomeTransaction) {
-  auto txn1 = MakeTransaction({"A", "B"}, {}, "some code", {{"A", {0, 0}}, {"B", {1, 0}}});
+  auto txn1 = ComputeInvolvedPartitions(MakeTransaction({"A", "B"}, {}, "some code", {{"A", {0, 0}}, {"B", {1, 0}}}),
+                                        configs_[0]);
 
-  auto txn2 = MakeTransaction({}, {"C", "D"}, "some code", {{"C", {1, 0}}, {"D", {0, 0}}});
+  auto txn2 = ComputeInvolvedPartitions(MakeTransaction({}, {"C", "D"}, "some code", {{"C", {1, 0}}, {"D", {0, 0}}}),
+                                        configs_[0]);
 
   auto env = make_unique<Envelope>();
   auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
@@ -119,14 +123,14 @@ class SequencerReplicationDelayTest : public SequencerTest {
     internal::Configuration extra_config;
     extra_config.mutable_replication_delay()->set_delay_pct(delay_percent);
     extra_config.mutable_replication_delay()->set_delay_amount_ms(delay_amount);
-    auto configs = MakeTestConfigurations("sequencer_replication_delay", 2, 1, extra_config);
-    slog_ = make_unique<TestSlog>(configs[0]);
+    configs_ = MakeTestConfigurations("sequencer_replication_delay", 2, 1, extra_config);
+    slog_ = make_unique<TestSlog>(configs_[0]);
     slog_->AddSequencer();
     slog_->AddOutputChannel(kInterleaverChannel);
     sender_ = slog_->NewSender();
 
     // This machine has no sequencer, it only receives the messages in the kInterleaverChannel
-    slog_2_ = make_unique<TestSlog>(configs[1]);
+    slog_2_ = make_unique<TestSlog>(configs_[1]);
     slog_2_->AddOutputChannel(kInterleaverChannel);
 
     slog_->StartInNewThreads();
@@ -138,7 +142,8 @@ class SequencerReplicationDelayTest : public SequencerTest {
 
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   CustomSetUp(100, 10);
-  auto txn = MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}});
+  auto txn = ComputeInvolvedPartitions(
+      MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}}), configs_[0]);
 
   auto env = make_unique<Envelope>();
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);

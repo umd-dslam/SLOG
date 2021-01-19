@@ -90,7 +90,7 @@ class SchedulerTest : public ::testing::Test {
     for (auto partition : partitions) {
       // This message is sent from machine 0:0, so it will be queued up in queue 0.
       // 'partition' just happens to be the same as machine id here.
-      sender_[0]->SendSerialized(env, partition, kSchedulerChannel);
+      sender_[0]->Send(env, partition, kSchedulerChannel);
     }
   }
 
@@ -150,7 +150,7 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
                           0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(txn, {0, 1});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -169,7 +169,7 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
                           0, 1);
   txn->mutable_internal()->set_type(TransactionType::SINGLE_HOME);
 
-  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(txn, {1, 2});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
@@ -468,7 +468,7 @@ TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
 
   SendTransaction(txn, {0, 1});
   SendTransaction(lo_txn_0, {0, 1});
-  SendTransaction(lo_txn_1, {0, 1});
+  SendTransaction(lo_txn_1, {0});
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;

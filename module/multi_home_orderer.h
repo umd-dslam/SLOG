@@ -34,7 +34,7 @@ class MultiHomeOrderer : public NetworkedModule {
   void ScheduleBatch(Transaction* txn);
   void SendBatch();
 
-  void ProcessForwardBatch(internal::ForwardBatch* forward_batch);
+  void ProcessForwardBatch(EnvelopePtr&& env);
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;

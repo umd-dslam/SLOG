@@ -94,8 +94,8 @@ void Interleaver::HandleInternalRequest(EnvelopePtr&& env) {
 
             break;
           case TransactionType::MULTI_HOME:
-            VLOG(1) << "Received data for MULTI-HOME batch " << batch->id()
-                    << ". Number of txns: " << batch->transactions_size();
+            VLOG(1) << "Received data for MULTI-HOME batch " << batch->id() << " from [" << env->from()
+                    << "]. Number of txns: " << batch->transactions_size();
             // MULTI-HOME txns are already ordered with respect to each other
             // and their IDs have been replaced with slot id in the orderer module
             // so here their id and slot id are the same

@@ -236,11 +236,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         LOG(ERROR) << "Already received SINGLE-HOME txn: " << txn_id;
         return nullptr;
       }
-      auto& txn_holder = ins.first->second.txn.value();
-      if (txn_holder.keys_in_partition().empty()) {
-        active_txns_.erase(ins.first);
-        return nullptr;
-      }
+      DCHECK(!ins.first->second.txn->keys_in_partition().empty());
       break;
     }
     case TransactionType::MULTI_HOME: {
@@ -253,11 +249,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         }
         active_txn.txn.emplace(config_, txn);
       }
-      auto& txn_holder = active_txn.txn.value();
-      if (txn_holder.keys_in_partition().empty()) {
-        active_txns_.erase(ins.first);
-        return nullptr;
-      }
+      DCHECK(!active_txn.txn->keys_in_partition().empty());
       break;
     }
     case TransactionType::LOCK_ONLY: {
@@ -271,11 +263,7 @@ Transaction* Scheduler::AcceptTransaction(EnvelopePtr&& env) {
         }
         active_txn.lock_only_txns[rep_id].emplace(config_, txn);
       }
-      auto& txn_holder = active_txn.lock_only_txns[rep_id].value();
-      if (txn_holder.keys_in_partition().empty()) {
-        active_txn.lock_only_txns[rep_id].reset();
-        return nullptr;
-      }
+      DCHECK(!active_txn.lock_only_txns[rep_id]->keys_in_partition().empty());
       break;
     }
     default:

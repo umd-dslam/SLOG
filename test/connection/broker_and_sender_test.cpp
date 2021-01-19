@@ -55,7 +55,7 @@ TEST(BrokerAndSenderTest, PingPong) {
     Sender sender(broker);
     // Send ping
     auto ping_req = MakeEchoRequest("ping");
-    sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
+    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
 
     // Wait for pong
     auto res = RecvEnvelope(socket);
@@ -83,7 +83,7 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     // Send pong
     auto pong_res = MakeEchoResponse("pong");
-    sender.SendSerialized(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
+    sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
   });
 
   ping.join();
@@ -107,7 +107,7 @@ TEST(BrokerTest, LocalPingPong) {
     auto socket = MakePullSocket(*context, PING);
 
     // Send ping
-    sender.SendLocal(MakeEchoRequest("ping"), PONG);
+    sender.Send(MakeEchoRequest("ping"), PONG);
 
     // Wait for pong
     auto res = RecvEnvelope(socket);
@@ -125,14 +125,14 @@ TEST(BrokerTest, LocalPingPong) {
     ASSERT_EQ("ping", req->request().echo().data());
 
     // Send pong
-    sender.SendLocal(MakeEchoResponse("pong"), PING);
+    sender.Send(MakeEchoResponse("pong"), PING);
   });
 
   ping.join();
   pong.join();
 }
 
-TEST(BrokerTest, MultiSendSerialized) {
+TEST(BrokerTest, MultiSend) {
   const Channel PING = 1;
   const Channel PONG = 2;
   const int NUM_PONGS = 3;
@@ -154,7 +154,7 @@ TEST(BrokerTest, MultiSendSerialized) {
     for (int i = 0; i < NUM_PONGS; i++) {
       dests.push_back(configs[0]->MakeMachineId(0, i + 1));
     }
-    sender.MultiSendSerialized(*ping_req, dests, PONG);
+    sender.MultiSend(*ping_req, dests, PONG);
 
     // Wait for pongs
     for (int i = 0; i < NUM_PONGS; i++) {
@@ -186,7 +186,7 @@ TEST(BrokerTest, MultiSendSerialized) {
 
       // Send pong
       auto pong_res = MakeEchoResponse("pong");
-      sender.SendSerialized(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
+      sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
 
       this_thread::sleep_for(200ms);
     });
@@ -220,7 +220,7 @@ TEST(BrokerTest, CreateRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PING);
-    ping_sender.SendLocal(move(env), kBrokerChannel);
+    ping_sender.Send(move(env), kBrokerChannel);
   }
 
   // Initialize pong machine
@@ -234,7 +234,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakeEchoRequest("ping");
-    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // The pong machine does not know which channel to forward to yet at this point
@@ -248,7 +248,7 @@ TEST(BrokerTest, CreateRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PONG);
-    pong_sender.SendLocal(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel);
   }
 
   // Now we can receive the ping message
@@ -262,7 +262,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send pong
   {
     auto pong_res = MakeEchoResponse("pong");
-    pong_sender.SendSerialized(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
+    pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
   }
 
   // We should be able to receive pong here since we already establish a redirection at
@@ -303,13 +303,13 @@ TEST(BrokerTest, RemoveRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PONG);
-    pong_sender.SendLocal(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel);
   }
 
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakeEchoRequest("ping");
-    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // Now we can the ping message here
@@ -326,13 +326,13 @@ TEST(BrokerTest, RemoveRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_stop(true);
-    pong_sender.SendLocal(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel);
   }
 
   // Send ping message again
   {
     auto ping_req = MakeEchoRequest("ping");
-    ping_sender.SendSerialized(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // The redirection is removed so we shouldn't be able to receive anything here

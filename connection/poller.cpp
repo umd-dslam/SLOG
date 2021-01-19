@@ -50,8 +50,8 @@ int Poller::Wait() {
 
 bool Poller::is_socket_ready(size_t i) const { return poll_items_[i].revents & ZMQ_POLLIN; }
 
-void Poller::AddTimedCallback(microseconds timeout, const std::function<void()>& cb) {
-  timed_callbacks_.push_back({.when = Clock::now() + timeout, .callback = cb});
+void Poller::AddTimedCallback(microseconds timeout, std::function<void()>&& cb) {
+  timed_callbacks_.push_back({.when = Clock::now() + timeout, .callback = move(cb)});
 }
 
 }  // namespace slog
