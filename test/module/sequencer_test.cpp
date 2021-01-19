@@ -22,7 +22,7 @@ class SequencerTest : public ::testing::Test {
     slog_->StartInNewThreads();
   }
 
-  void SendToSequencer(EnvelopePtr&& req) { sender_->SendLocal(std::move(req), kSequencerChannel); }
+  void SendToSequencer(EnvelopePtr&& req) { sender_->Send(std::move(req), kSequencerChannel); }
 
   internal::Batch* ReceiveBatch() {
     auto req_env = slog_->ReceiveFromOutputChannel(kInterleaverChannel);

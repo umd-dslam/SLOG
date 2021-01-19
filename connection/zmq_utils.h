@@ -85,27 +85,25 @@ inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
   return true;
 }
 
-inline bool DeserializeAny(google::protobuf::Any& any, const zmq::message_t& msg) {
+template <typename T>
+inline bool DeserializeProto(T& out, const char* data, size_t size) {
+  google::protobuf::Any any;
   auto header_sz = sizeof(MachineId) + sizeof(Channel);
-  if (msg.size() < header_sz) {
+  if (size < header_sz) {
     return false;
   }
   // Skip the machineid and channel part
-  auto proto_data = msg.data<char>() + header_sz;
-  auto proto_size = msg.size() - header_sz;
+  auto proto_data = data + header_sz;
+  auto proto_size = size - header_sz;
   if (!any.ParseFromArray(proto_data, proto_size)) {
     return false;
   }
-  return true;
+  return any.UnpackTo(&out);
 }
 
 template <typename T>
 inline bool DeserializeProto(T& out, const zmq::message_t& msg) {
-  google::protobuf::Any any;
-  if (!DeserializeAny(any, msg)) {
-    return false;
-  }
-  return any.UnpackTo(&out);
+  return DeserializeProto(out, msg.data<char>(), msg.size());
 }
 
 template <typename T>

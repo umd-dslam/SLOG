@@ -154,7 +154,7 @@ TEST(BrokerTest, MultiSend) {
     for (int i = 0; i < NUM_PONGS; i++) {
       dests.push_back(configs[0]->MakeMachineId(0, i + 1));
     }
-    sender.MultiSend(*ping_req, dests, PONG);
+    sender.Send(*ping_req, dests, PONG);
 
     // Wait for pongs
     for (int i = 0; i < NUM_PONGS; i++) {

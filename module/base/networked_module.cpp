@@ -15,17 +15,19 @@ using std::vector;
 
 namespace slog {
 
-NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
+using internal::Envelope;
+
+NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                                  std::chrono::milliseconds poll_timeout, int recv_batch)
     : Module(name),
       context_(broker->context()),
-      channel_(channel),
+      channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker),
       poller_(poll_timeout),
       recv_batch_(recv_batch) {
-  broker->AddChannel(channel);
-  pull_socket_.bind(MakeInProcChannelAddress(channel));
+  broker->AddChannel(channel_, chopt.recv_raw);
+  pull_socket_.bind(MakeInProcChannelAddress(channel_));
   // Remove limit on the zmq message queues
   pull_socket_.set(zmq::sockopt::rcvhwm, 0);
 
@@ -61,10 +63,21 @@ bool NetworkedModule::Loop() {
 
   for (int i = 0; i < recv_batch_; i++) {
     // Message from pull socket
-    if (auto env = RecvEnvelope(pull_socket_, true /* dont_wait */); env != nullptr) {
+    if (auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */); wrapped_env != nullptr) {
 #ifdef ENABLE_WORK_MEASURING
       auto start = std::chrono::steady_clock::now();
 #endif
+
+      EnvelopePtr env;
+      if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
+        env.reset(new Envelope());
+        if (!DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
+          continue;
+        }
+        env->set_from(wrapped_env->from());
+      } else {
+        env = move(wrapped_env);
+      }
 
       if (env->has_request()) {
         HandleInternalRequest(move(env));
@@ -92,14 +105,13 @@ bool NetworkedModule::Loop() {
   return false;
 }
 
-void NetworkedModule::Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel) {
+void NetworkedModule::Send(const Envelope& env, MachineId to_machine_id, Channel to_channel) {
   sender_.Send(env, to_machine_id, to_channel);
 }
 
 void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.Send(move(env), to_channel); }
 
-void NetworkedModule::Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids,
-                           Channel to_channel) {
+void NetworkedModule::Send(const Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {
   sender_.Send(env, to_machine_ids, to_channel);
 }
 

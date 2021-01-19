@@ -58,7 +58,8 @@ void LocalLog::UpdateReadyBatches() {
 
 Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                          std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout), config_(config) {}
+    : NetworkedModule("Interleaver", broker, {kInterleaverChannel, true /* recv_raw */}, poll_timeout),
+      config_(config) {}
 
 void Interleaver::HandleInternalRequest(EnvelopePtr&& env) {
   auto request = env->mutable_request();

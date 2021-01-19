@@ -14,7 +14,6 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
-
 namespace slog {
 
 /**
@@ -69,7 +68,7 @@ class Broker {
 
   void Stop();
 
-  void AddChannel(Channel chan);
+  void AddChannel(Channel chan, bool send_raw = false);
 
   const std::shared_ptr<zmq::context_t>& context() const;
   const ConfigurationPtr& config() const;
@@ -95,7 +94,7 @@ class Broker {
 
   void HandleIncomingMessage(zmq::message_t&& msg);
 
-  void ForwardMessage(zmq::socket_t& socket, zmq::message_t&& msg);
+  void ForwardMessage(zmq::socket_t& socket, bool send_raw, zmq::message_t&& msg);
 
   ConfigurationPtr config_;
   shared_ptr<zmq::context_t> context_;
@@ -114,8 +113,13 @@ class Broker {
 
   // Messages that are sent to this broker when it is not READY yet
   vector<zmq::message_t> unhandled_incoming_messages_;
-  // Map from channel name to the channel
-  std::unordered_map<Channel, zmq::socket_t> channels_;
+
+  struct ChannelEntry {
+    ChannelEntry(zmq::socket_t&& socket, bool send_raw) : socket(std::move(socket)), send_raw(send_raw) {}
+    zmq::socket_t socket;
+    const bool send_raw;
+  };
+  std::unordered_map<Channel, ChannelEntry> channels_;
 
   struct RedirectEntry {
     std::optional<Channel> to;

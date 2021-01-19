@@ -14,12 +14,18 @@
 
 namespace slog {
 
+struct ChannelOption {
+  ChannelOption(Channel channel, bool recv_raw = false) : channel(channel), recv_raw(recv_raw) {}
+  Channel channel;
+  bool recv_raw;
+};
+
 /**
  * Base class for modules that can send and receive in internal messages.
  */
 class NetworkedModule : public Module {
  public:
-  NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, Channel channel,
+  NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                   std::chrono::milliseconds poll_timeout, int recv_batch = 5000);
   ~NetworkedModule();
 

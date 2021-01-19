@@ -137,9 +137,7 @@ class InterleaverTest : public ::testing::Test {
     }
   }
 
-  void SendToInterleaver(int from, int to, const Envelope& req) {
-    senders_[from]->SendSerialized(req, to, kInterleaverChannel);
-  }
+  void SendToInterleaver(int from, int to, const Envelope& req) { senders_[from]->Send(req, to, kInterleaverChannel); }
 
   Transaction* ReceiveTxn(int i) {
     auto req_env = slogs_[i]->ReceiveFromOutputChannel(kSchedulerChannel);

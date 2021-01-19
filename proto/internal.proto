@@ -27,8 +27,9 @@ message Envelope {
     oneof type {
         Request request = 1;
         Response response = 2;
+        bytes raw = 3;
     }
-    uint32 from = 3;
+    uint32 from = 4;
 }
 
 /***********************************************

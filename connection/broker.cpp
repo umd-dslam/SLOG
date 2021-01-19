@@ -51,14 +51,14 @@ void Broker::StartInNewThread(std::optional<uint32_t> cpu) {
 
 void Broker::Stop() { running_ = false; }
 
-void Broker::AddChannel(Channel chan) {
+void Broker::AddChannel(Channel chan, bool send_raw) {
   CHECK(!running_) << "Cannot add new channel. The broker has already been running";
   CHECK(channels_.count(chan) == 0) << "Channel \"" << chan << "\" already exists";
 
   zmq::socket_t new_channel(*context_, ZMQ_PUSH);
   new_channel.set(zmq::sockopt::sndhwm, 0);
   new_channel.connect(MakeInProcChannelAddress(chan));
-  channels_.insert_or_assign(chan, move(new_channel));
+  channels_.try_emplace(chan, move(new_channel), send_raw);
 }
 
 const std::shared_ptr<zmq::context_t>& Broker::context() const { return context_; }
@@ -238,7 +238,7 @@ void Broker::Run() {
           auto& entry = redirect_[tag];
           entry.to = channel;
           for (auto& msg : entry.pending_msgs) {
-            ForwardMessage(chan_it->second, std::move(msg));
+            ForwardMessage(chan_it->second.socket, chan_it->second.send_raw, move(msg));
           }
           entry.pending_msgs.clear();
 
@@ -277,21 +277,25 @@ void Broker::HandleIncomingMessage(zmq::message_t&& msg) {
     LOG(ERROR) << "Unknown channel: \"" << chan_id << "\". Dropping message";
     return;
   }
-  ForwardMessage(chan_it->second, std::move(msg));
+  ForwardMessage(chan_it->second.socket, chan_it->second.send_raw, move(msg));
 }
 
-void Broker::ForwardMessage(zmq::socket_t& socket, zmq::message_t&& msg) {
+void Broker::ForwardMessage(zmq::socket_t& socket, bool send_raw, zmq::message_t&& msg) {
   MachineId machine_id = -1;
   ParseMachineId(machine_id, msg);
 
   auto env = std::make_unique<Envelope>();
-  if (DeserializeProto(*env, msg)) {
-    // This must be set AFTER deserializing otherwise it will be overwritten by the deserialization function
-    env->set_from(machine_id);
-    SendEnvelope(socket, std::move(env));
+  if (send_raw) {
+    env->set_raw(msg.to_string());
   } else {
-    LOG(ERROR) << "Malformed message";
+    if (!DeserializeProto(*env, msg)) {
+      LOG(ERROR) << "Malformed message";
+      return;
+    }
   }
+  // This must be set AFTER deserializing otherwise it will be overwritten by the deserialization function
+  env->set_from(machine_id);
+  SendEnvelope(socket, move(env));
 }
 
 }  // namespace slog
