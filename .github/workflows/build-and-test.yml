@@ -1,6 +1,6 @@
 name: Build and Test
 
-on: [push]
+on: [push, pull_request]
 
 env:
   BUILD_TYPE: Release
@@ -14,19 +14,19 @@ jobs:
       # Allow other jobs to continue when one job fails
       fail-fast: false
       matrix:
-        remaster: [NONE, SIMPLE, PER_KEY, COUNTERLESS]
-        lock: [OLD, RMA, DDR]
+        remaster: [none, simple, per_key, counterless]
+        lock: [old, rma, ddr]
         exclude:
-          - remaster: SIMPLE
-            lock: RMA
-          - remaster: SIMPLE
-            lock: DDR
-          - remaster: PER_KEY
-            lock: RMA
-          - remaster: PER_KEY
-            lock: DDR
-          - remaster: COUNTERLESS
-            lock: OLD
+          - remaster: simple
+            lock: rma
+          - remaster: simple
+            lock: ddr
+          - remaster: per_key
+            lock: rma
+          - remaster: per_key
+            lock: ddr
+          - remaster: counterless
+            lock: old
 
     steps:
     - name: Get latest CMake
