@@ -247,8 +247,10 @@ Transaction* Sequencer::GenerateLockOnlyTxn(const Transaction& txn) const {
     if (txn.remaster().new_master() == local_rep) {
       lock_only_txn->CopyFrom(txn);
       lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
-      involved_partitions = vector(lock_only_txn->internal().involved_partitions().begin(),
-                                   lock_only_txn->internal().involved_partitions().end());
+      involved_partitions.clear();
+      for (auto p : lock_only_txn->internal().involved_partitions()) {
+        involved_partitions.push_back(p);
+      }
     }
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
