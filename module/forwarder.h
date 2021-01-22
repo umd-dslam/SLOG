@@ -51,7 +51,7 @@ class Forwarder : public NetworkedModule {
   milliseconds batch_timeout_;
 
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
-  internal::Envelope lookup_request_;
+  std::vector<internal::Envelope> partitioned_lookup_request_;
   bool lookup_request_scheduled_;
 
   std::mt19937 rg_;

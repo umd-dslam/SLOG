@@ -34,7 +34,9 @@ Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& b
       config_(config),
       lookup_master_index_(lookup_master_index),
       batch_timeout_(batch_timeout),
-      rg_(std::random_device()()) {}
+      rg_(std::random_device()()) {
+  partitioned_lookup_request_.resize(config_->num_partitions());
+}
 
 void Forwarder::HandleInternalRequest(EnvelopePtr&& env) {
   switch (env->request().type_case()) {
@@ -54,12 +56,11 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
+  vector<uint32_t> involved_partitions;
   bool need_remote_lookup = false;
 
-  auto lookup_master = lookup_request_.mutable_request()->mutable_lookup_master();
-  vector<uint32_t> involved_partitions;
-  // This function will be called on the read and write set of the current txn
-  auto LocalMasterLookupFn = [this, txn, lookup_master, &involved_partitions,
+  // This function will be called on the read and write set of the current txn. It returns true if there is no error
+  auto LocalMasterLookupFn = [this, txn, &involved_partitions,
                               &need_remote_lookup](const google::protobuf::Map<string, string>& keys) -> bool {
     auto txn_metadata = txn->mutable_internal()->mutable_master_metadata();
     for (auto& pair : keys) {
@@ -87,8 +88,8 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
           new_metadata.set_counter(0);
         }
       } else {
-        // Otherwise, add the key to the remote lookup master request
-        lookup_master->add_keys(key);
+        // Otherwise, add the key to the appropriate remote lookup master request
+        partitioned_lookup_request_[partition].mutable_request()->mutable_lookup_master()->add_keys(key);
         need_remote_lookup = true;
       }
     }
@@ -119,7 +120,9 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   }
 
   VLOG(3) << "Remote master lookup needed to determine type of txn " << txn->internal().id();
-  lookup_master->add_txn_ids(txn->internal().id());
+  for (auto p : txn->internal().involved_partitions()) {
+    partitioned_lookup_request_[p].mutable_request()->mutable_lookup_master()->add_txn_ids(txn->internal().id());
+  }
   pending_transactions_.insert_or_assign(txn->internal().id(), move(env));
 
   // If the request is not scheduled to be sent yet, schedule one now
@@ -129,11 +132,10 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
       auto num_partitions = config_->num_partitions();
       for (uint32_t part = 0; part < num_partitions; part++) {
         if (part != config_->local_partition()) {
-          Send(lookup_request_, config_->MakeMachineId(local_rep, part), kForwarderChannel);
+          Send(partitioned_lookup_request_[part], config_->MakeMachineId(local_rep, part), kForwarderChannel);
+          partitioned_lookup_request_[part].Clear();
         }
       }
-      // Reset the lookup request
-      lookup_request_.Clear();
       lookup_request_scheduled_ = false;
     });
     lookup_request_scheduled_ = true;

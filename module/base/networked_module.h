@@ -15,7 +15,7 @@
 namespace slog {
 
 struct ChannelOption {
-  ChannelOption(Channel channel, bool recv_raw = false) : channel(channel), recv_raw(recv_raw) {}
+  ChannelOption(Channel channel, bool recv_raw = true) : channel(channel), recv_raw(recv_raw) {}
   Channel channel;
   bool recv_raw;
 };

@@ -30,7 +30,9 @@ void ValidateTransaction(Transaction* txn) {
 }
 
 Server::Server(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Server", broker, kServerChannel, poll_timeout), config_(config), txn_id_counter_(0) {}
+    : NetworkedModule("Server", broker, {kServerChannel, false /* recv_raw */}, poll_timeout),
+      config_(config),
+      txn_id_counter_(0) {}
 
 /***********************************************
                 Custom socket
