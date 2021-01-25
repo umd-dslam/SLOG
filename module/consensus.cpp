@@ -6,30 +6,9 @@ namespace slog {
 
 using internal::Request;
 
-vector<MachineId> GlobalPaxos::GetMembers(const ConfigurationPtr& config) {
-  auto part = config->leader_partition_for_multi_home_ordering();
-  vector<MachineId> members;
-  // Enlist a fixed machine at each region as members
-  for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
-    auto machine_id = config->MakeMachineId(rep, part);
-    members.push_back(machine_id);
-  }
-  return members;
-}
+namespace {
 
-GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                         std::chrono::milliseconds poll_timeout)
-    : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
-
-void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value) {
-  auto env = NewEnvelope();
-  auto order = env->mutable_request()->mutable_forward_batch()->mutable_batch_order();
-  order->set_slot(slot);
-  order->set_batch_id(value);
-  Send(std::move(env), kMultiHomeOrdererChannel);
-}
-
-vector<MachineId> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
+vector<MachineId> GetMembers(const ConfigurationPtr& config) {
   auto local_rep = config->local_replica();
   vector<MachineId> members;
   // Enlist all machines in the same region as members
@@ -39,11 +18,32 @@ vector<MachineId> LocalPaxos::GetMembers(const ConfigurationPtr& config) {
   return members;
 }
 
+}  // namespace
+
+GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+                         std::chrono::milliseconds poll_timeout)
+    : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {
+  for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
+    multihome_orderers_.push_back(config->MakeMachineId(rep, config->leader_partition_for_multi_home_ordering()));
+  }
+}
+
+void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, bool is_leader) {
+  if (!is_leader) {
+    return;
+  }
+  auto env = NewEnvelope();
+  auto order = env->mutable_request()->mutable_forward_batch()->mutable_batch_order();
+  order->set_slot(slot);
+  order->set_batch_id(value);
+  Send(std::move(env), multihome_orderers_, kMultiHomeOrdererChannel);
+}
+
 LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                        std::chrono::milliseconds poll_timeout)
     : SimpleMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
-void LocalPaxos::OnCommit(uint32_t slot, uint32_t value) {
+void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, bool) {
   auto env = NewEnvelope();
   auto order = env->mutable_request()->mutable_local_queue_order();
   order->set_queue_id(value);

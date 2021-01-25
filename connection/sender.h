@@ -19,11 +19,20 @@ class Sender {
 
   /**
    * Send a request or response to a given channel of a given machine
-   * @param request_or_response Request or response to be sent
+   * @param envelope Request or response to be sent
    * @param to_machine_id Id of the machine that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
    */
   void Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel);
+
+  /**
+   * Send a request or response to a given channel of a given machine. Use local send
+   * if the destination machine is the local machine
+   * @param envelope Request or response to be sent
+   * @param to_machine_id Id of the machine that this message is sent to
+   * @param to_channel Channel on the machine that this message is sent to
+   */
+  void Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel);
 
   /**
    * Send a request or response to the same machine given a channel

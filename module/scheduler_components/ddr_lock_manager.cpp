@@ -26,67 +26,25 @@ vector<TxnId> LockQueueTail::AcquireWriteLock(TxnId txn_id) {
   return deps;
 }
 
-bool DDRLockManager::AcceptTransaction(const TxnHolder& txn_holder) {
-  if (txn_holder.keys_in_partition().empty()) {
-    LOG(FATAL) << "Empty txn should not have reached lock manager";
-  }
+AcquireLocksResult DDRLockManager::AcquireLocks(const LockOnlyTxn& lo_txn) {
+  auto txn = lo_txn.holder.txn();
+  auto txn_id = lo_txn.holder.id();
 
-  auto txn = txn_holder.transaction();
-  auto txn_id = txn->internal().id();
-  auto& txn_info = txn_info_[txn_id];
-  if (txn->procedure_case() == Transaction::kRemaster) {
-    // A remaster txn only has one key K but it acquires locks on
-    // (K, RO) and (K, RN) where RO and RN are the old and new regions
-    // respectively.
-    txn_info.unarrived_lock_requests += 2;
-  } else {
-    txn_info.unarrived_lock_requests += txn_holder.keys_in_partition().size();
-  }
-  return txn_info.is_ready();
-}
+  // A remaster txn only has one key K but it acquires locks on (K, RO) and (K, RN)
+  // where RO and RN are the old and new region respectively.
+  auto num_required_locks =
+      txn->procedure_case() == Transaction::kRemaster ? 2 : lo_txn.holder.keys_in_partition().size();
+  auto ins = txn_info_.try_emplace(txn_id, num_required_locks);
 
-AcquireLocksResult DDRLockManager::AcquireLocks(const TxnHolder& txn_holder) {
-  if (txn_holder.keys_in_partition().empty()) {
-    LOG(FATAL) << "Empty txn should not have reached lock manager";
-  }
-
-  auto txn = txn_holder.transaction();
-  auto txn_id = txn->internal().id();
-  auto& txn_info = txn_info_[txn_id];
-
-  // Enumerate all locks to be requested
-  vector<pair<KeyReplica, LockMode>> locks_to_request;
-  if (txn->procedure_case() == Transaction::kRemaster) {
-    auto pair = *txn_holder.keys_in_partition().begin();
-    auto& key = pair.first;
-    auto mode = LockMode::WRITE;
-    // Lock on old master if this is the first part of the remaster
-    auto master = txn->internal().master_metadata().at(key).master();
-    if (txn->remaster().is_new_master_lock_only()) {
-      // Lock on new master if this is the second part of the remaster
-      master = txn->remaster().new_master();
-    }
-    auto key_replica = MakeKeyReplica(key, master);
-    locks_to_request.emplace_back(move(key_replica), mode);
-  } else {
-    for (auto& pair : txn_holder.keys_in_partition()) {
-      auto& key = pair.first;
-      auto mode = pair.second;
-      auto master = txn->internal().master_metadata().at(key).master();
-      auto key_replica = MakeKeyReplica(key, master);
-      locks_to_request.emplace_back(move(key_replica), mode);
-    }
-  }
-
-  txn_info.unarrived_lock_requests -= locks_to_request.size();
+  auto& txn_info = ins.first->second;
+  txn_info.unarrived_lock_requests -= lo_txn.keys.size();
 
   vector<TxnId> blocking_txns;
-  for (auto& pair : locks_to_request) {
-    auto& key_replica = pair.first;
-    auto mode = pair.second;
+  for (auto& key_info : lo_txn.keys) {
+    auto key_replica = MakeKeyReplica(key_info.key, lo_txn.master);
     auto& lock_queue_tail = lock_table_[key_replica];
 
-    switch (mode) {
+    switch (key_info.mode) {
       case LockMode::READ: {
         auto b_txn = lock_queue_tail.AcquireReadLock(txn_id);
         if (b_txn.has_value()) {
@@ -135,15 +93,9 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const TxnHolder& txn_holder) {
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult DDRLockManager::AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder) {
-  AcceptTransaction(txn_holder);
-  return AcquireLocks(txn_holder);
-}
-
 vector<TxnId> DDRLockManager::ReleaseLocks(const TxnHolder& txn_holder) {
   vector<TxnId> result;
-  auto txn = txn_holder.transaction();
-  auto txn_id = txn->internal().id();
+  auto txn_id = txn_holder.id();
   auto txn_info_it = txn_info_.find(txn_id);
   if (txn_info_it == txn_info_.end()) {
     return result;

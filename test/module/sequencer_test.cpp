@@ -46,8 +46,7 @@ class SequencerTest : public ::testing::Test {
 };
 
 TEST_F(SequencerTest, SingleHomeTransaction) {
-  auto txn = ComputeInvolvedPartitions(
-      MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}}), configs_[0]);
+  auto txn = MakeTestTransaction(configs_[0], 1000, {{"A"}, {"B"}}, {{"C"}});
 
   auto env = make_unique<Envelope>();
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
@@ -63,57 +62,97 @@ TEST_F(SequencerTest, SingleHomeTransaction) {
 }
 
 TEST_F(SequencerTest, MultiHomeTransaction) {
-  auto txn1 = ComputeInvolvedPartitions(MakeTransaction({"A", "B"}, {}, "some code", {{"A", {0, 0}}, {"B", {1, 0}}}),
-                                        configs_[0]);
-
-  auto txn2 = ComputeInvolvedPartitions(MakeTransaction({}, {"C", "D"}, "some code", {{"C", {1, 0}}, {"D", {0, 0}}}),
-                                        configs_[0]);
+  auto txn1 = MakeTestTransaction(configs_[0], 1000, {{"A", 0}, {"B", 1}}, {});
+  auto txn2 = MakeTestTransaction(configs_[0], 2000, {}, {{"C", 1}, {"D", 0}});
 
   auto env = make_unique<Envelope>();
   auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
-  mh_batch->add_transactions()->CopyFrom(*txn1);
-  mh_batch->add_transactions()->CopyFrom(*txn2);
-  mh_batch->set_transaction_type(TransactionType::MULTI_HOME);
+  mh_batch->mutable_transactions()->AddAllocated(txn1);
+  mh_batch->mutable_transactions()->AddAllocated(txn2);
+  mh_batch->set_transaction_type(TransactionType::MULTI_HOME_OR_LOCK_ONLY);
   SendToSequencer(move(env));
 
-  for (int i = 0; i < 2; i++) {
-    auto batch = ReceiveBatch();
-    ASSERT_NE(batch, nullptr);
+  auto batch = ReceiveBatch();
 
-    switch (batch->transaction_type()) {
-      case TransactionType::SINGLE_HOME: {
-        ASSERT_EQ(batch->transactions_size(), 2);
+  ASSERT_NE(batch, nullptr);
+  ASSERT_EQ(batch->transactions_size(), 2);
 
-        auto sh_txn1 = batch->transactions().at(0);
-        ASSERT_EQ(sh_txn1.read_set_size(), 1);
-        ASSERT_TRUE(sh_txn1.read_set().contains("A"));
-        ASSERT_EQ(sh_txn1.write_set_size(), 0);
-        ASSERT_EQ(sh_txn1.internal().type(), TransactionType::LOCK_ONLY);
+  auto sh_txn1 = batch->transactions().at(0);
+  ASSERT_EQ(sh_txn1.internal().id(), 1000);
+  ASSERT_EQ(sh_txn1.read_set_size(), 2);
+  ASSERT_TRUE(sh_txn1.read_set().contains("A"));
+  ASSERT_TRUE(sh_txn1.read_set().contains("B"));
+  ASSERT_EQ(sh_txn1.write_set_size(), 0);
+  ASSERT_EQ(sh_txn1.internal().master_metadata_size(), 1);
+  ASSERT_EQ(sh_txn1.internal().master_metadata().at("A").master(), 0);
+  ASSERT_EQ(sh_txn1.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
 
-        auto sh_txn2 = batch->transactions().at(1);
-        ASSERT_EQ(sh_txn2.read_set_size(), 0);
-        ASSERT_EQ(sh_txn2.write_set_size(), 1);
-        ASSERT_TRUE(sh_txn2.write_set().contains("D"));
-        ASSERT_EQ(sh_txn2.internal().type(), TransactionType::LOCK_ONLY);
-        break;
-      }
-      case TransactionType::MULTI_HOME: {
-        ASSERT_EQ(batch->transactions_size(), 2);
+  auto sh_txn2 = batch->transactions().at(1);
+  ASSERT_EQ(sh_txn2.internal().id(), 2000);
+  ASSERT_EQ(sh_txn2.read_set_size(), 0);
+  ASSERT_EQ(sh_txn2.write_set_size(), 2);
+  ASSERT_TRUE(sh_txn2.write_set().contains("C"));
+  ASSERT_TRUE(sh_txn2.write_set().contains("D"));
+  ASSERT_EQ(sh_txn2.internal().master_metadata_size(), 1);
+  ASSERT_EQ(sh_txn2.internal().master_metadata().at("D").master(), 0);
+  ASSERT_EQ(sh_txn2.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
 
-        auto mh_txn1 = batch->transactions().at(0);
-        ASSERT_EQ(mh_txn1, *txn1);
+  delete batch;
+}
 
-        auto mh_txn2 = batch->transactions().at(1);
-        ASSERT_EQ(mh_txn2, *txn2);
-        break;
-      }
-      default:
-        FAIL() << "Wrong transaction type. Expected SINGLE_HOME or MULTI_HOME. Actual: "
-               << ENUM_NAME(batch->transaction_type(), TransactionType);
-        break;
-    }
-    delete batch;
-  }
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+TEST_F(SequencerTest, RemasterTransaction) {
+  auto txn = MakeTestTransaction(configs_[0], 1000, {}, {{"A", 1}}, 0);
+
+  auto env = make_unique<Envelope>();
+  auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
+  mh_batch->mutable_transactions()->AddAllocated(txn);
+  mh_batch->set_transaction_type(TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+  SendToSequencer(move(env));
+
+  auto batch = ReceiveBatch();
+
+  ASSERT_NE(batch, nullptr);
+  ASSERT_EQ(batch->transactions_size(), 1);
+
+  auto sh_txn = batch->transactions().at(2);
+  ASSERT_EQ(sh_txn.internal().id(), 1000);
+  ASSERT_EQ(sh_txn.read_set_size(), 0);
+  ASSERT_EQ(sh_txn.write_set_size(), 1);
+  ASSERT_TRUE(sh_txn.write_set().contains("A"));
+  ASSERT_TRUE(sh_txn.remaster().is_new_master_lock_only());
+  ASSERT_EQ(sh_txn.internal().master_metadata_size(), 1);
+  ASSERT_EQ(sh_txn.internal().master_metadata().at("A").master(), 1);
+  ASSERT_EQ(sh_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+
+  delete batch;
+}
+#endif
+
+TEST_F(SequencerTest, MultiHomeTransactionBypassedOrderer) {
+  auto txn = MakeTestTransaction(configs_[0], 1000, {{"A", 0}, {"B", 1}}, {});
+
+  auto env = make_unique<Envelope>();
+  env->mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
+
+  SendToSequencer(move(env));
+
+  auto batch = ReceiveBatch();
+  ASSERT_NE(batch, nullptr);
+
+  ASSERT_EQ(batch->transactions_size(), 1);
+
+  auto sh_txn = batch->transactions().at(0);
+  ASSERT_EQ(sh_txn.internal().id(), 1000);
+  ASSERT_EQ(sh_txn.read_set_size(), 2);
+  ASSERT_TRUE(sh_txn.read_set().contains("A"));
+  ASSERT_TRUE(sh_txn.read_set().contains("B"));
+  ASSERT_EQ(sh_txn.write_set_size(), 0);
+  ASSERT_EQ(sh_txn.internal().master_metadata_size(), 1);
+  ASSERT_EQ(sh_txn.internal().master_metadata().at("A").master(), 0);
+  ASSERT_EQ(sh_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+
+  delete batch;
 }
 
 class SequencerReplicationDelayTest : public SequencerTest {
@@ -142,9 +181,7 @@ class SequencerReplicationDelayTest : public SequencerTest {
 
 TEST_F(SequencerReplicationDelayTest, SingleHomeTransaction) {
   CustomSetUp(100, 10);
-  auto txn = ComputeInvolvedPartitions(
-      MakeTransaction({"A", "B"}, {"C"}, "some code", {{"A", {0, 0}}, {"B", {0, 0}}, {"C", {0, 0}}}), configs_[0]);
-
+  auto txn = MakeTestTransaction(configs_[0], 1000, {{"A"}, {"B"}}, {{"C"}});
   auto env = make_unique<Envelope>();
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
   SendToSequencer(move(env));

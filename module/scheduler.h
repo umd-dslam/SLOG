@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glog/logging.h>
+
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -55,24 +57,18 @@ class Scheduler : public NetworkedModule {
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
   void ProcessTransaction(EnvelopePtr&& env);
 
-#ifdef ENABLE_REMASTER
-  // Check that remaster txn doesn't keep key at same master
-  bool MaybeAbortRemasterTransaction(Transaction* txn);
-#endif
-
   // Place a transaction in a holder if it has keys in this partition
   Transaction* AcceptTransaction(EnvelopePtr&& env);
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking
-  void SendToRemasterManager(const TxnHolder& txn_holder);
+  void SendToRemasterManager(const LockOnlyTxn& lo_txn);
   // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  // Send all transactions for locks, multi-home transactions are only registered
-  void SendToLockManager(const TxnHolder& txn_holder);
-  void AcquireLocksAndProcessResult(const TxnHolder& txn_holder);
+  // Send all transactions for locks
+  void SendToLockManager(const LockOnlyTxn& lo_txn);
 
   // Send txn to worker
   void Dispatch(TxnId txn_id);
@@ -94,11 +90,8 @@ class Scheduler : public NetworkedModule {
 
   // Start the abort. Only be called once per transaction
   void TriggerPreDispatchAbort(TxnId txn_id);
-  // Add a single or multi-home transaction to an abort that started before it
-  // arrived
-  bool MaybeContinuePreDispatchAbort(TxnId txn_id);
-  // Add a lock-only transaction to an abort that started before it arrived
-  bool MaybeContinuePreDispatchAbortLockOnly(TxnId txn_id);
+
+  void MaybeCleanUpTxn(TxnId txn_id);
 
   ConfigurationPtr config_;
 
@@ -117,36 +110,9 @@ class Scheduler : public NetworkedModule {
   RMALockManager lock_manager_;
 #endif
 
-  struct ActiveTxn {
-    explicit ActiveTxn(const ConfigurationPtr& config, Transaction* new_txn) : aborting(false), done(false) {
-      auto txn_type = new_txn->internal().type();
-      if (txn_type == TransactionType::MULTI_HOME || txn_type == TransactionType::LOCK_ONLY) {
-        lock_only_txns.resize(new_txn->internal().involved_replicas_size());
-      }
-      if (txn_type == TransactionType::MULTI_HOME || txn_type == TransactionType::SINGLE_HOME) {
-        txn.emplace(config, new_txn);
-      } else {
-        lock_only_txns[TxnHolder::replica_id(new_txn)].emplace(config, new_txn);
-      }
-    }
-
-    bool is_ready_for_gc() const {
-      bool res = done;
-      for (auto& lo : lock_only_txns) {
-        res &= lo.has_value();
-      }
-      return res;
-    }
-
-    std::optional<TxnHolder> txn;
-    std::vector<std::optional<TxnHolder>> lock_only_txns;
-    bool aborting;
-    bool done;
-  };
-  std::unordered_map<TxnId, ActiveTxn> active_txns_;
+  std::unordered_map<TxnId, TxnHolder> active_txns_;
 
   TxnHolder& GetTxnHolder(TxnId txn_id);
-  TxnHolder& GetLockOnlyTxnHolder(TxnId txn_id, uint32_t rep_id);
 
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed

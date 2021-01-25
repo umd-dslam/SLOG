@@ -72,45 +72,25 @@ class LockState {
 class RMALockManager {
  public:
   /**
-   * Counts the number of locks a txn needs.
-   *
-   * For MULTI_HOME txns, the number of needed locks before
-   * calling this method can be negative due to its LockOnly
-   * txn. Calling this function would bring the number of waited
-   * locks back to 0, meaning all locks are granted.
-   *
-   * @param txn_holder Holder of the transaction to be registered.
-   * @return    true if all locks are acquired, false if not and
-   *            the transaction is queued up.
-   */
-  bool AcceptTransaction(const TxnHolder& txn_holder);
-
-  /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
    * for the current lock holders to release.
    *
-   * @param txn_holder Holder of the transaction whose locks are acquired.
+   * @param lo_txn The transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  AcquireLocksResult AcquireLocks(const TxnHolder& txn_holder);
-
-  /**
-   * Convenient method to perform txn registration and
-   * lock acquisition at the same time.
-   */
-  AcquireLocksResult AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder);
+  AcquireLocksResult AcquireLocks(const LockOnlyTxn& lo_txn);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
    *
    * @param txn_holder Holder of the transaction whose locks are released.
-   *            LockOnly txn is not accepted.
+   *                   LockOnly txn is not accepted.
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  vector<TxnId> ReleaseLocks(const TxnHolder& txn_holder);
+  vector<TxnId> ReleaseLocks(const TxnHolder& holder);
 
   /**
    * Gets current statistics of the lock manager

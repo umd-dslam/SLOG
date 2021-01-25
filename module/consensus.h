@@ -10,10 +10,10 @@ class GlobalPaxos : public SimpleMultiPaxos {
               std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  void OnCommit(uint32_t slot, uint32_t value) final;
+  void OnCommit(uint32_t slot, uint32_t value, bool is_leader) final;
 
  private:
-  static vector<MachineId> GetMembers(const ConfigurationPtr& config);
+  vector<MachineId> multihome_orderers_;
 };
 
 class LocalPaxos : public SimpleMultiPaxos {
@@ -22,10 +22,7 @@ class LocalPaxos : public SimpleMultiPaxos {
              std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  void OnCommit(uint32_t slot, uint32_t value) final;
-
- private:
-  static vector<MachineId> GetMembers(const ConfigurationPtr& config);
+  void OnCommit(uint32_t slot, uint32_t value, bool) final;
 };
 
 }  // namespace slog

@@ -165,8 +165,8 @@ internal::Batch* MakeBatch(BatchId batch_id, const vector<Transaction*>& txns, T
 }
 
 TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
-  auto expected_txn_1 = MakeTransaction({"A"}, {"B"}, "some code");
-  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"}, "");
+  auto expected_txn_1 = MakeTransaction({"A"}, {"B"});
+  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"});
   auto batch = MakeBatch(100, {expected_txn_1, expected_txn_2}, SINGLE_HOME);
 
   // Replicate batch data to all machines
@@ -205,8 +205,8 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
 }
 
 TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
-  auto expected_txn_1 = MakeTransaction({"A"}, {"B"}, "some code");
-  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"}, "");
+  auto expected_txn_1 = MakeTransaction({"A"}, {"B"});
+  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"});
   auto batch = MakeBatch(100, {expected_txn_1, expected_txn_2}, SINGLE_HOME);
 
   // Then send local ordering
@@ -244,15 +244,12 @@ TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
   delete batch;
 }
 
-TEST_F(InterleaverTest, ThreeBatches) {
-  auto sh_txn_1 = MakeTransaction({"A"}, {"B"}, "some code");
+TEST_F(InterleaverTest, TwoBatches) {
+  auto sh_txn_1 = MakeTransaction({"A"}, {"B"});
   auto sh_batch_1 = MakeBatch(100, {sh_txn_1}, SINGLE_HOME);
 
-  auto sh_txn_2 = MakeTransaction({"M"}, {"N"}, "");
+  auto sh_txn_2 = MakeTransaction({"M"}, {"N"});
   auto sh_batch_2 = MakeBatch(200, {sh_txn_2}, SINGLE_HOME);
-
-  auto mh_txn = MakeTransaction({"X"}, {"Y"}, "");
-  auto mh_batch = MakeBatch(0, {mh_txn}, MULTI_HOME);
 
   // Replicate batch data to all machines
   {
@@ -266,21 +263,9 @@ TEST_F(InterleaverTest, ThreeBatches) {
     forward_batch2->mutable_batch_data()->CopyFrom(*sh_batch_2);
     forward_batch2->set_same_origin_position(0);
 
-    Envelope req3;
-    auto forward_batch3 = req3.mutable_request()->mutable_forward_batch();
-    forward_batch3->mutable_batch_data()->CopyFrom(*mh_batch);
-
     for (int i = 0; i < NUM_MACHINES; i++) {
       SendToInterleaver(0, i, req1);
       SendToInterleaver(1, i, req2);
-      SendToInterleaver(0, i, req3);
-    }
-
-    // The multi-home batch can be emitted immediately
-    for (int i = 0; i < NUM_MACHINES; i++) {
-      auto txn = ReceiveTxn(i);
-      ASSERT_EQ(*txn, *mh_txn);
-      delete txn;
     }
   }
 

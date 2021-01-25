@@ -45,6 +45,7 @@ class NetworkedModule : public Module {
 
   inline static EnvelopePtr NewEnvelope() { return std::make_unique<internal::Envelope>(); }
   void Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel);
+  void Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel);
   void Send(EnvelopePtr&& env, Channel to_channel);
   void Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
   void Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);

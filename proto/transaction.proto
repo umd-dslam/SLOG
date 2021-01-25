@@ -4,8 +4,7 @@ package slog;
 enum TransactionType {
     UNKNOWN = 0;
     SINGLE_HOME = 1;
-    MULTI_HOME = 2;
-    LOCK_ONLY = 3;
+    MULTI_HOME_OR_LOCK_ONLY = 2;
 }
 
 enum TransactionStatus {

@@ -109,6 +109,10 @@ void NetworkedModule::Send(const Envelope& env, MachineId to_machine_id, Channel
   sender_.Send(env, to_machine_id, to_channel);
 }
 
+void NetworkedModule::Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel) {
+  sender_.Send(move(env), to_machine_id, to_channel);
+}
+
 void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.Send(move(env), to_channel); }
 
 void NetworkedModule::Send(const Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {

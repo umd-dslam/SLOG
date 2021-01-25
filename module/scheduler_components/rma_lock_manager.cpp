@@ -101,69 +101,24 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
   return holders_;
 }
 
-bool RMALockManager::AcceptTransaction(const TxnHolder& txn_holder) {
-  if (txn_holder.keys_in_partition().empty()) {
-    LOG(FATAL) << "Empty txn should not have reached lock manager";
-  }
-
-  auto txn = txn_holder.transaction();
-  auto txn_id = txn->internal().id();
-  if (txn->procedure_case() == Transaction::kRemaster) {
-    // A remaster txn only has one key K but it acquires locks on
-    // (K, RO) and (K, RN) where RO and RN are the old and new region
-    // respectively.
-    num_locks_waited_[txn_id] += 2;
-  } else {
-    num_locks_waited_[txn_id] += txn_holder.keys_in_partition().size();
-  }
-
-  if (num_locks_waited_[txn_id] == 0) {
-    num_locks_waited_.erase(txn_id);
-    return true;
-  }
-  return false;
-}
-
-AcquireLocksResult RMALockManager::AcquireLocks(const TxnHolder& txn_holder) {
-  if (txn_holder.keys_in_partition().empty()) {
-    LOG(FATAL) << "Empty txn should not have reached lock manager";
-  }
-
-  auto txn = txn_holder.transaction();
+AcquireLocksResult RMALockManager::AcquireLocks(const LockOnlyTxn& lo_txn) {
+  auto txn = lo_txn.holder.txn();
   auto txn_id = txn->internal().id();
 
-  vector<pair<KeyReplica, LockMode>> locks_to_request;
-  if (txn->procedure_case() == Transaction::kRemaster) {
-    auto pair = *txn_holder.keys_in_partition().begin();
-    auto& key = pair.first;
-    auto mode = LockMode::WRITE;
-    // Lock on old master if this is the first part of the remaster
-    auto master = txn->internal().master_metadata().at(key).master();
-    if (txn->remaster().is_new_master_lock_only()) {
-      // Lock on new master if this is the second part of the remaster
-      master = txn->remaster().new_master();
-    }
-    auto key_replica = MakeKeyReplica(key, master);
-    locks_to_request.emplace_back(key_replica, mode);
-  } else {
-    for (auto& pair : txn_holder.keys_in_partition()) {
-      auto& key = pair.first;
-      auto mode = pair.second;
-      auto master = txn->internal().master_metadata().at(key).master();
-      auto key_replica = MakeKeyReplica(key, master);
-      locks_to_request.emplace_back(key_replica, mode);
-    }
-  }
+  // A remaster txn only has one key K but it acquires locks on (K, RO) and (K, RN)
+  // where RO and RN are the old and new region respectively.
+  auto num_required_locks =
+      txn->procedure_case() == Transaction::kRemaster ? 2 : lo_txn.holder.keys_in_partition().size();
+  auto ins = num_locks_waited_.try_emplace(txn_id, num_required_locks);
 
   int num_locks_acquired = 0;
-  for (auto& pair : locks_to_request) {
-    auto& key_replica = pair.first;
-    auto mode = pair.second;
+  for (auto& key_info : lo_txn.keys) {
+    auto key_replica = MakeKeyReplica(key_info.key, lo_txn.master);
     auto& lock_state = lock_table_[key_replica];
 
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key_replica;
     auto before_mode = lock_state.mode;
-    switch (mode) {
+    switch (key_info.mode) {
       case LockMode::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
           num_locks_acquired++;
@@ -182,41 +137,34 @@ AcquireLocksResult RMALockManager::AcquireLocks(const TxnHolder& txn_holder) {
     }
   }
 
+  auto num_locked_waited_it = ins.first;
   if (num_locks_acquired > 0) {
-    num_locks_waited_[txn_id] -= num_locks_acquired;
-    if (num_locks_waited_[txn_id] == 0) {
-      num_locks_waited_.erase(txn_id);
+    num_locked_waited_it->second -= num_locks_acquired;
+    if (num_locked_waited_it->second == 0) {
+      num_locks_waited_.erase(num_locked_waited_it);
       return AcquireLocksResult::ACQUIRED;
     }
   }
   return AcquireLocksResult::WAITING;
 }
 
-AcquireLocksResult RMALockManager::AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder) {
-  AcceptTransaction(txn_holder);
-  return AcquireLocks(txn_holder);
-}
-
 vector<TxnId> RMALockManager::ReleaseLocks(const TxnHolder& txn_holder) {
-  auto txn = txn_holder.transaction();
-  auto txn_id = txn->internal().id();
+  auto txn = txn_holder.txn();
+  auto txn_id = txn_holder.id();
 
   vector<KeyReplica> locks_to_release;
   if (txn->procedure_case() == Transaction::kRemaster) {
+    auto it = txn->internal().master_metadata().begin();
+
     // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
-    auto pair = *txn_holder.keys_in_partition().begin();
-    auto& key = pair.first;
-    auto old_master = txn->internal().master_metadata().at(key).master();
-    auto old_key_replica = MakeKeyReplica(key, old_master);
+    auto old_key_replica = MakeKeyReplica(it->first, it->second.master());
     locks_to_release.push_back(old_key_replica);
-    auto new_master = txn->remaster().new_master();
-    auto new_key_replica = MakeKeyReplica(key, new_master);
+
+    auto new_key_replica = MakeKeyReplica(it->first, txn->remaster().new_master());
     locks_to_release.push_back(new_key_replica);
   } else {
-    for (auto& pair : txn_holder.keys_in_partition()) {
-      auto& key = pair.first;
-      auto master = txn->internal().master_metadata().at(key).master();
-      auto key_replica = MakeKeyReplica(key, master);
+    for (auto& pair : txn->internal().master_metadata()) {
+      auto key_replica = MakeKeyReplica(pair.first, pair.second.master());
       locks_to_release.push_back(key_replica);
     }
   }

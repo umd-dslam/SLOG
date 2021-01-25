@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
       return info.txn->internal().type() == TransactionType::SINGLE_HOME;
     });
     multi_home += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
-      return info.txn->internal().type() == TransactionType::MULTI_HOME;
+      return info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
     });
     remaster += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;

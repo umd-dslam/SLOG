@@ -29,7 +29,7 @@ class SimpleMultiPaxos : public NetworkedModule {
 
   void HandleInternalResponse(EnvelopePtr&& env) final;
 
-  virtual void OnCommit(uint32_t slot, uint32_t value) = 0;
+  virtual void OnCommit(uint32_t slot, uint32_t value, bool is_elected) = 0;
 
  private:
   Leader leader_;

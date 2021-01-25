@@ -1,8 +1,8 @@
 #pragma once
 
 #include <unordered_map>
-#include <unordered_set>
 #include <variant>
+#include <vector>
 
 #include "common/configuration.h"
 #include "common/types.h"
@@ -14,7 +14,6 @@
 using std::pair;
 using std::string;
 using std::unordered_map;
-using std::unordered_set;
 
 namespace slog {
 
@@ -29,15 +28,25 @@ namespace slog {
  *                            transaction result to the client.
  * @return                    A new transaction having given properties
  */
-Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
+Transaction* MakeTransaction(const std::vector<Key>& read_set, const std::vector<Key>& write_set,
                              const std::variant<string, int>& proc = "",
                              const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata = {},
-                             const MachineId coordinating_server = 0);
+                             MachineId coordinating_server = 0);
+
+/**
+ * If in_place is set to true, the given txn is modified
+ */
+Transaction* GenerateLockOnlyTxn(Transaction& txn, uint32_t lo_master, bool in_place = false);
 
 /**
  * Populate the involved_replicas field in the transaction
  */
 void PopulateInvolvedReplicas(Transaction* txn);
+
+/**
+ * Populate the involved_partitions field in the transaction
+ */
+void PopulateInvolvedPartitions(Transaction* txn, const ConfigurationPtr& config);
 
 /**
  * Inspects the internal metadata of a transaction then determines whether
@@ -63,5 +72,22 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn);
 bool operator==(const Transaction& txn1, const Transaction txn2);
 
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata);
+
+template <typename List>
+void AddToPartitionedBatch(std::vector<std::unique_ptr<internal::Batch>>& partitioned_batch, const List& partitions,
+                           Transaction* txn) {
+  if (partitions.size() == 0) {
+    return;
+  }
+  for (int i = 0; i < partitions.size() - 1; i++) {
+    partitioned_batch[partitions[i]]->add_transactions()->CopyFrom(*txn);
+  }
+  partitioned_batch[partitions[partitions.size() - 1]]->mutable_transactions()->AddAllocated(txn);
+}
+
+/**
+ * Extract txns from a batch
+ */
+vector<Transaction*> Unbatch(internal::Batch* batch);
 
 }  // namespace slog

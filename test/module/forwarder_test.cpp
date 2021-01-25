@@ -173,7 +173,7 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
   auto forwarded_txn = ReceiveOnOrdererChannel(leader);
   // The txn should be forwarded to the multihome orderer module of the leader
   ASSERT_TRUE(forwarded_txn != nullptr);
-  ASSERT_EQ(TransactionType::MULTI_HOME, forwarded_txn->internal().type());
+  ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, forwarded_txn->internal().type());
   const auto& master_metadata = forwarded_txn->internal().master_metadata();
   ASSERT_EQ(2U, master_metadata.size());
   ASSERT_EQ(0U, master_metadata.at("A").master());

@@ -37,9 +37,13 @@ class E2ETest : public ::testing::Test {
       test_slogs[i]->AddScheduler();
       test_slogs[i]->AddLocalPaxos();
 
-      // Only one partition per replica participates in the global paxos process
-      if (configs[i]->leader_partition_for_multi_home_ordering() == configs[i]->local_partition()) {
+      // One region is selected to globally order the multihome batches
+      if (configs[i]->leader_replica_for_multi_home_ordering() == configs[i]->local_replica()) {
         test_slogs[i]->AddGlobalPaxos();
+      }
+
+      // At each region, a partition is used to batch the multihome txns
+      if (configs[i]->leader_partition_for_multi_home_ordering() == configs[i]->local_partition()) {
         test_slogs[i]->AddMultiHomeOrderer();
       }
     }
@@ -105,20 +109,20 @@ TEST_F(E2ETest, MultiHomeTxn) {
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
     ASSERT_EQ("valA", txn_resp.read_set().at("A"));
     ASSERT_EQ("valC", txn_resp.read_set().at("C"));
   }
 }
 
-TEST_F(E2ETest, MultiHomeMutliPartitionTxn) {
+TEST_F(E2ETest, MultiHomeMultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
     ASSERT_EQ("valA", txn_resp.read_set().at("A"));
     ASSERT_EQ("valX", txn_resp.read_set().at("X"));
   }
@@ -136,7 +140,7 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ(TransactionStatus::COMMITTED, remaster_txn_resp.status());
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
-  ASSERT_EQ(TransactionType::MULTI_HOME, remaster_txn_resp.internal().type());
+  ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, remaster_txn_resp.internal().type());
 #else
   ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
@@ -185,7 +189,7 @@ TEST_F(E2ETest, AbortTxnEmptyKeySets) {
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
+  ASSERT_EQ(TransactionType::UNKNOWN, aborted_txn_resp.internal().type());
 }
 
 class E2ETestBypassMHOrderer : public E2ETest {
@@ -196,27 +200,27 @@ class E2ETestBypassMHOrderer : public E2ETest {
   }
 };
 
-TEST_F(E2ETestBypassMHOrderer, MultiHomeTxn) {
+TEST_F(E2ETestBypassMHOrderer, MultiHomeSinglePartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A", "C"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
     ASSERT_EQ("valA", txn_resp.read_set().at("A"));
     ASSERT_EQ("valC", txn_resp.read_set().at("C"));
   }
 }
 
-TEST_F(E2ETestBypassMHOrderer, MultiHomeMutliPartitionTxn) {
+TEST_F(E2ETestBypassMHOrderer, MultiHomeMultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME, txn_resp.internal().type());
+    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
     ASSERT_EQ("valA", txn_resp.read_set().at("A"));
     ASSERT_EQ("valX", txn_resp.read_set().at("X"));
   }

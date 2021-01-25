@@ -34,6 +34,7 @@ Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& b
       config_(config),
       lookup_master_index_(lookup_master_index),
       batch_timeout_(batch_timeout),
+      lookup_request_scheduled_(false),
       rg_(std::random_device()()) {
   partitioned_lookup_request_.resize(config_->num_partitions());
 }
@@ -121,7 +122,9 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   VLOG(3) << "Remote master lookup needed to determine type of txn " << txn->internal().id();
   for (auto p : txn->internal().involved_partitions()) {
-    partitioned_lookup_request_[p].mutable_request()->mutable_lookup_master()->add_txn_ids(txn->internal().id());
+    if (p != config_->local_partition()) {
+      partitioned_lookup_request_[p].mutable_request()->mutable_lookup_master()->add_txn_ids(txn->internal().id());
+    }
   }
   pending_transactions_.insert_or_assign(txn->internal().id(), move(env));
 
@@ -131,7 +134,7 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
       auto local_rep = config_->local_replica();
       auto num_partitions = config_->num_partitions();
       for (uint32_t part = 0; part < num_partitions; part++) {
-        if (part != config_->local_partition()) {
+        if (!partitioned_lookup_request_[part].request().lookup_master().txn_ids().empty()) {
           Send(partitioned_lookup_request_[part], config_->MakeMachineId(local_rep, part), kForwarderChannel);
           partitioned_lookup_request_[part].Clear();
         }
@@ -216,6 +219,8 @@ void Forwarder::Forward(EnvelopePtr&& env) {
   auto txn_type = txn_internal->type();
   auto& master_metadata = txn_internal->master_metadata();
 
+  PopulateInvolvedReplicas(txn);
+
   if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
@@ -237,10 +242,8 @@ void Forwarder::Forward(EnvelopePtr&& env) {
 
       Send(*env, random_machine_in_home_replica, kSequencerChannel);
     }
-  } else if (txn_type == TransactionType::MULTI_HOME) {
+  } else if (txn_type == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
-
-    PopulateInvolvedReplicas(txn);
 
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
@@ -252,19 +255,10 @@ void Forwarder::Forward(EnvelopePtr&& env) {
         destinations.push_back(config_->MakeMachineId(rep, part));
       }
       Send(*env, destinations, kSequencerChannel);
-
-      // Send the txn to schedulers of involved partitions
-      destinations.clear();
-      for (auto part : txn->internal().involved_partitions()) {
-        for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
-          destinations.push_back(config_->MakeMachineId(rep, part));
-        }
-      }
-      Send(move(env), destinations, kSchedulerChannel);
     } else {
-      auto mh_orderer =
-          config_->MakeMachineId(config_->local_replica(), config_->leader_partition_for_multi_home_ordering());
-      Send(*env, mh_orderer, kMultiHomeOrdererChannel);
+      auto mh_orderer = config_->MakeMachineId(config_->leader_replica_for_multi_home_ordering(),
+                                               config_->leader_partition_for_multi_home_ordering());
+      Send(move(env), mh_orderer, kMultiHomeOrdererChannel);
     }
   }
 }

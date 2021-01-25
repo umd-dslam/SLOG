@@ -160,8 +160,8 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     }
   }
 
-  unordered_set<Key> read_set;
-  unordered_set<Key> write_set;
+  vector<Key> read_set;
+  vector<Key> write_set;
   std::ostringstream code;
 
   auto writes = params_.GetUInt32(WRITES);
@@ -195,11 +195,11 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
       // Decide whether this is a read or a write record
       if (i < writes) {
         code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
-        write_set.insert(key);
+        write_set.push_back(key);
         record.is_write = true;
       } else {
         code << "GET " << key << " ";
-        read_set.insert(key);
+        read_set.push_back(key);
         record.is_write = false;
       }
       record.home = home;

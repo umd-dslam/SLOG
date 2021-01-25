@@ -15,8 +15,8 @@ namespace slog {
 
 enum class VerifyMasterResult { VALID, WAITING, ABORT };
 struct RemasterOccurredResult {
-  list<const TxnHolder*> unblocked;
-  list<const TxnHolder*> should_abort;
+  list<const LockOnlyTxn*> unblocked;
+  list<const LockOnlyTxn*> should_abort;
 };
 
 /**
@@ -32,7 +32,7 @@ class RemasterManager {
   /**
    * Checks the counters of the transaction's master metadata.
    *
-   * @param txn_holder Transaction to be checked
+   * @param lo_txn Transaction to be checked
    * @return The result of the check.
    * - If Valid, the transaction can be sent for locks.
    * - If Waiting, the transaction will be queued until a remaster
@@ -40,7 +40,7 @@ class RemasterManager {
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  virtual VerifyMasterResult VerifyMaster(const TxnHolder& txn_holder) = 0;
+  virtual VerifyMasterResult VerifyMaster(const LockOnlyTxn& lo_txn) = 0;
 
   /**
    * Updates the queue of transactions waiting for remasters,
@@ -57,7 +57,6 @@ class RemasterManager {
    * Release a transaction from remaster queues. It's guaranteed that the released transaction
    * will not be in the returned result.
    *
-   * @param txn_id Transaction to be checked
    * @return Transactions that are now unblocked
    */
   virtual RemasterOccurredResult ReleaseTransaction(const TxnHolder& txn_holder) = 0;
@@ -66,46 +65,46 @@ class RemasterManager {
    * Compare transaction metadata to stored metadata, without adding the
    * transaction to any queues
    */
-  static VerifyMasterResult CheckCounters(const TxnHolder& txn_holder,
+  static VerifyMasterResult CheckCounters(const LockOnlyTxn& lo_txn,
                                           const shared_ptr<const Storage<Key, Record>>& storage) {
-    auto& keys = txn_holder.keys_in_partition();
-    auto& txn_master_metadata = txn_holder.transaction()->internal().master_metadata();
-
-    if (txn_master_metadata.empty()) {  // This should only be the case for testing
-      LOG(WARNING) << "Master metadata empty: txn id " << txn_holder.transaction()->internal().id();
-      return VerifyMasterResult::VALID;
-    }
-
     auto waiting = false;
-    for (auto& key_pair : keys) {
-      auto& key = key_pair.first;
-
-      auto txn_counter = txn_master_metadata.at(key).counter();
-
+    for (auto& key_info : lo_txn.keys) {
       // Get current counter from storage
       uint32_t storage_counter = 0;  // default to 0 for a new key
       Record record;
-      bool found = storage->Read(key, record);
+      bool found = storage->Read(key_info.key, record);
       if (found) {
         storage_counter = record.metadata.counter;
       }
 
-      if (txn_counter < storage_counter) {
+      if (key_info.counter < storage_counter) {
         return VerifyMasterResult::ABORT;
-      } else if (txn_counter > storage_counter) {
+      } else if (key_info.counter > storage_counter) {
         waiting = true;
       } else {
-        CHECK(txn_master_metadata.at(key).master() == record.metadata.master)
-            << "Masters don't match for same key \"" << key << "\". In txn: " << txn_master_metadata.at(key).master()
+        CHECK(lo_txn.master == record.metadata.master)
+            << "Masters don't match for same key \"" << key_info.key << "\". In txn: " << lo_txn.master
             << ". In storage: " << record.metadata.master;
       }
     }
 
-    if (waiting) {
-      return VerifyMasterResult::WAITING;
-    } else {
-      return VerifyMasterResult::VALID;
+    return waiting ? VerifyMasterResult::WAITING : VerifyMasterResult::VALID;
+  }
+
+  static VerifyMasterResult CheckCounters(const TxnHolder& holder,
+                                          const shared_ptr<const Storage<Key, Record>>& storage) {
+    auto waiting = false;
+    for (auto& lo_txn : holder.lock_only_txns()) {
+      if (lo_txn.has_value()) {
+        auto res = CheckCounters(lo_txn.value(), storage);
+        if (res == VerifyMasterResult::WAITING)
+          waiting = true;
+        else if (res == VerifyMasterResult::ABORT)
+          return VerifyMasterResult::ABORT;
+      }
     }
+
+    return waiting ? VerifyMasterResult::WAITING : VerifyMasterResult::VALID;
   }
 };
 

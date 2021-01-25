@@ -43,6 +43,7 @@ class Configuration {
   MachineId MakeMachineId(uint32_t replica, uint32_t partition) const;
   std::pair<uint32_t, uint32_t> UnpackMachineId(MachineId machine_id) const;
 
+  uint32_t leader_replica_for_multi_home_ordering() const;
   uint32_t leader_partition_for_multi_home_ordering() const;
 
   uint32_t partition_of_key(const Key& key) const;

@@ -123,8 +123,10 @@ std::pair<uint32_t, uint32_t> Configuration::UnpackMachineId(MachineId machine_i
   return std::make_pair(machine_id / np, machine_id % np);
 }
 
+uint32_t Configuration::leader_replica_for_multi_home_ordering() const { return 0; }
+
 uint32_t Configuration::leader_partition_for_multi_home_ordering() const {
-  // Avoid using partition 0 here since it usually works as the
+  // Avoid using partition 0 here since that partition already works as the
   // leader of the local paxos process
   return num_partitions() - 1;
 }

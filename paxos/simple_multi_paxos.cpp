@@ -16,6 +16,7 @@ SimpleMultiPaxos::SimpleMultiPaxos(Channel group_number, const shared_ptr<Broker
       acceptor_(*this) {}
 
 void SimpleMultiPaxos::HandleInternalRequest(EnvelopePtr&& req) {
+  // A non-leader machine can still need to do some work to maintain its state should it becomes a leader later
   leader_.HandleRequest(*req);
   acceptor_.HandleRequest(*req);
 }

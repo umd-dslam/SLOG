@@ -70,7 +70,7 @@ void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
   proposal.is_committed = true;
 
   // Report to the paxos user
-  paxos_.OnCommit(slot, value);
+  paxos_.OnCommit(slot, value, is_elected_);
 
   if (slot >= next_empty_slot_) {
     next_empty_slot_ = slot + 1;

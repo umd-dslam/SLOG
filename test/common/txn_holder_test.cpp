@@ -1,18 +1,18 @@
+#include "common/txn_holder.h"
+
 #include <gmock/gmock.h>
 
 #include <algorithm>
 
 #include "common/proto_utils.h"
-#include "common/txn_holder.h"
 #include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;
 
-using ::testing::ElementsAre;
 using ::testing::UnorderedElementsAre;
 
-class TransactionHolderTest : public ::testing::Test {
+class TxnHolderTest : public ::testing::Test {
  protected:
   static const size_t NUM_MACHINES = 6;
   void SetUp() {
@@ -28,7 +28,7 @@ class TransactionHolderTest : public ::testing::Test {
   ConfigVec configs;
 };
 
-TEST_F(TransactionHolderTest, keys_in_partition) {
+TEST_F(TxnHolderTest, keys_in_partition) {
   auto txn = MakeTransaction({"A"},                           /* read_set */
                              {"D"},                           /* write_set */
                              "",                              /* code */
@@ -38,14 +38,15 @@ TEST_F(TransactionHolderTest, keys_in_partition) {
   auto txn2 = new Transaction(*txn);
 
   TxnHolder holder1(configs[0], txn);
-  ASSERT_THAT(holder1.keys_in_partition(),
-              ElementsAre(make_pair("A", LockMode::READ), make_pair("D", LockMode::WRITE)));
+  ASSERT_THAT(holder1.any_lock_only_txn()->keys, UnorderedElementsAre(LockOnlyTxn::KeyInfo("A", LockMode::READ, 3),
+                                                                      LockOnlyTxn::KeyInfo("D", LockMode::WRITE, 0)));
+  ASSERT_EQ(holder1.any_lock_only_txn()->master, 1);
 
   TxnHolder holder2(configs[1], txn2);
-  ASSERT_TRUE(holder2.keys_in_partition().empty());
+  ASSERT_TRUE(holder2.any_lock_only_txn()->keys.empty());
 }
 
-TEST_F(TransactionHolderTest, active_partitions) {
+TEST_F(TxnHolderTest, active_partitions) {
   for (uint32_t i = 0; i < NUM_MACHINES; i++) {
     auto txn = MakeTransaction({"A"},                                          /* read_set */
                                {"B", "D"},                                     /* write_set */

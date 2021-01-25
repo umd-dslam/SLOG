@@ -50,15 +50,15 @@ void ExecuteTxn(const char* txn_file) {
 
   // 2. Construct a request
   auto read_set_arr = d["read_set"].GetArray();
-  unordered_set<string> read_set;
+  vector<string> read_set;
   for (auto& v : read_set_arr) {
-    read_set.insert(v.GetString());
+    read_set.push_back(v.GetString());
   }
 
   auto write_set_arr = d["write_set"].GetArray();
-  unordered_set<string> write_set;
+  vector<string> write_set;
   for (auto& v : write_set_arr) {
-    write_set.insert(v.GetString());
+    write_set.push_back(v.GetString());
   }
 
   unordered_map<Key, pair<uint32_t, uint32_t>> metadata;

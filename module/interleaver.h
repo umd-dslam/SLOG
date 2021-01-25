@@ -62,7 +62,6 @@ class Interleaver : public NetworkedModule {
 
   ConfigurationPtr config_;
   std::unordered_map<uint32_t, BatchLog> single_home_logs_;
-  BatchLog multi_home_log_;
   LocalLog local_log_;
 };
 

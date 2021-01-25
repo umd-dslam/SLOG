@@ -165,9 +165,13 @@ int main(int argc, char* argv[]) {
   modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
 
-  // Only one partition per replica participates in the global paxos process
-  if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
+  // One region is selected to globally order the multihome batches
+  if (config->leader_replica_for_multi_home_ordering() == config->local_replica()) {
     modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
+  }
+
+  // At each region, a partition is used to batch the multihome txns
+  if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
     modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration()));
   }
 

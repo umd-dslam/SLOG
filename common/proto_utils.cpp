@@ -35,10 +35,10 @@ bool operator==(Map<K, V> map1, Map<K, V> map2) {
 
 }  // namespace
 
-Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered_set<Key>& write_set,
+Transaction* MakeTransaction(const vector<Key>& read_set, const vector<Key>& write_set,
                              const std::variant<string, int>& proc,
                              const unordered_map<Key, pair<uint32_t, uint32_t>>& master_metadata,
-                             const MachineId coordinating_server) {
+                             MachineId coordinating_server) {
   Transaction* txn = new Transaction();
   for (const auto& key : read_set) {
     txn->mutable_read_set()->insert({key, ""});
@@ -57,7 +57,7 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
 
   for (const auto& pair : master_metadata) {
     const auto& key = pair.first;
-    if (read_set.count(key) > 0 || write_set.count(key) > 0) {
+    if (txn->read_set().count(key) > 0 || txn->write_set().count(key) > 0) {
       MasterMetadata metadata;
       metadata.set_master(pair.second.first);
       metadata.set_counter(pair.second.second);
@@ -65,14 +65,51 @@ Transaction* MakeTransaction(const unordered_set<Key>& read_set, const unordered
     }
   }
 
-  PopulateInvolvedReplicas(txn);
-
   SetTransactionType(*txn);
+
+  PopulateInvolvedReplicas(txn);
 
   return txn;
 }
 
+Transaction* GenerateLockOnlyTxn(Transaction& txn, uint32_t lo_master, bool in_place) {
+  Transaction* lock_only_txn = &txn;
+  if (!in_place) {
+    lock_only_txn = new Transaction(txn);
+  }
+
+#ifdef REMASTER_PROTOCOL_COUNTERLESS
+  if (txn.procedure_case() == Transaction::kRemaster && txn.remaster().new_master() == lo_master) {
+    lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
+    // For remaster txn, there is only one key in the metadata, and we want to keep that key there
+    // in this case, so we return here.
+    return lock_only_txn;
+  }
+#endif /* REMASTER_PROTOCOL_COUNTERLESS */
+
+  auto master_metadata = lock_only_txn->mutable_internal()->mutable_master_metadata();
+  for (auto it = master_metadata->begin(); it != master_metadata->end();) {
+    if (it->second.master() != lo_master) {
+      it = master_metadata->erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  return lock_only_txn;
+}
+
 void PopulateInvolvedReplicas(Transaction* txn) {
+  if (txn->internal().type() == TransactionType::UNKNOWN) {
+    return;
+  }
+
+  if (txn->internal().type() == TransactionType::SINGLE_HOME) {
+    txn->mutable_internal()->mutable_involved_replicas()->Clear();
+    txn->mutable_internal()->add_involved_replicas(txn->internal().master_metadata().begin()->second.master());
+    return;
+  }
+
   vector<uint32_t> involved_replicas;
   for (const auto& pair : txn->internal().master_metadata()) {
     involved_replicas.push_back(pair.second.master());
@@ -88,11 +125,29 @@ void PopulateInvolvedReplicas(Transaction* txn) {
   *txn->mutable_internal()->mutable_involved_replicas() = {involved_replicas.begin(), last};
 }
 
+void PopulateInvolvedPartitions(Transaction* txn, const ConfigurationPtr& config) {
+  vector<uint32_t> involved_partitions;
+  auto ExtractPartitions = [&involved_partitions, &config](const google::protobuf::Map<string, string>& keys) {
+    for (auto& pair : keys) {
+      const auto& key = pair.first;
+      uint32_t partition;
+      partition = config->partition_of_key(key);
+      involved_partitions.push_back(partition);
+    }
+  };
+  ExtractPartitions(txn->read_set());
+  ExtractPartitions(txn->write_set());
+
+  sort(involved_partitions.begin(), involved_partitions.end());
+  auto last = unique(involved_partitions.begin(), involved_partitions.end());
+  *txn->mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
+}
+
 TransactionType SetTransactionType(Transaction& txn) {
   auto txn_internal = txn.mutable_internal();
   auto& master_metadata = txn_internal->master_metadata();
 
-  bool master_metadata_is_complete = true;
+  bool master_metadata_is_complete = (txn.read_set_size() + txn.write_set_size()) > 0;
   for (auto& pair : txn.read_set()) {
     if (!master_metadata.contains(pair.first)) {
       master_metadata_is_complete = false;
@@ -130,7 +185,7 @@ TransactionType SetTransactionType(Transaction& txn) {
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
-  txn_internal->set_type(is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME);
+  txn_internal->set_type(is_single_home ? TransactionType::SINGLE_HOME : TransactionType::MULTI_HOME_OR_LOCK_ONLY);
   return txn_internal->type();
 }
 
@@ -225,6 +280,26 @@ bool operator==(const Transaction& txn1, const Transaction txn2) {
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
   os << std::setw(10) << "(" << metadata.master() << ", " << metadata.counter() << ")";
   return os;
+}
+
+vector<Transaction*> Unbatch(internal::Batch* batch) {
+  auto transactions = batch->mutable_transactions();
+
+  vector<Transaction*> buffer(transactions->size());
+
+  for (int i = transactions->size() - 1; i >= 0; i--) {
+    auto txn = transactions->ReleaseLast();
+    auto txn_internal = txn->mutable_internal();
+
+    // Transfer recorded events from batch to each txn in the batch
+    txn_internal->mutable_events()->MergeFrom(batch->events());
+    txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
+    txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
+
+    buffer[i] = txn;
+  }
+
+  return buffer;
 }
 
 }  // namespace slog

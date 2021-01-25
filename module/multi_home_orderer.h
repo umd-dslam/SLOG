@@ -31,15 +31,19 @@ class MultiHomeOrderer : public NetworkedModule {
 
  private:
   void NewBatch();
-  void ScheduleBatch(Transaction* txn);
+  BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id(); }
+  void AddToBatch(Transaction* txn);
   void SendBatch();
 
   void ProcessForwardBatch(EnvelopePtr&& env);
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
-  unique_ptr<internal::Batch> batch_;
+  std::vector<unique_ptr<internal::Batch>> batch_per_rep_;
   BatchId batch_id_counter_;
+  int batch_size_;
+  bool batch_scheduled_;
+
   BatchLog multi_home_batch_log_;
 };
 

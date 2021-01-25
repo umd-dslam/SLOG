@@ -51,9 +51,10 @@ class LockQueueTail {
 };
 
 struct TxnInfo {
+  TxnInfo(int unarrived) : unarrived_lock_requests(unarrived), waiting_for_cnt(0) {}
   vector<TxnId> waited_by;
-  int waiting_for_cnt = 0;
-  int unarrived_lock_requests = 0;
+  int unarrived_lock_requests;
+  int waiting_for_cnt;
 
   bool is_ready() const { return waiting_for_cnt == 0 && unarrived_lock_requests == 0; }
 };
@@ -81,35 +82,15 @@ struct TxnInfo {
 class DDRLockManager {
  public:
   /**
-   * Counts the number of locks a txn needs.
-   *
-   * For MULTI_HOME txns, the number of needed locks before
-   * calling this method can be negative due to its LockOnly
-   * txn. Calling this function would bring the number of waited
-   * locks back to 0, meaning all locks are granted.
-   *
-   * @param txn_holder Holder of the transaction to be registered.
-   * @return    true if all locks are acquired, false if not and
-   *            the transaction is queued up.
-   */
-  bool AcceptTransaction(const TxnHolder& txn_holder);
-
-  /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait
    * for the current holders to release.
    *
-   * @param txn_holder Holder of the transaction whose locks are acquired.
+   * @param lo_txn The transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  AcquireLocksResult AcquireLocks(const TxnHolder& txn_holder);
-
-  /**
-   * Convenient method to perform txn registration and
-   * lock acquisition at the same time.
-   */
-  AcquireLocksResult AcceptTxnAndAcquireLocks(const TxnHolder& txn_holder);
+  AcquireLocksResult AcquireLocks(const LockOnlyTxn& lo_txn);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.

@@ -20,17 +20,22 @@ MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_
       config_(config),
       batch_timeout_(batch_timeout),
       batch_id_counter_(0) {
+  batch_per_rep_.resize(config_->num_replicas());
   NewBatch();
 }
 
 void MultiHomeOrderer::NewBatch() {
-  if (batch_ == nullptr) {
-    batch_.reset(new Batch());
-  }
-  batch_->Clear();
-  batch_->set_transaction_type(TransactionType::MULTI_HOME);
   ++batch_id_counter_;
-  batch_->set_id(batch_id_counter_ * kMaxNumMachines + config_->local_machine_id());
+  batch_scheduled_ = false;
+  batch_size_ = 0;
+  for (auto& batch : batch_per_rep_) {
+    if (batch == nullptr) {
+      batch.reset(new Batch());
+    }
+    batch->Clear();
+    batch->set_transaction_type(TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    batch->set_id(batch_id());
+  }
 }
 
 void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
@@ -42,7 +47,7 @@ void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
 
       TRACE(txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
 
-      ScheduleBatch(txn);
+      AddToBatch(txn);
       break;
     }
     case Request::kForwardBatch:
@@ -104,40 +109,39 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
   }
 }
 
-void MultiHomeOrderer::ScheduleBatch(Transaction* txn) {
-  DCHECK(txn->internal().type() == TransactionType::MULTI_HOME)
+void MultiHomeOrderer::AddToBatch(Transaction* txn) {
+  DCHECK(txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY)
       << "Multi-home orderer batch can only contain multi-home txn. ";
 
-  batch_->mutable_transactions()->AddAllocated(txn);
+  AddToPartitionedBatch(batch_per_rep_, txn->internal().involved_replicas(), txn);
+  ++batch_size_;
+
   // If this is the first txn of the batch, start the timer to send the batch
-  if (batch_->transactions_size() == 1) {
+  if (!batch_scheduled_) {
     NewTimedCallback(batch_timeout_, [this]() {
       SendBatch();
       NewBatch();
     });
+    batch_scheduled_ = true;
   }
 }
 
 void MultiHomeOrderer::SendBatch() {
-  VLOG(3) << "Finished multi-home batch " << batch_->id() << " of size " << batch_->transactions().size();
+  VLOG(3) << "Finished multi-home batch " << batch_id() << " of size " << batch_size_;
 
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
-  paxos_propose->set_value(batch_->id());
-  Send(move(paxos_env), kGlobalPaxos);
+  paxos_propose->set_value(batch_id());
+  Send(move(paxos_env), config_->MakeMachineId(config_->leader_replica_for_multi_home_ordering(), 0), kGlobalPaxos);
 
   // Replicate new batch to other regions
-  auto batch_env = NewEnvelope();
-  auto forward_batch = batch_env->mutable_request()->mutable_forward_batch();
-  forward_batch->set_allocated_batch_data(batch_.release());
-
   auto part = config_->leader_partition_for_multi_home_ordering();
-  auto num_replicas = config_->num_replicas();
-  vector<MachineId> destinations;
-  for (uint32_t rep = 0; rep < num_replicas; rep++) {
-    destinations.push_back(config_->MakeMachineId(rep, part));
+  for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
+    auto env = NewEnvelope();
+    auto forward_batch = env->mutable_request()->mutable_forward_batch();
+    forward_batch->set_allocated_batch_data(batch_per_rep_[rep].release());
+    Send(move(env), config_->MakeMachineId(rep, part), kMultiHomeOrdererChannel);
   }
-  Send(move(batch_env), destinations, kMultiHomeOrdererChannel);
 }
 
 }  // namespace slog

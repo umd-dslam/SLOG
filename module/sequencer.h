@@ -36,13 +36,10 @@ class Sequencer : public NetworkedModule {
  private:
   void NewBatch();
   BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id(); }
-  void ScheduleBatch(Transaction* txn);
+  void AddToBatch(Transaction* txn);
   void SendBatch();
   EnvelopePtr NewBatchRequest(internal::Batch* batch);
   bool SendBatchDelayed();
-
-  void ProcessMultiHomeBatch(EnvelopePtr&& env);
-  Transaction* GenerateLockOnlyTxn(const Transaction& txn) const;
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;

@@ -14,20 +14,23 @@ void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, C
   SendSerializedProto(*GetRemoteSocket(to_machine_id), envelope, local_machine_id_, to_channel);
 }
 
+void Sender::Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel) {
+  if (to_machine_id == local_machine_id_) {
+    Send(move(envelope), to_channel);
+  } else {
+    Send(*envelope, to_machine_id, to_channel);
+  }
+}
+
 void Sender::Send(EnvelopePtr&& envelope, Channel to_channel) {
   // Lazily establish a new connection when necessary
   auto it = local_channel_to_socket_.find(to_channel);
   if (it == local_channel_to_socket_.end()) {
-    if (auto br = broker_.lock()) {
-      zmq::socket_t new_socket(*context_, ZMQ_PUSH);
-      new_socket.connect(MakeInProcChannelAddress(to_channel));
-      new_socket.set(zmq::sockopt::sndhwm, 0);
-      auto res = local_channel_to_socket_.insert_or_assign(to_channel, move(new_socket));
-      it = res.first;
-    } else {
-      // Broker has been destroyed. This can only happen during cleaning up
-      return;
-    }
+    zmq::socket_t new_socket(*context_, ZMQ_PUSH);
+    new_socket.connect(MakeInProcChannelAddress(to_channel));
+    new_socket.set(zmq::sockopt::sndhwm, 0);
+    auto res = local_channel_to_socket_.insert_or_assign(to_channel, move(new_socket));
+    it = res.first;
   }
   envelope->set_from(local_machine_id_);
   SendEnvelope(it->second, move(envelope));

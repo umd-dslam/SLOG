@@ -52,7 +52,7 @@ void Worker::HandleInternalRequest(EnvelopePtr&& env) {
   VLOG(2) << "Got remote read result for txn " << txn_id;
 
   auto& state = state_it->second;
-  auto txn = state.txn_holder->transaction();
+  auto txn = state.txn_holder->txn();
 
   if (txn->status() != TransactionStatus::ABORTED) {
     if (read_result.will_abort()) {
@@ -91,7 +91,7 @@ bool Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
   }
 
   auto txn_holder = *msg.data<TxnHolder*>();
-  auto txn = txn_holder->transaction();
+  auto txn = txn_holder->txn();
   auto txn_id = txn->internal().id();
   auto local_partition = config_->local_partition();
 
@@ -178,7 +178,7 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
 void Worker::ReadLocalStorage(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
-  auto txn = txn_holder->transaction();
+  auto txn = txn_holder->txn();
 
   auto will_abort = false;
 
@@ -259,7 +259,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
 void Worker::Execute(TxnId txn_id) {
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->transaction();
+  auto txn = state.txn_holder->txn();
 
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
@@ -281,7 +281,7 @@ void Worker::Execute(TxnId txn_id) {
 
 void Worker::Commit(TxnId txn_id) {
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->transaction();
+  auto txn = state.txn_holder->txn();
   switch (txn->procedure_case()) {
     case Transaction::ProcedureCase::kCode: {
       // Apply all writes to local storage if the transaction is not aborted
@@ -334,7 +334,7 @@ void Worker::Commit(TxnId txn_id) {
 }
 
 void Worker::Finish(TxnId txn_id) {
-  TRACE(TxnState(txn_id).txn_holder->transaction()->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(TxnState(txn_id).txn_holder->txn()->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // This must happen before the sending to scheduler below. Otherwise,
   // the scheduler may destroy the transaction holder before we can
@@ -366,7 +366,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
     return;
   }
 
-  auto txn = txn_holder->transaction();
+  auto txn = txn_holder->txn();
   auto local_partition = config_->local_partition();
   auto local_replica = config_->local_replica();
   auto aborted = txn->status() == TransactionStatus::ABORTED;
@@ -402,7 +402,7 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
   completed_sub_txn->set_partition(config_->local_partition());
 
-  Transaction* txn = txn_holder->transaction();
+  Transaction* txn = txn_holder->txn();
   if (!config_->return_dummy_txn()) {
     completed_sub_txn->set_allocated_txn(txn);
   } else {
