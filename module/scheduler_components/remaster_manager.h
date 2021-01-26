@@ -15,8 +15,8 @@ namespace slog {
 
 enum class VerifyMasterResult { VALID, WAITING, ABORT };
 struct RemasterOccurredResult {
-  list<const LockOnlyTxn*> unblocked;
-  list<const LockOnlyTxn*> should_abort;
+  list<const Transaction*> unblocked;
+  list<const Transaction*> should_abort;
 };
 
 /**
@@ -32,7 +32,7 @@ class RemasterManager {
   /**
    * Checks the counters of the transaction's master metadata.
    *
-   * @param lo_txn Transaction to be checked
+   * @param txn Transaction to be checked
    * @return The result of the check.
    * - If Valid, the transaction can be sent for locks.
    * - If Waiting, the transaction will be queued until a remaster
@@ -40,7 +40,7 @@ class RemasterManager {
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  virtual VerifyMasterResult VerifyMaster(const LockOnlyTxn& lo_txn) = 0;
+  virtual VerifyMasterResult VerifyMaster(const Transaction& txn) = 0;
 
   /**
    * Updates the queue of transactions waiting for remasters,
@@ -59,48 +59,35 @@ class RemasterManager {
    *
    * @return Transactions that are now unblocked
    */
-  virtual RemasterOccurredResult ReleaseTransaction(const TxnHolder& txn_holder) = 0;
+  virtual RemasterOccurredResult ReleaseTransaction(const Transaction& txn) = 0;
 
   /**
    * Compare transaction metadata to stored metadata, without adding the
    * transaction to any queues
    */
-  static VerifyMasterResult CheckCounters(const LockOnlyTxn& lo_txn,
+  static VerifyMasterResult CheckCounters(const Transaction& txn, bool filter_by_home,
                                           const shared_ptr<const Storage<Key, Record>>& storage) {
     auto waiting = false;
-    for (auto& key_info : lo_txn.keys) {
+    for (const auto& kv : txn.keys()) {
+      if (filter_by_home && static_cast<int>(kv.second.metadata().master()) != txn.internal().home()) {
+        continue;
+      }
       // Get current counter from storage
       uint32_t storage_counter = 0;  // default to 0 for a new key
       Record record;
-      bool found = storage->Read(key_info.key, record);
+      bool found = storage->Read(kv.first, record);
       if (found) {
         storage_counter = record.metadata.counter;
       }
 
-      if (key_info.counter < storage_counter) {
+      if (kv.second.metadata().counter() < storage_counter) {
         return VerifyMasterResult::ABORT;
-      } else if (key_info.counter > storage_counter) {
+      } else if (kv.second.metadata().counter() > storage_counter) {
         waiting = true;
       } else {
-        CHECK(lo_txn.master == record.metadata.master)
-            << "Masters don't match for same key \"" << key_info.key << "\". In txn: " << lo_txn.master
+        CHECK(kv.second.metadata().master() == record.metadata.master)
+            << "Masters don't match for same key \"" << kv.first << "\". In txn: " << kv.second.metadata().master()
             << ". In storage: " << record.metadata.master;
-      }
-    }
-
-    return waiting ? VerifyMasterResult::WAITING : VerifyMasterResult::VALID;
-  }
-
-  static VerifyMasterResult CheckCounters(const TxnHolder& holder,
-                                          const shared_ptr<const Storage<Key, Record>>& storage) {
-    auto waiting = false;
-    for (auto& lo_txn : holder.lock_only_txns()) {
-      if (lo_txn.has_value()) {
-        auto res = CheckCounters(lo_txn.value(), storage);
-        if (res == VerifyMasterResult::WAITING)
-          waiting = true;
-        else if (res == VerifyMasterResult::ABORT)
-          return VerifyMasterResult::ABORT;
       }
     }
 

@@ -113,7 +113,13 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
   DCHECK(txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY)
       << "Multi-home orderer batch can only contain multi-home txn. ";
 
-  AddToPartitionedBatch(batch_per_rep_, txn->internal().involved_replicas(), txn);
+  auto& replicas = txn->internal().involved_replicas();
+  for (int i = 0; i < replicas.size() - 1; i++) {
+    batch_per_rep_[replicas[i]]->add_transactions()->CopyFrom(*txn);
+  }
+  // Add the last one directly to avoid copying
+  batch_per_rep_[replicas[replicas.size() - 1]]->mutable_transactions()->AddAllocated(txn);
+
   ++batch_size_;
 
   // If this is the first txn of the batch, start the timer to send the batch

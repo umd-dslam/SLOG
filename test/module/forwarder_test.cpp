@@ -91,7 +91,7 @@ class ForwarderTest : public ::testing::Test {
 
 TEST_F(ForwarderTest, ForwardToSameRegion) {
   // This txn needs to lookup from both partitions in a region
-  auto txn = MakeTransaction({"A"} /* read_set */, {"B"} /* write_set */);
+  auto txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}});
   // Send to partition 0 of replica 0
   test_slogs[0]->SendTxn(txn);
   auto forwarded_txn = ReceiveOnSequencerChannel({0});
@@ -99,22 +99,21 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   // The txn should be forwarded to the sequencer of the same machine
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-  const auto& master_metadata = forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2U, master_metadata.size());
-  ASSERT_EQ(0U, master_metadata.at("A").master());
-  ASSERT_EQ(0U, master_metadata.at("A").counter());
-  ASSERT_EQ(0U, master_metadata.at("B").master());
-  ASSERT_EQ(1U, master_metadata.at("B").counter());
+  ASSERT_EQ(0, forwarded_txn->internal().home());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("B").metadata().master());
+  ASSERT_EQ(1U, forwarded_txn->keys().at("B").metadata().counter());
 }
 
 TEST_F(ForwarderTest, ForwardToAnotherRegion) {
   // Send to partition 1 of replica 0. This txn needs to lookup
   // from both partitions and later forwarded to replica 1
-  test_slogs[1]->SendTxn(MakeTransaction({"C"} /* read_set */, {"X"} /* write_set */));
+  test_slogs[1]->SendTxn(MakeTransaction({{"C"}, {"X", KeyType::WRITE}}));
 
   // Send to partition 0 of replica 1. This txn needs to lookup
   // from partition 0 only and later forwarded to replica 0
-  test_slogs[2]->SendTxn(MakeTransaction({"A"} /* read_set */, {}));
+  test_slogs[2]->SendTxn(MakeTransaction({{"A"}}));
 
   {
     auto forwarded_txn = ReceiveOnSequencerChannel({2, 3});
@@ -122,12 +121,11 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     // replica 1
     ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-    const auto& master_metadata = forwarded_txn->internal().master_metadata();
-    ASSERT_EQ(2U, master_metadata.size());
-    ASSERT_EQ(1U, master_metadata.at("C").master());
-    ASSERT_EQ(1U, master_metadata.at("C").counter());
-    ASSERT_EQ(1U, master_metadata.at("X").master());
-    ASSERT_EQ(0U, master_metadata.at("X").counter());
+    ASSERT_EQ(1, forwarded_txn->internal().home());
+    ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().master());
+    ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().counter());
+    ASSERT_EQ(1U, forwarded_txn->keys().at("X").metadata().master());
+    ASSERT_EQ(0U, forwarded_txn->keys().at("X").metadata().counter());
   }
 
   {
@@ -136,16 +134,15 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     // replica 0
     ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-    const auto& master_metadata = forwarded_txn->internal().master_metadata();
-    ASSERT_EQ(1U, master_metadata.size());
-    ASSERT_EQ(0U, master_metadata.at("A").master());
-    ASSERT_EQ(0U, master_metadata.at("A").counter());
+    ASSERT_EQ(0, forwarded_txn->internal().home());
+    ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
+    ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
   }
 }
 
 TEST_F(ForwarderTest, TransactionHasNewKeys) {
   // This txn needs to lookup from both partitions in a region
-  auto txn = MakeTransaction({"NEW"} /* read_set */, {"KEY"} /* write_set */);
+  auto txn = MakeTransaction({{"NEW"}, {"KEY", KeyType::WRITE}});
   // Send to partition 0 of replica 0
   test_slogs[3]->SendTxn(txn);
 
@@ -153,17 +150,15 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
   // The txn should be forwarded to the scheduler of the same machine
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-  const auto& master_metadata = forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2U, master_metadata.size());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, master_metadata.at("NEW").master());
-  ASSERT_EQ(0U, master_metadata.at("NEW").counter());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, master_metadata.at("KEY").master());
-  ASSERT_EQ(0U, master_metadata.at("KEY").counter());
+  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, forwarded_txn->keys().at("NEW").metadata().master());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("NEW").metadata().counter());
+  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, forwarded_txn->keys().at("KEY").metadata().master());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("KEY").metadata().counter());
 }
 
 TEST_F(ForwarderTest, ForwardMultiHome) {
   // This txn involves data mastered by two regions
-  auto txn = MakeTransaction({"A"} /* read_set */, {"C"} /* write_set */);
+  auto txn = MakeTransaction({{"A"}, {"C", KeyType::WRITE}});
   auto leader = configs[0]->leader_partition_for_multi_home_ordering();
   auto non_leader = (1 + leader) % configs[0]->num_partitions();
 
@@ -174,10 +169,9 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
   // The txn should be forwarded to the multihome orderer module of the leader
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, forwarded_txn->internal().type());
-  const auto& master_metadata = forwarded_txn->internal().master_metadata();
-  ASSERT_EQ(2U, master_metadata.size());
-  ASSERT_EQ(0U, master_metadata.at("A").master());
-  ASSERT_EQ(0U, master_metadata.at("A").counter());
-  ASSERT_EQ(1U, master_metadata.at("C").master());
-  ASSERT_EQ(1U, master_metadata.at("C").counter());
+  ASSERT_EQ(-1, forwarded_txn->internal().home());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
+  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
+  ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().master());
+  ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().counter());
 }

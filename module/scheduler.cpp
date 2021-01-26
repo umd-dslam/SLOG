@@ -106,7 +106,7 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   auto& txn_holder = GetTxnHolder(txn_id);
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder.txn());
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
@@ -116,9 +116,9 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   auto txn = txn_holder.txn();
   // If a remaster transaction, trigger any unblocked txns
-  if (txn->procedure_case() == Transaction::ProcedureCase::kRemaster && txn->status() == TransactionStatus::COMMITTED) {
-    auto& key = txn->write_set().begin()->first;
-    auto counter = txn->internal().master_metadata().at(key).counter() + 1;
+  if (txn.procedure_case() == Transaction::ProcedureCase::kRemaster && txn.status() == TransactionStatus::COMMITTED) {
+    auto& key = txn.keys().begin()->first;
+    auto counter = txn.keys().begin()->second.metadata().counter() + 1;
     ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
   }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
@@ -139,11 +139,25 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
 /***********************************************
               Transaction Processing
 ***********************************************/
-
 void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
   auto txn_id = txn->internal().id();
   auto ins = active_txns_.try_emplace(txn_id, config_, txn);
+
+  if (ins.second) {
+    TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
+
+    VLOG(2) << "Accepted " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
+            << txn->internal().home() << ")";
+  } else {
+    if (!ins.first->second.AddLockOnlyTxn(txn)) {
+      LOG(ERROR) << "Already received txn: (" << txn_id << ", " << txn->internal().home() << ")";
+      return;
+    }
+
+    VLOG(2) << "Added " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
+            << txn->internal().home() << ")";
+  }
 
   if (ins.first->second.is_aborting()) {
     if (ins.first->second.is_ready_for_gc()) {
@@ -152,46 +166,26 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
     return;
   }
 
-  const LockOnlyTxn* lo_txn = nullptr;
-  if (ins.second) {
-    TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
-
-    lo_txn = ins.first->second.any_lock_only_txn();
-
-    VLOG(2) << "Accepted " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
-            << lo_txn->master << ")";
-  } else {
-    lo_txn = ins.first->second.AddLockOnlyTxn(txn);
-
-    VLOG(2) << "Added " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
-            << lo_txn->master << ")";
-  }
-
-  if (lo_txn == nullptr) {
-    LOG(ERROR) << "Already received txn: (" << txn_id << ", " << TxnHolder::replica_id(txn) << ")";
-    return;
-  }
-
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  SendToRemasterManager(*lo_txn);
+  SendToRemasterManager(*txn);
 #else
-  SendToLockManager(*lo_txn);
+  SendToLockManager(*txn);
 #endif
 }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-void Scheduler::SendToRemasterManager(const LockOnlyTxn& lo_txn) {
-  switch (remaster_manager_.VerifyMaster(lo_txn)) {
+void Scheduler::SendToRemasterManager(const Transaction& txn) {
+  switch (remaster_manager_.VerifyMaster(txn)) {
     case VerifyMasterResult::VALID: {
-      SendToLockManager(lo_txn);
+      SendToLockManager(txn);
       break;
     }
     case VerifyMasterResult::ABORT: {
-      TriggerPreDispatchAbort(lo_txn.holder.id());
+      TriggerPreDispatchAbort(txn.internal().id());
       break;
     }
     case VerifyMasterResult::WAITING: {
-      VLOG(4) << "Txn waiting on remaster: " << lo_txn.holder.id();
+      VLOG(4) << "Txn waiting on remaster: " << txn.internal().id();
       // Do nothing
       break;
     }
@@ -209,7 +203,7 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
   // TODO: remove this set and check
   unordered_set<TxnId> aborting_txn_ids;
   for (auto unblocked_lo : result.should_abort) {
-    aborting_txn_ids.insert(unblocked_lo->holder.id());
+    aborting_txn_ids.insert(unblocked_lo->internal().id());
   }
   CHECK_EQ(result.should_abort.size(), aborting_txn_ids.size()) << "Duplicate transactions returned for abort";
   for (auto txn_id : aborting_txn_ids) {
@@ -219,12 +213,12 @@ void Scheduler::ProcessRemasterResult(RemasterOccurredResult result) {
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
-void Scheduler::SendToLockManager(const LockOnlyTxn& lo_txn) {
-  auto txn_id = lo_txn.holder.id();
+void Scheduler::SendToLockManager(const Transaction& txn) {
+  auto txn_id = txn.internal().id();
 
   VLOG(2) << "Trying to acquires locks of txn " << txn_id;
 
-  switch (lock_manager_.AcquireLocks(lo_txn)) {
+  switch (lock_manager_.AcquireLocks(txn)) {
     case AcquireLocksResult::ACQUIRED:
       Dispatch(txn_id);
       break;
@@ -247,7 +241,7 @@ void Scheduler::SendToLockManager(const LockOnlyTxn& lo_txn) {
 void Scheduler::Dispatch(TxnId txn_id) {
   auto& txn_holder = GetTxnHolder(txn_id);
 
-  TRACE(txn_holder.txn()->mutable_internal(), TransactionEvent::DISPATCHED);
+  TRACE(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED);
 
   zmq::message_t msg(sizeof(TxnHolder*));
   *msg.data<TxnHolder*>() = &txn_holder;
@@ -275,6 +269,8 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 
   txn_holder.SetAborting();
 
+  auto& txn = txn_holder.txn();
+
   // Release txn from remaster manager and lock manager.
   //
   // If the abort was triggered by a remote partition,
@@ -283,18 +279,18 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   //
   // This also releases any lock-only transactions.
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  ProcessRemasterResult(remaster_manager_.ReleaseTransaction(txn_holder));
+  ProcessRemasterResult(remaster_manager_.ReleaseTransaction(txn));
 #endif
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
 
   // Let a worker handle notifying other partitions and send back to the server.
-  txn_holder.txn()->set_status(TransactionStatus::ABORTED);
+  txn.set_status(TransactionStatus::ABORTED);
   Dispatch(txn_id);
 
   if (txn_holder.is_ready_for_gc()) {

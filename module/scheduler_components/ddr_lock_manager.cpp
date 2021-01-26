@@ -26,33 +26,36 @@ vector<TxnId> LockQueueTail::AcquireWriteLock(TxnId txn_id) {
   return deps;
 }
 
-AcquireLocksResult DDRLockManager::AcquireLocks(const LockOnlyTxn& lo_txn) {
-  auto txn = lo_txn.holder.txn();
-  auto txn_id = lo_txn.holder.id();
+AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
+  auto txn_id = txn.internal().id();
+  auto home = txn.internal().home();
+  auto is_remaster = txn.procedure_case() == Transaction::kRemaster;
 
   // A remaster txn only has one key K but it acquires locks on (K, RO) and (K, RN)
   // where RO and RN are the old and new region respectively.
-  auto num_required_locks =
-      txn->procedure_case() == Transaction::kRemaster ? 2 : lo_txn.holder.keys_in_partition().size();
+  auto num_required_locks = is_remaster ? 2 : txn.keys_size();
   auto ins = txn_info_.try_emplace(txn_id, num_required_locks);
 
-  auto& txn_info = ins.first->second;
-  txn_info.unarrived_lock_requests -= lo_txn.keys.size();
-
+  int num_relevant_locks = 0;
   vector<TxnId> blocking_txns;
-  for (auto& key_info : lo_txn.keys) {
-    auto key_replica = MakeKeyReplica(key_info.key, lo_txn.master);
+  for (const auto& kv : txn.keys()) {
+    if (!is_remaster && static_cast<int>(kv.second.metadata().master()) != home) {
+      continue;
+    }
+    ++num_relevant_locks;
+
+    auto key_replica = MakeKeyReplica(kv.first, home);
     auto& lock_queue_tail = lock_table_[key_replica];
 
-    switch (key_info.mode) {
-      case LockMode::READ: {
+    switch (kv.second.type()) {
+      case KeyType::READ: {
         auto b_txn = lock_queue_tail.AcquireReadLock(txn_id);
         if (b_txn.has_value()) {
           blocking_txns.push_back(b_txn.value());
         }
         break;
       }
-      case LockMode::WRITE: {
+      case KeyType::WRITE: {
         auto b_txns = lock_queue_tail.AcquireWriteLock(txn_id);
         blocking_txns.insert(blocking_txns.begin(), b_txns.begin(), b_txns.end());
         break;
@@ -66,6 +69,9 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const LockOnlyTxn& lo_txn) {
   // so there is no need to erase the extra values at the tail
   std::sort(blocking_txns.begin(), blocking_txns.end());
   auto last = std::unique(blocking_txns.begin(), blocking_txns.end());
+
+  auto& txn_info = ins.first->second;
+  txn_info.unarrived_lock_requests -= num_relevant_locks;
 
   // Add current txn to the waited_by list of each blocking txn
   for (auto b_txn = blocking_txns.begin(); b_txn != last; b_txn++) {
@@ -93,9 +99,9 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const LockOnlyTxn& lo_txn) {
   return AcquireLocksResult::WAITING;
 }
 
-vector<TxnId> DDRLockManager::ReleaseLocks(const TxnHolder& txn_holder) {
+vector<TxnId> DDRLockManager::ReleaseLocks(const Transaction& txn) {
   vector<TxnId> result;
-  auto txn_id = txn_holder.id();
+  auto txn_id = txn.internal().id();
   auto txn_info_it = txn_info_.find(txn_id);
   if (txn_info_it == txn_info_.end()) {
     return result;

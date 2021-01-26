@@ -26,9 +26,9 @@ class PerKeyRemasterManagerTest : public ::testing::Test {
 
 TEST_F(PerKeyRemasterManagerTest, CheckCounters) {
   storage->Write("A", Record("valueA", 0, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 0, 1}}, {});
-  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"A", 0, 2}}, {});
-  auto txn3 = MakeTestTxnHolder(configs[0], 300, {{"A", 0, 0}}, {});
+  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, {{0, 1}}}});
+  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"A", KeyType::READ, {{0, 2}}}});
+  auto txn3 = MakeTestTxnHolder(configs[0], 300, {{"A", KeyType::READ, {{0, 0}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(0)), VerifyMasterResult::VALID);
   ASSERT_EQ(remaster_manager->VerifyMaster(txn2.lock_only_txn(0)), VerifyMasterResult::WAITING);
@@ -39,9 +39,15 @@ TEST_F(PerKeyRemasterManagerTest, CheckMultipleCounters) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
   storage->Write("C", Record("valueC", 0, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 0, 1}, {"C", 0, 1}}, {{"B", 0, 1}});
-  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"A", 0, 1}, {"C", 0, 2}}, {{"B", 0, 1}});
-  auto txn3 = MakeTestTxnHolder(configs[0], 300, {{"A", 0, 1}, {"C", 0, 2}}, {{"B", 0, 0}});
+  auto txn1 = MakeTestTxnHolder(
+      configs[0], 100,
+      {{"A", KeyType::READ, {{0, 1}}}, {"C", KeyType::READ, {{0, 1}}}, {"B", KeyType::WRITE, {{0, 1}}}});
+  auto txn2 = MakeTestTxnHolder(
+      configs[0], 200,
+      {{"A", KeyType::READ, {{0, 1}}}, {"C", KeyType::READ, {{0, 2}}}, {"B", KeyType::WRITE, {{0, 1}}}});
+  auto txn3 = MakeTestTxnHolder(
+      configs[0], 300,
+      {{"A", KeyType::READ, {{0, 1}}}, {"C", KeyType::READ, {{0, 2}}}, {"B", KeyType::WRITE, {{0, 0}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(0)), VerifyMasterResult::VALID);
   ASSERT_EQ(remaster_manager->VerifyMaster(txn2.lock_only_txn(0)), VerifyMasterResult::WAITING);
@@ -51,9 +57,9 @@ TEST_F(PerKeyRemasterManagerTest, CheckMultipleCounters) {
 TEST_F(PerKeyRemasterManagerTest, CheckIndirectBlocking) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 0, 1}}, {{"B", 0, 2}});
-  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"A", 0, 1}}, {});
-  auto txn3 = MakeTestTxnHolder(configs[0], 300, {{"B", 0, 1}}, {});
+  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, {{0, 1}}}, {"B", KeyType::WRITE, {{0, 2}}}});
+  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"A", KeyType::READ, {{0, 1}}}});
+  auto txn3 = MakeTestTxnHolder(configs[0], 300, {{"B", KeyType::READ, {{0, 1}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(0)), VerifyMasterResult::WAITING);
   ASSERT_EQ(remaster_manager->VerifyMaster(txn2.lock_only_txn(0)), VerifyMasterResult::WAITING);
@@ -62,7 +68,7 @@ TEST_F(PerKeyRemasterManagerTest, CheckIndirectBlocking) {
 
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueSingleKey) {
   storage->Write("A", Record("valueA", 0, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 1, 2}}, {});
+  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, {{1, 2}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(1)), VerifyMasterResult::WAITING);
   storage->Write("A", Record("valueA", 1, 2));
@@ -73,7 +79,7 @@ TEST_F(PerKeyRemasterManagerTest, RemasterQueueSingleKey) {
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleKeys) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 1, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 1, 2}}, {{"B", 1, 3}});
+  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, {{1, 2}}}, {"B", KeyType::WRITE, {{1, 3}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(1)), VerifyMasterResult::WAITING);
   storage->Write("B", Record("valueB", 0, 2));
@@ -87,8 +93,8 @@ TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleKeys) {
 TEST_F(PerKeyRemasterManagerTest, RemasterQueueMultipleTxns) {
   storage->Write("A", Record("valueA", 0, 1));
   storage->Write("B", Record("valueB", 0, 1));
-  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", 1, 2}}, {{"B", 1, 2}});
-  auto txn2 = MakeTestTxnHolder(configs[0], 200, {}, {{"B", 1, 2}});
+  auto txn1 = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, {{1, 2}}}, {"B", KeyType::WRITE, {{1, 2}}}});
+  auto txn2 = MakeTestTxnHolder(configs[0], 200, {{"B", KeyType::WRITE, {{1, 2}}}});
 
   ASSERT_EQ(remaster_manager->VerifyMaster(txn1.lock_only_txn(1)), VerifyMasterResult::WAITING);
   ASSERT_EQ(remaster_manager->VerifyMaster(txn2.lock_only_txn(1)), VerifyMasterResult::WAITING);

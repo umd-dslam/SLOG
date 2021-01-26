@@ -72,13 +72,16 @@ class SchedulerTest : public ::testing::Test {
     }
   }
 
-  void SendTransaction(Transaction* txn, const vector<size_t>& partitions) {
-    internal::Envelope env;
-    env.mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
-    for (auto partition : partitions) {
+  void SendTransaction(Transaction* txn) {
+    CHECK(txn != nullptr);
+    for (auto p : txn->internal().involved_partitions()) {
+      auto new_txn = GeneratePartitionedTxn(test_slogs[0]->config(), *txn, p);
+      CHECK(new_txn != nullptr);
+      internal::Envelope env;
+      env.mutable_request()->mutable_forward_txn()->set_allocated_txn(new_txn);
       // This message is sent from machine 0:0, so it will be queued up in queue 0.
-      // 'partition' just happens to be the same as machine id here.
-      sender[0]->Send(env, partition, kSchedulerChannel);
+      // 'p' just happens to be the same as machine id here.
+      sender[0]->Send(env, p, kSchedulerChannel);
     }
   }
 
@@ -111,93 +114,117 @@ class SchedulerTest : public ::testing::Test {
 };
 
 TEST_F(SchedulerTest, SinglePartitionTransaction) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}}, {{"D", 0, 1}},
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{0, 1}}}, {"D", KeyType::WRITE, {{0, 1}}}},
                                  "GET A     \n"
                                  "SET D newD\n",
                                  MakeMachineId(0, 1));
 
-  SendTransaction(txn, {0});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
-  ASSERT_EQ(output_txn.write_set_size(), 1);
-  ASSERT_EQ(output_txn.write_set().at("D"), "newD");
+  ASSERT_EQ(output_txn.keys_size(), 2);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
+  ASSERT_EQ(output_txn.keys().at("D").new_value(), "newD");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}}, {{"C", 0, 1}}, "COPY A C");
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{0, 1}}}, {"C", KeyType::WRITE, {{0, 1}}}}, "COPY A C");
 
-  SendTransaction(txn, {0, 1});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
-  ASSERT_EQ(output_txn.write_set_size(), 1);
-  ASSERT_EQ(output_txn.write_set().at("C"), "valueA");
+  ASSERT_EQ(output_txn.keys_size(), 2);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
+  ASSERT_EQ(output_txn.keys().at("C").new_value(), "valueA");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"B", 0, 1}, {"C", 0, 1}}, {{"B", 0, 1}, {"C", 0, 1}},
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"B", KeyType::WRITE, {{0, 1}}}, {"C", KeyType::WRITE, {{0, 1}}}},
                                  "COPY C B\n"
                                  "COPY B C\n");
 
-  SendTransaction(txn, {1, 2});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 2);
-  ASSERT_EQ(output_txn.read_set().at("B"), "valueB");
-  ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
-  ASSERT_EQ(output_txn.write_set_size(), 2);
-  ASSERT_EQ(output_txn.write_set().at("B"), "valueC");
-  ASSERT_EQ(output_txn.write_set().at("C"), "valueB");
+  ASSERT_EQ(output_txn.keys_size(), 2);
+  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
+  ASSERT_EQ(output_txn.keys().at("B").new_value(), "valueC");
+  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
+  ASSERT_EQ(output_txn.keys().at("C").new_value(), "valueB");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {}, {{"A", 0, 1}, {"B", 0, 1}, {"C", 0, 1}},
-                                 "SET A newA\n"
-                                 "SET B newB\n"
-                                 "SET C newC\n");
+  auto txn = MakeTestTransaction(
+      test_slogs[0]->config(), 1000,
+      {{"A", KeyType::WRITE, {{0, 1}}}, {"B", KeyType::WRITE, {{0, 1}}}, {"C", KeyType::WRITE, {{0, 1}}}},
+      "SET A newA\n"
+      "SET B newB\n"
+      "SET C newC\n");
 
-  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 0);
-  ASSERT_EQ(output_txn.write_set_size(), 3);
-  ASSERT_EQ(output_txn.write_set().at("A"), "newA");
-  ASSERT_EQ(output_txn.write_set().at("B"), "newB");
-  ASSERT_EQ(output_txn.write_set().at("C"), "newC");
+  ASSERT_EQ(output_txn.keys_size(), 3);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(output_txn.keys().at("A").new_value(), "newA");
+  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
+  ASSERT_EQ(output_txn.keys().at("B").new_value(), "newB");
+  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
+  ASSERT_EQ(output_txn.keys().at("C").new_value(), "newC");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"D", 0, 1}, {"E", 0, 1}, {"F", 0, 1}}, {},
-                                 "GET D\n"
-                                 "GET E\n"
-                                 "GET F\n");
+  auto txn = MakeTestTransaction(
+      test_slogs[0]->config(), 1000,
+      {{"D", KeyType::READ, {{0, 1}}}, {"E", KeyType::READ, {{0, 1}}}, {"F", KeyType::READ, {{0, 1}}}},
+      "GET D\n"
+      "GET E\n"
+      "GET F\n");
 
-  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 3);
-  ASSERT_EQ(output_txn.read_set().at("D"), "valueD");
-  ASSERT_EQ(output_txn.read_set().at("E"), "valueE");
-  ASSERT_EQ(output_txn.read_set().at("F"), "valueF");
-  ASSERT_EQ(output_txn.write_set_size(), 0);
+  ASSERT_EQ(output_txn.keys_size(), 3);
+  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
+  ASSERT_EQ(output_txn.keys().at("E").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("E").value(), "valueE");
+  ASSERT_EQ(output_txn.keys().at("F").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("F").value(), "valueF");
 }
 
 TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}, {"X", 1, 1}, {"C", 0, 1}},
-                                 {{"B", 0, 1}, {"Y", 1, 1}, {"Z", 1, 1}},
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{0, 1}}},
+                                  {"X", KeyType::READ, {{1, 1}}},
+                                  {"C", KeyType::READ, {{0, 1}}},
+                                  {"B", KeyType::WRITE, {{0, 1}}},
+                                  {"Y", KeyType::WRITE, {{1, 1}}},
+                                  {"Z", KeyType::WRITE, {{1, 1}}}},
                                  "GET A\n"
                                  "GET X\n"
                                  "GET C\n"
@@ -205,52 +232,64 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
                                  "SET Y newY\n"
                                  "SET Z newZ\n");
 
-  auto lo_txn_0 = GenerateLockOnlyTxn(*txn, 0);
-  auto lo_txn_1 = GenerateLockOnlyTxn(*txn, 1);
+  auto lo_txn_0 = GenerateLockOnlyTxn(txn, 0);
+  auto lo_txn_1 = GenerateLockOnlyTxn(txn, 1);
 
   delete txn;
 
-  SendTransaction(lo_txn_0, {0, 1, 2});
-  SendTransaction(lo_txn_1, {0, 1, 2});
+  SendTransaction(lo_txn_0);
+  SendTransaction(lo_txn_1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 3);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 3);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
-  ASSERT_EQ(output_txn.read_set().at("X"), "valueX");
-  ASSERT_EQ(output_txn.read_set().at("C"), "valueC");
-  ASSERT_EQ(output_txn.write_set_size(), 3);
-  ASSERT_EQ(output_txn.write_set().at("B"), "newB");
-  ASSERT_EQ(output_txn.write_set().at("Y"), "newY");
-  ASSERT_EQ(output_txn.write_set().at("Z"), "newZ");
+  ASSERT_EQ(output_txn.keys_size(), 6);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(output_txn.keys().at("X").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("X").value(), "valueX");
+  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
+  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
+  ASSERT_EQ(output_txn.keys().at("B").new_value(), "newB");
+  ASSERT_EQ(output_txn.keys().at("Y").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("Y").value(), "valueY");
+  ASSERT_EQ(output_txn.keys().at("Y").new_value(), "newY");
+  ASSERT_EQ(output_txn.keys().at("Z").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("Z").value(), "valueZ");
+  ASSERT_EQ(output_txn.keys().at("Z").new_value(), "newZ");
 }
 
 TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}}, {{"D", 0, 1}},
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{0, 1}}}, {"D", KeyType::WRITE, {{0, 1}}}},
                                  "GET A     \n"
                                  "SET D newD\n",
                                  MakeMachineId(0, 1));
 
-  SendTransaction(txn, {0});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
-  ASSERT_EQ(output_txn.write_set_size(), 1);
-  ASSERT_EQ(output_txn.write_set().at("D"), "newD");
+  ASSERT_EQ(output_txn.keys_size(), 2);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::WRITE);
+  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
+  ASSERT_EQ(output_txn.keys().at("D").new_value(), "newD");
 }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 1, 2}}, {}, "GET A", MakeMachineId(0, 0));
-  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 2000, {}, {{"A", 0, 1}}, 1, /* remaster */
-                                          MakeMachineId(0, 1));
+  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 2000, {{"A", KeyType::WRITE, {{0, 1}}}},
+                                          1 /* remaster */, MakeMachineId(0, 1));
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", KeyType::READ, {{1, 2}}}}, "GET A",
+                                 MakeMachineId(0, 0));
 
-  SendTransaction(txn, {0});
-  SendTransaction(remaster_txn, {0});
+  SendTransaction(txn);
+  SendTransaction(remaster_txn);
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
@@ -262,26 +301,28 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.internal().id(), 1000);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+  ASSERT_EQ(output_txn.keys_size(), 1);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
 }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
-  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {}, {{"A", 0, 0}}, 1, /* new master */
+  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", KeyType::WRITE, 0}}, 1, /* new master */
                                           MakeMachineId(0, 1));
 
-  auto remaster_txn_lo_0 = GenerateLockOnlyTxn(*remaster_txn, 0);
-  auto remaster_txn_lo_1 = GenerateLockOnlyTxn(*remaster_txn, 1);
+  auto remaster_txn_lo_0 = GenerateLockOnlyTxn(remaster_txn, 0);
+  auto remaster_txn_lo_1 = GenerateLockOnlyTxn(remaster_txn, 1);
 
   delete remaster_txn;
 
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 2000, {{"A", 1, 0}}, {}, "GET A", MakeMachineId(0, 0));
+  auto txn =
+      MakeTestTransaction(test_slogs[0]->config(), 2000, {{"A", KeyType::READ, 1}}, "GET A", MakeMachineId(0, 0));
 
-  SendTransaction(remaster_txn_lo_1, {0});
-  SendTransaction(remaster_txn_lo_0, {0});
-  SendTransaction(txn, {0});
+  SendTransaction(remaster_txn_lo_1);
+  SendTransaction(remaster_txn_lo_0);
+  SendTransaction(txn);
 
   auto output_remaster_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_remaster_txn;
@@ -292,15 +333,17 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.internal().id(), 2000U);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
-  ASSERT_EQ(output_txn.read_set_size(), 1);
-  ASSERT_EQ(output_txn.read_set().at("A"), "valueA");
+  ASSERT_EQ(output_txn.keys_size(), 1);
+  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
+  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
 }
 #endif /* REMASTERING_PROTOCOL_COUNTERLESS */
 
 TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 1, 0}}, {}, "GET A", MakeMachineId(0, 1));
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", KeyType::READ, {{1, 0}}}}, "GET A",
+                                 MakeMachineId(0, 1));
 
-  SendTransaction(txn, {0});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(1, 1);
   LOG(INFO) << output_txn;
@@ -308,15 +351,17 @@ TEST_F(SchedulerTest, AbortSingleHomeSinglePartition) {
 }
 
 TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}, {"D", 1, 0}}, {{"Y", 1, 1}});
+  auto txn = MakeTestTransaction(
+      test_slogs[0]->config(), 1000,
+      {{"A", KeyType::READ, {{0, 1}}}, {"D", KeyType::READ, {{1, 0}}}, {"Y", KeyType::WRITE, {{1, 1}}}});
 
-  auto lo_txn_0 = GenerateLockOnlyTxn(*txn, 0);
-  auto lo_txn_1 = GenerateLockOnlyTxn(*txn, 1);
+  auto lo_txn_0 = GenerateLockOnlyTxn(txn, 0);
+  auto lo_txn_1 = GenerateLockOnlyTxn(txn, 1);
 
   delete txn;
 
-  SendTransaction(lo_txn_0, {0});
-  SendTransaction(lo_txn_1, {0});
+  SendTransaction(lo_txn_0);
+  SendTransaction(lo_txn_1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 1);
   LOG(INFO) << output_txn;
@@ -324,12 +369,13 @@ TEST_F(SchedulerTest, AbortMultiHomeSinglePartition) {
 }
 
 TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 1, 0}}, {{"X", 1, 1}},
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{1, 0}}}, {"X", KeyType::WRITE, {{1, 1}}}},
                                  "GET A     \n"
                                  "SET X newC    \n",
                                  MakeMachineId(0, 1));
 
-  SendTransaction(txn, {0, 1});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(1, 2);
   LOG(INFO) << output_txn;
@@ -337,13 +383,15 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition) {
 }
 
 TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
-  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"Y", 1, 1}}, {{"C", 1, 0}, {"B", 1, 0}},
-                                 "GET Y     \n"
-                                 "SET C newC    \n"
-                                 "SET B newB    \n",
-                                 MakeMachineId(0, 1));
+  auto txn = MakeTestTransaction(
+      test_slogs[0]->config(), 1000,
+      {{"Y", KeyType::READ, {{1, 1}}}, {"C", KeyType::WRITE, {{1, 0}}}, {"B", KeyType::WRITE, {{1, 0}}}},
+      "GET Y     \n"
+      "SET C newC    \n"
+      "SET B newB    \n",
+      MakeMachineId(0, 1));
 
-  SendTransaction(txn, {0, 1, 2});
+  SendTransaction(txn);
 
   auto output_txn = ReceiveMultipleAndMerge(1, 3);
   LOG(INFO) << output_txn;
@@ -351,16 +399,21 @@ TEST_F(SchedulerTest, AbortSingleHomeMultiPartition2Active) {
 }
 
 TEST_F(SchedulerTest, AbortMultiHomeMultiPartition2Active) {
-  auto txn =
-      MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", 0, 1}, {"D", 1, 0}}, {{"Y", 1, 1}, {"X", 0, 0}}, "");
+  // D and X have outdated master information
+  auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000,
+                                 {{"A", KeyType::READ, {{0, 1}}},
+                                  {"D", KeyType::READ, {{1, 0}}},
+                                  {"Y", KeyType::WRITE, {{1, 1}}},
+                                  {"X", KeyType::WRITE, {{0, 0}}}},
+                                 "");
 
-  auto lo_txn_0 = GenerateLockOnlyTxn(*txn, 0);
-  auto lo_txn_1 = GenerateLockOnlyTxn(*txn, 1);
+  auto lo_txn_0 = GenerateLockOnlyTxn(txn, 0);
+  auto lo_txn_1 = GenerateLockOnlyTxn(txn, 1);
 
   delete txn;
 
-  SendTransaction(lo_txn_0, {0, 1});
-  SendTransaction(lo_txn_1, {0});
+  SendTransaction(lo_txn_0);
+  SendTransaction(lo_txn_1);
 
   auto output_txn = ReceiveMultipleAndMerge(0, 2);
   LOG(INFO) << output_txn;

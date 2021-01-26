@@ -21,9 +21,9 @@ class PerKeyRemasterManager : public RemasterManager {
   PerKeyRemasterManager() = default;
   PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
-  VerifyMasterResult VerifyMaster(const LockOnlyTxn& lo_txn) final;
+  VerifyMasterResult VerifyMaster(const Transaction& txn) final;
   RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) final;
-  RemasterOccurredResult ReleaseTransaction(const TxnHolder& txn_holder) final;
+  RemasterOccurredResult ReleaseTransaction(const Transaction& txn) final;
 
   void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) { storage_ = storage; }
 
@@ -33,12 +33,7 @@ class PerKeyRemasterManager : public RemasterManager {
    * unblock txns starting from the front of the queue, and stop when they reach a
    * larger counter.
    */
-  void InsertIntoBlockedQueue(const Key& key, uint32_t counter, const LockOnlyTxn& lo_txn);
-
-  /**
-   * Release a lock only txn
-   */
-  void ReleaseTransaction(const LockOnlyTxn& lo_txn, RemasterOccurredResult& result);
+  void InsertIntoBlockedQueue(const Key& key, uint32_t counter, const Transaction& txn);
 
   /**
    * Test if the head of this queue can be unblocked
@@ -50,7 +45,7 @@ class PerKeyRemasterManager : public RemasterManager {
 
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
-  unordered_map<Key, list<pair<const LockOnlyTxn*, uint32_t>>> blocked_queue_;
+  unordered_map<Key, list<pair<const Transaction*, uint32_t>>> blocked_queue_;
 };
 
 }  // namespace slog

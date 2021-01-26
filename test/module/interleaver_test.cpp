@@ -165,8 +165,8 @@ internal::Batch* MakeBatch(BatchId batch_id, const vector<Transaction*>& txns, T
 }
 
 TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
-  auto expected_txn_1 = MakeTransaction({"A"}, {"B"});
-  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"});
+  auto expected_txn_1 = MakeTransaction({{"A"}, {"B", KeyType::WRITE}});
+  auto expected_txn_2 = MakeTransaction({{"X"}, {"Y", KeyType::WRITE}});
   auto batch = MakeBatch(100, {expected_txn_1, expected_txn_2}, SINGLE_HOME);
 
   // Replicate batch data to all machines
@@ -205,8 +205,8 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
 }
 
 TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
-  auto expected_txn_1 = MakeTransaction({"A"}, {"B"});
-  auto expected_txn_2 = MakeTransaction({"X"}, {"Y"});
+  auto expected_txn_1 = MakeTransaction({{"A"}, {"B", KeyType::WRITE}});
+  auto expected_txn_2 = MakeTransaction({{"X"}, {"Y", KeyType::WRITE}});
   auto batch = MakeBatch(100, {expected_txn_1, expected_txn_2}, SINGLE_HOME);
 
   // Then send local ordering
@@ -245,10 +245,10 @@ TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
 }
 
 TEST_F(InterleaverTest, TwoBatches) {
-  auto sh_txn_1 = MakeTransaction({"A"}, {"B"});
+  auto sh_txn_1 = MakeTransaction({{"A"}, {"B", KeyType::WRITE}});
   auto sh_batch_1 = MakeBatch(100, {sh_txn_1}, SINGLE_HOME);
 
-  auto sh_txn_2 = MakeTransaction({"M"}, {"N"});
+  auto sh_txn_2 = MakeTransaction({{"M"}, {"N", KeyType::WRITE}});
   auto sh_batch_2 = MakeBatch(200, {sh_txn_2}, SINGLE_HOME);
 
   // Replicate batch data to all machines

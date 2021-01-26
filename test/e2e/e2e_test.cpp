@@ -70,70 +70,72 @@ class E2ETest : public ::testing::Test {
 
 // This test submits multiple transactions to the system serially and checks the
 // read values for correctness.
-// TODO: submit transactions concurrently (multiple outcomes would be valid)
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
-  auto txn1 = MakeTransaction({},    /* read_set */
-                              {"A"}, /* write_set */
-                              "SET A newA\n" /* code */);
-  auto txn2 = MakeTransaction({"A"} /* read_set */, {} /* write_set */);
+  auto txn1 = MakeTransaction({{"A", KeyType::WRITE}}, "SET A newA");
+  auto txn2 = MakeTransaction({{"A", KeyType::READ}}, "GET A");
 
   test_slogs[0]->SendTxn(txn1);
   auto txn1_resp = test_slogs[0]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn1_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn1_resp.internal().type());
+  ASSERT_EQ(txn1_resp.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn1_resp.internal().type(), TransactionType::SINGLE_HOME);
+  ASSERT_EQ(txn1_resp.keys_size(), 1);
+  ASSERT_EQ(txn1_resp.keys().at("A").value(), "valA");
+  ASSERT_EQ(txn1_resp.keys().at("A").new_value(), "newA");
 
   test_slogs[0]->SendTxn(txn2);
   auto txn2_resp = test_slogs[0]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn2_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn2_resp.internal().type());
-  ASSERT_EQ("newA", txn2_resp.read_set().at("A"));
+  ASSERT_EQ(txn2_resp.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn2_resp.internal().type(), TransactionType::SINGLE_HOME);
+  ASSERT_EQ(txn2_resp.keys_size(), 1);
+  ASSERT_EQ(txn2_resp.keys().at("A").value(), "newA");;
 }
 
 TEST_F(E2ETest, MultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "B"} /* read_set */, {} /* write_set */);
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"B", KeyType::WRITE}}, "GET A SET B newB");
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+    ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+    ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);
+    ASSERT_EQ(txn_resp.keys().size(), 2);
+    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
+    ASSERT_EQ(txn_resp.keys().at("B").new_value(), "newB");
   }
 }
 
 TEST_F(E2ETest, MultiHomeTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "C"} /* read_set */, {} /* write_set */);
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"C", KeyType::WRITE}}, "GET A SET C newC");
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+    ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+    ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(txn_resp.keys().size(), 2);
+    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
+    ASSERT_EQ(txn_resp.keys().at("C").new_value(), "newC");
   }
 }
 
 TEST_F(E2ETest, MultiHomeMultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"X", KeyType::READ}, {"C", KeyType::READ}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+    ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+    ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(txn_resp.keys().size(), 3);
+    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
+    ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
+    ASSERT_EQ(txn_resp.keys().at("C").value(), "valC");
   }
 }
 
 #ifdef ENABLE_REMASTER
 TEST_F(E2ETest, RemasterTxn) {
-  auto remaster_txn = MakeTransaction({},    /* read_set */
-                                      {"A"}, /* write_set */
-                                      1,     /* new master */
-                                      {} /* master metadata */);
+  auto remaster_txn = MakeTransaction({{"A", KeyType::WRITE}}, 1);
 
   test_slogs[1]->SendTxn(remaster_txn);
   auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();
@@ -145,46 +147,43 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ(TransactionType::SINGLE_HOME, remaster_txn_resp.internal().type());
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
-  auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
+  auto txn = MakeTransaction({{"A"}, {"X"}});
 
   // Since replication factor is set to 2 for all tests in this file, it is
   // guaranteed that this txn will see the changes made by the remaster txn
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());  // used to be MH
-  ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-  ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+  ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);  // used to be MH
+  ASSERT_EQ(txn_resp.keys().size(), 2);
+  ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
+  ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
 }
 #endif
 
 TEST_F(E2ETest, AbortTxnBadCommand) {
   // Multi-partition transaction where one of the partition will abort
-  auto aborted_txn = MakeTransaction({"A"},                  /* read_set */
-                                     {"B"},                  /* write_set */
-                                     "SET B notB EQ A notA", /* code */
-                                     {} /* master metadata */);
+  auto aborted_txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}},
+                                     "SET B notB EQ A notA");
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
   ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
 
-  auto txn = MakeTransaction({"B"}, /* read_set */
-                             {},    /* write_set */
-                             "GET B");
+  auto txn = MakeTransaction({{"B"}}, "GET B");
 
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();
-  ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-  ASSERT_EQ(TransactionType::SINGLE_HOME, txn_resp.internal().type());
+  ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+  ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);
   // Value of B must not change because the previous txn was aborted
-  ASSERT_EQ("valB", txn_resp.read_set().at("B"));
+  ASSERT_EQ(txn_resp.keys().at("B").value(), "valB");
 }
 
 TEST_F(E2ETest, AbortTxnEmptyKeySets) {
   // Multi-partition transaction where one of the partition will abort
-  auto aborted_txn = MakeTransaction({}, {});
+  auto aborted_txn = MakeTransaction({});
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
@@ -202,27 +201,29 @@ class E2ETestBypassMHOrderer : public E2ETest {
 
 TEST_F(E2ETestBypassMHOrderer, MultiHomeSinglePartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "C"} /* read_set */, {} /* write_set */);
+    auto txn = MakeTransaction({{"A"}, {"C"}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
     ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valC", txn_resp.read_set().at("C"));
+    ASSERT_EQ("valA", txn_resp.keys().at("A").value());
+    ASSERT_EQ("valC", txn_resp.keys().at("C").value());
   }
 }
 
 TEST_F(E2ETestBypassMHOrderer, MultiHomeMultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({"A", "X"} /* read_set */, {} /* write_set */);
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"X", KeyType::READ}, {"C", KeyType::READ}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
-    ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
-    ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.read_set().at("A"));
-    ASSERT_EQ("valX", txn_resp.read_set().at("X"));
+    ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
+    ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(txn_resp.keys().size(), 3);
+    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
+    ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
+    ASSERT_EQ(txn_resp.keys().at("C").value(), "valC");
   }
 }
 

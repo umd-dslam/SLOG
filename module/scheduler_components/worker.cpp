@@ -52,19 +52,18 @@ void Worker::HandleInternalRequest(EnvelopePtr&& env) {
   VLOG(2) << "Got remote read result for txn " << txn_id;
 
   auto& state = state_it->second;
-  auto txn = state.txn_holder->txn();
+  auto& txn = state.txn_holder->txn();
 
-  if (txn->status() != TransactionStatus::ABORTED) {
+  if (txn.status() != TransactionStatus::ABORTED) {
     if (read_result.will_abort()) {
       // TODO: optimize by returning an aborting transaction to the scheduler immediately.
       // later remote reads will need to be garbage collected.
-      txn->set_status(TransactionStatus::ABORTED);
-      txn->set_abort_reason(read_result.abort_reason());
+      txn.set_status(TransactionStatus::ABORTED);
+      txn.set_abort_reason(read_result.abort_reason());
     } else {
-      // Apply remote reads. After this point, the transaction has all the data it needs to
-      // execute the code.
-      for (const auto& key_value : read_result.reads()) {
-        (*txn->mutable_read_set())[key_value.first] = key_value.second;
+      // Apply remote reads.
+      for (const auto& kv : read_result.reads()) {
+        txn.mutable_keys()->insert(kv);
       }
     }
   }
@@ -91,46 +90,17 @@ bool Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
   }
 
   auto txn_holder = *msg.data<TxnHolder*>();
-  auto txn = txn_holder->txn();
-  auto txn_id = txn->internal().id();
-  auto local_partition = config_->local_partition();
+  auto& txn = txn_holder->txn();
+  auto txn_id = txn.internal().id();
 
-  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_WORKER);
+  TRACE(txn.mutable_internal(), TransactionEvent::ENTER_WORKER);
 
   // Create a state for the new transaction
   auto [iter, ok] = txn_states_.try_emplace(txn_id, txn_holder);
 
   DCHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
-  if (txn->status() == TransactionStatus::ABORTED) {
-    NotifyOtherPartitions(txn_id);
-    iter->second.phase = TransactionState::Phase::FINISH;
-  } else {
-    iter->second.phase = TransactionState::Phase::READ_LOCAL_STORAGE;
-    // Remove keys that will be filled in later by remote partitions.
-    // They are removed at this point so that the next phase will only
-    // read the local keys from local storage.
-    auto itr = txn->mutable_read_set()->begin();
-    while (itr != txn->mutable_read_set()->end()) {
-      const auto& key = itr->first;
-      auto partition = config_->partition_of_key(key);
-      if (partition != local_partition) {
-        itr = txn->mutable_read_set()->erase(itr);
-      } else {
-        itr++;
-      }
-    }
-    itr = txn->mutable_write_set()->begin();
-    while (itr != txn->mutable_write_set()->end()) {
-      const auto& key = itr->first;
-      auto partition = config_->partition_of_key(key);
-      if (partition != local_partition) {
-        itr = txn->mutable_write_set()->erase(itr);
-      } else {
-        itr++;
-      }
-    }
-  }
+  iter->second.phase = TransactionState::Phase::READ_LOCAL_STORAGE;
 
   // Establish a redirection at broker for this txn so that we can receive remote reads
   auto redirect_env = NewEnvelope();
@@ -178,75 +148,59 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
 void Worker::ReadLocalStorage(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
-  auto txn = txn_holder->txn();
+  auto& txn = txn_holder->txn();
 
-  auto will_abort = false;
-
+  if (txn.status() != TransactionStatus::ABORTED) {
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  switch (RemasterManager::CheckCounters(*txn_holder, storage_)) {
-    case VerifyMasterResult::VALID: {
-      break;
+    switch (RemasterManager::CheckCounters(txn, false, storage_)) {
+      case VerifyMasterResult::VALID: {
+        break;
+      }
+      case VerifyMasterResult::ABORT: {
+        txn.set_status(TransactionStatus::ABORTED);
+        txn.set_abort_reason("Outdated counter");
+        break;
+      }
+      case VerifyMasterResult::WAITING: {
+        LOG(FATAL) << "Transaction " << txn_id << " was sent to worker with a high counter";
+        break;
+      }
+      default:
+        LOG(FATAL) << "Unrecognized check counter result";
+        break;
     }
-    case VerifyMasterResult::ABORT: {
-      will_abort = true;
-      break;
-    }
-    case VerifyMasterResult::WAITING: {
-      LOG(ERROR) << "Transaction " << txn_id << " was sent to worker with a high counter";
-      break;
-    }
-    default:
-      LOG(ERROR) << "Unrecognized check counter result";
-      break;
-  }
-#else
-  // Check whether the store master metadata matches with the information
-  // stored in the transaction
-  // TODO: this loop can be merged with the one below to reduce accesses to
-  //       the storage
-  for (auto& key_pair : txn->internal().master_metadata()) {
-    auto& key = key_pair.first;
-    auto txn_master = key_pair.second.master();
+#endif
 
-    Record record;
-    bool found = storage_->Read(key, record);
-    if (found && txn_master != record.metadata.master) {
-      will_abort = true;
-      break;
-    }
-  }
-#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
-
-  if (will_abort) {
-    txn->set_status(TransactionStatus::ABORTED);
-    txn->set_abort_reason("Outdated master information");
-  } else {
-    // If not abort due to remastering, read from local storage
-    for (auto& key_value : *txn->mutable_read_set()) {
+    // We don't need to check if keys are in partition here since the assumption is that
+    // the out-of-partition keys have already been removed
+    for (auto& kv : *(txn.mutable_keys())) {
       Record record;
-      storage_->Read(key_value.first, record);
-      key_value.second = record.value;
-    }
-    for (auto& key_value : *txn->mutable_write_set()) {
-      Record record;
-      storage_->Read(key_value.first, record);
-      key_value.second = record.value;
+      if (storage_->Read(kv.first, record)) {
+        // Check whether the store master metadata matches with the information
+        // stored in the transaction
+        if (kv.second.metadata().master() != record.metadata.master) {
+          txn.set_status(TransactionStatus::ABORTED);
+          txn.set_abort_reason("Outdated master");
+          break;
+        }
+        kv.second.set_value(record.value);
+      } else if (txn.procedure_case() == Transaction::kRemaster) {
+        txn.set_status(TransactionStatus::ABORTED);
+        txn.set_abort_reason("Remaster non-existent key " + kv.first);
+        break;
+      }
     }
   }
 
   NotifyOtherPartitions(txn_id);
 
-  // TODO: if will_abort == true, we can immediate jump to the FINISH phased.
-  //       To do this, we need to removing the CHECK at the start of ProcessRemoteReadResult
-  //       because we no longer require an aborted txn to receive all remote reads
-  //       before moving on.
   // Set the number of remote reads that this partition needs to wait for
   state.remote_reads_waiting_on = 0;
-  const auto& active_partitions = txn_holder->active_partitions();
+  const auto& active_partitions = txn.internal().active_partitions();
   if (std::find(active_partitions.begin(), active_partitions.end(), config_->local_partition()) !=
       active_partitions.end()) {
     // Active partition needs remote reads from all partitions
-    state.remote_reads_waiting_on = txn->internal().involved_partitions_size() - 1;
+    state.remote_reads_waiting_on = txn.internal().involved_partitions_size() - 1;
   }
   if (state.remote_reads_waiting_on == 0) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
@@ -259,19 +213,19 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
 void Worker::Execute(TxnId txn_id) {
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->txn();
+  auto& txn = state.txn_holder->txn();
 
-  switch (txn->procedure_case()) {
-    case Transaction::ProcedureCase::kCode: {
-      if (txn->status() == TransactionStatus::ABORTED) {
+  switch (txn.procedure_case()) {
+    case Transaction::kCode: {
+      if (txn.status() == TransactionStatus::ABORTED) {
         break;
       }
       // Execute the transaction code
-      commands_->Execute(*txn);
+      commands_->Execute(txn);
       break;
     }
-    case Transaction::ProcedureCase::kRemaster:
-      txn->set_status(TransactionStatus::COMMITTED);
+    case Transaction::kRemaster:
+      txn.set_status(TransactionStatus::COMMITTED);
       break;
     default:
       LOG(FATAL) << "Procedure is not set";
@@ -281,30 +235,29 @@ void Worker::Execute(TxnId txn_id) {
 
 void Worker::Commit(TxnId txn_id) {
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->txn();
-  switch (txn->procedure_case()) {
-    case Transaction::ProcedureCase::kCode: {
+  auto& txn = state.txn_holder->txn();
+  switch (txn.procedure_case()) {
+    case Transaction::kCode: {
       // Apply all writes to local storage if the transaction is not aborted
-      if (txn->status() != TransactionStatus::COMMITTED) {
-        VLOG(3) << "Txn " << txn_id << " aborted with reason: " << txn->abort_reason();
+      if (txn.status() != TransactionStatus::COMMITTED) {
+        VLOG(3) << "Txn " << txn_id << " aborted with reason: " << txn.abort_reason();
         break;
       }
-      auto& master_metadata = txn->internal().master_metadata();
-      for (const auto& key_value : txn->write_set()) {
-        const auto& key = key_value.first;
+      for (const auto& kv : txn.keys()) {
+        if (kv.second.type() == KeyType::READ) {
+          continue;
+        }
+        const auto& key = kv.first;
         if (config_->key_is_in_local_partition(key)) {
-          const auto& value = key_value.second;
           Record record;
-          bool found = storage_->Read(key_value.first, record);
-          if (!found) {
-            DCHECK(master_metadata.contains(key)) << "Master metadata for key \"" << key << "\" is missing";
-            record.metadata = master_metadata.at(key);
+          if (!storage_->Read(key, record)) {
+            record.metadata = kv.second.metadata();
           }
-          record.value = value;
+          record.value = kv.second.new_value();
           storage_->Write(key, record);
         }
       }
-      for (const auto& key : txn->delete_set()) {
+      for (const auto& key : txn.deleted_keys()) {
         if (config_->key_is_in_local_partition(key)) {
           storage_->Delete(key);
         }
@@ -312,17 +265,13 @@ void Worker::Commit(TxnId txn_id) {
       VLOG(3) << "Committed txn " << txn_id;
       break;
     }
-    case Transaction::ProcedureCase::kRemaster: {
-      const auto& key = txn->write_set().begin()->first;
+    case Transaction::kRemaster: {
+      auto key_it = txn.keys().begin();
+      const auto& key = key_it->first;
       if (config_->key_is_in_local_partition(key)) {
-        auto txn_key_metadata = txn->internal().master_metadata().at(key);
         Record record;
-        bool found = storage_->Read(key, record);
-        if (!found) {
-          // TODO: handle case where key is deleted
-          LOG(FATAL) << "Remastering key that does not exist: " << key;
-        }
-        record.metadata = Metadata(txn->remaster().new_master(), txn_key_metadata.counter() + 1);
+        storage_->Read(key, record);
+        record.metadata = Metadata(txn.remaster().new_master(), key_it->second.metadata().counter() + 1);
         storage_->Write(key, record);
       }
       break;
@@ -334,7 +283,7 @@ void Worker::Commit(TxnId txn_id) {
 }
 
 void Worker::Finish(TxnId txn_id) {
-  TRACE(TxnState(txn_id).txn_holder->txn()->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  TRACE(TxnState(txn_id).txn_holder->txn().mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // This must happen before the sending to scheduler below. Otherwise,
   // the scheduler may destroy the transaction holder before we can
@@ -361,15 +310,15 @@ void Worker::Finish(TxnId txn_id) {
 void Worker::NotifyOtherPartitions(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn_holder = state.txn_holder;
+  auto& txn = txn_holder->txn();
 
-  if (txn_holder->active_partitions().empty()) {
+  if (txn.internal().active_partitions().empty()) {
     return;
   }
 
-  auto txn = txn_holder->txn();
   auto local_partition = config_->local_partition();
   auto local_replica = config_->local_replica();
-  auto aborted = txn->status() == TransactionStatus::ABORTED;
+  auto aborted = txn.status() == TransactionStatus::ABORTED;
 
   // Send abort result and local reads to all remote active partitions
   Envelope env;
@@ -377,15 +326,15 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   rrr->set_txn_id(txn_id);
   rrr->set_partition(local_partition);
   rrr->set_will_abort(aborted);
-  rrr->set_abort_reason(txn->abort_reason());
+  rrr->set_abort_reason(txn.abort_reason());
   if (!aborted) {
     auto reads_to_be_sent = rrr->mutable_reads();
-    for (auto& key_value : txn->read_set()) {
-      (*reads_to_be_sent)[key_value.first] = key_value.second;
+    for (const auto& kv : txn.keys()) {
+      reads_to_be_sent->insert(kv);
     }
   }
 
-  for (auto p : txn_holder->active_partitions()) {
+  for (auto p : txn.internal().active_partitions()) {
     if (p != local_partition) {
       auto machine_id = config_->MakeMachineId(local_replica, p);
       Send(env, std::move(machine_id), txn_id);
@@ -402,23 +351,23 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
   completed_sub_txn->set_partition(config_->local_partition());
 
-  Transaction* txn = txn_holder->txn();
+  auto& txn = txn_holder->txn();
   if (!config_->return_dummy_txn()) {
-    completed_sub_txn->set_allocated_txn(txn);
+    completed_sub_txn->set_allocated_txn(&txn);
   } else {
     auto dummy_txn = completed_sub_txn->mutable_txn();
-    dummy_txn->set_status(txn->status());
-    dummy_txn->set_abort_reason(txn->abort_reason());
-    dummy_txn->mutable_internal()->set_id(txn->internal().id());
-    dummy_txn->mutable_internal()->set_type(txn->internal().type());
-    dummy_txn->mutable_internal()->set_coordinating_server(txn->internal().coordinating_server());
-    dummy_txn->mutable_internal()->mutable_involved_partitions()->CopyFrom(txn->internal().involved_partitions());
-    dummy_txn->mutable_internal()->mutable_events()->CopyFrom(txn->internal().events());
-    dummy_txn->mutable_internal()->mutable_event_times()->CopyFrom(txn->internal().event_times());
-    dummy_txn->mutable_internal()->mutable_event_machines()->CopyFrom(txn->internal().event_machines());
+    dummy_txn->set_status(txn.status());
+    dummy_txn->set_abort_reason(txn.abort_reason());
+    dummy_txn->mutable_internal()->set_id(txn.internal().id());
+    dummy_txn->mutable_internal()->set_type(txn.internal().type());
+    dummy_txn->mutable_internal()->set_coordinating_server(txn.internal().coordinating_server());
+    dummy_txn->mutable_internal()->mutable_involved_partitions()->CopyFrom(txn.internal().involved_partitions());
+    dummy_txn->mutable_internal()->mutable_events()->CopyFrom(txn.internal().events());
+    dummy_txn->mutable_internal()->mutable_event_times()->CopyFrom(txn.internal().event_times());
+    dummy_txn->mutable_internal()->mutable_event_machines()->CopyFrom(txn.internal().event_machines());
   }
 
-  Send(env, txn->internal().coordinating_server(), kServerChannel);
+  Send(env, txn.internal().coordinating_server(), kServerChannel);
 
   if (!config_->return_dummy_txn()) {
     completed_sub_txn->release_txn();

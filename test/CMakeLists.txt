@@ -31,7 +31,6 @@ endmacro()
 
 add_slog_test(common/message_pool_test.cpp)
 add_slog_test(common/string_utils_test.cpp)
-add_slog_test(common/txn_holder_test.cpp)
 add_slog_test(connection/broker_and_sender_test.cpp)
 add_slog_test(connection/zmq_utils_test.cpp)
 add_slog_test(data_structure/batch_log_test.cpp)

@@ -35,9 +35,7 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
   pro.is_multi_home = false;
   pro.is_multi_partition = false;
 
-  vector<Key> read_set;
-  vector<Key> write_set;
-  unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
+  vector<KeyEntry> keys;
 
   auto home = uniform_int_distribution<>(0, config_->num_replicas() - 1)(rg_);
   auto partition = uniform_int_distribution<>(0, config_->num_partitions() - 1)(rg_);
@@ -45,7 +43,7 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
   auto new_master = (home + 1) % config_->num_replicas();
 
   auto key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
-  write_set.push_back(key);
+  keys.emplace_back(key, KeyType::WRITE);
   TransactionProfile::Record record{
       .partition = static_cast<uint32_t>(partition),
       .home = static_cast<uint32_t>(home),
@@ -55,7 +53,7 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
 
   pro.records.insert({key, record});
 
-  auto txn = MakeTransaction(read_set, write_set, new_master, metadata, 0);
+  auto txn = MakeTransaction(keys, new_master);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 
   client_txn_id_counter_++;

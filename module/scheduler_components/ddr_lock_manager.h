@@ -86,11 +86,11 @@ class DDRLockManager {
    * all locks are acquired, the transaction is queued up to wait
    * for the current holders to release.
    *
-   * @param lo_txn The transaction whose locks are acquired.
+   * @param txn The transaction whose locks are acquired.
    * @return    true if all locks are acquired, false if not and
    *            the transaction is queued up.
    */
-  AcquireLocksResult AcquireLocks(const LockOnlyTxn& lo_txn);
+  AcquireLocksResult AcquireLocks(const Transaction& txn);
 
   /**
    * Releases all locks that a transaction is holding or waiting for.
@@ -100,7 +100,7 @@ class DDRLockManager {
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  vector<TxnId> ReleaseLocks(const TxnHolder& txn_holder);
+  vector<TxnId> ReleaseLocks(const Transaction& txn);
 
   /**
    * Gets current statistics of the lock manager

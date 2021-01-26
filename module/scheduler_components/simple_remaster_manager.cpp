@@ -7,28 +7,23 @@ namespace slog {
 SimpleRemasterManager::SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
     : storage_(storage) {}
 
-VerifyMasterResult SimpleRemasterManager::VerifyMaster(const LockOnlyTxn& lo_txn) {
-  auto& keys = lo_txn.keys;
-  if (keys.empty()) {
+VerifyMasterResult SimpleRemasterManager::VerifyMaster(const Transaction& txn) {
+  if (txn.keys().empty()) {
     return VerifyMasterResult::VALID;
   }
 
-  // Determine which local log this txn is from. Since only single home or
-  // lock only txns, all keys will have same master
-  auto local_log_machine_id = lo_txn.master;
-
   // Block this txn behind other txns from same local log
   // TODO: check the counters now? would abort earlier
-  auto it = blocked_queue_.find(local_log_machine_id);
+  auto it = blocked_queue_.find(txn.internal().home());
   if (it != blocked_queue_.end() && !it->second.empty()) {
-    it->second.push_back(&lo_txn);
+    it->second.push_back(&txn);
     return VerifyMasterResult::WAITING;
   }
 
   // Test counters
-  auto result = CheckCounters(lo_txn, storage_);
+  auto result = CheckCounters(txn, true, storage_);
   if (result == VerifyMasterResult::WAITING) {
-    blocked_queue_[local_log_machine_id].push_back(&lo_txn);
+    blocked_queue_[txn.internal().home()].push_back(&txn);
   }
   return result;
 }
@@ -40,9 +35,9 @@ RemasterOccurredResult SimpleRemasterManager::RemasterOccured(const Key& remaste
   // Note that multiple queues could contain the same key with different counters
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
-      auto lo_txn = queue_pair.second.front();
-      for (auto& key_info : lo_txn->keys) {
-        if (key_info.key == remaster_key) {
+      auto txn = queue_pair.second.front();
+      for (const auto& kv : txn->keys()) {
+        if (static_cast<int>(kv.second.metadata().master()) == txn->internal().home() && kv.first == remaster_key) {
           // TODO: check here if counters match, saves an iteration through all keys
           TryToUnblock(queue_pair.first, result);
           break;
@@ -53,8 +48,8 @@ RemasterOccurredResult SimpleRemasterManager::RemasterOccured(const Key& remaste
   return result;
 }
 
-RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(const TxnHolder& txn_holder) {
-  auto& txn_internal = txn_holder.txn()->internal();
+RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(const Transaction& txn) {
+  auto& txn_internal = txn.internal();
   for (auto replica : txn_internal.involved_replicas()) {
     auto it = blocked_queue_.find(replica);
     if (it == blocked_queue_.end() || it->second.empty()) {
@@ -62,7 +57,7 @@ RemasterOccurredResult SimpleRemasterManager::ReleaseTransaction(const TxnHolder
     }
     auto& queue = it->second;
     for (auto itr = queue.begin(); itr != queue.end(); itr++) {
-      if ((*itr)->holder.id() == txn_internal.id()) {
+      if ((*itr)->internal().id() == txn_internal.id()) {
         queue.erase(itr);
         break;  // Any transaction should only occur once per queue
       }
@@ -87,7 +82,7 @@ void SimpleRemasterManager::TryToUnblock(uint32_t local_log_machine_id, Remaster
 
   auto lo_txn = it->second.front();
 
-  auto counter_result = CheckCounters(*lo_txn, storage_);
+  auto counter_result = CheckCounters(*lo_txn, true, storage_);
   if (counter_result == VerifyMasterResult::WAITING) {
     return;
   } else if (counter_result == VerifyMasterResult::VALID) {

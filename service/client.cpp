@@ -48,32 +48,25 @@ void ExecuteTxn(const char* txn_file) {
   d.Accept(writer);
   LOG(INFO) << "Parsed JSON: " << buffer.GetString();
 
+  vector<KeyEntry> keys;
+
   // 2. Construct a request
   auto read_set_arr = d["read_set"].GetArray();
-  vector<string> read_set;
   for (auto& v : read_set_arr) {
-    read_set.push_back(v.GetString());
+    keys.emplace_back(v.GetString(), KeyType::READ);
   }
 
   auto write_set_arr = d["write_set"].GetArray();
   vector<string> write_set;
   for (auto& v : write_set_arr) {
-    write_set.push_back(v.GetString());
-  }
-
-  unordered_map<Key, pair<uint32_t, uint32_t>> metadata;
-  if (d.HasMember("metadata")) {
-    auto json = d["metadata"].GetObject();
-    for (auto& mem : d["metadata"].GetObject()) {
-      metadata[mem.name.GetString()] = {mem.value.GetUint(), 0};
-    }
+    keys.emplace_back(v.GetString(), KeyType::WRITE);
   }
 
   Transaction* txn;
   if (d.HasMember("new_master")) {
-    txn = MakeTransaction(read_set, write_set, d["new_master"].GetInt(), metadata, 0);
+    txn = MakeTransaction(keys, d["new_master"].GetInt());
   } else {
-    txn = MakeTransaction(read_set, write_set, d["code"].GetString(), metadata, 0);
+    txn = MakeTransaction(keys, d["code"].GetString());
   }
 
   api::Request req;

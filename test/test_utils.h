@@ -28,19 +28,11 @@ using ConfigVec = std::vector<ConfigurationPtr>;
 ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_partitions,
                                  internal::Configuration common_config = {});
 
-struct KeyInfo {
-  KeyInfo(const Key& key, uint32_t master = 0, uint32_t counter = 0) : key(key), master(master), counter(counter) {}
-  Key key;
-  uint32_t master;
-  uint32_t counter;
-};
+Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+                                 const std::variant<string, int>& proc = "", MachineId coordinator = 0);
 
-Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyInfo>& read_set_info,
-                                 const std::vector<KeyInfo>& write_set_info, const std::variant<string, int>& proc = "",
-                                 MachineId coordinator = 0);
-
-TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyInfo>& read_set_info,
-                            const std::vector<KeyInfo>& write_set_info, const std::variant<string, int>& proc = "");
+TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+                            const std::variant<string, int>& proc = "");
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 

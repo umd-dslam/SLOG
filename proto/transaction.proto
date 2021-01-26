@@ -13,9 +13,23 @@ enum TransactionStatus {
     ABORTED = 2;
 }
 
+enum KeyType {
+    READ = 0;
+    WRITE = 1;
+}
+
 message MasterMetadata {
     uint32 master = 1;
     uint32 counter = 2;
+}
+
+message ValueEntry {
+    string value = 1;
+    string new_value = 2;
+    KeyType type = 3;
+    oneof optional {
+        MasterMetadata metadata = 4;
+    }
 }
 
 enum TransactionEvent {
@@ -46,16 +60,17 @@ message TransactionInternal {
     // unique transaction id, multi-home and lock only
     // txns share this id
     uint32 id = 1;
-    map<string, MasterMetadata> master_metadata = 2;
-    TransactionType type = 3;
+    TransactionType type = 2;
+    int32 home = 3;
     uint32 coordinating_server = 4;
     repeated uint32 involved_partitions = 5;
-    repeated uint32 involved_replicas = 6;
+    repeated uint32 active_partitions = 6;
+    repeated uint32 involved_replicas = 7;
 
     // for recording time of different events of txn
-    repeated TransactionEvent events = 7;
-    repeated int64 event_times = 8;    // when the events took place
-    repeated uint32 event_machines = 9; // where the events took place
+    repeated TransactionEvent events = 8;
+    repeated int64 event_times = 9;    // when the events took place
+    repeated uint32 event_machines = 10; // where the events took place
 }
 
 message RemasterProcedure {
@@ -83,10 +98,9 @@ message Transaction {
         RemasterProcedure remaster = 3;
     }
 
-    map<string, string> read_set = 4;
-    map<string, string> write_set = 5;
+    map<string, ValueEntry> keys = 4;
+    repeated string deleted_keys = 5;
 
     TransactionStatus status = 6;
     string abort_reason = 7;
-    repeated string delete_set = 8;
 }

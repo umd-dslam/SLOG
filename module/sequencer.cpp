@@ -81,14 +81,19 @@ void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
 
 void Sequencer::AddToBatch(Transaction* txn) {
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
-    txn = GenerateLockOnlyTxn(*txn, config_->local_replica(), true /* in_place */);
-    if (txn->internal().master_metadata().empty()) {
-      delete txn;
+    txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
+    if (txn == nullptr) {
       return;
     }
   }
 
-  AddToPartitionedBatch(partitioned_batch_, txn->internal().involved_partitions(), txn);
+  for (auto p : txn->internal().involved_partitions()) {
+    auto new_txn = GeneratePartitionedTxn(config_, *txn, p);
+    CHECK(new_txn != nullptr);
+    partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
+  }
+  delete txn;
+
   ++batch_size_;
 
   if (!batch_scheduled_) {
@@ -139,7 +144,7 @@ bool Sequencer::SendBatchDelayed() {
 
   auto delay_ms = config_->replication_delay_amount_ms();
 
-  VLOG(4) << "Delay batch " << batch_id() << " for " << delay_ms << " ms";
+  VLOG(3) << "Delay batch " << batch_id() << " for " << delay_ms << " ms";
 
   for (uint32_t part = 0; part < config_->num_partitions(); part++) {
     auto env = NewBatchRequest(partitioned_batch_[part].release());
@@ -148,7 +153,7 @@ bool Sequencer::SendBatchDelayed() {
     Send(*env, config_->MakeMachineId(config_->local_replica(), part), kInterleaverChannel);
 
     NewTimedCallback(milliseconds(delay_ms), [this, part, delayed_env = env.release()]() {
-      VLOG(4) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();
+      VLOG(3) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();
       // Replicate batch to all replicas EXCEPT local replica
       vector<MachineId> destinations;
       for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {

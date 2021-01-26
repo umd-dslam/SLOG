@@ -58,36 +58,25 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   return configs;
 }
 
-Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyInfo>& read_set_info,
-                                 const std::vector<KeyInfo>& write_set_info, const std::variant<string, int>& proc,
-                                 MachineId coordinator) {
-  vector<Key> read_set, write_set;
-  unordered_map<Key, pair<uint32_t, uint32_t>> master_metadata;
-  for (auto& info : read_set_info) {
-    read_set.push_back(info.key);
-    master_metadata.try_emplace(info.key, info.master, info.counter);
-  }
-  for (auto& info : write_set_info) {
-    write_set.push_back(info.key);
-    master_metadata.try_emplace(info.key, info.master, info.counter);
-  }
-  auto txn = MakeTransaction(read_set, write_set, proc, master_metadata, coordinator);
+Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+                                 const std::variant<string, int>& proc, MachineId coordinator) {
+  auto txn = MakeTransaction(keys, proc, coordinator);
   txn->mutable_internal()->set_id(id);
 
-  PopulateInvolvedPartitions(txn, config);
+  PopulateInvolvedPartitions(config, *txn);
 
   return txn;
 }
 
-TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyInfo>& read_set_info,
-                            const std::vector<KeyInfo>& write_set_info, const std::variant<string, int>& proc) {
-  auto txn = MakeTestTransaction(config, id, read_set_info, write_set_info, proc);
-  auto first_lo = GenerateLockOnlyTxn(*txn, txn->internal().involved_replicas(0));
-  CHECK(!first_lo->internal().master_metadata().empty());
+TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+                            const std::variant<string, int>& proc) {
+  auto txn = MakeTestTransaction(config, id, keys, proc);
+  auto first_lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(0));
+  CHECK(first_lo != nullptr);
   TxnHolder holder(config, first_lo);
   for (int i = 1; i < txn->internal().involved_replicas_size(); ++i) {
-    auto lo = GenerateLockOnlyTxn(*txn, txn->internal().involved_replicas(i));
-    CHECK(!lo->internal().master_metadata().empty());
+    auto lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(i));
+    CHECK(lo != nullptr);
     holder.AddLockOnlyTxn(lo);
   }
   delete txn;

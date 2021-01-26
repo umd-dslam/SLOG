@@ -14,9 +14,10 @@ using testing::UnorderedElementsAre;
 TEST(OldLockManagerTest, GetAllLocksOnFirstTry) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto holder = MakeTestTxnHolder(configs[0], 100, {{"readA"}, {"readB"}}, {{"writeC"}});
+  auto holder = MakeTestTxnHolder(
+      configs[0], 1000, {{"readA", KeyType::READ, 0}, {"readB", KeyType::READ, 0}, {"writeC", KeyType::WRITE, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  auto result = lock_manager.ReleaseLocks(holder);
+  auto result = lock_manager.ReleaseLocks(holder.txn());
   ASSERT_TRUE(result.empty());
 }
 
@@ -24,9 +25,9 @@ TEST(OldLockManagerTest, GetAllLocksMultiPartitions) {
   auto configs = MakeTestConfigurations("locking", 1, 2);
   OldLockManager lock_manager;
   // "AAAA" is in partition 0 so lock is acquired
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"readX"}}, {{"AAAA"}});
+  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"readX", KeyType::READ, 0}, {"AAAA", KeyType::WRITE, 0}});
   // "ZZZZ" is in partition 1 so is ignored
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readX"}}, {{"ZZZZ"}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readX", KeyType::READ, 0}, {"ZZZZ", KeyType::WRITE, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
 }
@@ -34,26 +35,26 @@ TEST(OldLockManagerTest, GetAllLocksMultiPartitions) {
 TEST(OldLockManager, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"readA"}, {"readB"}}, {});
+  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"readA", KeyType::READ, 0}, {"readB", KeyType::READ, 0}});
 
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readB"}, {"readC"}}, {});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readB", KeyType::READ, 0}, {"readC", KeyType::READ, 0}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1).empty());
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.txn()).empty());
 }
 
 TEST(OldLockManager, WriteLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {}, {{"writeA"}, {"writeB"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readA"}}, {{"writeA"}});
+  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"writeA", KeyType::WRITE, 0}, {"writeB", KeyType::WRITE, 0}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readA", KeyType::READ, 0}, {"writeA", KeyType::WRITE, 0}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager.ReleaseLocks(holder1).size(), 1U);
+  ASSERT_EQ(lock_manager.ReleaseLocks(holder1.txn()).size(), 1U);
   // Make sure the lock is already held by holder2
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
 }
@@ -61,19 +62,20 @@ TEST(OldLockManager, WriteLocks) {
 TEST(OldLockManager, ReleaseLocksAndGetManyNewHolders) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"A"}}, {{"B"}, {"C"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"B"}}, {{"A"}});
-  auto holder3 = MakeTestTxnHolder(configs[0], 300, {{"B"}}, {});
-  auto holder4 = MakeTestTxnHolder(configs[0], 400, {{"C"}}, {});
+  auto holder1 =
+      MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, 0}, {"B", KeyType::WRITE, 0}, {"C", KeyType::WRITE, 0}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"B", KeyType::READ, 0}, {"A", KeyType::WRITE, 0}});
+  auto holder3 = MakeTestTxnHolder(configs[0], 300, {{"B", KeyType::READ, 0}});
+  auto holder4 = MakeTestTxnHolder(configs[0], 400, {{"C", KeyType::READ, 0}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder4.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.txn()).empty());
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn());
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
   ASSERT_EQ(ready_txns.size(), 2U);
@@ -83,61 +85,49 @@ TEST(OldLockManager, ReleaseLocksAndGetManyNewHolders) {
 TEST(OldLockManager, PartiallyAcquiredLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"A"}}, {{"B"}, {"C"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A"}}, {{"B"}});
-  auto holder3 = MakeTestTxnHolder(configs[0], 300, {}, {{"A"}, {"C"}});
+  auto holder1 =
+      MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, 0}, {"B", KeyType::WRITE, 0}, {"C", KeyType::WRITE, 0}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A", KeyType::READ, 0}, {"B", KeyType::WRITE, 0}});
+  auto holder3 = MakeTestTxnHolder(configs[0], 300, {{"A", KeyType::WRITE, 0}, {"C", KeyType::WRITE, 0}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn());
   ASSERT_THAT(ready_txns, ElementsAre(200));
 
-  ready_txns = lock_manager.ReleaseLocks(holder2);
+  ready_txns = lock_manager.ReleaseLocks(holder2.txn());
   ASSERT_THAT(ready_txns, ElementsAre(300));
-}
-
-TEST(OldLockManager, PrioritizeWriteLock) {
-  auto configs = MakeTestConfigurations("locking", 1, 1);
-  OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"A"}}, {{"A"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A"}}, {});
-
-  ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
-
-  auto ready_txns = lock_manager.ReleaseLocks(holder1);
-  ASSERT_THAT(ready_txns, ElementsAre(200));
 }
 
 TEST(OldLockManager, AcquireLocksWithLockOnlyholder1) {
   auto configs = MakeTestConfigurations("locking", 3, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"A"}}, {{"B"}, {"C"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A", 2}}, {{"B", 1}});
-  auto holder2_lockonly1 = MakeTestTxnHolder(configs[0], 200, {}, {{"B"}});
-  auto holder2_lockonly2 = MakeTestTxnHolder(configs[0], 200, {{"A"}}, {});
+  auto holder1 =
+      MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, 0}, {"B", KeyType::WRITE, 0}, {"C", KeyType::WRITE, 0}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A", KeyType::READ, 2}, {"B", KeyType::WRITE, 1}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(2)), AcquireLocksResult::ACQUIRED);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder2);
+  auto ready_txns = lock_manager.ReleaseLocks(holder2.txn());
   ASSERT_THAT(ready_txns, ElementsAre(100));
 }
 
 TEST(OldLockManager, AcquireLocksWithLockOnlyholder2) {
   auto configs = MakeTestConfigurations("locking", 3, 1);
   OldLockManager lock_manager;
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"A"}}, {{"B"}, {"C"}});
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A", 2}}, {{"B", 1}});
+  auto holder1 =
+      MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::READ, 0}, {"B", KeyType::WRITE, 0}, {"C", KeyType::WRITE, 0}});
+  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"A", KeyType::READ, 2}, {"B", KeyType::WRITE, 1}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(2)), AcquireLocksResult::WAITING);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1);
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn());
   ASSERT_THAT(ready_txns, ElementsAre(200));
 }
 
@@ -145,6 +135,6 @@ TEST(OldLockManager, GhostTxns) {
   auto configs = MakeTestConfigurations("locking", 1, 2);
   OldLockManager lock_manager;
   // "Z" is in partition 1
-  auto holder = MakeTestTxnHolder(configs[0], 101, {{"Z"}}, {});
+  auto holder = MakeTestTxnHolder(configs[0], 101, {{"Z", KeyType::READ, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
 }
