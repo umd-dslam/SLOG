@@ -28,20 +28,20 @@ void Acceptor::ProcessAcceptRequest(const internal::PaxosAcceptRequest& req, Mac
     return;
   }
   ballot_ = req.ballot();
-  Envelope env;
-  auto accept_response = env.mutable_response()->mutable_paxos_accept();
+  auto env = sender_.NewEnvelope();
+  auto accept_response = env->mutable_response()->mutable_paxos_accept();
   accept_response->set_ballot(ballot_);
   accept_response->set_slot(req.slot());
-  sender_.SendSameChannel(env, from_machine_id);
+  sender_.SendSameChannel(move(env), from_machine_id);
 }
 
 void Acceptor::ProcessCommitRequest(const internal::PaxosCommitRequest& req, MachineId from_machine_id) {
   // TODO: If leader election is implemented, this is where we erase
   //       memory about an accepted value
-  Envelope env;
-  auto commit_response = env.mutable_response()->mutable_paxos_commit();
+  auto env = sender_.NewEnvelope();
+  auto commit_response = env->mutable_response()->mutable_paxos_commit();
   commit_response->set_slot(req.slot());
-  sender_.SendSameChannel(env, from_machine_id);
+  sender_.SendSameChannel(move(env), from_machine_id);
 }
 
 }  // namespace slog

@@ -89,23 +89,20 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
 
   while (multi_home_batch_log_.HasNextBatch()) {
     auto batch_and_slot = multi_home_batch_log_.NextBatch();
-    auto slot = batch_and_slot.first;
     auto& batch = batch_and_slot.second;
 
     VLOG(1) << "Processing batch " << batch->id();
+  
+    auto transactions = Unbatch(batch.get());
+    for (auto txn : transactions) {
 
-    // Replace the batch id with its slot number so that it is
-    // easier to determine the batch order later on
-    batch->set_id(slot);
+      TRACE(txn->mutable_internal(), TransactionEvent::EXIT_MULTI_HOME_ORDERER);
 
-    auto env = NewEnvelope();
-    auto forward_batch = env->mutable_request()->mutable_forward_batch();
-    forward_batch->set_allocated_batch_data(batch.release());
-
-    TRACE(forward_batch->mutable_batch_data(), TransactionEvent::EXIT_MULTI_HOME_ORDERER_IN_BATCH);
-
-    // Send the newly ordered multi-home batch to the sequencer
-    Send(move(env), kSequencerChannel);
+      auto env = NewEnvelope();
+      auto forward_txn = env->mutable_request()->mutable_forward_txn();
+      forward_txn->set_allocated_txn(txn);
+      Send(move(env), kSequencerChannel);
+    }
   }
 }
 

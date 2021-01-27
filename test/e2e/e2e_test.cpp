@@ -32,6 +32,7 @@ class E2ETest : public ::testing::Test {
 
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
+      test_slogs[i]->AddMultiHomeOrderer();
       test_slogs[i]->AddSequencer();
       test_slogs[i]->AddInterleaver();
       test_slogs[i]->AddScheduler();
@@ -42,10 +43,6 @@ class E2ETest : public ::testing::Test {
         test_slogs[i]->AddGlobalPaxos();
       }
 
-      // At each region, a partition is used to batch the multihome txns
-      if (configs[i]->leader_partition_for_multi_home_ordering() == configs[i]->local_partition()) {
-        test_slogs[i]->AddMultiHomeOrderer();
-      }
     }
 
     // Replica 0

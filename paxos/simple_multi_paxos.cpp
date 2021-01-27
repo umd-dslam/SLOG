@@ -29,4 +29,13 @@ void SimpleMultiPaxos::SendSameChannel(const internal::Envelope& env, MachineId 
   Send(env, to_machine_id, channel());
 }
 
+void SimpleMultiPaxos::SendSameChannel(EnvelopePtr&& env, MachineId to_machine_id) {
+  Send(std::move(env), to_machine_id, channel());
+}
+
+void SimpleMultiPaxos::SendSameChannel(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids) {
+  Send(std::move(env), to_machine_ids, channel());
+}
+
+
 }  // namespace slog

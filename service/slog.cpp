@@ -79,7 +79,7 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
-  auto num_threads = config->num_workers();
+  auto num_threads = config->num_workers() + 6;
   auto num_partitions = config->num_partitions();
   auto partition = config->local_partition();
 
@@ -159,6 +159,7 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
+  modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration()));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage, config->forwarder_batch_duration()));
   modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->sequencer_batch_duration()));
@@ -170,10 +171,6 @@ int main(int argc, char* argv[]) {
     modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
   }
 
-  // At each region, a partition is used to batch the multihome txns
-  if (config->leader_partition_for_multi_home_ordering() == config->local_partition()) {
-    modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration()));
-  }
 
   // Block SIGINT from here so that the new threads inherit the block mask
   sigset_t signal_set;

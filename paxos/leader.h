@@ -15,6 +15,8 @@ using std::vector;
 
 namespace slog {
 
+using EnvelopePtr = unique_ptr<internal::Envelope>;
+
 class SimpleMultiPaxos;
 
 struct Proposal {
@@ -50,8 +52,6 @@ class Leader {
 
   void StartNewCommit(SlotId slot);
   void CommitStateChanged(const CommitTracker* commit);
-
-  void SendToAllMembers(const internal::Envelope& env);
 
   SimpleMultiPaxos& paxos_;
 

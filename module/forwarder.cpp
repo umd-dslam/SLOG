@@ -226,9 +226,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       }
       Send(*env, destinations, kSequencerChannel);
     } else {
-      auto mh_orderer = config_->MakeMachineId(config_->leader_replica_for_multi_home_ordering(),
-                                               config_->leader_partition_for_multi_home_ordering());
-      Send(move(env), mh_orderer, kMultiHomeOrdererChannel);
+      Send(move(env), kMultiHomeOrdererChannel);
     }
   }
 }

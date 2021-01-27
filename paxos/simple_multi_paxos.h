@@ -36,6 +36,8 @@ class SimpleMultiPaxos : public NetworkedModule {
   Acceptor acceptor_;
 
   void SendSameChannel(const internal::Envelope& env, MachineId to_machine_id);
+  void SendSameChannel(EnvelopePtr&& env, MachineId to_machine_id);
+  void SendSameChannel(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids);
 
   friend class Leader;
   friend class Acceptor;

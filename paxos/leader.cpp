@@ -109,14 +109,14 @@ void Leader::StartNewAcceptance(uint32_t value) {
   proposals_[next_empty_slot_] = Proposal(ballot_, value);
   quorum_trackers_.emplace_back(new AcceptanceTracker(members_.size(), ballot_, next_empty_slot_));
 
-  Envelope env;
-  auto paxos_accept = env.mutable_request()->mutable_paxos_accept();
+  auto env = paxos_.NewEnvelope();
+  auto paxos_accept = env->mutable_request()->mutable_paxos_accept();
   paxos_accept->set_ballot(ballot_);
   paxos_accept->set_slot(next_empty_slot_);
   paxos_accept->set_value(value);
   next_empty_slot_++;
 
-  SendToAllMembers(env);
+  paxos_.SendSameChannel(move(env), members_);
 }
 
 void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
@@ -133,22 +133,16 @@ void Leader::AcceptanceStateChanged(const AcceptanceTracker* acceptance) {
 void Leader::StartNewCommit(SlotId slot) {
   quorum_trackers_.emplace_back(new CommitTracker(members_.size(), slot));
 
-  Envelope env;
-  auto paxos_commit = env.mutable_request()->mutable_paxos_commit();
+  auto env = paxos_.NewEnvelope();
+  auto paxos_commit = env->mutable_request()->mutable_paxos_commit();
   paxos_commit->set_slot(slot);
   paxos_commit->set_value(proposals_[slot].value);
 
-  SendToAllMembers(env);
+  paxos_.SendSameChannel(move(env), members_);
 }
 
 void Leader::CommitStateChanged(const CommitTracker* /* commit */) {
   // TODO: Retransmit request after we implement heartbeat
-}
-
-void Leader::SendToAllMembers(const Envelope& env) {
-  for (const auto& member : members_) {
-    paxos_.SendSameChannel(env, member);
-  }
 }
 
 bool Leader::IsMember() const { return is_member_; }
