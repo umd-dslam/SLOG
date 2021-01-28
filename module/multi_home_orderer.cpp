@@ -92,10 +92,9 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
     auto& batch = batch_and_slot.second;
 
     VLOG(1) << "Processing batch " << batch->id();
-  
+
     auto transactions = Unbatch(batch.get());
     for (auto txn : transactions) {
-
       TRACE(txn->mutable_internal(), TransactionEvent::EXIT_MULTI_HOME_ORDERER);
 
       auto env = NewEnvelope();

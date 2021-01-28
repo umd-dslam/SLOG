@@ -9,8 +9,8 @@ using internal::Request;
 using internal::Response;
 
 SimulatedMultiPaxos::SimulatedMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker,
-                                   const vector<MachineId>& members, MachineId me,
-                                   std::chrono::milliseconds poll_timeout)
+                                         const vector<MachineId>& members, MachineId me,
+                                         std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Paxos-" + std::to_string(group_number), broker, group_number, poll_timeout),
       leader_(*this, members, me),
       acceptor_(*this) {}

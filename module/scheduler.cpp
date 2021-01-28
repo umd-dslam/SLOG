@@ -301,7 +301,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 
 TxnHolder& Scheduler::GetTxnHolder(TxnId txn_id) {
   auto active_txn_it = active_txns_.find(txn_id);
-  DCHECK(active_txn_it != active_txns_.end());
+  CHECK(active_txn_it != active_txns_.end());
   return active_txn_it->second;
 }
 

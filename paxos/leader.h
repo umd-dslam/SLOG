@@ -20,8 +20,7 @@ using EnvelopePtr = unique_ptr<internal::Envelope>;
 class SimulatedMultiPaxos;
 
 struct PaxosInstance {
-  PaxosInstance(uint32_t ballot, uint32_t value) 
-      : ballot(ballot), value(value), num_accepts(0), num_commits(0) {}
+  PaxosInstance(uint32_t ballot, uint32_t value) : ballot(ballot), value(value), num_accepts(0), num_commits(0) {}
 
   uint32_t ballot;
   uint32_t value;

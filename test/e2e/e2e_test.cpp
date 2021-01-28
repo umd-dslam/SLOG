@@ -42,7 +42,6 @@ class E2ETest : public ::testing::Test {
       if (configs[i]->leader_replica_for_multi_home_ordering() == configs[i]->local_replica()) {
         test_slogs[i]->AddGlobalPaxos();
       }
-
     }
 
     // Replica 0

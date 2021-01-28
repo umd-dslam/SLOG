@@ -7,6 +7,11 @@
         "long": "Address sanitizer",
         "buildType": "Asan"
       },
+      "tsan": {
+        "short": "Tsan",
+        "long": "Thread sanitizer",
+        "buildType": "Tsan"
+      },
       "ubsan": {
         "short": "Ubsan",
         "long": "Undefined behaviour sanitizer",

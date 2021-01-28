@@ -171,7 +171,6 @@ int main(int argc, char* argv[]) {
     modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
   }
 
-
   // Block SIGINT from here so that the new threads inherit the block mask
   sigset_t signal_set;
   sigemptyset(&signal_set);
