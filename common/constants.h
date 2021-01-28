@@ -45,4 +45,6 @@ const char NUM_LOCKED_KEYS[] = "num_locked_keys";
 const char NUM_TXNS_WAITING_FOR_LOCK[] = "num_txns_waiting_for_lock";
 const char NUM_LOCKS_WAITED_PER_TXN[] = "num_locks_waited_per_txn";
 const char LOCK_TABLE[] = "lock_table";
+const char LOCK_TABLE_TYPE[] = "lock_table_type";
+const char LOCK_WAITED_BY_GRAPH[] = "lock_waited_by_graph";
 }  // namespace slog

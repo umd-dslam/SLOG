@@ -215,6 +215,7 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();
+  stats.AddMember(StringRef(LOCK_TABLE_TYPE), 0, alloc);
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
 
   if (level >= 1) {
@@ -234,6 +235,7 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
       }
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
+      // [key, mode, [holders], [(txn_id, mode)]]
       entry.PushBack(key_json, alloc)
           .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
           .PushBack(ToJsonArray(lock_state.GetHolders(), alloc), alloc)

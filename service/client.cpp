@@ -207,19 +207,27 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       const auto& entry = entry_.GetArray();
       auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
 
-      cout << "Key: " << entry[0].GetString() << ". Mode: " << LockModeStr(lock_mode) << "\n";
+      if (stats[LOCK_TABLE_TYPE].GetInt() == 0) {
+        cout << "Key: " << entry[0].GetString() << ". Mode: " << LockModeStr(lock_mode) << "\n";
+        cout << "\tHolders: ";
+        for (auto& holder : entry[2].GetArray()) {
+          cout << holder.GetUint() << " ";
+        }
+        cout << "\n";
 
-      cout << "\tHolders: ";
-      for (auto& holder : entry[2].GetArray()) {
-        cout << holder.GetUint() << " ";
-      }
-      cout << "\n";
-
-      cout << "\tWaiters: ";
-      for (auto& waiter : entry[3].GetArray()) {
-        auto txn_and_mode = waiter.GetArray();
-        cout << "(" << txn_and_mode[0].GetUint() << ", "
-             << LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
+        cout << "\tWaiters: ";
+        for (auto& waiter : entry[3].GetArray()) {
+          auto txn_and_mode = waiter.GetArray();
+          cout << "(" << txn_and_mode[0].GetUint() << ", "
+               << LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
+        }
+      } else {
+        cout << "Key: " << entry[0].GetString() << "\n";
+        cout << "\tLatest write requester: " << entry[1].GetUint() << "\n";
+        cout << "\tLatest read requesters: ";
+        for (auto& requester : entry[2].GetArray()) {
+          cout << requester.GetUint() << " ";
+        }
       }
       cout << "\n";
     }
