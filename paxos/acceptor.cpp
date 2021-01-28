@@ -1,6 +1,6 @@
 #include "paxos/acceptor.h"
 
-#include "paxos/simple_multi_paxos.h"
+#include "paxos/simulated_multi_paxos.h"
 
 namespace slog {
 
@@ -8,7 +8,7 @@ using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
-Acceptor::Acceptor(SimpleMultiPaxos& sender) : sender_(sender), ballot_(0) {}
+Acceptor::Acceptor(SimulatedMultiPaxos& sender) : sender_(sender), ballot_(0) {}
 
 void Acceptor::HandleRequest(const internal::Envelope& req) {
   switch (req.request().type_case()) {

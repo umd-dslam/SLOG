@@ -7,14 +7,14 @@ using std::string;
 
 namespace slog {
 
-class SimpleMultiPaxos;
+class SimulatedMultiPaxos;
 
 class Acceptor {
  public:
   /**
    * @param sender The enclosing Paxos class
    */
-  Acceptor(SimpleMultiPaxos& sender);
+  Acceptor(SimulatedMultiPaxos& sender);
 
   void HandleRequest(const internal::Envelope& req);
 
@@ -23,7 +23,7 @@ class Acceptor {
 
   void ProcessCommitRequest(const internal::PaxosCommitRequest& req, MachineId from_machine_id);
 
-  SimpleMultiPaxos& sender_;
+  SimulatedMultiPaxos& sender_;
 
   uint32_t ballot_;
 };

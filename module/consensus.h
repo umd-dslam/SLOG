@@ -1,10 +1,10 @@
 #pragma once
 
-#include "paxos/simple_multi_paxos.h"
+#include "paxos/simulated_multi_paxos.h"
 
 namespace slog {
 
-class GlobalPaxos : public SimpleMultiPaxos {
+class GlobalPaxos : public SimulatedMultiPaxos {
  public:
   GlobalPaxos(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
               std::chrono::milliseconds poll_timeout = kModuleTimeout);
@@ -16,7 +16,7 @@ class GlobalPaxos : public SimpleMultiPaxos {
   vector<MachineId> multihome_orderers_;
 };
 
-class LocalPaxos : public SimpleMultiPaxos {
+class LocalPaxos : public SimulatedMultiPaxos {
  public:
   LocalPaxos(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
              std::chrono::milliseconds poll_timeout = kModuleTimeout);

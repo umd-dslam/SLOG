@@ -10,7 +10,7 @@ using std::string;
 
 namespace slog {
 
-class SimpleMultiPaxos : public NetworkedModule {
+class SimulatedMultiPaxos : public NetworkedModule {
  public:
   /**
    * @param group_number  Number of the current paxos group. Used to differentiate messages
@@ -19,14 +19,13 @@ class SimpleMultiPaxos : public NetworkedModule {
    * @param members       Machine Id of all members participating in this Paxos process
    * @param me            Machine Id of the current machine
    */
-  SimpleMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker, const vector<MachineId>& group_members,
-                   MachineId me, std::chrono::milliseconds poll_timeout = kModuleTimeout);
+  SimulatedMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker, const vector<MachineId>& group_members,
+                      MachineId me, std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
   bool IsMember() const;
 
  protected:
   void HandleInternalRequest(EnvelopePtr&& env) final;
-
   void HandleInternalResponse(EnvelopePtr&& env) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value, bool is_elected) = 0;

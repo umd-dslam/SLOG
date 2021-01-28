@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "common/proto_utils.h"
-#include "paxos/simple_multi_paxos.h"
+#include "paxos/simulated_multi_paxos.h"
 #include "test/test_utils.h"
 
 using namespace slog;
@@ -14,10 +14,10 @@ using Pair = pair<uint32_t, uint32_t>;
 
 const Channel kTestChannel = 1;
 
-class TestSimpleMultiPaxos : public SimpleMultiPaxos {
+class TestSimulatedMultiPaxos : public SimulatedMultiPaxos {
  public:
-  TestSimpleMultiPaxos(const shared_ptr<Broker>& broker, const vector<MachineId>& group_members, const MachineId& me)
-      : SimpleMultiPaxos(kTestChannel, broker, group_members, me, kTestModuleTimeout) {}
+  TestSimulatedMultiPaxos(const shared_ptr<Broker>& broker, const vector<MachineId>& group_members, const MachineId& me)
+      : SimulatedMultiPaxos(kTestChannel, broker, group_members, me, kTestModuleTimeout) {}
 
   Pair Poll() {
     unique_lock<mutex> lock(m_);
@@ -58,7 +58,7 @@ class PaxosTest : public ::testing::Test {
     context->set(zmq::ctxopt::blocky, false);
 
     auto broker = make_shared<Broker>(config, context, kTestModuleTimeout);
-    auto paxos = make_shared<TestSimpleMultiPaxos>(broker, members, me);
+    auto paxos = make_shared<TestSimulatedMultiPaxos>(broker, members, me);
     auto sender = make_unique<Sender>(broker);
     auto paxos_runner = new ModuleRunner(paxos);
 
@@ -79,7 +79,7 @@ class PaxosTest : public ::testing::Test {
     senders_[index]->Send(move(env), kTestChannel);
   }
 
-  vector<shared_ptr<TestSimpleMultiPaxos>> paxi;
+  vector<shared_ptr<TestSimulatedMultiPaxos>> paxi;
 
  private:
   vector<shared_ptr<zmq::context_t>> contexts_;

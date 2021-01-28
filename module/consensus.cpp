@@ -22,7 +22,7 @@ vector<MachineId> GetMembers(const ConfigurationPtr& config) {
 
 GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                          std::chrono::milliseconds poll_timeout)
-    : SimpleMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {
+    : SimulatedMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {
   for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
     multihome_orderers_.push_back(config->MakeMachineId(rep, config->leader_partition_for_multi_home_ordering()));
   }
@@ -41,7 +41,7 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, bool is_leader) {
 
 LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                        std::chrono::milliseconds poll_timeout)
-    : SimpleMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
+    : SimulatedMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, bool) {
   auto env = NewEnvelope();

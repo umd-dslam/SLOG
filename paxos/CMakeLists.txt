@@ -5,7 +5,5 @@ target_sources(slog-core
     CMakeLists.txt
     leader.cpp
     leader.h
-    quorum_tracker.cpp
-    quorum_tracker.h
-    simple_multi_paxos.cpp
-    simple_multi_paxos.h)
+    simulated_multi_paxos.cpp
+    simulated_multi_paxos.h)
