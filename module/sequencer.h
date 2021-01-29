@@ -20,7 +20,6 @@ namespace slog {
  *         process for ordering, and simultaneously, this batch is sent to the
  *         Interleaver of all machines across all regions.
  *
- *         For ForwardBatch, MULTI_HOME txns are extracted from the batch.
  *         For each MULTI_HOME txn, a corresponding LockOnly txn is created
  *         and put into the same batch as the SINGLE_HOME txn above. The
  *         MULTI_HOME txn is sent to all Interleavers in the SAME region.

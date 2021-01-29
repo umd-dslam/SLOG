@@ -70,8 +70,7 @@ class CompletedTransaction {
 };
 
 /**
- * A Server serves external requests from the clients. It also answers
- * requests about mastership of data.
+ * A Server serves external requests from the clients.
  *
  * INPUT:  External TransactionRequest
  *

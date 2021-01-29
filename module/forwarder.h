@@ -16,7 +16,7 @@ namespace slog {
  * A Forwarder determines the type of a transaction (SINGLE_HOME vs. MULTI_HOME)
  * then forwards it to the appropriate module.
  *
- * To determine the type of a txn, it sends LookupMasterRequests to all Server
+ * To determine the type of a txn, it sends LookupMasterRequests to other Forwarder
  * modules in the same region and aggregates the responses.
  *
  * INPUT:  ForwardTransaction and LookUpMasterRequest

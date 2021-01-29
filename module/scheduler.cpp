@@ -35,6 +35,7 @@ void Scheduler::Initialize() {
   }
 }
 
+// Custom sockets are used to communicate with the workers
 std::vector<zmq::socket_t> Scheduler::InitializeCustomSockets() {
   zmq::socket_t worker_socket(*context(), ZMQ_DEALER);
   worker_socket.set(zmq::sockopt::rcvhwm, 0);
@@ -45,10 +46,6 @@ std::vector<zmq::socket_t> Scheduler::InitializeCustomSockets() {
   sockets.push_back(move(worker_socket));
   return sockets;
 }
-
-/***********************************************
-        Internal Requests & Responses
-***********************************************/
 
 void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
   switch (env->request().type_case()) {
@@ -96,6 +93,7 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
   Send(move(env), kServerChannel);
 }
 
+// Handle responses from the workers
 bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   zmq::message_t msg;
   if (!worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
@@ -136,9 +134,6 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   return true;
 }
 
-/***********************************************
-              Transaction Processing
-***********************************************/
 void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
   auto txn_id = txn->internal().id();
@@ -234,10 +229,6 @@ void Scheduler::SendToLockManager(const Transaction& txn) {
   }
 }
 
-/***********************************************
-              Transaction Dispatch
-***********************************************/
-
 void Scheduler::Dispatch(TxnId txn_id) {
   auto& txn_holder = GetTxnHolder(txn_id);
 
@@ -250,9 +241,6 @@ void Scheduler::Dispatch(TxnId txn_id) {
   VLOG(2) << "Dispatched txn " << txn_id;
 }
 
-/***********************************************
-         Pre-Dispatch Abort Processing
-***********************************************/
 // Disable pre-dispatch abort when DDR is used. Removing this method is sufficient to disable the
 // whole mechanism
 #ifdef LOCK_MANAGER_DDR
@@ -271,6 +259,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 
   auto& txn = txn_holder.txn();
 
+#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Release txn from remaster manager and lock manager.
   //
   // If the abort was triggered by a remote partition,
@@ -278,9 +267,8 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   // be in one of the managers, and needs to be removed.
   //
   // This also releases any lock-only transactions.
-#if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   ProcessRemasterResult(remaster_manager_.ReleaseTransaction(txn));
-#endif
+#endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
@@ -297,12 +285,6 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
     active_txns_.erase(active_txn_it);
   }
 }
-#endif
-
-TxnHolder& Scheduler::GetTxnHolder(TxnId txn_id) {
-  auto active_txn_it = active_txns_.find(txn_id);
-  CHECK(active_txn_it != active_txns_.end());
-  return active_txn_it->second;
-}
+#endif /* LOCK_MANAGER_DDR */
 
 }  // namespace slog
