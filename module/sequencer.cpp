@@ -42,44 +42,13 @@ void Sequencer::NewBatch() {
 }
 
 void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
-  switch (env->request().type_case()) {
-    case Request::kForwardTxn: {
-      auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
-
-      TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
-
-      AddToBatch(txn);
-
-      break;
-    }
-    case Request::kForwardBatch: {
-      if (env->request().forward_batch().part_case() != internal::ForwardBatch::kBatchData) {
-        LOG(ERROR) << "Request must contain batch data";
-        break;
-      }
-
-      auto batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
-      if (batch->transaction_type() != TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
-        LOG(ERROR) << "Batch has to contain multi-home txns";
-        break;
-      }
-
-      TRACE(batch, TransactionEvent::ENTER_SEQUENCER_IN_BATCH);
-
-      auto transactions = Unbatch(batch);
-      for (auto txn : transactions) {
-        AddToBatch(txn);
-      }
-
-      break;
-    }
-    default:
-      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
-      break;
+  if (env->request().type_case() != Request::kForwardTxn) {
+    return;
   }
-}
+  auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
 
-void Sequencer::AddToBatch(Transaction* txn) {
+  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
+
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
     txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
     if (txn == nullptr) {

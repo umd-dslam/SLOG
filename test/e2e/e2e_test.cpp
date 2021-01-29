@@ -83,7 +83,7 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
   ASSERT_EQ(txn2_resp.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn2_resp.internal().type(), TransactionType::SINGLE_HOME);
   ASSERT_EQ(txn2_resp.keys_size(), 1);
-  ASSERT_EQ(txn2_resp.keys().at("A").value(), "newA");;
+  ASSERT_EQ(txn2_resp.keys().at("A").value(), "newA");
 }
 
 TEST_F(E2ETest, MultiPartitionTxn) {
@@ -159,8 +159,7 @@ TEST_F(E2ETest, RemasterTxn) {
 
 TEST_F(E2ETest, AbortTxnBadCommand) {
   // Multi-partition transaction where one of the partition will abort
-  auto aborted_txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}},
-                                     "SET B notB EQ A notA");
+  auto aborted_txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}}, "SET B notB EQ A notA");
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();

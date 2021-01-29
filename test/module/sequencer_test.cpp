@@ -102,16 +102,12 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
 TEST_P(SequencerTest, MultiHomeTransaction) {
   //             A  B  C  D
   // Partition:  0  1  0  1
-  auto txn1 = MakeTestTransaction(configs_[0], 1000, {{"A", KeyType::READ, 0}, {"B", KeyType::READ, 1}});
-  auto txn2 = MakeTestTransaction(
-      configs_[0], 2000,
+  auto txn = MakeTestTransaction(
+      configs_[0], 1000,
       {{"A", KeyType::READ, 0}, {"B", KeyType::READ, 1}, {"C", KeyType::WRITE, 0}, {"D", KeyType::WRITE, 0}});
-
   auto env = make_unique<Envelope>();
-  auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
-  mh_batch->mutable_transactions()->Add()->CopyFrom(*txn1);
-  mh_batch->mutable_transactions()->Add()->CopyFrom(*txn2);
-  mh_batch->set_transaction_type(TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+  env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+
   SendToSequencer(move(env));
 
   for (int rep = 0; rep < 2; rep++) {
@@ -119,22 +115,15 @@ TEST_P(SequencerTest, MultiHomeTransaction) {
       auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
 
       ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 2);
+      ASSERT_EQ(batch->transactions_size(), 1);
 
-      auto lo_txn1 = batch->transactions().at(0);
-      ASSERT_EQ(lo_txn1.internal().id(), 1000);
-      ASSERT_EQ(lo_txn1.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn1.internal().home(), 0);
-      ASSERT_EQ(lo_txn1.keys_size(), 1);
-      ASSERT_EQ(lo_txn1.keys().at("A"), txn1->keys().at("A"));
-
-      auto lo_txn2 = batch->transactions().at(1);
-      ASSERT_EQ(lo_txn2.internal().id(), 2000);
-      ASSERT_EQ(lo_txn2.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn1.internal().home(), 0);
-      ASSERT_EQ(lo_txn2.keys_size(), 2);
-      ASSERT_EQ(lo_txn2.keys().at("A"), txn2->keys().at("A"));
-      ASSERT_EQ(lo_txn2.keys().at("C"), txn2->keys().at("C"));
+      auto lo_txn = batch->transactions().at(0);
+      ASSERT_EQ(lo_txn.internal().id(), 1000);
+      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+      ASSERT_EQ(lo_txn.internal().home(), 0);
+      ASSERT_EQ(lo_txn.keys_size(), 2);
+      ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+      ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
 
       delete batch;
     }
@@ -143,22 +132,15 @@ TEST_P(SequencerTest, MultiHomeTransaction) {
       auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
 
       ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 2);
+      ASSERT_EQ(batch->transactions_size(), 1);
 
-      auto lo_txn1 = batch->transactions().at(0);
-      ASSERT_EQ(lo_txn1.internal().id(), 1000);
-      ASSERT_EQ(lo_txn1.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn1.internal().home(), 0);
-      ASSERT_EQ(lo_txn1.keys_size(), 1);
-      ASSERT_EQ(lo_txn1.keys().at("B"), txn1->keys().at("B"));
-
-      auto lo_txn2 = batch->transactions().at(1);
-      ASSERT_EQ(lo_txn2.internal().id(), 2000);
-      ASSERT_EQ(lo_txn2.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn1.internal().home(), 0);
-      ASSERT_EQ(lo_txn2.keys_size(), 2);
-      ASSERT_EQ(lo_txn2.keys().at("B"), txn2->keys().at("B"));
-      ASSERT_EQ(lo_txn2.keys().at("D"), txn2->keys().at("D"));
+      auto lo_txn = batch->transactions().at(0);
+      ASSERT_EQ(lo_txn.internal().id(), 1000);
+      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+      ASSERT_EQ(lo_txn.internal().home(), 0);
+      ASSERT_EQ(lo_txn.keys_size(), 2);
+      ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+      ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
 
       delete batch;
     }
@@ -168,11 +150,9 @@ TEST_P(SequencerTest, MultiHomeTransaction) {
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
 TEST_P(SequencerTest, RemasterTransaction) {
   auto txn = MakeTestTransaction(configs_[0], 1000, {{"A", KeyType::WRITE, 1}}, 0);
-
   auto env = make_unique<Envelope>();
-  auto mh_batch = env->mutable_request()->mutable_forward_batch()->mutable_batch_data();
-  mh_batch->mutable_transactions()->Add()->CopyFrom(*txn);
-  mh_batch->set_transaction_type(TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+  env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+
   SendToSequencer(move(env));
 
   for (int rep = 0; rep < 2; rep++) {

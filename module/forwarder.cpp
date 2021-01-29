@@ -218,7 +218,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
     if (config_->bypass_mh_orderer()) {
-      // Send the txn to sequencers of involved replicas to generate lock-only txns
+      // Send the txn directly to sequencers of involved replicas to generate lock-only txns
       auto part = ChooseRandomPartition(*txn, rg_);
       vector<MachineId> destinations;
       for (auto rep : txn_internal->involved_replicas()) {
@@ -226,6 +226,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       }
       Send(*env, destinations, kSequencerChannel);
     } else {
+      // Send the txn to the orderer to form a global order
       Send(move(env), kMultiHomeOrdererChannel);
     }
   }
