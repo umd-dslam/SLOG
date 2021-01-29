@@ -43,18 +43,17 @@ constexpr char HOT_RECORDS[] = "hot_records";
 constexpr char WRITES[] = "writes";
 // Size of a written value in bytes
 constexpr char VALUE_SIZE[] = "value_size";
-// Region that is home to a single-home transaction.
-// Use a negative number to select a random region for
-// each transaction
-constexpr char SH_REGION[] = "sh_region";
+// If set to 1, a SH txn will always be sent to the nearest
+// region, a MH txn will always have a part that touches the nearest region
+constexpr char NEAREST[] = "nearest";
 // Partition that is used in a single-partition transaction.
 // Use a negative number to select a random partition for
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";
 
-const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"},   {MP_PCT, "0"},       {MP_PARTS, "2"},
-                                    {HOT, "1000"},       {RECORDS, "10"},   {HOT_RECORDS, "2"},  {WRITES, "2"},
-                                    {VALUE_SIZE, "100"}, {SH_REGION, "-1"}, {SP_PARTITION, "-1"}};
+const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"}, {MP_PCT, "0"},       {MP_PARTS, "2"},
+                                    {HOT, "1000"},       {RECORDS, "10"}, {HOT_RECORDS, "2"},  {WRITES, "2"},
+                                    {VALUE_SIZE, "100"}, {NEAREST, "0"},  {SP_PARTITION, "-1"}};
 
 }  // namespace
 
@@ -144,19 +143,25 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   // Select a number of homes to choose from for each record
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
+    CHECK_GE(num_replicas, 2) << "There must be at least 2 regions for MH txns";
     candidate_homes.resize(num_replicas);
     iota(candidate_homes.begin(), candidate_homes.end(), 0);
-    shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
+    if (params_.GetInt(NEAREST)) {
+      std::swap(candidate_homes[0], candidate_homes[config_->local_replica()]);
+      shuffle(candidate_homes.begin() + 1, candidate_homes.end(), rg_);
+    } else {
+      shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
+    }
+
     auto mp_num_homes = params_.GetUInt32(MH_HOMES);
+    CHECK_GE(mp_num_homes, 2) << "At least 2 regions must be selected for MH txns";
     candidate_homes.resize(mp_num_homes);
   } else {
-    auto sh_region = params_.GetInt(SH_REGION);
-    if (sh_region < 0) {
+    if (params_.GetInt(NEAREST)) {
+      candidate_homes.push_back(config_->local_replica());
+    } else {
       std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
       candidate_homes.push_back(dis(rg_));
-    } else {
-      CHECK_LT(static_cast<uint32_t>(sh_region), num_replicas) << "Selected single-home region does not exist";
-      candidate_homes.push_back(sh_region);
     }
   }
 

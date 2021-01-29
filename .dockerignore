@@ -5,3 +5,4 @@ build
 .dockerignore
 *.dat
 venv
+tmp

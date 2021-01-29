@@ -14,7 +14,7 @@ using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 inline std::string MakeInProcChannelAddress(Channel chan) { return "inproc://channel_" + std::to_string(chan); }
 
 /**
- * Sends a pointer to an envelope
+ * Sends a pointer of an envelope
  */
 inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
   auto env = envelope.release();
@@ -24,6 +24,9 @@ inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
   socket.send(msg, zmq::send_flags::dontwait);
 }
 
+/**
+ * Receives a pointer of an envelope
+ */
 inline EnvelopePtr RecvEnvelope(zmq::socket_t& socket, bool dont_wait = false) {
   zmq::message_t msg;
   auto flag = dont_wait ? zmq::recv_flags::dontwait : zmq::recv_flags::none;

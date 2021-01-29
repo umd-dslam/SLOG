@@ -50,7 +50,6 @@ void Leader::HandleRequest(const Envelope& req) {
 }
 
 void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
-  auto ballot = commit.ballot();
   auto slot = commit.slot();
   auto value = commit.value();
 
