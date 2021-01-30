@@ -28,43 +28,101 @@ $ make -j4
 
 The following command starts SLOG using the example configuration for a single-node cluster.
 ```
-$ build/slog -config examples/single.conf
+$ build/slog -config examples/single.conf -address /tmp/slog 
 ```
 
 After that, use the client to send a transaction that writes some data.
 ```
-$ build/client txn examples/write_sh.1.json
-```
-This command will return the following confirmation.
-```
+$ build/client txn examples/write.json
+...
 Transaction ID: 1000
 Status: COMMITTED
-Read set:
-Write set:
-         A ==> Hello
-         B ==> World
-         C ==> !!!!!
+Key set:
+[WRITE] 0
+        Value:
+        New value: Hello
+        Metadata: (0, 0)
+[WRITE] 1
+        Value:
+        New value: World
+        Metadata: (0, 0)
+[WRITE] 2
+        Value:
+        New value: !!!!!
+        Metadata: (0, 0)
 Type: SINGLE_HOME
-Code: SET A Hello SET B World SET C !!!!!
+Code: SET 0 Hello SET 1 World SET 2 !!!!!
+Coordinating server: 0
+Involved partitions: 0
+Involved replicas: 0
 ```
 
-Send another transaction to read the written data.
+Send a transaction to copy data from the previous keys to different keys:
 ```
-$ build/client txn examples/read_sh.1.json
-```
-Below is the result of the read transaction. Note that this time, the key-value pairs are from the readset.
-```
+$ build/client txn examples/copy.json
+...
 Transaction ID: 2000
 Status: COMMITTED
-Read set:
-         A ==> Hello
-         B ==> World
-         C ==> !!!!!
-Write set:
+Key set:
+[WRITE] 5
+        Value:
+        New value: !!!!!
+        Metadata: (0, 0)
+[WRITE] 3
+        Value:
+        New value: Hello
+        Metadata: (0, 0)
+[READ] 2
+        Value: !!!!!
+        Metadata: (0, 0)
+[READ] 0
+        Value: Hello
+        Metadata: (0, 0)
+[READ] 1
+        Value: World
+        Metadata: (0, 0)
+[WRITE] 4
+        Value:
+        New value: World
+        Metadata: (0, 0)
 Type: SINGLE_HOME
-Code: GET A GET B GET C
+Code: COPY 0 3 COPY 1 4 COPY 2 5
+Coordinating server: 0
+Involved partitions: 0
+Involved replicas: 0
 ```
 
+Send a transaction to read the written data.
+```
+$ build/client txn examples/read.json
+...
+Transaction ID: 3000
+Status: COMMITTED
+Key set:
+[READ] 4
+        Value: World
+        Metadata: (0, 0)
+[READ] 2
+        Value: !!!!!
+        Metadata: (0, 0)
+[READ] 5
+        Value: !!!!!
+        Metadata: (0, 0)
+[READ] 0
+        Value: Hello
+        Metadata: (0, 0)
+[READ] 1
+        Value: World
+        Metadata: (0, 0)
+[READ] 3
+        Value: Hello
+        Metadata: (0, 0)
+Type: SINGLE_HOME
+Code: GET 0 GET 1 GET 2 GET 3 GET 4 GET 5
+Coordinating server: 0
+Involved partitions: 0
+Involved replicas: 0
+```
 
 ## Run SLOG on a cluster
 
@@ -109,74 +167,92 @@ $ build/slog -config examples/cluster.conf -address 192.168.2.14 -replica 1 -par
 Use the client to send a write transaction to a machine in the cluster. If you changed the `port` option in the configuration file, you need to use the `--port` argument in the command to match with the new port.
 ```
 $ build/client txn examples/write.json --host 192.168.2.11
-```
-
-The following confirmation is returned.
-
-```
+...
 Transaction ID: 1000
 Status: COMMITTED
-Read set:
-Write set:
-         0 ==> Hello
-         1 ==> World
-         2 ==> !!!!!
-Master metadata:
-         2:          (0, 0))
-         1:          (0, 0))
-         0:          (0, 0))
+Key set:
+[WRITE] 0
+        Value: 
+        New value: Hello
+        Metadata: (0, 0)
+[WRITE] 1
+        Value: 
+        New value: World
+        Metadata: (0, 0)
+[WRITE] 2
+        Value: 
+        New value: !!!!!
+        Metadata: (0, 0)
 Type: SINGLE_HOME
 Code: SET 0 Hello SET 1 World SET 2 !!!!!
+Coordinating server: 0
+Involved partitions: 0 1 
+Involved replicas: 0 
 ```
 
 Send a copy transaction that copies the values from the written keys to new keys.
 ```
 $ build/client txn examples/copy.json --host 192.168.2.11
-```
-```
+...
 Transaction ID: 2000
 Status: COMMITTED
-Read set:
-         0 ==> Hello
-         1 ==> World
-         2 ==> !!!!!
-Write set:
-         5 ==> !!!!!
-         3 ==> Hello
-         4 ==> World
-Master metadata:
-         5:          (0, 0))
-         2:          (0, 0))
-         1:          (0, 0))
-         3:          (0, 0))
-         4:          (0, 0))
-         0:          (0, 0))
+Key set:
+[WRITE] 5
+        Value: 
+        New value: 
+        Metadata: (0, 0)
+[READ] 1
+        Value: World
+        Metadata: (0, 0)
+[WRITE] 4
+        Value: 
+        New value: 
+        Metadata: (0, 0)
+[READ] 2
+        Value: !!!!!
+        Metadata: (0, 0)
+[WRITE] 3
+        Value: 
+        New value: 
+        Metadata: (0, 0)
+[READ] 0
+        Value: Hello
+        Metadata: (0, 0)
 Type: SINGLE_HOME
 Code: COPY 0 3 COPY 1 4 COPY 2 5
+Coordinating server: 0
+Involved partitions: 0 1 
+Involved replicas: 0 
 ```
 
 Send a read transaction to read the written data. This time, we read from a different replica to demonstrate that the data has been replicated.
 ```
 $ build/client txn examples/read.1.json --host 192.168.2.13
-```
-```
-Transaction ID: 1003
+...
+Transaction ID: 1002
 Status: COMMITTED
-Read set:
-         0 ==> Hello
-         1 ==> World
-         2 ==> !!!!!
-         3 ==> Hello
-         4 ==> World
-         5 ==> !!!!!
-Write set:
-Master metadata:
-         4:          (0, 0))
-         0:          (0, 0))
-         5:          (0, 0))
-         3:          (0, 0))
-         2:          (0, 0))
-         1:          (0, 0))
+Key set:
+[READ] 4
+        Value: World
+        Metadata: (0, 0)
+[READ] 2
+        Value: !!!!!
+        Metadata: (0, 0)
+[READ] 3
+        Value: Hello
+        Metadata: (0, 0)
+[READ] 5
+        Value: !!!!!
+        Metadata: (0, 0)
+[READ] 1
+        Value: World
+        Metadata: (0, 0)
+[READ] 0
+        Value: Hello
+        Metadata: (0, 0)
 Type: SINGLE_HOME
 Code: GET 0 GET 1 GET 2 GET 3 GET 4 GET 5
+Coordinating server: 2
+Involved partitions: 0 1 
+Involved replicas: 0 
 ```

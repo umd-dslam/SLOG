@@ -11,6 +11,10 @@ void InitializeTracing(const ConfigurationPtr& config) {
   gLocalMachineId = config->local_machine_id();
   auto events = config->disabled_tracing_events();
   for (auto e : events) {
+    if (e == TransactionEvent::ALL) {
+      gDisabledTracingEvents = ~0;
+      return;
+    }
     gDisabledTracingEvents |= (1 << e);
   }
 }

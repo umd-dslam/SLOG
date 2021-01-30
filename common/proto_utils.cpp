@@ -225,7 +225,7 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
     os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << kv.first << "\n";
     os << "\tValue: " << v.value() << "\n";
     if (v.type() == KeyType::WRITE) {
-      os << "\tNew value: " << v.value() << "\n";
+      os << "\tNew value: " << v.new_value() << "\n";
     }
     os << "\tMetadata: " << v.metadata() << "\n";
   }
