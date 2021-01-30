@@ -38,7 +38,7 @@ message Envelope {
 /**
  * The first message of a communication between two entities is
  * always a Request. Some types of Request needs a Response
- * (e.g. LookUpMasterRequest); these requests end with "Request".
+ * (e.g. LookUpMasterRequest); names of these requests end with "Request".
  * Some others are one-way requests (e.g. PaxosPropose) and do not 
  * end with "Request".
  */

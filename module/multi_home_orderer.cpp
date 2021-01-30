@@ -113,7 +113,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
   for (int i = 0; i < replicas.size() - 1; i++) {
     batch_per_rep_[replicas[i]]->add_transactions()->CopyFrom(*txn);
   }
-  // Add the last one directly to avoid copying
+  // Add the last one directly instead of copying
   batch_per_rep_[replicas[replicas.size() - 1]]->mutable_transactions()->AddAllocated(txn);
 
   ++batch_size_;

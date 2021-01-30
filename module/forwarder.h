@@ -13,7 +13,7 @@
 namespace slog {
 
 /**
- * A Forwarder determines the type of a transaction (SINGLE_HOME vs. MULTI_HOME)
+ * A Forwarder determines the type of a transaction (single-home vs. multi-home)
  * then forwards it to the appropriate module.
  *
  * To determine the type of a txn, it sends LookupMasterRequests to other Forwarder
@@ -21,8 +21,10 @@ namespace slog {
  *
  * INPUT:  ForwardTransaction and LookUpMasterRequest
  *
- * OUTPUT: If the txn is SINGLE_HOME, forward to the Sequencer in its home region.
- *         If the txn is MULTI_HOME, forward to the GlobalPaxos for ordering.
+ * OUTPUT: If the txn is single-home, forward to the Sequencer in its home region.
+ *         If the txn is multi-home, forward to the MultiHomeOrderer for ordering;
+ *         if bypass_mh_orderer is set to true in the config, the multi-home txn is
+ *         sent directly to the involved regions.
  *
  *         For LookUpMasterRequest, a LookUpMasterResponse is sent back to
  *         the requester.

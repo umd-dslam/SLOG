@@ -4,6 +4,16 @@ target_sources(slog-core
     base/module.h
     base/networked_module.cpp
     base/networked_module.h
+    consensus.cpp
+    consensus.h
+    forwarder.cpp
+    forwarder.h
+    interleaver.cpp
+    interleaver.h
+    multi_home_orderer.cpp
+    multi_home_orderer.h
+    scheduler.cpp
+    scheduler.h
     scheduler_components/commands.cpp
     scheduler_components/commands.h
     scheduler_components/ddr_lock_manager.cpp
@@ -19,16 +29,6 @@ target_sources(slog-core
     scheduler_components/simple_remaster_manager.h
     scheduler_components/worker.cpp
     scheduler_components/worker.h
-    consensus.cpp
-    consensus.h
-    forwarder.cpp
-    forwarder.h
-    interleaver.cpp
-    interleaver.h
-    multi_home_orderer.cpp
-    multi_home_orderer.h
-    scheduler.cpp
-    scheduler.h
     sequencer.cpp
     sequencer.h
     server.cpp

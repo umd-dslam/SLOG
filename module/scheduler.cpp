@@ -102,8 +102,7 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
 
   auto txn_id = *msg.data<TxnId>();
   auto& txn_holder = GetTxnHolder(txn_id);
-  // Release locks held by this txn. Enqueue the txns that
-  // become ready thanks to this release.
+  // Release locks held by this txn then dispatch the txns that become ready thanks to this release.
   auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder.txn());
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);

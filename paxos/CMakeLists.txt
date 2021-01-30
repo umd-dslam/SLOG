@@ -2,7 +2,6 @@ target_sources(slog-core
   PRIVATE
     acceptor.cpp
     acceptor.h
-    CMakeLists.txt
     leader.cpp
     leader.h
     simulated_multi_paxos.cpp

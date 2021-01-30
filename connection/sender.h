@@ -63,9 +63,6 @@ class Sender {
  private:
   zmq::socket_t* GetRemoteSocket(MachineId to_machine_id);
 
-  // To make a unique identity for a Sender
-  static std::atomic<uint8_t> counter;
-
   // Keep a pointer to context here to make sure that the below sockets
   // are destroyed before the context is
   std::shared_ptr<zmq::context_t> context_;

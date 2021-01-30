@@ -6,9 +6,8 @@ target_sources(slog-core
     csv_writer.cpp
     csv_writer.h
     json_utils.h
-    message_pool.h
-    monitor.h
     monitor.cpp
+    monitor.h
     offline_data_reader.cpp
     offline_data_reader.h
     proto_utils.cpp

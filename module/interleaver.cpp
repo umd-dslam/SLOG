@@ -2,16 +2,11 @@
 
 #include <glog/logging.h>
 
-#include <stack>
-
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
-
-using std::pair;
-using std::stack;
 
 namespace slog {
 
@@ -31,7 +26,7 @@ void LocalLog::AddSlot(SlotId slot_id, uint32_t queue_id) {
 
 bool LocalLog::HasNextBatch() const { return !ready_batches_.empty(); }
 
-pair<SlotId, BatchId> LocalLog::NextBatch() {
+std::pair<SlotId, BatchId> LocalLog::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
@@ -117,7 +112,7 @@ void Interleaver::AdvanceLogs() {
     auto slot_id = next_batch.first;
     auto batch_id = next_batch.second;
 
-    // Replicate the batch and slot id to the corresponding partition in other regions
+    // Replicate the batch id and slot id to the corresponding partition in other regions
     Envelope env;
     auto forward_batch_order = env.mutable_request()->mutable_forward_batch()->mutable_batch_order();
     forward_batch_order->set_batch_id(batch_id);
