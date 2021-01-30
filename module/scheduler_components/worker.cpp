@@ -362,6 +362,7 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
     dummy_txn->mutable_internal()->set_type(txn.internal().type());
     dummy_txn->mutable_internal()->set_coordinating_server(txn.internal().coordinating_server());
     dummy_txn->mutable_internal()->mutable_involved_partitions()->CopyFrom(txn.internal().involved_partitions());
+    dummy_txn->mutable_internal()->mutable_involved_replicas()->CopyFrom(txn.internal().involved_replicas());
     dummy_txn->mutable_internal()->mutable_events()->CopyFrom(txn.internal().events());
     dummy_txn->mutable_internal()->mutable_event_times()->CopyFrom(txn.internal().event_times());
     dummy_txn->mutable_internal()->mutable_event_machines()->CopyFrom(txn.internal().event_machines());
