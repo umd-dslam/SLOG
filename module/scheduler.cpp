@@ -61,6 +61,13 @@ void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
   }
 }
 
+/**
+ * {
+ *    num_all_txns: <number of active txns>,
+ *    all_txns: [<txn id>, ...],
+ *    ...<stats from lock manager>...
+ * }
+ */
 void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   using rapidjson::StringRef;
 

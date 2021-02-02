@@ -129,25 +129,51 @@ vector<TxnId> DDRLockManager::ReleaseLocks(const Transaction& txn) {
   return result;
 }
 
+/**
+ * {
+ *    lock_manager_type: 1,
+ *    num_txns_waiting_for_lock: <number of txns waiting for lock>,
+ *    num_waiting_for_per_txn (lvl == 1): [
+ *      [<txn id>, <number of txns waited>],
+ *      ...
+ *    ],
+ *    waited_by_graph (lvl > 1): [
+ *      [<txn id>, [<waited by txn id>, ...]],
+ *      ...
+ *    ],
+ *    lock_table (lvl >= 2): [
+ *      [
+ *        <key>,
+ *        <write lock requester>,
+ *        [<read lock requester>, ...],
+ *      ],
+ *      ...
+ *    ],
+ * }
+ */
 void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();
 
-  stats.AddMember(StringRef(LOCK_TABLE_TYPE), 1, alloc);
+  stats.AddMember(StringRef(LOCK_MANAGER_TYPE), 1, alloc);
 
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), txn_info_.size(), alloc);
   if (level == 1) {
-    // Collect number of locks waited per txn
-    // TODO: Give this another name. For this lock manager, this is
-    // number of txn waited, not the number of locks.
-    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN),
+    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN),
                     ToJsonArrayOfKeyValue(
                         txn_info_, [](const auto& info) { return info.waiting_for_cnt; }, alloc),
                     alloc);
+  } else if (level > 1) {
+    rapidjson::Value waited_by_graph(rapidjson::kArrayType);
+    for (const auto& info : txn_info_) {
+      rapidjson::Value entry(rapidjson::kArrayType);
+      entry.PushBack(info.first, alloc).PushBack(ToJsonArray(info.second.waited_by, alloc), alloc);
+      waited_by_graph.PushBack(entry, alloc);
+    }
+    stats.AddMember(StringRef(WAITED_BY_GRAPH), move(waited_by_graph), alloc);
   }
 
-  stats.AddMember(StringRef(NUM_LOCKED_KEYS), 0, alloc);
   if (level >= 2) {
     // Collect data from lock tables
     rapidjson::Value lock_table(rapidjson::kArrayType);
@@ -156,7 +182,6 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
       auto& lock_state = pair.second;
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
-      // [key, write_lock_requester, [read_lock_requesters]]
       entry.PushBack(key_json, alloc)
           .PushBack(lock_state.write_lock_requester().value_or(0), alloc)
           .PushBack(ToJsonArray(lock_state.read_lock_requesters(), alloc), alloc);

@@ -193,16 +193,36 @@ vector<TxnId> OldLockManager::ReleaseLocks(const Transaction& txn) {
   return result;
 }
 
+/**
+ * {
+ *    lock_manager_type: 0,
+ *    num_txns_waiting_for_lock: <number of txns waiting for lock>,
+ *    num_waiting_for_per_txn (lvl >= 1): [
+ *      [<txn id>, <number of locks waited>],
+ *      ...
+ *    ],
+ *    num_locked_keys: <number of keys locked>,
+ *    lock_table (lvl >= 2): [
+ *      [
+ *        <key>,
+ *        <mode>,
+ *        [<holder>, ...],
+ *        [[<waiting txn id>, <mode>], ...]
+ *      ],
+ *      ...
+ *    ],
+ * }
+ */
 void OldLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const {
   using rapidjson::StringRef;
 
   auto& alloc = stats.GetAllocator();
-  stats.AddMember(StringRef(LOCK_TABLE_TYPE), 0, alloc);
+  stats.AddMember(StringRef(LOCK_MANAGER_TYPE), 0, alloc);
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
 
   if (level >= 1) {
     // Collect number of locks waited per txn
-    stats.AddMember(StringRef(NUM_LOCKS_WAITED_PER_TXN), ToJsonArrayOfKeyValue(num_locks_waited_, alloc), alloc);
+    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN), ToJsonArrayOfKeyValue(num_locks_waited_, alloc), alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);
@@ -217,7 +237,6 @@ void OldLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
       }
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
-      // [key, mode, [holders], [(txn_id, mode)]]
       entry.PushBack(key_json, alloc)
           .PushBack(static_cast<uint32_t>(lock_state.mode), alloc)
           .PushBack(ToJsonArray(lock_state.GetHolders(), alloc), alloc)

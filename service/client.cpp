@@ -104,30 +104,27 @@ void ExecuteTxn(const char* txn_file) {
 /***********************************************
                 Stats Command
 ***********************************************/
-
-const size_t MAX_DISPLAYED_ARRAY_SIZE = 50;
+#define MAX_DISPLAYED_ARRAY_SIZE 50
+#define TRUNCATED_COUNTER counter ## __LINE__
+#define TRUNCATED_FOR_EACH(ITER, ARRAY)           \
+  int TRUNCATED_COUNTER = 0;                      \
+  for (auto& ITER : ARRAY)                        \
+    if (++TRUNCATED_COUNTER >= 50) {              \
+      std::cout << "(truncated)\n";               \
+      break;                                      \
+    } else
 
 struct StatsModule {
   api::StatsModule api_enum;
   function<void(const rapidjson::Document&, uint32_t level)> print_func;
 };
 
-void Header(const std::string& header) {
-  cout << "\n\n====================== " << header << " ======================\n\n";
-}
-
 void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Txn id counter: " << stats[TXN_ID_COUNTER].GetUint() << "\n";
   cout << "Pending responses: " << stats[NUM_PENDING_RESPONSES].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of pending responses (txn_id, stream_id):\n";
-    size_t counter = 0;
-    for (auto& entry : stats[PENDING_RESPONSES].GetArray()) {
-      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << " (truncated)";
-        break;
-      }
-
+    TRUNCATED_FOR_EACH(entry, stats[PENDING_RESPONSES].GetArray()) {
       cout << "(" << entry.GetArray()[0].GetUint() << ", " << entry.GetArray()[1].GetUint() << ")\n";
     }
     cout << "\n";
@@ -135,13 +132,7 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of partially completed txns: ";
-    size_t counter = 0;
-    for (auto& txn_id : stats[PARTIALLY_COMPLETED_TXNS].GetArray()) {
-      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << " (truncated)";
-        break;
-      }
-
+    TRUNCATED_FOR_EACH(txn_id, stats[PARTIALLY_COMPLETED_TXNS].GetArray()) {
       cout << txn_id.GetUint() << " ";
     }
     cout << "\n";
@@ -162,52 +153,49 @@ string LockModeStr(LockMode mode) {
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
-  Header("Transactions");
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of all txns:\n";
-    size_t counter = 0;
-    for (auto& txn_id : stats[ALL_TXNS].GetArray()) {
-      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << " (truncated)";
-        break;
-      }
-
+    TRUNCATED_FOR_EACH(txn_id, stats[ALL_TXNS].GetArray()) {
       cout << txn_id.GetUint() << " ";
     }
     cout << "\n";
   }
 
-  cout << "Txns waiting for lock: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
-  if (level >= 1) {
-    cout << "Locks waited per txn:\n";
-    cout << setw(10) << "Txn" << setw(18) << "# locks waited\n";
-    size_t counter = 0;
-    for (auto& pair : stats[NUM_LOCKS_WAITED_PER_TXN].GetArray()) {
-      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << "(truncated)\n";
-        break;
-      }
+  cout << "Waiting txns: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
 
-      const auto& txn_and_locks = pair.GetArray();
-      cout << setw(10) << txn_and_locks[0].GetUint() << setw(18) << txn_and_locks[1].GetInt() << "\n";
+  // 0: OLD or RMA. 1: DDR
+  auto lock_man_type = stats[LOCK_MANAGER_TYPE].GetInt();
+
+  if (lock_man_type == 0) {
+    cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << "\n";
+  }
+
+  if (level == 1 || (level > 1 && lock_man_type == 0)) {
+    cout << setw(10) << "Txn" << setw(18) << "# waiting for" << "\n";
+    TRUNCATED_FOR_EACH(it, stats[NUM_WAITING_FOR_PER_TXN].GetArray()) {
+      const auto& entry = it.GetArray();
+      cout << setw(10) << entry[0].GetUint() << setw(18) << entry[1].GetInt() << "\n";
+    }
+  } else if (level > 1) {
+    cout << "\nWAITED-BY GRAPH\n";
+    cout << setw(10) << "Txn" << "\tTxns waiting for this txn" << "\n";
+    TRUNCATED_FOR_EACH(it, stats[WAITED_BY_GRAPH].GetArray()) {
+      const auto& entry = it.GetArray();
+      cout << setw(10) << entry[0].GetUint() << "\t";
+      TRUNCATED_FOR_EACH(e, entry[1].GetArray()) {
+        cout << e.GetUint() << " ";
+      }
+      cout << "\n";
     }
   }
 
-  cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << "\n";
   if (level >= 2) {
-    cout << "Lock table:\n";
-    size_t counter = 0;
-    for (auto& entry_ : stats[LOCK_TABLE].GetArray()) {
-      if (++counter >= MAX_DISPLAYED_ARRAY_SIZE) {
-        cout << "(truncated)\n";
-        break;
-      }
-
-      const auto& entry = entry_.GetArray();
-      auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
-
-      if (stats[LOCK_TABLE_TYPE].GetInt() == 0) {
+    cout << "\nLOCK TABLE\n";
+    TRUNCATED_FOR_EACH(it, stats[LOCK_TABLE].GetArray()) {
+      const auto& entry = it.GetArray();
+      if (lock_man_type == 0) {
+        auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
         cout << "Key: " << entry[0].GetString() << ". Mode: " << LockModeStr(lock_mode) << "\n";
         cout << "\tHolders: ";
         for (auto& holder : entry[2].GetArray()) {
@@ -216,16 +204,16 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         cout << "\n";
 
         cout << "\tWaiters: ";
-        for (auto& waiter : entry[3].GetArray()) {
+        TRUNCATED_FOR_EACH(waiter, entry[3].GetArray()) {
           auto txn_and_mode = waiter.GetArray();
           cout << "(" << txn_and_mode[0].GetUint() << ", "
                << LockModeStr(static_cast<LockMode>(txn_and_mode[1].GetUint())) << ") ";
         }
       } else {
         cout << "Key: " << entry[0].GetString() << "\n";
-        cout << "\tLatest write requester: " << entry[1].GetUint() << "\n";
-        cout << "\tLatest read requesters: ";
-        for (auto& requester : entry[2].GetArray()) {
+        cout << "\tWite: " << entry[1].GetUint() << "\n";
+        cout << "\tReads: ";
+        TRUNCATED_FOR_EACH(requester, entry[2].GetArray()) {
           cout << requester.GetUint() << " ";
         }
       }

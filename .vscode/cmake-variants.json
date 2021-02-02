@@ -37,7 +37,7 @@
   "remasterProtocol": {
     "default": "none-rma",
     "choices": {
-      "none/old": {
+      "none-old": {
         "short": "None/OLD",
         "long": "No remaster protocol with OLD lock manager",
         "settings": {
