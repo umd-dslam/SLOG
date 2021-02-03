@@ -39,6 +39,8 @@ class Worker : public NetworkedModule {
          const std::shared_ptr<Storage<Key, Record>>& storage,
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
+  static Channel MakeChannel(int worker_num) { return kMaxChannel + worker_num; }
+
  protected:
   std::vector<zmq::socket_t> InitializeCustomSockets() final;
   /**
