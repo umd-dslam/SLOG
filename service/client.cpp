@@ -105,13 +105,13 @@ void ExecuteTxn(const char* txn_file) {
                 Stats Command
 ***********************************************/
 #define MAX_DISPLAYED_ARRAY_SIZE 50
-#define TRUNCATED_COUNTER counter ## __LINE__
-#define TRUNCATED_FOR_EACH(ITER, ARRAY)           \
-  int TRUNCATED_COUNTER = 0;                      \
-  for (auto& ITER : ARRAY)                        \
-    if (++TRUNCATED_COUNTER >= 50) {              \
-      std::cout << "(truncated)\n";               \
-      break;                                      \
+#define TRUNCATED_COUNTER counter##__LINE__
+#define TRUNCATED_FOR_EACH(ITER, ARRAY) \
+  int TRUNCATED_COUNTER = 0;            \
+  for (auto& ITER : ARRAY)              \
+    if (++TRUNCATED_COUNTER >= 50) {    \
+      std::cout << "(truncated)\n";     \
+      break;                            \
     } else
 
 struct StatsModule {
@@ -132,9 +132,7 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of partially completed txns: ";
-    TRUNCATED_FOR_EACH(txn_id, stats[PARTIALLY_COMPLETED_TXNS].GetArray()) {
-      cout << txn_id.GetUint() << " ";
-    }
+    TRUNCATED_FOR_EACH(txn_id, stats[PARTIALLY_COMPLETED_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
     cout << "\n";
   }
   cout << endl;
@@ -156,9 +154,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   if (level >= 1) {
     cout << "List of all txns:\n";
-    TRUNCATED_FOR_EACH(txn_id, stats[ALL_TXNS].GetArray()) {
-      cout << txn_id.GetUint() << " ";
-    }
+    TRUNCATED_FOR_EACH(txn_id, stats[ALL_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
     cout << "\n";
   }
 
@@ -172,20 +168,21 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   }
 
   if (level == 1 || (level > 1 && lock_man_type == 0)) {
-    cout << setw(10) << "Txn" << setw(18) << "# waiting for" << "\n";
+    cout << setw(10) << "Txn" << setw(18) << "# waiting for"
+         << "\n";
     TRUNCATED_FOR_EACH(it, stats[NUM_WAITING_FOR_PER_TXN].GetArray()) {
       const auto& entry = it.GetArray();
       cout << setw(10) << entry[0].GetUint() << setw(18) << entry[1].GetInt() << "\n";
     }
   } else if (level > 1) {
     cout << "\nWAITED-BY GRAPH\n";
-    cout << setw(10) << "Txn" << "\tTxns waiting for this txn" << "\n";
+    cout << setw(10) << "Txn"
+         << "\tTxns waiting for this txn"
+         << "\n";
     TRUNCATED_FOR_EACH(it, stats[WAITED_BY_GRAPH].GetArray()) {
       const auto& entry = it.GetArray();
       cout << setw(10) << entry[0].GetUint() << "\t";
-      TRUNCATED_FOR_EACH(e, entry[1].GetArray()) {
-        cout << e.GetUint() << " ";
-      }
+      TRUNCATED_FOR_EACH(e, entry[1].GetArray()) { cout << e.GetUint() << " "; }
       cout << "\n";
     }
   }
@@ -213,9 +210,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         cout << "Key: " << entry[0].GetString() << "\n";
         cout << "\tWite: " << entry[1].GetUint() << "\n";
         cout << "\tReads: ";
-        TRUNCATED_FOR_EACH(requester, entry[2].GetArray()) {
-          cout << requester.GetUint() << " ";
-        }
+        TRUNCATED_FOR_EACH(requester, entry[2].GetArray()) { cout << requester.GetUint() << " "; }
       }
       cout << "\n";
     }

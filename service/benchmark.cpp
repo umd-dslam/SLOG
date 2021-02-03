@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (sigtimedwait(&signal_set, nullptr, &sigpoll_time) >= 0) {
-      if (!FLAGS_out_dir.empty()) {
+      if (writers) {
         LOG(WARNING) << "Benchmark interuptted. Partial results will be written out.";
       }
       break;

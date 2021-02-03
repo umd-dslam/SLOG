@@ -29,11 +29,10 @@ constexpr char MH_HOMES[] = "mh_homes";
 constexpr char MP_PCT[] = "mp";
 // Number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_PARTS[] = "mp_parts";
-// Number of hot keys across the key space. The actual number of
+// Number of hot keys per partition. The actual number of
 // hot keys won't match exactly the specified number but will be close.
 // Precisely, it will be:
-//        floor(hot / num_key_lists) * num_key_lists
-//  where: num_key_lists = total_num_replicas * total_num_partitions
+//        floor(hot / num_replicas) * num_replicas
 constexpr char HOT[] = "hot";
 // Number of records in a transaction
 constexpr char RECORDS[] = "records";
@@ -66,7 +65,7 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr config, const string& data_d
       client_txn_id_counter_(0) {
   auto num_replicas = config->num_replicas();
   auto num_partitions = config->num_partitions();
-  auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / (num_replicas * num_partitions));
+  auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / num_replicas);
   auto simple_partitioning = config->simple_partitioning();
   for (uint32_t part = 0; part < num_partitions; part++) {
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
@@ -177,16 +176,13 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   CHECK_LE(hot_records, records) << "Number of hot records cannot exceed number of records in a transaction!";
 
   // Randomly pick some records to be hot records (can be either read or write records)
-  vector<bool> is_hot(hot_records, true);
-  is_hot.resize(records);
-  shuffle(is_hot.begin(), is_hot.end(), rg_);
   for (size_t i = 0; i < records; i++) {
     auto partition = candidate_partitions[i % candidate_partitions.size()];
     auto home = candidate_homes[i % candidate_homes.size()];
 
     Key key;
-    // Decide whether to pick a hot or cold key
-    if (is_hot[i]) {
+    auto is_hot = i < hot_records;
+    if (is_hot) {
       key = partition_to_key_lists_[partition][home].GetRandomHotKey(rg_);
     } else {
       key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
@@ -195,7 +191,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     auto ins = pro.records.try_emplace(key, TransactionProfile::Record());
     if (ins.second) {
       auto& record = ins.first->second;
-      record.is_hot = is_hot[i];
+      record.is_hot = is_hot;
       // Decide whether this is a read or a write record
       if (i < writes) {
         code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
