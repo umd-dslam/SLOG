@@ -117,10 +117,9 @@ endif()
 # Other results are discarded
 find_package(Protobuf QUIET)
 
-# Generating code from protobuf files is done here because we want
-# to do absolute import in .proto files, consistent with the rest of
-# the codebase. More importantly, as implicit relative import is disabled
-# in python 3, we need absolute import for the generated python code to work.
+# Generating code from protobuf files is done here instead of in a CMakeLists.txt
+# in the 'proto' directory because, otherwise, we cannot do absolute import in the
+# .proto files as well as in Python.
 
 # Turn this off so that "protobuf_generate_cpp" won't append directory
 # of each .proto file to the protobuf include path, which should contain only
