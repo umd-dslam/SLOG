@@ -143,8 +143,11 @@ int main(int argc, char* argv[]) {
     auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
     auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
 
-    LOG(INFO) << "Sent: " << num_sent_txns << "; Received: " << num_recv_txns << "; Sent tps: " << send_tps
-              << "; Recv tps: " << recv_tps << "\n";
+    // Effectively skip the first log since it is usually inaccurate.
+    if (last_num_sent_txns > 0) {
+      LOG(INFO) << "Sent: " << num_sent_txns << "; Received: " << num_recv_txns << "; Sent tps: " << send_tps
+                << "; Recv tps: " << recv_tps << "\n";
+    }
 
     last_num_sent_txns = num_sent_txns;
     last_num_recv_txns = num_recv_txns;
