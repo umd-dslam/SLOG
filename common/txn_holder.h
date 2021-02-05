@@ -23,8 +23,20 @@ class TxnHolder {
         done_(false),
         lo_txns_(config->num_replicas()),
         num_lo_txns_(0),
-        num_involved_replicas_(txn->internal().involved_replicas_size()) {
+        expected_num_lo_txns_(0) {
+    // Initialize to a non-existing replica number
+    auto prev = config->num_replicas() + 1;
+    // Compute expected number of lock-only txn. We don't use number of
+    // involved replicas for this because certain partitions might only
+    // receive lock-only txns from a subset of the involved replicas.
+    for (const auto& kv : txn->keys()) {
+      if (kv.second.metadata().master() != prev) {
+        ++expected_num_lo_txns_;
+        prev = kv.second.metadata().master();
+      }
+    }
     lo_txns_[txn->internal().home()].reset(txn);
+    ++num_lo_txns_;
   }
 
   bool AddLockOnlyTxn(Transaction* txn) {
@@ -49,7 +61,9 @@ class TxnHolder {
   void SetAborting() { aborting_ = true; }
   bool is_aborting() const { return aborting_; }
 
-  bool is_ready_for_gc() const { return done_ && num_lo_txns_ == num_involved_replicas_; }
+  bool is_ready_for_gc() const { return done_ && num_lo_txns_ == expected_num_lo_txns_; }
+  int num_lock_only_txns() const { return num_lo_txns_; }
+  int expected_num_lock_only_txns() const { return expected_num_lo_txns_; }
 
  private:
   TxnId id_;
@@ -58,7 +72,7 @@ class TxnHolder {
   bool done_;
   std::vector<std::unique_ptr<Transaction>> lo_txns_;
   int num_lo_txns_;
-  int num_involved_replicas_;
+  int expected_num_lo_txns_;
 };
 
 }  // namespace slog

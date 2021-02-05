@@ -47,4 +47,10 @@ const char NUM_TXNS_WAITING_FOR_LOCK[] = "num_txns_waiting_for_lock";
 const char NUM_WAITING_FOR_PER_TXN[] = "num_waiting_for_per_txn";
 const char LOCK_TABLE[] = "lock_table";
 const char WAITED_BY_GRAPH[] = "waited_by_graph";
+const char TXN_ID[] = "id";
+const char TXN_DONE[] = "done";
+const char TXN_ABORTING[] = "aborting";
+const char TXN_NUM_LO[] = "num_lo";
+const char TXN_EXPECTED_NUM_LO[] = "expected_num_lo";
+
 }  // namespace slog

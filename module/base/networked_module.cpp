@@ -38,7 +38,11 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
   debug_info_ = os.str();
 }
 
-NetworkedModule::~NetworkedModule() { LOG(INFO) << name() << " stopped. Work done: " << work_; }
+NetworkedModule::~NetworkedModule() {
+#ifdef ENABLE_WORK_MEASURING
+  LOG(INFO) << name() << " - work done: " << work_;
+#endif
+}
 
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_[i]; }
 

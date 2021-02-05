@@ -18,7 +18,7 @@ DEFINE_int32(workers, 1, "Number of worker threads");
 DEFINE_uint32(r, 0, "The region where the current machine is located");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_string(out_dir, "", "Directory containing output data");
-DEFINE_uint32(rate, 1000, "Maximum number of transactions sent per second");
+DEFINE_uint32(rate, 100, "Maximum number of transactions sent per second");
 DEFINE_uint32(txns, 100, "Total number of txns being sent. ");
 DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");

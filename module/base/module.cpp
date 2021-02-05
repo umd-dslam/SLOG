@@ -17,6 +17,7 @@ ModuleRunner::~ModuleRunner() {
   if (thread_.joinable()) {
     thread_.join();
   }
+  LOG(INFO) << module_->name() << " - thread stopped";
 }
 
 void ModuleRunner::Start(std::optional<uint32_t> cpu) {

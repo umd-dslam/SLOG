@@ -35,7 +35,9 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
 Broker::~Broker() {
   running_ = false;
   thread_.join();
+#ifdef ENABLE_WORK_MEASURING
   LOG(INFO) << "Broker stopped. Work done: " << work_;
+#endif
 }
 
 void Broker::StartInNewThread(std::optional<uint32_t> cpu) {

@@ -64,7 +64,17 @@ void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
 /**
  * {
  *    num_all_txns: <number of active txns>,
- *    all_txns: [<txn id>, ...],
+ *    all_txns (lvl == 1): [<txn id>, ...],
+ *    all_txns (lvl >= 2): [
+ *      {
+ *        id: <txn id>,
+ *        done: <is done>,
+ *        aborting: <is aborting>,
+ *        num_lo: <num lock only txns>,
+ *        expected_num_lo: <expected num lock only txns>,
+ *      },
+ *      ...
+ *    ],
  *    ...<stats from lock manager>...
  * }
  */
@@ -79,11 +89,25 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
   // Add stats for current transactions in the system
   stats.AddMember(StringRef(NUM_ALL_TXNS), active_txns_.size(), alloc);
-  if (level >= 1) {
+  if (level == 1) {
     stats.AddMember(StringRef(ALL_TXNS),
                     ToJsonArray(
                         active_txns_, [](const auto& p) { return p.first; }, alloc),
                     alloc);
+  }
+
+  if (level >= 2) {
+    rapidjson::Value txns(rapidjson::kArrayType);
+    for (const auto& kv : active_txns_) {
+      rapidjson::Value txn_obj(rapidjson::kObjectType);
+      txn_obj.AddMember(StringRef(TXN_ID), kv.first, alloc)
+          .AddMember(StringRef(TXN_DONE), kv.second.is_done(), alloc)
+          .AddMember(StringRef(TXN_ABORTING), kv.second.is_aborting(), alloc)
+          .AddMember(StringRef(TXN_NUM_LO), kv.second.num_lock_only_txns(), alloc)
+          .AddMember(StringRef(TXN_EXPECTED_NUM_LO), kv.second.expected_num_lock_only_txns(), alloc);
+      txns.PushBack(txn_obj, alloc);
+    }
+    stats.AddMember(StringRef(ALL_TXNS), txns, alloc);
   }
 
   // Add stats from the lock manager

@@ -72,11 +72,9 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
                             const std::variant<string, int>& proc) {
   auto txn = MakeTestTransaction(config, id, keys, proc);
   auto first_lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(0));
-  CHECK(first_lo != nullptr);
   TxnHolder holder(config, first_lo);
   for (int i = 1; i < txn->internal().involved_replicas_size(); ++i) {
     auto lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(i));
-    CHECK(lo != nullptr);
     holder.AddLockOnlyTxn(lo);
   }
   delete txn;

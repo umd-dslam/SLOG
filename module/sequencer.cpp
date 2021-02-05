@@ -51,15 +51,24 @@ void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
 
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
     txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
-    if (txn == nullptr) {
-      return;
-    }
   }
 
   for (auto p : txn->internal().involved_partitions()) {
     auto new_txn = GeneratePartitionedTxn(config_, *txn, p);
     CHECK(new_txn != nullptr);
-    partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
+
+    // Check if the generated subtxn does not intend to lock any key in its home region
+    // If this is a remaster txn, it is never redundant
+    auto is_redundant = !new_txn->has_remaster();
+    for (const auto& kv : new_txn->keys()) {
+      if (static_cast<int>(kv.second.metadata().master()) == new_txn->internal().home()) {
+        is_redundant = false;
+        break;
+      }
+    }
+    if (!is_redundant) {
+      partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
+    }
   }
   delete txn;
 

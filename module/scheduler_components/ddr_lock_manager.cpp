@@ -133,11 +133,7 @@ vector<TxnId> DDRLockManager::ReleaseLocks(const Transaction& txn) {
  * {
  *    lock_manager_type: 1,
  *    num_txns_waiting_for_lock: <number of txns waiting for lock>,
- *    num_waiting_for_per_txn (lvl == 1): [
- *      [<txn id>, <number of txns waited>],
- *      ...
- *    ],
- *    waited_by_graph (lvl > 1): [
+ *    waited_by_graph (lvl >= 1): [
  *      [<txn id>, [<waited by txn id>, ...]],
  *      ...
  *    ],
@@ -159,12 +155,7 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   stats.AddMember(StringRef(LOCK_MANAGER_TYPE), 1, alloc);
 
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), txn_info_.size(), alloc);
-  if (level == 1) {
-    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN),
-                    ToJsonArrayOfKeyValue(
-                        txn_info_, [](const auto& info) { return info.waiting_for_cnt; }, alloc),
-                    alloc);
-  } else if (level > 1) {
+  if (level >= 1) {
     rapidjson::Value waited_by_graph(rapidjson::kArrayType);
     for (const auto& info : txn_info_) {
       rapidjson::Value entry(rapidjson::kArrayType);

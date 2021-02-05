@@ -99,23 +99,12 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
 
-  bool is_relevant = false;
-  for (const auto& kv : lock_only_txn->keys()) {
-    if (kv.second.metadata().master() == lo_master) {
-      is_relevant = true;
-    }
-  }
-
-  if (!is_relevant) {
-    delete lock_only_txn;
-    return nullptr;
-  }
-
   return lock_only_txn;
 }
 
 Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transaction& txn, uint32_t partition) {
   auto new_txn = new Transaction(txn);
+  // Remove keys that are not in the target partition
   for (auto it = new_txn->mutable_keys()->begin(); it != new_txn->mutable_keys()->end();) {
     if (config->partition_of_key(it->first) != partition) {
       it = new_txn->mutable_keys()->erase(it);

@@ -99,7 +99,7 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
   }
 }
 
-TEST_P(SequencerTest, MultiHomeTransaction) {
+TEST_P(SequencerTest, MultiHomeTransaction1) {
   //             A  B  C  D
   // Partition:  0  1  0  1
   auto txn = MakeTestTransaction(
@@ -110,6 +110,8 @@ TEST_P(SequencerTest, MultiHomeTransaction) {
 
   SendToSequencer(move(env));
 
+  // The txn was sent to region 0, which generates two subtxns, each for each partitions. These subtxns are
+  // also replicated to region 1.
   for (int rep = 0; rep < 2; rep++) {
     {
       auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
@@ -124,6 +126,48 @@ TEST_P(SequencerTest, MultiHomeTransaction) {
       ASSERT_EQ(lo_txn.keys_size(), 2);
       ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
       ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
+
+      delete batch;
+    }
+
+    {
+      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
+
+      ASSERT_NE(batch, nullptr);
+      ASSERT_EQ(batch->transactions_size(), 1);
+
+      auto lo_txn = batch->transactions().at(0);
+      ASSERT_EQ(lo_txn.internal().id(), 1000);
+      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+      ASSERT_EQ(lo_txn.internal().home(), 0);
+      ASSERT_EQ(lo_txn.keys_size(), 2);
+      ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+      ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+
+      delete batch;
+    }
+  }
+}
+
+TEST_P(SequencerTest, MultiHomeTransaction2) {
+  //             A  B  C  D
+  // Partition:  0  1  0  1
+  auto txn = MakeTestTransaction(
+      configs_[0], 1000,
+      {{"A", KeyType::READ, 1}, {"B", KeyType::READ, 0}, {"C", KeyType::WRITE, 1}, {"D", KeyType::WRITE, 1}});
+  auto env = make_unique<Envelope>();
+  env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
+
+  SendToSequencer(move(env));
+
+  // The txn was sent to region 0, which only generates one subtxn for partition 1 because the subtxn for partition
+  // 0 is redundant (both A and C are homed at region 1)
+  for (int rep = 0; rep < 2; rep++) {
+    {
+      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
+
+      ASSERT_NE(batch, nullptr);
+      ASSERT_EQ(batch->transactions_size(), 0);
 
       delete batch;
     }
@@ -175,6 +219,7 @@ TEST_P(SequencerTest, RemasterTransaction) {
 #endif
 
 TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
+  // "A" and "B" are on two different partitions
   auto txn = MakeTestTransaction(configs_[0], 1000, {{"A", KeyType::READ, 0}, {"B", KeyType::READ, 1}});
 
   auto env = make_unique<Envelope>();
@@ -182,6 +227,8 @@ TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
 
   SendToSequencer(move(env));
 
+  // The txn was sent to region 0, which only generates one subtxns for partition 0 because B of partition 1
+  // does not have any key homed at 0.
   for (int rep = 0; rep < 2; rep++) {
     {
       auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
@@ -203,14 +250,7 @@ TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
       auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
 
       ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
-
-      auto lo_txn = batch->transactions().at(0);
-      ASSERT_EQ(lo_txn.internal().id(), 1000);
-      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn.internal().home(), 0);
-      ASSERT_EQ(lo_txn.keys_size(), 1);
-      ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+      ASSERT_EQ(batch->transactions_size(), 0);
 
       delete batch;
     }

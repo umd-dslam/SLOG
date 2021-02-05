@@ -17,6 +17,7 @@ DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
 DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
 DEFINE_uint32(repeat, 1, "Used with \"txn\" command. Send the txn multiple times");
 DEFINE_bool(no_wait, false, "Used with \"txn\" command. Don't wait for reply");
+DEFINE_int32(truncate, 50, "Number of lines to truncate the output at");
 
 using namespace slog;
 using namespace std;
@@ -51,15 +52,15 @@ void ExecuteTxn(const char* txn_file) {
   vector<KeyEntry> keys;
 
   // 2. Construct a request
-  auto read_set_arr = d["read_set"].GetArray();
-  for (auto& v : read_set_arr) {
-    keys.emplace_back(v.GetString(), KeyType::READ);
-  }
-
   auto write_set_arr = d["write_set"].GetArray();
   vector<string> write_set;
   for (auto& v : write_set_arr) {
     keys.emplace_back(v.GetString(), KeyType::WRITE);
+  }
+
+  auto read_set_arr = d["read_set"].GetArray();
+  for (auto& v : read_set_arr) {
+    keys.emplace_back(v.GetString(), KeyType::READ);
   }
 
   Transaction* txn;
@@ -104,14 +105,13 @@ void ExecuteTxn(const char* txn_file) {
 /***********************************************
                 Stats Command
 ***********************************************/
-#define MAX_DISPLAYED_ARRAY_SIZE 50
 #define TRUNCATED_COUNTER counter##__LINE__
-#define TRUNCATED_FOR_EACH(ITER, ARRAY) \
-  int TRUNCATED_COUNTER = 0;            \
-  for (auto& ITER : ARRAY)              \
-    if (++TRUNCATED_COUNTER >= 50) {    \
-      std::cout << "(truncated)\n";     \
-      break;                            \
+#define TRUNCATED_FOR_EACH(ITER, ARRAY)          \
+  int TRUNCATED_COUNTER = 0;                     \
+  for (auto& ITER : ARRAY)                       \
+    if (++TRUNCATED_COUNTER >= FLAGS_truncate) { \
+      std::cout << "(truncated)\n";              \
+      break;                                     \
     } else
 
 struct StatsModule {
@@ -152,7 +152,7 @@ string LockModeStr(LockMode mode) {
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
-  if (level >= 1) {
+  if (level == 1) {
     cout << "List of all txns:\n";
     TRUNCATED_FOR_EACH(txn_id, stats[ALL_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
     cout << "\n";
@@ -167,28 +167,40 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
     cout << "Locked keys: " << stats[NUM_LOCKED_KEYS].GetUint() << "\n";
   }
 
-  if (level == 1 || (level > 1 && lock_man_type == 0)) {
-    cout << setw(10) << "Txn" << setw(18) << "# waiting for"
-         << "\n";
-    TRUNCATED_FOR_EACH(it, stats[NUM_WAITING_FOR_PER_TXN].GetArray()) {
-      const auto& entry = it.GetArray();
-      cout << setw(10) << entry[0].GetUint() << setw(18) << entry[1].GetInt() << "\n";
+  if (level >= 1) {
+    cout << "\nACTIVE TRANSACTIONS\n\n";
+    TRUNCATED_FOR_EACH(txn, stats[ALL_TXNS].GetArray()) {
+      cout << "\t";
+      cout << TXN_ID << ": " << txn[TXN_ID].GetUint() << ", ";
+      cout << TXN_DONE << ": " << txn[TXN_DONE].GetBool() << ", ";
+      cout << TXN_ABORTING << ": " << txn[TXN_ABORTING].GetBool() << ", ";
+      cout << TXN_NUM_LO << ": " << txn[TXN_NUM_LO].GetInt() << ", ";
+      cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << "\n";
     }
-  } else if (level > 1) {
-    cout << "\nWAITED-BY GRAPH\n";
-    cout << setw(10) << "Txn"
-         << "\tTxns waiting for this txn"
-         << "\n";
-    TRUNCATED_FOR_EACH(it, stats[WAITED_BY_GRAPH].GetArray()) {
-      const auto& entry = it.GetArray();
-      cout << setw(10) << entry[0].GetUint() << "\t";
-      TRUNCATED_FOR_EACH(e, entry[1].GetArray()) { cout << e.GetUint() << " "; }
-      cout << "\n";
+
+    cout << "\n\nTRANSACTION DEPENDENCIES\n\n";
+    if (lock_man_type == 0) {
+      cout << setw(10) << "Txn" << setw(18) << "# waiting for"
+           << "\n";
+      TRUNCATED_FOR_EACH(it, stats[NUM_WAITING_FOR_PER_TXN].GetArray()) {
+        const auto& entry = it.GetArray();
+        cout << setw(10) << entry[0].GetUint() << setw(18) << entry[1].GetInt() << "\n";
+      }
+    } else {
+      cout << setw(10) << "Txn"
+           << "\tTxns waiting for this txn"
+           << "\n";
+      TRUNCATED_FOR_EACH(it, stats[WAITED_BY_GRAPH].GetArray()) {
+        const auto& entry = it.GetArray();
+        cout << setw(10) << entry[0].GetUint() << "\t";
+        TRUNCATED_FOR_EACH(e, entry[1].GetArray()) { cout << e.GetUint() << " "; }
+        cout << "\n";
+      }
     }
   }
 
   if (level >= 2) {
-    cout << "\nLOCK TABLE\n";
+    cout << "\n\nLOCK TABLE\n\n";
     TRUNCATED_FOR_EACH(it, stats[LOCK_TABLE].GetArray()) {
       const auto& entry = it.GetArray();
       if (lock_man_type == 0) {
@@ -208,7 +220,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         }
       } else {
         cout << "Key: " << entry[0].GetString() << "\n";
-        cout << "\tWite: " << entry[1].GetUint() << "\n";
+        cout << "\tWrite: " << entry[1].GetUint() << "\n";
         cout << "\tReads: ";
         TRUNCATED_FOR_EACH(requester, entry[2].GetArray()) { cout << requester.GetUint() << " "; }
       }
