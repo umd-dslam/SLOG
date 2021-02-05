@@ -58,7 +58,7 @@ TransactionType SetTransactionType(Transaction& txn);
 Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_place = false);
 
 /**
- * Returns nullptr if the generated txn contains no key
+ * Returns nullptr if the generated txn contains no relevant key
  */
 Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transaction& txn, uint32_t partition);
 

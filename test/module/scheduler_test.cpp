@@ -76,12 +76,13 @@ class SchedulerTest : public ::testing::Test {
     CHECK(txn != nullptr);
     for (auto p : txn->internal().involved_partitions()) {
       auto new_txn = GeneratePartitionedTxn(test_slogs[0]->config(), *txn, p);
-      CHECK(new_txn != nullptr);
-      internal::Envelope env;
-      env.mutable_request()->mutable_forward_txn()->set_allocated_txn(new_txn);
-      // This message is sent from machine 0:0, so it will be queued up in queue 0.
-      // 'p' just happens to be the same as machine id here.
-      sender[0]->Send(env, p, kSchedulerChannel);
+      if (new_txn != nullptr) {
+        internal::Envelope env;
+        env.mutable_request()->mutable_forward_txn()->set_allocated_txn(new_txn);
+        // This message is sent from machine 0:0, so it will be queued up in queue 0.
+        // 'p' just happens to be the same as machine id here.
+        sender[0]->Send(env, p, kSchedulerChannel);
+      }
     }
   }
 

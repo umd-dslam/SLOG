@@ -104,18 +104,39 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
 
 Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transaction& txn, uint32_t partition) {
   auto new_txn = new Transaction(txn);
+
+  vector<uint32_t> involved_replicas;
+
+  // Check if the generated subtxn does not intend to lock any key in its home region
+  // If this is a remaster txn, it is never redundant
+  bool is_redundant = !new_txn->has_remaster();
+
   // Remove keys that are not in the target partition
   for (auto it = new_txn->mutable_keys()->begin(); it != new_txn->mutable_keys()->end();) {
     if (config->partition_of_key(it->first) != partition) {
       it = new_txn->mutable_keys()->erase(it);
     } else {
+      auto master = it->second.metadata().master();
+      involved_replicas.push_back(master);
+      is_redundant &= static_cast<int>(master) != new_txn->internal().home();
+
       ++it;
     }
   }
-  if (new_txn->keys().empty()) {
+
+  // Shortcut for when the key set is empty or there is no key mastered at the home region
+  if (new_txn->keys().empty() || is_redundant) {
     delete new_txn;
     return nullptr;
   }
+
+  // Update involved replica list if needed
+  if (new_txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
+    sort(involved_replicas.begin(), involved_replicas.end());
+    auto last = unique(involved_replicas.begin(), involved_replicas.end());
+    *new_txn->mutable_internal()->mutable_involved_replicas() = {involved_replicas.begin(), last};
+  }
+
   return new_txn;
 }
 

@@ -55,18 +55,7 @@ void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
 
   for (auto p : txn->internal().involved_partitions()) {
     auto new_txn = GeneratePartitionedTxn(config_, *txn, p);
-    CHECK(new_txn != nullptr);
-
-    // Check if the generated subtxn does not intend to lock any key in its home region
-    // If this is a remaster txn, it is never redundant
-    auto is_redundant = !new_txn->has_remaster();
-    for (const auto& kv : new_txn->keys()) {
-      if (static_cast<int>(kv.second.metadata().master()) == new_txn->internal().home()) {
-        is_redundant = false;
-        break;
-      }
-    }
-    if (!is_redundant) {
+    if (new_txn != nullptr) {
       partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
     }
   }

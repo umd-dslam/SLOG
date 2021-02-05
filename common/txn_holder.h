@@ -23,18 +23,7 @@ class TxnHolder {
         done_(false),
         lo_txns_(config->num_replicas()),
         num_lo_txns_(0),
-        expected_num_lo_txns_(0) {
-    // Initialize to a non-existing replica number
-    auto prev = config->num_replicas() + 1;
-    // Compute expected number of lock-only txn. We don't use number of
-    // involved replicas for this because certain partitions might only
-    // receive lock-only txns from a subset of the involved replicas.
-    for (const auto& kv : txn->keys()) {
-      if (kv.second.metadata().master() != prev) {
-        ++expected_num_lo_txns_;
-        prev = kv.second.metadata().master();
-      }
-    }
+        expected_num_lo_txns_(txn->internal().involved_replicas_size()) {
     lo_txns_[txn->internal().home()].reset(txn);
     ++num_lo_txns_;
   }
