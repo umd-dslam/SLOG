@@ -64,8 +64,8 @@ void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
 /**
  * {
  *    num_all_txns: <number of active txns>,
- *    all_txns (lvl == 1): [<txn id>, ...],
- *    all_txns (lvl >= 2): [
+ *    all_txns (lvl == 0): [<txn id>, ...],
+ *    all_txns (lvl >= 1): [
  *      {
  *        id: <txn id>,
  *        done: <is done>,
@@ -89,14 +89,14 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
   // Add stats for current transactions in the system
   stats.AddMember(StringRef(NUM_ALL_TXNS), active_txns_.size(), alloc);
-  if (level == 1) {
+  if (level == 0) {
     stats.AddMember(StringRef(ALL_TXNS),
                     ToJsonArray(
                         active_txns_, [](const auto& p) { return p.first; }, alloc),
                     alloc);
   }
 
-  if (level >= 2) {
+  if (level >= 1) {
     rapidjson::Value txns(rapidjson::kArrayType);
     for (const auto& kv : active_txns_) {
       rapidjson::Value txn_obj(rapidjson::kObjectType);

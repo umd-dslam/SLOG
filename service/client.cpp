@@ -151,13 +151,22 @@ string LockModeStr(LockMode mode) {
 }
 
 void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
-  cout << "Number of all txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
-  if (level == 1) {
-    cout << "List of all txns:\n";
+  cout << "Number of active txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
+  cout << "\nACTIVE TRANSACTIONS\n\n";
+  if (level == 0) {
     TRUNCATED_FOR_EACH(txn_id, stats[ALL_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
-    cout << "\n";
+  } else if (level >= 1) {
+    TRUNCATED_FOR_EACH(txn, stats[ALL_TXNS].GetArray()) {
+      cout << "\t";
+      cout << TXN_ID << ": " << txn[TXN_ID].GetUint() << ", ";
+      cout << TXN_DONE << ": " << txn[TXN_DONE].GetBool() << ", ";
+      cout << TXN_ABORTING << ": " << txn[TXN_ABORTING].GetBool() << ", ";
+      cout << TXN_NUM_LO << ": " << txn[TXN_NUM_LO].GetInt() << ", ";
+      cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << "\n";
+    }
   }
-
+  
+  cout << "\n";
   cout << "Waiting txns: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
 
   // 0: OLD or RMA. 1: DDR
@@ -168,16 +177,6 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   }
 
   if (level >= 1) {
-    cout << "\nACTIVE TRANSACTIONS\n\n";
-    TRUNCATED_FOR_EACH(txn, stats[ALL_TXNS].GetArray()) {
-      cout << "\t";
-      cout << TXN_ID << ": " << txn[TXN_ID].GetUint() << ", ";
-      cout << TXN_DONE << ": " << txn[TXN_DONE].GetBool() << ", ";
-      cout << TXN_ABORTING << ": " << txn[TXN_ABORTING].GetBool() << ", ";
-      cout << TXN_NUM_LO << ": " << txn[TXN_NUM_LO].GetInt() << ", ";
-      cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << "\n";
-    }
-
     cout << "\n\nTRANSACTION DEPENDENCIES\n\n";
     if (lock_man_type == 0) {
       cout << setw(10) << "Txn" << setw(18) << "# waiting for"

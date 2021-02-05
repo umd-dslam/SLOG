@@ -166,7 +166,7 @@ void PopulateInvolvedReplicas(Transaction& txn) {
 
   sort(involved_replicas.begin(), involved_replicas.end());
   auto last = unique(involved_replicas.begin(), involved_replicas.end());
-  *txn.mutable_internal()->mutable_involved_replicas() = {involved_replicas.begin(), last};
+  txn.mutable_internal()->mutable_involved_replicas()->Add(involved_replicas.begin(), last);
 }
 
 void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn) {
