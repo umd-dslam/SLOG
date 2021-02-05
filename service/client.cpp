@@ -11,6 +11,7 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include "rapidjson/prettywriter.h"
 #include "service/service_utils.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
@@ -150,7 +151,7 @@ string LockModeStr(LockMode mode) {
   return "<error>";
 }
 
-void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
+void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) { 
   cout << "Number of active txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   cout << "\nACTIVE TRANSACTIONS\n\n";
   if (level == 0) {
@@ -251,6 +252,12 @@ void ExecuteStats(const char* module, uint32_t level) {
   } else {
     rapidjson::Document stats;
     stats.Parse(res.stats().stats_json().c_str());
+
+    rapidjson::StringBuffer buf;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buf);
+    stats.Accept(writer);
+    VLOG(1) << "Stats object: " << buf.GetString();
+
     stats_module.print_func(stats, level);
   }
 }
