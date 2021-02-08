@@ -153,17 +153,17 @@ class KeyList {
   KeyList(const ConfigurationPtr config, int partition, int master, size_t num_hot_keys = 0)
       : is_simple_(true), partition_(partition), master_(master), num_hot_keys_(num_hot_keys) {
     auto simple_partitioning = config->simple_partitioning();
-    auto num_records = simple_partitioning->num_records();
+    auto num_records = static_cast<long long>(simple_partitioning->num_records());
     num_partitions_ = config->num_partitions();
     num_replicas_ = config->num_replicas();
-    num_keys_ = ((num_records - partition) / num_partitions_ - master) / num_replicas_;
+    num_keys_ = std::max(1LL, ((num_records - partition) / num_partitions_ - master) / num_replicas_);
   }
 
   void AddKey(Key key) {
     if (is_simple_) {
       throw std::runtime_error("Cannot add keys to a simple key list");
     }
-    if (hot_keys_.size() < num_hot_keys_) {
+    if (static_cast<long long>(hot_keys_.size()) < num_hot_keys_) {
       hot_keys_.push_back(key);
       return;
     }
@@ -205,8 +205,8 @@ class KeyList {
   int master_;
   int num_partitions_;
   int num_replicas_;
-  uint64_t num_keys_;
-  uint64_t num_hot_keys_;
+  long long num_keys_;
+  long long num_hot_keys_;
   std::vector<Key> cold_keys_;
   std::vector<Key> hot_keys_;
 };

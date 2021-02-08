@@ -27,7 +27,7 @@ DEFINE_double(sample, 10, "Percent of sampled transactions to be written to resu
 DEFINE_int32(
     seed, -1,
     "Seed for any randomization in the benchmark. If set to negative, seed will be picked from std::random_device()");
-DEFINE_bool(txn_profiles, false, "Output transaction profiles");
+DEFINE_bool(txn_profiles, true, "Output transaction profiles");
 
 using namespace slog;
 
@@ -62,12 +62,21 @@ using std::unique_ptr;
 int main(int argc, char* argv[]) {
   InitializeService(&argc, &argv);
 
+  if (FLAGS_dry_run) {
+    LOG(WARNING) << "Generating transactions without sending to servers";
+  }
+
+  LOG(INFO) << "Arguments:\n"
+            << "Workload: " << FLAGS_wl << "\nParams: " << FLAGS_params << "\nNum txns: " << FLAGS_txns
+            << "\nSending rate: " << FLAGS_rate;
+
   const uint32_t seed = (FLAGS_seed < 0) ? std::random_device()() : FLAGS_seed;
 
   std::optional<ResultWriters> writers;
   if (FLAGS_out_dir.empty()) {
     LOG(WARNING) << "Results will not be written to files because output directory is not provided";
   } else {
+    LOG(INFO) << "Results will be written to \"" << FLAGS_out_dir << "/\"";
     writers.emplace();
   }
 
