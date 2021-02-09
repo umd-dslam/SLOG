@@ -71,7 +71,6 @@ class TestSlog {
 
  private:
   ConfigurationPtr config_;
-  shared_ptr<zmq::context_t> context_;
   shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
   shared_ptr<Broker> broker_;
   ModuleRunnerPtr server_;

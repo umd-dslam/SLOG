@@ -39,7 +39,7 @@ class MultiHomeOrderer : public NetworkedModule {
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
-  std::vector<unique_ptr<internal::Batch>> batch_per_rep_;
+  std::vector<std::unique_ptr<internal::Batch>> batch_per_rep_;
   BatchId batch_id_counter_;
   int batch_size_;
   bool batch_scheduled_;

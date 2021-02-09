@@ -10,6 +10,7 @@
 
 using std::make_shared;
 using std::move;
+using std::shared_ptr;
 
 namespace slog {
 

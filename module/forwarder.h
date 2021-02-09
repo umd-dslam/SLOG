@@ -31,8 +31,8 @@ namespace slog {
  */
 class Forwarder : public NetworkedModule {
  public:
-  Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-            const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds batch_timeout,
+  Forwarder(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+            const std::shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds batch_timeout,
             milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:

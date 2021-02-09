@@ -54,10 +54,7 @@ class PaxosTest : public ::testing::Test {
   }
 
   void AddAndStartNewPaxos(const ConfigurationPtr& config, const vector<MachineId>& members, MachineId me) {
-    auto context = make_shared<zmq::context_t>(1);
-    context->set(zmq::ctxopt::blocky, false);
-
-    auto broker = make_shared<Broker>(config, context, kTestModuleTimeout);
+    auto broker = Broker::New(config, kTestModuleTimeout);
     auto paxos = make_shared<TestSimulatedMultiPaxos>(broker, members, me);
     auto sender = make_unique<Sender>(broker);
     auto paxos_runner = new ModuleRunner(paxos);
@@ -65,7 +62,6 @@ class PaxosTest : public ::testing::Test {
     broker->StartInNewThread();
     paxos_runner->StartInNewThread();
 
-    contexts_.push_back(context);
     brokers_.emplace_back(broker);
     senders_.push_back(move(sender));
     paxos_runners_.emplace_back(paxos_runner);
@@ -82,7 +78,6 @@ class PaxosTest : public ::testing::Test {
   vector<shared_ptr<TestSimulatedMultiPaxos>> paxi;
 
  private:
-  vector<shared_ptr<zmq::context_t>> contexts_;
   vector<shared_ptr<Broker>> brokers_;
   vector<unique_ptr<ModuleRunner>> paxos_runners_;
   vector<unique_ptr<Sender>> senders_;

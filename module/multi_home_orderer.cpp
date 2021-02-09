@@ -8,6 +8,8 @@
 #include "module/ticker.h"
 #include "paxos/simulated_multi_paxos.h"
 
+using std::shared_ptr;
+
 namespace slog {
 
 using internal::Batch;

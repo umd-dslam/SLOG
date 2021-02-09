@@ -19,7 +19,8 @@ void ValidateTransaction(Transaction* txn) {
   txn->set_status(TransactionStatus::NOT_STARTED);
 }
 
-Server::Server(const ConfigurationPtr& config, const shared_ptr<Broker>& broker, std::chrono::milliseconds poll_timeout)
+Server::Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+               std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Server", broker, kServerChannel, poll_timeout), config_(config), txn_id_counter_(0) {}
 
 /***********************************************

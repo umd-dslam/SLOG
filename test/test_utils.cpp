@@ -16,6 +16,7 @@
 #include "module/ticker.h"
 #include "proto/api.pb.h"
 
+using std::make_shared;
 using std::to_string;
 
 namespace slog {
@@ -83,12 +84,10 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
 
 TestSlog::TestSlog(const ConfigurationPtr& config)
     : config_(config),
-      context_(new zmq::context_t(1)),
       storage_(new MemOnlyStorage<Key, Record, Metadata>()),
+      broker_(Broker::New(config, kTestModuleTimeout)),
       client_context_(1) {
-  context_->set(zmq::ctxopt::blocky, false);
   client_context_.set(zmq::ctxopt::blocky, false);
-  broker_ = std::make_shared<Broker>(config, context_, kTestModuleTimeout);
   client_socket_ = zmq::socket_t(client_context_, ZMQ_DEALER);
 }
 
@@ -125,7 +124,7 @@ void TestSlog::AddMultiHomeOrderer() {
 void TestSlog::AddOutputChannel(Channel channel) {
   broker_->AddChannel(channel);
 
-  zmq::socket_t socket(*context_, ZMQ_PULL);
+  zmq::socket_t socket(*broker_->context(), ZMQ_PULL);
   socket.bind(MakeInProcChannelAddress(channel));
   channels_.insert_or_assign(channel, std::move(socket));
 }

@@ -142,10 +142,7 @@ int main(int argc, char* argv[]) {
     LOG(WARNING) << "Dummy transactions will be returned";
   }
 
-  auto context = make_shared<zmq::context_t>(1);
-  context->set(zmq::ctxopt::blocky, false);
-
-  auto broker = make_shared<Broker>(config, context);
+  auto broker = Broker::New(config);
 
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();

@@ -39,7 +39,7 @@ class Sequencer : public NetworkedModule {
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
-  std::vector<unique_ptr<internal::Batch>> partitioned_batch_;
+  std::vector<std::unique_ptr<internal::Batch>> partitioned_batch_;
   BatchId batch_id_counter_;
   int batch_size_;
   bool batch_scheduled_;

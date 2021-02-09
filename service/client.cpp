@@ -9,9 +9,9 @@
 #include "proto/api.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
+#include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
-#include "rapidjson/prettywriter.h"
 #include "service/service_utils.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
@@ -151,7 +151,7 @@ string LockModeStr(LockMode mode) {
   return "<error>";
 }
 
-void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) { 
+void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << "Number of active txns: " << stats[NUM_ALL_TXNS].GetUint() << "\n";
   cout << "\nACTIVE TRANSACTIONS\n\n";
   if (level == 0) {
@@ -166,7 +166,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << "\n";
     }
   }
-  
+
   cout << "\n";
   cout << "Waiting txns: " << stats[NUM_TXNS_WAITING_FOR_LOCK].GetUint() << "\n";
 

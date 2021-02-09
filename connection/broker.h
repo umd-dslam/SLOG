@@ -10,10 +10,6 @@
 #include "common/types.h"
 #include "connection/zmq_utils.h"
 
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using std::vector;
 namespace slog {
 
 /**
@@ -60,8 +56,9 @@ namespace slog {
  */
 class Broker {
  public:
-  Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
-         std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
+  static std::shared_ptr<Broker> New(const ConfigurationPtr& config,
+                                     std::chrono::milliseconds poll_timeout_ms = kModuleTimeout, bool blocky = false);
+
   ~Broker();
 
   void StartInNewThread(std::optional<uint32_t> cpu = {});
@@ -70,14 +67,17 @@ class Broker {
 
   void AddChannel(Channel chan, bool send_raw = false);
 
-  const std::shared_ptr<zmq::context_t>& context() const;
-  const ConfigurationPtr& config() const;
+  const ConfigurationPtr& config() const { return config_; }
+  const std::shared_ptr<zmq::context_t>& context() const { return context_; }
 
   std::string GetEndpointByMachineId(MachineId machine_id);
 
   MachineId local_machine_id() const;
 
  private:
+  Broker(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context,
+         std::chrono::milliseconds poll_timeout_ms);
+
   string MakeEndpoint(const string& addr = "") const;
 
   /**
@@ -97,7 +97,7 @@ class Broker {
   void ForwardMessage(zmq::socket_t& socket, bool send_raw, zmq::message_t&& msg);
 
   ConfigurationPtr config_;
-  shared_ptr<zmq::context_t> context_;
+  std::shared_ptr<zmq::context_t> context_;
   std::chrono::milliseconds poll_timeout_ms_;
   zmq::socket_t external_socket_;
   zmq::socket_t internal_socket_;

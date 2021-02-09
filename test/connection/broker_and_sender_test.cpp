@@ -44,13 +44,11 @@ TEST(BrokerAndSenderTest, PingPong) {
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
   auto ping = thread([&]() {
-    auto context = make_shared<zmq::context_t>(1);
-
-    auto socket = MakePullSocket(*context, PING);
-
-    auto broker = make_shared<Broker>(configs[0], context);
+    auto broker = Broker::New(configs[0], kTestModuleTimeout);
     broker->AddChannel(PING);
     broker->StartInNewThread();
+
+    auto recv_socket = MakePullSocket(*broker->context(), PING);
 
     Sender sender(broker);
     // Send ping
@@ -58,20 +56,19 @@ TEST(BrokerAndSenderTest, PingPong) {
     sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
 
     // Wait for pong
-    auto res = RecvEnvelope(socket);
+    auto res = RecvEnvelope(recv_socket);
     ASSERT_TRUE(res != nullptr);
     ASSERT_TRUE(res->has_response());
     ASSERT_EQ("pong", res->response().echo().data());
   });
 
   auto pong = thread([&]() {
-    auto context = std::make_shared<zmq::context_t>(1);
-
-    auto socket = MakePullSocket(*context, PONG);
-
-    auto broker = make_shared<Broker>(configs[1], context);
+    // Set blocky to true to avoid exitting before sending the pong message
+    auto broker = Broker::New(configs[1], kTestModuleTimeout, true);
     broker->AddChannel(PONG);
     broker->StartInNewThread();
+
+    auto socket = MakePullSocket(*broker->context(), PONG);
 
     Sender sender(broker);
 
@@ -94,9 +91,7 @@ TEST(BrokerTest, LocalPingPong) {
   const Channel PING = 1;
   const Channel PONG = 2;
   ConfigVec configs = MakeTestConfigurations("local_ping_pong", 1, 1);
-  auto context = std::make_shared<zmq::context_t>(1);
-  context->set(zmq::ctxopt::blocky, false);
-  auto broker = make_shared<Broker>(configs[0], context);
+  auto broker = Broker::New(configs[0], kTestModuleTimeout);
   broker->AddChannel(PING);
   broker->AddChannel(PONG);
 
@@ -104,7 +99,7 @@ TEST(BrokerTest, LocalPingPong) {
 
   auto ping = thread([&]() {
     Sender sender(broker);
-    auto socket = MakePullSocket(*context, PING);
+    auto socket = MakePullSocket(*broker->context(), PING);
 
     // Send ping
     sender.Send(MakeEchoRequest("ping"), PONG);
@@ -117,7 +112,7 @@ TEST(BrokerTest, LocalPingPong) {
 
   auto pong = thread([&]() {
     Sender sender(broker);
-    auto socket = MakePullSocket(*context, PONG);
+    auto socket = MakePullSocket(*broker->context(), PONG);
 
     // Wait for ping
     auto req = RecvEnvelope(socket);
@@ -139,13 +134,11 @@ TEST(BrokerTest, MultiSend) {
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, NUM_PONGS + 1);
 
   auto ping = thread([&]() {
-    auto context = make_shared<zmq::context_t>(1);
-
-    auto socket = MakePullSocket(*context, PING);
-
-    auto broker = make_shared<Broker>(configs[0], context);
+    auto broker = Broker::New(configs[0], kTestModuleTimeout);
     broker->AddChannel(PING);
     broker->StartInNewThread();
+
+    auto socket = MakePullSocket(*broker->context(), PING);
 
     Sender sender(broker);
     // Send ping
@@ -168,13 +161,11 @@ TEST(BrokerTest, MultiSend) {
   thread pongs[NUM_PONGS];
   for (int i = 0; i < NUM_PONGS; i++) {
     pongs[i] = thread([&configs, i]() {
-      auto context = std::make_shared<zmq::context_t>(1);
-
-      auto socket = MakePullSocket(*context, PONG);
-
-      auto broker = make_shared<Broker>(configs[i + 1], context);
+      auto broker = Broker::New(configs[i + 1], kTestModuleTimeout);
       broker->AddChannel(PONG);
       broker->StartInNewThread();
+
+      auto socket = MakePullSocket(*broker->context(), PONG);
 
       Sender sender(broker);
 
@@ -205,9 +196,8 @@ TEST(BrokerTest, CreateRedirection) {
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
   // Initialize ping machine
-  auto ping_context = make_shared<zmq::context_t>(1);
-  auto ping_socket = MakePullSocket(*ping_context, PING);
-  auto ping_broker = make_shared<Broker>(configs[0], ping_context);
+  auto ping_broker = Broker::New(configs[0], kTestModuleTimeout);
+  auto ping_socket = MakePullSocket(*ping_broker->context(), PING);
   ping_broker->AddChannel(PING);
   ping_broker->StartInNewThread();
   Sender ping_sender(ping_broker);
@@ -224,9 +214,8 @@ TEST(BrokerTest, CreateRedirection) {
   }
 
   // Initialize pong machine
-  auto pong_context = make_shared<zmq::context_t>(1);
-  auto pong_socket = MakePullSocket(*pong_context, PONG);
-  auto pong_broker = make_shared<Broker>(configs[1], pong_context);
+  auto pong_broker = Broker::New(configs[1], kTestModuleTimeout);
+  auto pong_socket = MakePullSocket(*pong_broker->context(), PONG);
   pong_broker->AddChannel(PONG);
   pong_broker->StartInNewThread();
   Sender pong_sender(pong_broker);
@@ -282,17 +271,15 @@ TEST(BrokerTest, RemoveRedirection) {
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
   // Initialize ping machine
-  auto ping_context = make_shared<zmq::context_t>(1);
-  auto ping_socket = MakePullSocket(*ping_context, PING);
-  auto ping_broker = make_shared<Broker>(configs[0], ping_context);
+  auto ping_broker = Broker::New(configs[0], kTestModuleTimeout);
+  auto ping_socket = MakePullSocket(*ping_broker->context(), PING);
   ping_broker->AddChannel(PING);
   ping_broker->StartInNewThread();
   Sender ping_sender(ping_broker);
 
   // Initialize pong machine
-  auto pong_context = make_shared<zmq::context_t>(1);
-  auto pong_socket = MakePullSocket(*pong_context, PONG);
-  auto pong_broker = make_shared<Broker>(configs[1], pong_context);
+  auto pong_broker = Broker::New(configs[1], kTestModuleTimeout);
+  auto pong_socket = MakePullSocket(*pong_broker->context(), PONG);
   pong_broker->AddChannel(PONG);
   pong_broker->StartInNewThread();
   Sender pong_sender(pong_broker);

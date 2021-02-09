@@ -9,6 +9,7 @@
 #include "common/proto_utils.h"
 
 using std::move;
+using std::shared_ptr;
 using std::sort;
 using std::string;
 using std::unique;

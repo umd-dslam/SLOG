@@ -10,14 +10,22 @@
 #include "common/thread_utils.h"
 #include "proto/internal.pb.h"
 
+using std::make_shared;
 using std::move;
 using std::pair;
+using std::shared_ptr;
 using std::string;
 using std::unordered_set;
 
 namespace slog {
 
 using internal::Envelope;
+
+shared_ptr<Broker> Broker::New(const ConfigurationPtr& config, std::chrono::milliseconds poll_timeout_ms, bool blocky) {
+  auto context = make_shared<zmq::context_t>(1);
+  context->set(zmq::ctxopt::blocky, blocky);
+  return shared_ptr<Broker>(new Broker(config, context, poll_timeout_ms));
+}
 
 Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>& context,
                std::chrono::milliseconds poll_timeout_ms)
@@ -62,9 +70,6 @@ void Broker::AddChannel(Channel chan, bool send_raw) {
   new_channel.connect(MakeInProcChannelAddress(chan));
   channels_.try_emplace(chan, move(new_channel), send_raw);
 }
-
-const std::shared_ptr<zmq::context_t>& Broker::context() const { return context_; }
-const ConfigurationPtr& Broker::config() const { return config_; }
 
 std::string Broker::GetEndpointByMachineId(MachineId machine_id) {
   std::unique_lock<std::mutex> lock(mutex_);

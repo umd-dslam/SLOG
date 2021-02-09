@@ -113,7 +113,7 @@ class Scheduler : public NetworkedModule {
 
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed
-  std::vector<unique_ptr<ModuleRunner>> workers_;
+  std::vector<std::unique_ptr<ModuleRunner>> workers_;
 };
 
 }  // namespace slog

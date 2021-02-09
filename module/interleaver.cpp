@@ -8,6 +8,8 @@
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
+using std::shared_ptr;
+
 namespace slog {
 
 using internal::Envelope;
