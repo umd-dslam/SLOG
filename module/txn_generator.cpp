@@ -103,12 +103,12 @@ bool TxnGenerator::Loop() {
         LOG(ERROR) << "Received response for finished txn. Stream id: " << res.stream_id();
       } else {
         info.recv_at = system_clock::now();
-        if (!config_->return_dummy_txn()) {
-          delete info.txn;
-          info.txn = res.mutable_txn()->release_txn();
-        } else {
+        if (config_->return_dummy_txn()) {
           info.txn->set_status(res.txn().txn().status());
           info.txn->mutable_internal()->CopyFrom(res.txn().txn().internal());
+        } else {
+          delete info.txn;
+          info.txn = res.mutable_txn()->release_txn();
         }
         info.finished = true;
         ++num_recv_txns_;
