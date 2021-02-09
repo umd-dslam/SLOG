@@ -18,8 +18,7 @@ inline std::string MakeInProcChannelAddress(Channel chan) { return "inproc://cha
  */
 inline void SendEnvelope(zmq::socket_t& socket, EnvelopePtr&& envelope) {
   auto env = envelope.release();
-  size_t sz = sizeof(env);
-  zmq::message_t msg(sz);
+  zmq::message_t msg(sizeof(env));
   *(msg.data<internal::Envelope*>()) = env;
   socket.send(msg, zmq::send_flags::dontwait);
 }
@@ -40,20 +39,20 @@ inline zmq::message_t SerializeProto(const google::protobuf::Message& proto) {
   google::protobuf::Any any;
   any.PackFrom(proto);
 
-  size_t sz = sizeof(MachineId) + sizeof(Channel) + any.ByteSizeLong();
-  zmq::message_t msg(sz);
-  auto data = msg.data<char>() + sizeof(MachineId) + sizeof(Channel);
-  any.SerializeToArray(data, any.ByteSizeLong());
+  auto header_sz = sizeof(MachineId) + sizeof(Channel);
+  zmq::message_t msg(header_sz + any.ByteSizeLong());
+  any.SerializeToArray(msg.data<char>() + header_sz, any.ByteSizeLong());
 
   return msg;
 }
 
 inline void SendAddressedBuffer(zmq::socket_t& socket, zmq::message_t&& msg, MachineId from_machine_id = -1,
                                 Channel to_chan = 0) {
-  auto data = msg.data<char>();
-  memcpy(data, &from_machine_id, sizeof(MachineId));
-  data += sizeof(MachineId);
-  memcpy(data, &to_chan, sizeof(Channel));
+  auto machine_id_data = msg.data<MachineId>();
+  *machine_id_data = from_machine_id;
+
+  auto channel_data = reinterpret_cast<Channel*>(machine_id_data + 1);
+  *channel_data = to_chan;
 
   socket.send(msg, zmq::send_flags::dontwait);
 }
@@ -76,7 +75,7 @@ inline bool ParseMachineId(MachineId& id, const zmq::message_t& msg) {
   if (msg.size() < sizeof(MachineId)) {
     return false;
   }
-  memcpy(&id, msg.data<char>(), sizeof(MachineId));
+  id = *msg.data<MachineId>();
   return true;
 }
 
@@ -84,7 +83,8 @@ inline bool ParseChannel(Channel& chan, const zmq::message_t& msg) {
   if (msg.size() < sizeof(MachineId) + sizeof(Channel)) {
     return false;
   }
-  memcpy(&chan, msg.data<char>() + sizeof(MachineId), sizeof(Channel));
+  auto chan_data = reinterpret_cast<const Channel*>(msg.data<MachineId>() + 1);
+  chan = *chan_data;
   return true;
 }
 
