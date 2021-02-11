@@ -50,15 +50,6 @@ class LockQueueTail {
   vector<TxnId> read_lock_requesters_;
 };
 
-struct TxnInfo {
-  TxnInfo(int unarrived) : unarrived_lock_requests(unarrived), waiting_for_cnt(0) {}
-  vector<TxnId> waited_by;
-  int unarrived_lock_requests;
-  int waiting_for_cnt;
-
-  bool is_ready() const { return waiting_for_cnt == 0 && unarrived_lock_requests == 0; }
-};
-
 /**
  * This is a deterministic lock manager which grants locks for transactions
  * in the order that they request. If transaction X, appears before
@@ -98,7 +89,7 @@ class DDRLockManager {
    * @return    A set of IDs of transactions that are able to obtain
    *            all of their locks thanks to this release.
    */
-  vector<TxnId> ReleaseLocks(const Transaction& txn);
+  vector<TxnId> ReleaseLocks(TxnId txn_id);
 
   /**
    * Gets current statistics of the lock manager
@@ -108,8 +99,16 @@ class DDRLockManager {
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
  private:
-  unordered_map<KeyReplica, LockQueueTail> lock_table_;
+  struct TxnInfo {
+    TxnInfo(int unarrived) : unarrived_lock_requests(unarrived), waiting_for_cnt(0) {}
+    vector<TxnId> waited_by;
+    int unarrived_lock_requests;
+    int waiting_for_cnt;
+
+    bool is_ready() const { return waiting_for_cnt == 0 && unarrived_lock_requests == 0; }
+  };
   unordered_map<TxnId, TxnInfo> txn_info_;
+  unordered_map<KeyReplica, LockQueueTail> lock_table_;
 };
 
 }  // namespace slog

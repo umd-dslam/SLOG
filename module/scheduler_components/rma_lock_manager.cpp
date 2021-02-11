@@ -109,16 +109,19 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
   // A remaster txn only has one key K but it acquires locks on (K, RO) and (K, RN)
   // where RO and RN are the old and new region respectively.
   auto num_required_locks = is_remaster ? 2 : txn.keys_size();
-  auto ins = num_locks_waited_.try_emplace(txn_id, num_required_locks);
-  int num_locks_acquired = 0;
+  auto ins = txn_info_.try_emplace(txn_id, num_required_locks);
+  auto& txn_info = ins.first->second;
+
   for (const auto& kv : txn.keys()) {
-    // Skip keys that does not belong to the assigned home. Remaster txn is an exception since
+    // Skip keys that does not belong to the assigned home. Remaster txn is an exception where
     // it is allowed that the metadata on the txn does not match its assigned home
     if (!is_remaster && static_cast<int>(kv.second.metadata().master()) != home) {
       continue;
     }
 
     auto key_replica = MakeKeyReplica(kv.first, home);
+    txn_info.keys.push_back(key_replica);
+
     auto& lock_state = lock_table_[key_replica];
 
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key_replica;
@@ -127,12 +130,12 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
     switch (kv.second.type()) {
       case KeyType::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
-          num_locks_acquired++;
+          txn_info.num_waiting_for--;
         }
         break;
       case KeyType::WRITE:
         if (lock_state.AcquireWriteLock(txn_id)) {
-          num_locks_acquired++;
+          txn_info.num_waiting_for--;
         }
         break;
       default:
@@ -143,38 +146,19 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
     }
   }
 
-  auto it = ins.first;
-  // Minus 1 to compensate for the placeholder
-  it->second -= num_locks_acquired;
-  if (it->second == 0) {
-    num_locks_waited_.erase(it);
+  if (txn_info.is_ready()) {
     return AcquireLocksResult::ACQUIRED;
   }
   return AcquireLocksResult::WAITING;
 }
 
-vector<TxnId> RMALockManager::ReleaseLocks(const Transaction& txn) {
-  auto txn_id = txn.internal().id();
-
-  vector<KeyReplica> locks_to_release;
-  if (txn.procedure_case() == Transaction::kRemaster) {
-    auto it = txn.keys().begin();
-
-    // TODO: old lock can be deleted. Waiting txns are aborted, unless they are a remaster
-    auto old_key_replica = MakeKeyReplica(it->first, it->second.metadata().master());
-    locks_to_release.push_back(old_key_replica);
-
-    auto new_key_replica = MakeKeyReplica(it->first, txn.remaster().new_master());
-    locks_to_release.push_back(new_key_replica);
-  } else {
-    for (const auto& kv : txn.keys()) {
-      auto key_replica = MakeKeyReplica(kv.first, kv.second.metadata().master());
-      locks_to_release.push_back(key_replica);
-    }
-  }
+vector<TxnId> RMALockManager::ReleaseLocks(TxnId txn_id) {
+  auto info_it = txn_info_.find(txn_id);
+  DCHECK(info_it != txn_info_.end());
+  auto& info = info_it->second;
 
   vector<TxnId> result;
-  for (auto& key_replica : locks_to_release) {
+  for (const auto& key_replica : info.keys) {
     auto lock_state_it = lock_table_.find(key_replica);
     if (lock_state_it == lock_table_.end()) {
       continue;
@@ -194,19 +178,21 @@ vector<TxnId> RMALockManager::ReleaseLocks(const Transaction& txn) {
     }
 
     for (auto new_txn : new_grantees) {
-      num_locks_waited_[new_txn]--;
-      if (num_locks_waited_[new_txn] == 0) {
-        num_locks_waited_.erase(new_txn);
+      auto it = txn_info_.find(new_txn);
+      DCHECK(it != txn_info_.end());
+      it->second.num_waiting_for--;
+      if (it->second.is_ready()) {
         result.push_back(new_txn);
       }
     }
   }
+
+  txn_info_.erase(info_it);
+
   // Deduplicate the result
   std::sort(result.begin(), result.end());
   auto last = std::unique(result.begin(), result.end());
   result.erase(last, result.end());
-
-  num_locks_waited_.erase(txn_id);
 
   return result;
 }
@@ -236,11 +222,14 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
 
   auto& alloc = stats.GetAllocator();
   stats.AddMember(StringRef(LOCK_MANAGER_TYPE), 0, alloc);
-  stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
+  stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), txn_info_.size(), alloc);
 
   if (level >= 1) {
     // Collect number of locks waited per txn
-    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN), ToJsonArrayOfKeyValue(num_locks_waited_, alloc), alloc);
+    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN),
+                    ToJsonArrayOfKeyValue(
+                        txn_info_, [](const auto& info) { return info.num_waiting_for; }, alloc),
+                    alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);

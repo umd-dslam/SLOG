@@ -21,7 +21,7 @@ TEST_F(DDRLockManagerTest, GetAllLocksOnFirstTry) {
   auto holder = MakeTestTxnHolder(
       configs[0], 100, {{"readA", KeyType::READ, 0}, {"readB", KeyType::READ, 0}, {"writeC", KeyType::WRITE, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  auto result = lock_manager.ReleaseLocks(holder.txn());
+  auto result = lock_manager.ReleaseLocks(holder.id());
   ASSERT_TRUE(result.empty());
 }
 
@@ -31,8 +31,8 @@ TEST_F(DDRLockManagerTest, ReadLocks) {
   auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readB", KeyType::READ, 0}, {"readC", KeyType::READ, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.txn()).empty());
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.id()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.id()).empty());
 }
 
 TEST_F(DDRLockManagerTest, WriteLocks) {
@@ -43,7 +43,7 @@ TEST_F(DDRLockManagerTest, WriteLocks) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager.ReleaseLocks(holder1.txn()).size(), 1U);
+  ASSERT_EQ(lock_manager.ReleaseLocks(holder1.id()).size(), 1U);
   // Make sure the lock is already held by holder2
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
 }
@@ -61,17 +61,17 @@ TEST_F(DDRLockManagerTest, ReleaseLocksAndReturnMultipleNewLockHolders) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder4.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager.ReleaseLocks(holder1.txn());
+  auto result = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_EQ(result.size(), 2U);
   ASSERT_TRUE(find(result.begin(), result.end(), 200) != result.end());
   ASSERT_TRUE(find(result.begin(), result.end(), 400) != result.end());
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder4.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder4.id()).empty());
 
-  result = lock_manager.ReleaseLocks(holder2.txn());
+  result = lock_manager.ReleaseLocks(holder2.id());
   ASSERT_THAT(result, ElementsAre(300));
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.id()).empty());
 }
 
 TEST_F(DDRLockManagerTest, PartiallyAcquiredLocks) {
@@ -85,10 +85,10 @@ TEST_F(DDRLockManagerTest, PartiallyAcquiredLocks) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager.ReleaseLocks(holder1.txn());
+  auto result = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_THAT(result, ElementsAre(200));
 
-  result = lock_manager.ReleaseLocks(holder2.txn());
+  result = lock_manager.ReleaseLocks(holder2.id());
   ASSERT_THAT(result, ElementsAre(300));
 }
 
@@ -102,7 +102,7 @@ TEST_F(DDRLockManagerTest, AcquireLocksWithLockOnly1) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(1)), AcquireLocksResult::ACQUIRED);
 
-  auto result = lock_manager.ReleaseLocks(holder2.txn());
+  auto result = lock_manager.ReleaseLocks(holder2.id());
   ASSERT_THAT(result, ElementsAre(100));
 }
 
@@ -116,7 +116,7 @@ TEST_F(DDRLockManagerTest, AcquireLocksWithLockOnly2) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager.ReleaseLocks(holder1.txn());
+  auto result = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_THAT(result, ElementsAre(200));
 }
 
@@ -130,10 +130,10 @@ TEST_F(DDRLockManagerTest, MultiEdgeBetweenTwoTxns) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(2)), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager.ReleaseLocks(holder1.txn());
+  auto result = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_THAT(result, ElementsAre(200));
 
-  result = lock_manager.ReleaseLocks(holder2.txn());
+  result = lock_manager.ReleaseLocks(holder2.id());
   ASSERT_TRUE(result.empty());
 }
 
@@ -153,11 +153,11 @@ TEST_F(DDRLockManagerTest, RemasterTxn) {
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(2)), AcquireLocksResult::ACQUIRED);
-  lock_manager.ReleaseLocks(holder.txn());
+  lock_manager.ReleaseLocks(holder.id());
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(2)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(1)), AcquireLocksResult::ACQUIRED);
-  lock_manager.ReleaseLocks(holder.txn());
+  lock_manager.ReleaseLocks(holder.id());
 }
 #endif
 
@@ -169,12 +169,12 @@ TEST_F(DDRLockManagerTest, EnsureStateIsClean) {
   auto holder3 = MakeTestTxnHolder(configs[0], 300, {{"C", KeyType::WRITE, 0}});
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.id()).empty());
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.txn()).empty());
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.id()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.id()).empty());
 }
 
 TEST_F(DDRLockManagerTest, LongChain) {
@@ -191,15 +191,15 @@ TEST_F(DDRLockManagerTest, LongChain) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder4.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder5.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto result = lock_manager.ReleaseLocks(holder1.txn());
+  auto result = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_THAT(result, UnorderedElementsAre(200, 300));
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.txn()).empty());
-  result = lock_manager.ReleaseLocks(holder3.txn());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.id()).empty());
+  result = lock_manager.ReleaseLocks(holder3.id());
   ASSERT_THAT(result, ElementsAre(400));
 
-  result = lock_manager.ReleaseLocks(holder4.txn());
+  result = lock_manager.ReleaseLocks(holder4.id());
   ASSERT_THAT(result, ElementsAre(500));
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder5.txn()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder5.id()).empty());
 }

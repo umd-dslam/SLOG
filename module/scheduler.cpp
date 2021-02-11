@@ -133,9 +133,8 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   }
 
   auto txn_id = *msg.data<TxnId>();
-  auto& txn_holder = GetTxnHolder(txn_id);
   // Release locks held by this txn then dispatch the txns that become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_holder.txn());
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_id);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }
@@ -143,6 +142,7 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
   VLOG(2) << "Released locks of txn " << txn_id;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
+  auto& txn_holder = GetTxnHolder(txn_id);
   auto txn = txn_holder.txn();
   // If a remaster transaction, trigger any unblocked txns
   if (txn.procedure_case() == Transaction::ProcedureCase::kRemaster && txn.status() == TransactionStatus::COMMITTED) {
@@ -303,7 +303,7 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 
   // Release locks held by this txn. Enqueue the txns that
   // become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(txn);
+  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_id);
   for (auto unblocked_txn : unblocked_txns) {
     Dispatch(unblocked_txn);
   }

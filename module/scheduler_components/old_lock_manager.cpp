@@ -104,10 +104,9 @@ unordered_set<TxnId> OldLockState::Release(TxnId txn_id) {
 AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
 
-  // Add 1 as a placeholder for keys from unarrived lock-only txns
-  auto ins = num_locks_waited_.try_emplace(txn_id, txn.keys_size());
+  auto ins = txn_info_.try_emplace(txn_id, txn.keys_size());
+  auto& txn_info = ins.first->second;
 
-  int num_locks_acquired = 0;
   for (const auto& kv : txn.keys()) {
     // Skip keys that does not belong to the assigned home
     if (static_cast<int>(kv.second.metadata().master()) != txn.internal().home()) {
@@ -115,6 +114,8 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
     }
 
     auto& key = kv.first;
+    txn_info.keys.push_back(key);
+
     auto& lock_state = lock_table_[key];
 
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key;
@@ -123,12 +124,12 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
     switch (kv.second.type()) {
       case KeyType::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
-          num_locks_acquired++;
+          txn_info.num_waiting_for--;
         }
         break;
       case KeyType::WRITE:
         if (lock_state.AcquireWriteLock(txn_id)) {
-          num_locks_acquired++;
+          txn_info.num_waiting_for--;
         }
         break;
       default:
@@ -140,22 +141,20 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
     }
   }
 
-  auto it = ins.first;
-  // Minus 1 to compensate for the placeholder
-  it->second -= num_locks_acquired;
-  if (it->second == 0) {
-    num_locks_waited_.erase(it);
+  if (txn_info.is_ready()) {
     return AcquireLocksResult::ACQUIRED;
   }
   return AcquireLocksResult::WAITING;
 }
 
-vector<TxnId> OldLockManager::ReleaseLocks(const Transaction& txn) {
-  vector<TxnId> result;
-  auto txn_id = txn.internal().id();
+vector<TxnId> OldLockManager::ReleaseLocks(TxnId txn_id) {
+  auto info_it = txn_info_.find(txn_id);
+  DCHECK(info_it != txn_info_.end());
+  auto& info = info_it->second;
 
-  for (const auto& kv : txn.keys()) {
-    auto lock_state_it = lock_table_.find(kv.first);
+  vector<TxnId> result;
+  for (const auto& key : info.keys) {
+    auto lock_state_it = lock_table_.find(key);
     if (lock_state_it == lock_table_.end()) {
       continue;
     }
@@ -168,27 +167,26 @@ vector<TxnId> OldLockManager::ReleaseLocks(const Transaction& txn) {
         num_locked_keys_--;
       }
       if (lock_table_.size() > kLockTableSizeLimit) {
-        lock_table_.erase(kv.first);
+        lock_table_.erase(key);
       }
     }
 
     for (auto new_txn : new_grantees) {
-      auto it = num_locks_waited_.find(new_txn);
-      DCHECK(it != num_locks_waited_.end());
-      it->second--;
-      if (it->second == 0) {
-        num_locks_waited_.erase(it);
+      auto it = txn_info_.find(new_txn);
+      DCHECK(it != txn_info_.end());
+      it->second.num_waiting_for--;
+      if (it->second.is_ready()) {
         result.push_back(new_txn);
       }
     }
   }
 
+  txn_info_.erase(info_it);
+
   // Deduplicate the result
   std::sort(result.begin(), result.end());
   auto last = std::unique(result.begin(), result.end());
   result.erase(last, result.end());
-
-  num_locks_waited_.erase(txn_id);
 
   return result;
 }
@@ -218,11 +216,14 @@ void OldLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
 
   auto& alloc = stats.GetAllocator();
   stats.AddMember(StringRef(LOCK_MANAGER_TYPE), 0, alloc);
-  stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), num_locks_waited_.size(), alloc);
+  stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), txn_info_.size(), alloc);
 
   if (level >= 1) {
     // Collect number of locks waited per txn
-    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN), ToJsonArrayOfKeyValue(num_locks_waited_, alloc), alloc);
+    stats.AddMember(StringRef(NUM_WAITING_FOR_PER_TXN),
+                    ToJsonArrayOfKeyValue(
+                        txn_info_, [](const auto& info) { return info.num_waiting_for; }, alloc),
+                    alloc);
   }
 
   stats.AddMember(StringRef(NUM_LOCKED_KEYS), num_locked_keys_, alloc);

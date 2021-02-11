@@ -99,9 +99,8 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
   return AcquireLocksResult::WAITING;
 }
 
-vector<TxnId> DDRLockManager::ReleaseLocks(const Transaction& txn) {
+vector<TxnId> DDRLockManager::ReleaseLocks(TxnId txn_id) {
   vector<TxnId> result;
-  auto txn_id = txn.internal().id();
   auto txn_info_it = txn_info_.find(txn_id);
   if (txn_info_it == txn_info_.end()) {
     return result;

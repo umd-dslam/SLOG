@@ -83,11 +83,11 @@ class RMALockManager {
   /**
    * Releases all locks that a transaction is holding or waiting for.
    *
-   * @param txn Transaction whose locks are released.
-   * @return    A set of IDs of transactions that are able to obtain
-   *            all of their locks thanks to this release.
+   * @param txn_id Id of transaction whose locks are released.
+   * @return       A set of IDs of transactions that are able to obtain
+   *               all of their locks thanks to this release.
    */
-  vector<TxnId> ReleaseLocks(const Transaction& txn);
+  vector<TxnId> ReleaseLocks(TxnId txn_id);
 
   /**
    * Gets current statistics of the lock manager
@@ -97,8 +97,16 @@ class RMALockManager {
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
  private:
+  struct TxnInfo {
+    TxnInfo(int num_keys) : num_waiting_for(num_keys) { keys.reserve(num_keys); }
+
+    bool is_ready() const { return num_waiting_for == 0; }
+
+    int num_waiting_for;
+    std::vector<Key> keys;
+  };
+  unordered_map<TxnId, TxnInfo> txn_info_;
   unordered_map<KeyReplica, LockState> lock_table_;
-  unordered_map<TxnId, int32_t> num_locks_waited_;
   uint32_t num_locked_keys_ = 0;
 };
 
