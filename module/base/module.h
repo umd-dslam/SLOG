@@ -48,7 +48,6 @@ class ModuleRunner {
 
   void Start(std::optional<uint32_t> cpu = {});
   void StartInNewThread(std::optional<uint32_t> cpu = {});
-  void StartOnce();
 
   void Stop();
 
@@ -58,7 +57,6 @@ class ModuleRunner {
 
  private:
   void Run();
-  void SetUpOnce();
 
   std::shared_ptr<Module> module_;
   std::thread thread_;

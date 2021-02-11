@@ -42,25 +42,13 @@ void ModuleRunner::StartInNewThread(std::optional<uint32_t> cpu) {
   }
 }
 
-void ModuleRunner::StartOnce() {
-  if (running_) {
-    throw std::runtime_error("The module has already started");
-  }
-  SetUpOnce();
-  module_->Loop();
-}
-
 void ModuleRunner::Run() {
-  SetUpOnce();
-  while (running_) {
-    if (module_->Loop()) Stop();
-  }
-}
-
-void ModuleRunner::SetUpOnce() {
   if (!setup_) {
     module_->SetUp();
     setup_ = true;
+  }
+  while (running_) {
+    if (module_->Loop()) Stop();
   }
 }
 
