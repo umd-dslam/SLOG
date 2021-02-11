@@ -41,7 +41,7 @@ void Sequencer::NewBatch() {
   }
 }
 
-void Sequencer::HandleInternalRequest(EnvelopePtr&& env) {
+void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
   if (env->request().type_case() != Request::kForwardTxn) {
     return;
   }

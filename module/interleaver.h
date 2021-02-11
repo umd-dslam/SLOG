@@ -53,7 +53,7 @@ class Interleaver : public NetworkedModule {
               std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
   void AdvanceLogs();

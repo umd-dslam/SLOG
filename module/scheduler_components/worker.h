@@ -42,17 +42,17 @@ class Worker : public NetworkedModule {
   static Channel MakeChannel(int worker_num) { return kMaxChannel + worker_num; }
 
  protected:
-  std::vector<zmq::socket_t> InitializeCustomSockets() final;
+  void Initialize() final;
   /**
    * Applies remote read for transactions that are in the WAIT_REMOTE_READ phase.
    * When all remote reads are received, the transaction is moved to the EXECUTE phase.
    */
-  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
   /**
-   * Initializes the state of a new transaction
+   * Receives new transaction from the scheduler
    */
-  bool HandleCustomSocket(zmq::socket_t& socket, size_t socket_index) final;
+  bool OnPollTimeout() final;
 
  private:
   /**

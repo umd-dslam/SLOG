@@ -15,13 +15,13 @@ SimulatedMultiPaxos::SimulatedMultiPaxos(Channel group_number, const shared_ptr<
       leader_(*this, members, me),
       acceptor_(*this) {}
 
-void SimulatedMultiPaxos::HandleInternalRequest(EnvelopePtr&& req) {
+void SimulatedMultiPaxos::OnInternalRequestReceived(EnvelopePtr&& req) {
   // A non-leader machine can still need to do some work to maintain its state should it becomes a leader later
   leader_.HandleRequest(*req);
   acceptor_.HandleRequest(*req);
 }
 
-void SimulatedMultiPaxos::HandleInternalResponse(EnvelopePtr&& res) { leader_.HandleResponse(*res); }
+void SimulatedMultiPaxos::OnInternalResponseReceived(EnvelopePtr&& res) { leader_.HandleResponse(*res); }
 
 bool SimulatedMultiPaxos::IsMember() const { return leader_.IsMember(); }
 

@@ -34,21 +34,16 @@ void Scheduler::Initialize() {
   for (auto& worker : workers_) {
     worker->StartInNewThread();
   }
-}
 
-// Custom sockets are used to communicate with the workers
-std::vector<zmq::socket_t> Scheduler::InitializeCustomSockets() {
   zmq::socket_t worker_socket(*context(), ZMQ_DEALER);
   worker_socket.set(zmq::sockopt::rcvhwm, 0);
   worker_socket.set(zmq::sockopt::sndhwm, 0);
   worker_socket.bind(MakeInProcChannelAddress(kWorkerChannel));
 
-  vector<zmq::socket_t> sockets;
-  sockets.push_back(move(worker_socket));
-  return sockets;
+  AddCustomSocket(move(worker_socket));
 }
 
-void Scheduler::HandleInternalRequest(EnvelopePtr&& env) {
+void Scheduler::OnInternalRequestReceived(EnvelopePtr&& env) {
   switch (env->request().type_case()) {
     case Request::kForwardTxn:
       ProcessTransaction(move(env));
@@ -126,7 +121,9 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 }
 
 // Handle responses from the workers
-bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
+bool Scheduler::OnPollTimeout() {
+  auto& worker_socket = GetCustomSocket(0);
+
   zmq::message_t msg;
   if (!worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
     return false;

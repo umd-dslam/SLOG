@@ -44,6 +44,11 @@ NetworkedModule::~NetworkedModule() {
 #endif
 }
 
+void NetworkedModule::AddCustomSocket(zmq::socket_t&& new_socket) {
+  auto& sock = custom_sockets_.emplace_back(move(new_socket));
+  poller_.PushSocket(sock);
+}
+
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_[i]; }
 
 const std::shared_ptr<zmq::context_t> NetworkedModule::context() const { return context_; }
@@ -52,10 +57,6 @@ void NetworkedModule::SetUp() {
   VLOG(1) << "Thread info: " << debug_info_;
 
   poller_.PushSocket(pull_socket_);
-  custom_sockets_ = InitializeCustomSockets();
-  for (auto& socket : custom_sockets_) {
-    poller_.PushSocket(socket);
-  }
 
   Initialize();
 }
@@ -84,9 +85,9 @@ bool NetworkedModule::Loop() {
       }
 
       if (env->has_request()) {
-        HandleInternalRequest(move(env));
+        OnInternalRequestReceived(move(env));
       } else if (env->has_response()) {
-        HandleInternalResponse(move(env));
+        OnInternalResponseReceived(move(env));
       }
 
 #ifdef ENABLE_WORK_MEASURING
@@ -94,16 +95,14 @@ bool NetworkedModule::Loop() {
 #endif
     }
 
-    for (size_t i = 0; i < custom_sockets_.size(); i++) {
 #ifdef ENABLE_WORK_MEASURING
-      auto start = std::chrono::steady_clock::now();
-      if (HandleCustomSocket(custom_sockets_[i], i)) {
-        work_ += (std::chrono::steady_clock::now() - start).count();
-      }
-#else
-      HandleCustomSocket(custom_sockets_[i], i);
-#endif
+    auto start = std::chrono::steady_clock::now();
+    if (OnPollTimeout()) {
+      work_ += (std::chrono::steady_clock::now() - start).count();
     }
+#else
+    OnPollTimeout();
+#endif
   }
 
   return false;

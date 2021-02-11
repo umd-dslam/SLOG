@@ -27,7 +27,7 @@ class MultiHomeOrderer : public NetworkedModule {
                    milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
   void NewBatch();

@@ -26,18 +26,16 @@ Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
       // TODO: change this dynamically based on selected experiment
       commands_(new KeyValueCommands()) {}
 
-vector<zmq::socket_t> Worker::InitializeCustomSockets() {
+void Worker::Initialize() {
   zmq::socket_t sched_socket(*context(), ZMQ_DEALER);
   sched_socket.set(zmq::sockopt::rcvhwm, 0);
   sched_socket.set(zmq::sockopt::sndhwm, 0);
   sched_socket.connect(MakeInProcChannelAddress(kWorkerChannel));
 
-  vector<zmq::socket_t> sockets;
-  sockets.push_back(std::move(sched_socket));
-  return sockets;
+  AddCustomSocket(std::move(sched_socket));
 }
 
-void Worker::HandleInternalRequest(EnvelopePtr&& env) {
+void Worker::OnInternalRequestReceived(EnvelopePtr&& env) {
   if (env->request().type_case() != Request::kRemoteReadResult) {
     LOG(FATAL) << "Invalid request for worker";
   }
@@ -83,7 +81,9 @@ void Worker::HandleInternalRequest(EnvelopePtr&& env) {
   AdvanceTransaction(txn_id);
 }
 
-bool Worker::HandleCustomSocket(zmq::socket_t& sched_socket, size_t) {
+bool Worker::OnPollTimeout() {
+  auto& sched_socket = GetCustomSocket(0);
+
   zmq::message_t msg;
   if (!sched_socket.recv(msg, zmq::recv_flags::dontwait)) {
     return false;

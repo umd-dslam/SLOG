@@ -40,7 +40,7 @@ Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& b
   partitioned_lookup_request_.resize(config_->num_partitions());
 }
 
-void Forwarder::HandleInternalRequest(EnvelopePtr&& env) {
+void Forwarder::OnInternalRequestReceived(EnvelopePtr&& env) {
   switch (env->request().type_case()) {
     case Request::kForwardTxn:
       ProcessForwardTxn(move(env));
@@ -150,7 +150,7 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
   Send(lookup_env, env->from(), kForwarderChannel);
 }
 
-void Forwarder::HandleInternalResponse(EnvelopePtr&& env) {
+void Forwarder::OnInternalResponseReceived(EnvelopePtr&& env) {
   // The forwarder only cares about lookup master responses
   if (env->response().type_case() != Response::kLookupMaster) {
     LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(env->response().type_case(), Response) << "\"";

@@ -27,7 +27,7 @@ Server::Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
                 Custom socket
 ***********************************************/
 
-std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
+void Server::Initialize() {
   string endpoint = "tcp://*:" + std::to_string(config_->server_port());
   zmq::socket_t client_socket(*context(), ZMQ_ROUTER);
   client_socket.set(zmq::sockopt::rcvhwm, 0);
@@ -36,16 +36,16 @@ std::vector<zmq::socket_t> Server::InitializeCustomSockets() {
 
   LOG(INFO) << "Bound Server to: " << endpoint;
 
-  vector<zmq::socket_t> sockets;
-  sockets.push_back(move(client_socket));
-  return sockets;
+  AddCustomSocket(move(client_socket));
 }
 
 /***********************************************
                   API Requests
 ***********************************************/
 
-bool Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
+bool Server::OnPollTimeout() {
+  auto& socket = GetCustomSocket(0);
+
   zmq::message_t identity;
   if (!socket.recv(identity, zmq::recv_flags::dontwait)) {
     return false;
@@ -120,7 +120,7 @@ bool Server::HandleCustomSocket(zmq::socket_t& socket, size_t) {
               Internal Requests
 ***********************************************/
 
-void Server::HandleInternalRequest(EnvelopePtr&& env) {
+void Server::OnInternalRequestReceived(EnvelopePtr&& env) {
   if (env->request().type_case() != internal::Request::kCompletedSubtxn) {
     LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), internal::Request)
                << "\"";
@@ -180,14 +180,14 @@ void Server::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
   auto env = NewEnvelope();
   env->mutable_response()->mutable_stats()->set_id(stats_request.id());
   env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
-  HandleInternalResponse(move(env));
+  OnInternalResponseReceived(move(env));
 }
 
 /***********************************************
               Internal Responses
 ***********************************************/
 
-void Server::HandleInternalResponse(EnvelopePtr&& env) {
+void Server::OnInternalResponseReceived(EnvelopePtr&& env) {
   if (env->response().type_case() != internal::Response::kStats) {
     LOG(ERROR) << "Unexpected response type received: \"" << CASE_NAME(env->response().type_case(), internal::Response)
                << "\"";

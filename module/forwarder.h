@@ -36,8 +36,8 @@ class Forwarder : public NetworkedModule {
             milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
-  void HandleInternalRequest(EnvelopePtr&& env) final;
-  void HandleInternalResponse(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
+  void OnInternalResponseReceived(EnvelopePtr&& env) final;
 
  private:
   void ProcessForwardTxn(EnvelopePtr&& env);

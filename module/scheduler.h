@@ -47,13 +47,11 @@ class Scheduler : public NetworkedModule {
 
  protected:
   void Initialize() final;
-  // Custom sockets are used to communicate with the workers
-  std::vector<zmq::socket_t> InitializeCustomSockets() final;
 
-  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
   // Handle responses from the workers
-  bool HandleCustomSocket(zmq::socket_t& socket, size_t) final;
+  bool OnPollTimeout() final;
 
  private:
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);

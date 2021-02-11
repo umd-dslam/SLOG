@@ -57,7 +57,7 @@ Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker
                          std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout), config_(config) {}
 
-void Interleaver::HandleInternalRequest(EnvelopePtr&& env) {
+void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
   auto request = env->mutable_request();
   if (request->type_case() == Request::kLocalQueueOrder) {
     auto& order = request->local_queue_order();

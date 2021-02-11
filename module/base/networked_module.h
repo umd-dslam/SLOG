@@ -30,17 +30,16 @@ class NetworkedModule : public Module {
   ~NetworkedModule();
 
  protected:
-  virtual std::vector<zmq::socket_t> InitializeCustomSockets() { return {}; }
-
   virtual void Initialize(){};
 
-  virtual void HandleInternalRequest(EnvelopePtr&& env) = 0;
+  virtual void OnInternalRequestReceived(EnvelopePtr&& env) = 0;
 
-  virtual void HandleInternalResponse(EnvelopePtr&& /* env */) {}
+  virtual void OnInternalResponseReceived(EnvelopePtr&& /* env */) {}
 
-  // The implementation of this function must never block
-  virtual bool HandleCustomSocket(zmq::socket_t& /* socket */, size_t /* socket_index */) { return false; };
+  // Returns true if want to count the time spent on this function to work measuring
+  virtual bool OnPollTimeout() { return false; }
 
+  void AddCustomSocket(zmq::socket_t&& new_socket);
   zmq::socket_t& GetCustomSocket(size_t i);
 
   inline static EnvelopePtr NewEnvelope() { return std::make_unique<internal::Envelope>(); }

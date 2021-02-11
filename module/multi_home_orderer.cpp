@@ -40,7 +40,7 @@ void MultiHomeOrderer::NewBatch() {
   }
 }
 
-void MultiHomeOrderer::HandleInternalRequest(EnvelopePtr&& env) {
+void MultiHomeOrderer::OnInternalRequestReceived(EnvelopePtr&& env) {
   auto request = env->mutable_request();
   switch (request->type_case()) {
     case Request::kForwardTxn: {

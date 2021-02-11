@@ -84,7 +84,7 @@ class Server : public NetworkedModule {
          std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
-  std::vector<zmq::socket_t> InitializeCustomSockets() final;
+  void Initialize() final;
 
   /**
    * After a transaction is processed by different partitions, each
@@ -93,11 +93,11 @@ class Server : public NetworkedModule {
    * in charge of merging these sub-transactions and responding back to
    * the client.
    */
-  void HandleInternalRequest(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
-  void HandleInternalResponse(EnvelopePtr&& env) final;
+  void OnInternalResponseReceived(EnvelopePtr&& env) final;
 
-  bool HandleCustomSocket(zmq::socket_t& socket, size_t /* socket_index */) final;
+  bool OnPollTimeout() final;
 
  private:
   void ProcessCompletedSubtxn(EnvelopePtr&& req);

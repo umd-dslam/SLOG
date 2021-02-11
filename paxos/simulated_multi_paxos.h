@@ -25,8 +25,8 @@ class SimulatedMultiPaxos : public NetworkedModule {
   bool IsMember() const;
 
  protected:
-  void HandleInternalRequest(EnvelopePtr&& env) final;
-  void HandleInternalResponse(EnvelopePtr&& env) final;
+  void OnInternalRequestReceived(EnvelopePtr&& env) final;
+  void OnInternalResponseReceived(EnvelopePtr&& env) final;
 
   virtual void OnCommit(uint32_t slot, uint32_t value, bool is_elected) = 0;
 
