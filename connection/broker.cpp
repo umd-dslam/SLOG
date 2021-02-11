@@ -110,10 +110,9 @@ string Broker::MakeEndpoint(const string& addr) const {
 }
 
 bool Broker::InitializeConnection() {
+  LOG(INFO) << "Binding Broker to: " << MakeEndpoint();
   // Bind the router to its endpoint
   external_socket_.bind(MakeEndpoint());
-  LOG(INFO) << "Bound Broker to: " << MakeEndpoint();
-
   internal_socket_.bind(MakeInProcChannelAddress(kBrokerChannel));
 
   // Prepare a READY message
