@@ -87,7 +87,6 @@ class OldLockManager {
   void GetStats(rapidjson::Document& stats, uint32_t level) const;
 
  private:
-  
   struct TxnInfo {
     TxnInfo(int num_keys) : num_waiting_for(num_keys) { keys.reserve(num_keys); }
 

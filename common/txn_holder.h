@@ -18,19 +18,20 @@ class TxnHolder {
  public:
   TxnHolder(const ConfigurationPtr& config, Transaction* txn)
       : id_(txn->internal().id()),
-        txn_(*txn),
+        main_txn_(txn->internal().home()),
+        lo_txns_(config->num_replicas()),
+        remaster_result_(std::nullopt),
         aborting_(false),
         done_(false),
-        lo_txns_(config->num_replicas()),
         num_lo_txns_(0),
         expected_num_lo_txns_(txn->internal().involved_replicas_size()) {
-    lo_txns_[txn->internal().home()].reset(txn);
+    lo_txns_[main_txn_].reset(txn);
     ++num_lo_txns_;
   }
 
   bool AddLockOnlyTxn(Transaction* txn) {
     auto home = txn->internal().home();
-    if (lo_txns_[home] != nullptr) {
+    if (home >= static_cast<int>(lo_txns_.size()) || lo_txns_[home] != nullptr) {
       return false;
     }
     lo_txns_[home].reset(txn);
@@ -38,11 +39,18 @@ class TxnHolder {
     return true;
   }
 
+  Transaction* Release() {
+    auto txn = lo_txns_[main_txn_].release();
+    lo_txns_.clear();
+    return txn;
+  }
+
   TxnId id() const { return id_; }
-
-  Transaction& txn() const { return txn_; }
-
+  Transaction& txn() const { return *lo_txns_[main_txn_]; }
   Transaction& lock_only_txn(size_t i) const { return *lo_txns_[i]; }
+
+  void SetRemasterResult(const Key& key, uint32_t counter) { remaster_result_.emplace(key, counter); }
+  std::optional<pair<Key, uint32_t>> remaster_result() const { return remaster_result_; }
 
   void SetDone() { done_ = true; }
   bool is_done() const { return done_; }
@@ -56,10 +64,11 @@ class TxnHolder {
 
  private:
   TxnId id_;
-  Transaction& txn_;
+  size_t main_txn_;
+  std::vector<std::unique_ptr<Transaction>> lo_txns_;
+  std::optional<pair<Key, uint32_t>> remaster_result_;
   bool aborting_;
   bool done_;
-  std::vector<std::unique_ptr<Transaction>> lo_txns_;
   int num_lo_txns_;
   int expected_num_lo_txns_;
 };

@@ -148,11 +148,12 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
 }
 
 vector<TxnId> OldLockManager::ReleaseLocks(TxnId txn_id) {
-  auto info_it = txn_info_.find(txn_id);
-  DCHECK(info_it != txn_info_.end());
-  auto& info = info_it->second;
-
   vector<TxnId> result;
+  auto info_it = txn_info_.find(txn_id);
+  if (info_it == txn_info_.end()) {
+    return result;
+  }
+  auto& info = info_it->second;
   for (const auto& key : info.keys) {
     auto lock_state_it = lock_table_.find(key);
     if (lock_state_it == lock_table_.end()) {

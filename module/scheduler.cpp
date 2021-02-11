@@ -141,24 +141,22 @@ bool Scheduler::HandleCustomSocket(zmq::socket_t& worker_socket, size_t) {
 
   VLOG(2) << "Released locks of txn " << txn_id;
 
+  auto it = active_txns_.find(txn_id);
+  DCHECK(it != active_txns_.end());
+  auto& txn_holder = it->second;
+
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  auto& txn_holder = GetTxnHolder(txn_id);
-  auto txn = txn_holder.txn();
+  auto remaster_result = txn_holder.remaster_result();
   // If a remaster transaction, trigger any unblocked txns
-  if (txn.procedure_case() == Transaction::ProcedureCase::kRemaster && txn.status() == TransactionStatus::COMMITTED) {
-    auto& key = txn.keys().begin()->first;
-    auto counter = txn.keys().begin()->second.metadata().counter() + 1;
-    ProcessRemasterResult(remaster_manager_.RemasterOccured(key, counter));
+  if (remaster_result.has_value()) {
+    ProcessRemasterResult(remaster_manager_.RemasterOccured(remaster_result->first, remaster_result->second));
   }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  auto it = active_txns_.find(txn_id);
-  DCHECK(it != active_txns_.end());
+  txn_holder.SetDone();
 
-  it->second.SetDone();
-
-  if (it->second.is_ready_for_gc()) {
+  if (txn_holder.is_ready_for_gc()) {
     active_txns_.erase(it);
   }
 
@@ -261,7 +259,8 @@ void Scheduler::SendToLockManager(const Transaction& txn) {
 }
 
 void Scheduler::Dispatch(TxnId txn_id) {
-  auto& txn_holder = GetTxnHolder(txn_id);
+  auto it = active_txns_.find(txn_id);
+  auto& txn_holder = it->second;
 
   TRACE(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED);
 
@@ -311,10 +310,6 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
   // Let a worker handle notifying other partitions and send back to the server.
   txn.set_status(TransactionStatus::ABORTED);
   Dispatch(txn_id);
-
-  if (txn_holder.is_ready_for_gc()) {
-    active_txns_.erase(active_txn_it);
-  }
 }
 #endif /* LOCK_MANAGER_DDR */
 

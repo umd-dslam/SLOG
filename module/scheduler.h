@@ -105,12 +105,6 @@ class Scheduler : public NetworkedModule {
 
   std::unordered_map<TxnId, TxnHolder> active_txns_;
 
-  TxnHolder& GetTxnHolder(TxnId txn_id) {
-    auto active_txn_it = active_txns_.find(txn_id);
-    CHECK(active_txn_it != active_txns_.end());
-    return active_txn_it->second;
-  }
-
   // This must be defined at the end so that the workers exit before any resources
   // in the scheduler is destroyed
   std::vector<std::unique_ptr<ModuleRunner>> workers_;
