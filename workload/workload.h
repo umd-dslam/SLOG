@@ -21,12 +21,12 @@ class WorkloadParams {
 
   void Update(const std::string& params_str) {
     auto new_params_ = Parse(params_str);
-    for (const auto& pair : new_params_) {
-      auto res = raw_params_.insert_or_assign(pair.first, pair.second);
+    for (const auto& [param, value] : new_params_) {
+      auto res = raw_params_.insert_or_assign(param, value);
       // If did an insertion instead of an assignment
       if (res.second) {
         std::ostringstream ss;
-        ss << "Unknown param for current workload: " << pair.first << ". Default params: " << ToString();
+        ss << "Unknown param for current workload: " << param << ". Default params: " << ToString();
         throw std::runtime_error(ss.str());
       }
     }
@@ -59,8 +59,8 @@ class WorkloadParams {
 
   std::string ToString() const {
     std::ostringstream ss;
-    for (const auto& param : raw_params_) {
-      ss << param.first << " = " << param.second << "; ";
+    for (const auto& [param, value] : raw_params_) {
+      ss << param << " = " << value << "; ";
     }
     return ss.str();
   }

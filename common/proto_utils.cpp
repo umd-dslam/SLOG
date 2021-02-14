@@ -15,7 +15,7 @@ namespace slog {
 Transaction* MakeTransaction(const std::vector<KeyEntry>& keys, const std::variant<string, int>& proc,
                              MachineId coordinating_server) {
   Transaction* txn = new Transaction();
-  for (auto& key : keys) {
+  for (const auto& key : keys) {
     ValueEntry val;
     val.set_type(key.type);
     if (key.metadata.has_value()) {
@@ -172,10 +172,10 @@ void PopulateInvolvedReplicas(Transaction& txn) {
 void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn) {
   vector<uint32_t> involved_partitions;
   vector<uint32_t> active_partitions;
-  for (const auto& kv : txn.keys()) {
-    auto partition = config->partition_of_key(kv.first);
+  for (const auto& [key, value] : txn.keys()) {
+    auto partition = config->partition_of_key(key);
     involved_partitions.push_back(partition);
-    if (kv.second.type() == KeyType::WRITE) {
+    if (value.type() == KeyType::WRITE) {
       active_partitions.push_back(partition);
     }
   }
@@ -230,9 +230,8 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   }
   os << "Key set:\n";
   os << std::setfill(' ');
-  for (const auto& kv : txn.keys()) {
-    auto& v = kv.second;
-    os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << kv.first << "\n";
+  for (const auto& [k, v] : txn.keys()) {
+    os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << k << "\n";
     os << "\tValue: " << v.value() << "\n";
     if (v.type() == KeyType::WRITE) {
       os << "\tNew value: " << v.new_value() << "\n";

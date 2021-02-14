@@ -38,16 +38,16 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
 
   int num_relevant_locks = 0;
   vector<TxnId> blocking_txns;
-  for (const auto& kv : txn.keys()) {
-    if (!is_remaster && static_cast<int>(kv.second.metadata().master()) != home) {
+  for (const auto& [key, value] : txn.keys()) {
+    if (!is_remaster && static_cast<int>(value.metadata().master()) != home) {
       continue;
     }
     ++num_relevant_locks;
 
-    auto key_replica = MakeKeyReplica(kv.first, home);
+    auto key_replica = MakeKeyReplica(key, home);
     auto& lock_queue_tail = lock_table_[key_replica];
 
-    switch (kv.second.type()) {
+    switch (value.type()) {
       case KeyType::READ: {
         auto b_txn = lock_queue_tail.AcquireReadLock(txn_id);
         if (b_txn.has_value()) {
@@ -156,9 +156,9 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   stats.AddMember(StringRef(NUM_TXNS_WAITING_FOR_LOCK), txn_info_.size(), alloc);
   if (level >= 1) {
     rapidjson::Value waited_by_graph(rapidjson::kArrayType);
-    for (const auto& info : txn_info_) {
+    for (const auto& [txn_id, info] : txn_info_) {
       rapidjson::Value entry(rapidjson::kArrayType);
-      entry.PushBack(info.first, alloc).PushBack(ToJsonArray(info.second.waited_by, alloc), alloc);
+      entry.PushBack(txn_id, alloc).PushBack(ToJsonArray(info.waited_by, alloc), alloc);
       waited_by_graph.PushBack(entry, alloc);
     }
     stats.AddMember(StringRef(WAITED_BY_GRAPH), move(waited_by_graph), alloc);
@@ -167,9 +167,7 @@ void DDRLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   if (level >= 2) {
     // Collect data from lock tables
     rapidjson::Value lock_table(rapidjson::kArrayType);
-    for (const auto& pair : lock_table_) {
-      auto& key = pair.first;
-      auto& lock_state = pair.second;
+    for (const auto& [key, lock_state] : lock_table_) {
       rapidjson::Value entry(rapidjson::kArrayType);
       rapidjson::Value key_json(key.c_str(), alloc);
       entry.PushBack(key_json, alloc)

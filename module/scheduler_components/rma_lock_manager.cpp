@@ -112,14 +112,14 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
   auto ins = txn_info_.try_emplace(txn_id, num_required_locks);
   auto& txn_info = ins.first->second;
 
-  for (const auto& kv : txn.keys()) {
+  for (const auto& [key, value] : txn.keys()) {
     // Skip keys that does not belong to the assigned home. Remaster txn is an exception where
     // it is allowed that the metadata on the txn does not match its assigned home
-    if (!is_remaster && static_cast<int>(kv.second.metadata().master()) != home) {
+    if (!is_remaster && static_cast<int>(value.metadata().master()) != home) {
       continue;
     }
 
-    auto key_replica = MakeKeyReplica(kv.first, home);
+    auto key_replica = MakeKeyReplica(key, home);
     txn_info.keys.push_back(key_replica);
 
     auto& lock_state = lock_table_[key_replica];
@@ -127,7 +127,7 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key_replica;
 
     auto before_mode = lock_state.mode;
-    switch (kv.second.type()) {
+    switch (value.type()) {
       case KeyType::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
           txn_info.num_waiting_for--;
@@ -237,9 +237,7 @@ void RMALockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   if (level >= 2) {
     // Collect data from lock tables
     rapidjson::Value lock_table(rapidjson::kArrayType);
-    for (const auto& pair : lock_table_) {
-      auto& key = pair.first;
-      auto& lock_state = pair.second;
+    for (const auto& [key, lock_state] : lock_table_) {
       if (lock_state.mode == LockMode::UNLOCKED) {
         continue;
       }

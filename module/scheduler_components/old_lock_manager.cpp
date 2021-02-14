@@ -107,13 +107,12 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
   auto ins = txn_info_.try_emplace(txn_id, txn.keys_size());
   auto& txn_info = ins.first->second;
 
-  for (const auto& kv : txn.keys()) {
+  for (const auto& [key, value] : txn.keys()) {
     // Skip keys that does not belong to the assigned home
-    if (static_cast<int>(kv.second.metadata().master()) != txn.internal().home()) {
+    if (static_cast<int>(value.metadata().master()) != txn.internal().home()) {
       continue;
     }
 
-    auto& key = kv.first;
     txn_info.keys.push_back(key);
 
     auto& lock_state = lock_table_[key];
@@ -121,7 +120,7 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key;
 
     auto before_mode = lock_state.mode;
-    switch (kv.second.type()) {
+    switch (value.type()) {
       case KeyType::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
           txn_info.num_waiting_for--;
@@ -231,9 +230,7 @@ void OldLockManager::GetStats(rapidjson::Document& stats, uint32_t level) const 
   if (level >= 2) {
     // Collect data from lock tables
     rapidjson::Value lock_table(rapidjson::kArrayType);
-    for (const auto& pair : lock_table_) {
-      auto& key = pair.first;
-      auto& lock_state = pair.second;
+    for (const auto& [key, lock_state] : lock_table_) {
       if (lock_state.mode == LockMode::UNLOCKED) {
         continue;
       }

@@ -91,9 +91,7 @@ bool operator==(google::protobuf::Map<K, V> map1, google::protobuf::Map<K, V> ma
   if (map1.size() != map2.size()) {
     return false;
   }
-  for (const auto& key_value : map1) {
-    auto& key = key_value.first;
-    auto& value = key_value.second;
+  for (const auto& [key, value] : map1) {
     if (!map2.contains(key) || !(map2.at(key) == value)) {
       return false;
     }

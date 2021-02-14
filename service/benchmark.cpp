@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
   for (;;) {
     std::this_thread::sleep_for(1s);
     bool setup = true;
-    for (auto& w : workers) setup &= w->set_up();
+    for (const auto& w : workers) setup &= w->set_up();
     if (setup) break;
   }
 
@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
     txn_infos.resize(sample_size);
 
     std::unordered_map<int, string> event_names;
-    for (auto& info : txn_infos) {
+    for (const auto& info : txn_infos) {
       CHECK(info.txn != nullptr);
       auto& txn_internal = info.txn->internal();
       writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
@@ -243,7 +243,7 @@ int main(int argc, char* argv[]) {
         throw std::runtime_error(std::string("Cannot open file: ") + file_name);
       }
       const int kCellWidth = 12;
-      for (auto& info : txn_infos) {
+      for (const auto& info : txn_infos) {
         profiles << *info.txn;
         profiles << "Multi-Home: " << info.profile.is_multi_home << "\n";
         profiles << "Multi-Partition: " << info.profile.is_multi_partition << "\n";
@@ -251,9 +251,7 @@ int main(int argc, char* argv[]) {
         profiles << setw(kCellWidth) << "Key" << setw(kCellWidth) << "Home" << setw(kCellWidth) << "Partition"
                  << setw(kCellWidth) << "Hot" << setw(kCellWidth) << "Write"
                  << "\n";
-        for (const auto& pair : info.profile.records) {
-          const auto& key = pair.first;
-          const auto& record = pair.second;
+        for (const auto& [key, record] : info.profile.records) {
           profiles << setw(kCellWidth) << key << setw(kCellWidth) << record.home << setw(kCellWidth) << record.partition
                    << setw(kCellWidth) << record.is_hot << setw(kCellWidth) << record.is_write << "\n";
         }

@@ -66,22 +66,22 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   }
 
   bool need_remote_lookup = false;
-  for (auto& kv : *txn->mutable_keys()) {
-    auto partition = config_->partition_of_key(kv.first);
+  for (auto& [key, value] : *txn->mutable_keys()) {
+    auto partition = config_->partition_of_key(key);
 
     // If this is a local partition, lookup the master info from the local storage
     if (partition == config_->local_partition()) {
       Metadata metadata;
-      if (lookup_master_index_->GetMasterMetadata(kv.first, metadata)) {
-        kv.second.mutable_metadata()->set_master(metadata.master);
-        kv.second.mutable_metadata()->set_counter(metadata.counter);
+      if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
+        value.mutable_metadata()->set_master(metadata.master);
+        value.mutable_metadata()->set_counter(metadata.counter);
       } else {
-        kv.second.mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-        kv.second.mutable_metadata()->set_counter(0);
+        value.mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
+        value.mutable_metadata()->set_counter(0);
       }
     } else {
       // Otherwise, add the key to the appropriate remote lookup master request
-      partitioned_lookup_request_[partition].mutable_request()->mutable_lookup_master()->add_keys(kv.first);
+      partitioned_lookup_request_[partition].mutable_request()->mutable_lookup_master()->add_keys(key);
       need_remote_lookup = true;
     }
   }
@@ -166,11 +166,11 @@ void Forwarder::OnInternalResponseReceived(EnvelopePtr&& env) {
     // Transfer master info from the lookup response to its intended transaction
     auto& pending_env = pending_txn_it->second;
     auto txn = pending_env->mutable_request()->mutable_forward_txn()->mutable_txn();
-    for (auto& kv : *txn->mutable_keys()) {
-      if (!kv.second.has_metadata()) {
-        auto it = lookup_master.master_metadata().find(kv.first);
+    for (auto& [key, value] : *txn->mutable_keys()) {
+      if (!value.has_metadata()) {
+        auto it = lookup_master.master_metadata().find(key);
         if (it != lookup_master.master_metadata().end()) {
-          kv.second.mutable_metadata()->CopyFrom(it->second);
+          value.mutable_metadata()->CopyFrom(it->second);
         }
       }
     }

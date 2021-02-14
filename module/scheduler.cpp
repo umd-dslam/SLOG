@@ -94,13 +94,13 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
 
   if (level >= 1) {
     rapidjson::Value txns(rapidjson::kArrayType);
-    for (const auto& kv : active_txns_) {
+    for (const auto& [txn_id, txn_holder] : active_txns_) {
       rapidjson::Value txn_obj(rapidjson::kObjectType);
-      txn_obj.AddMember(StringRef(TXN_ID), kv.first, alloc)
-          .AddMember(StringRef(TXN_DONE), kv.second.is_done(), alloc)
-          .AddMember(StringRef(TXN_ABORTING), kv.second.is_aborting(), alloc)
-          .AddMember(StringRef(TXN_NUM_LO), kv.second.num_lock_only_txns(), alloc)
-          .AddMember(StringRef(TXN_EXPECTED_NUM_LO), kv.second.expected_num_lock_only_txns(), alloc);
+      txn_obj.AddMember(StringRef(TXN_ID), txn_id, alloc)
+          .AddMember(StringRef(TXN_DONE), txn_holder.is_done(), alloc)
+          .AddMember(StringRef(TXN_ABORTING), txn_holder.is_aborting(), alloc)
+          .AddMember(StringRef(TXN_NUM_LO), txn_holder.num_lock_only_txns(), alloc)
+          .AddMember(StringRef(TXN_EXPECTED_NUM_LO), txn_holder.expected_num_lock_only_txns(), alloc);
       txns.PushBack(txn_obj, alloc);
     }
     stats.AddMember(StringRef(ALL_TXNS), txns, alloc);

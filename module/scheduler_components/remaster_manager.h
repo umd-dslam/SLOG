@@ -68,25 +68,25 @@ class RemasterManager {
   static VerifyMasterResult CheckCounters(const Transaction& txn, bool filter_by_home,
                                           const shared_ptr<const Storage<Key, Record>>& storage) {
     auto waiting = false;
-    for (const auto& kv : txn.keys()) {
-      if (filter_by_home && static_cast<int>(kv.second.metadata().master()) != txn.internal().home()) {
+    for (const auto& [key, value] : txn.keys()) {
+      if (filter_by_home && static_cast<int>(value.metadata().master()) != txn.internal().home()) {
         continue;
       }
       // Get current counter from storage
       uint32_t storage_counter = 0;  // default to 0 for a new key
       Record record;
-      bool found = storage->Read(kv.first, record);
+      bool found = storage->Read(key, record);
       if (found) {
         storage_counter = record.metadata.counter;
       }
 
-      if (kv.second.metadata().counter() < storage_counter) {
+      if (value.metadata().counter() < storage_counter) {
         return VerifyMasterResult::ABORT;
-      } else if (kv.second.metadata().counter() > storage_counter) {
+      } else if (value.metadata().counter() > storage_counter) {
         waiting = true;
       } else {
-        CHECK(kv.second.metadata().master() == record.metadata.master)
-            << "Masters don't match for same key \"" << kv.first << "\". In txn: " << kv.second.metadata().master()
+        CHECK(value.metadata().master() == record.metadata.master)
+            << "Masters don't match for same key \"" << key << "\". In txn: " << value.metadata().master()
             << ". In storage: " << record.metadata.master;
       }
     }

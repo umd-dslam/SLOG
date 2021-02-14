@@ -55,12 +55,12 @@ void ExecuteTxn(const char* txn_file) {
   // 2. Construct a request
   auto write_set_arr = d["write_set"].GetArray();
   vector<string> write_set;
-  for (auto& v : write_set_arr) {
+  for (const auto& v : write_set_arr) {
     keys.emplace_back(v.GetString(), KeyType::WRITE);
   }
 
   auto read_set_arr = d["read_set"].GetArray();
-  for (auto& v : read_set_arr) {
+  for (const auto& v : read_set_arr) {
     keys.emplace_back(v.GetString(), KeyType::READ);
   }
 
@@ -207,7 +207,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
         auto lock_mode = static_cast<LockMode>(entry[1].GetUint());
         cout << "Key: " << entry[0].GetString() << ". Mode: " << LockModeStr(lock_mode) << "\n";
         cout << "\tHolders: ";
-        for (auto& holder : entry[2].GetArray()) {
+        for (const auto& holder : entry[2].GetArray()) {
           cout << holder.GetUint() << " ";
         }
         cout << "\n";

@@ -22,12 +22,12 @@ VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const Transaction& txn) {
     case VerifyMasterResult::VALID: {
       // Check if other transactions are blocking the queue
       auto indirectly_blocked = false;
-      for (const auto& kv : txn.keys()) {
-        auto q_it = blocked_queue_.find(kv.first);
+      for (const auto& [key, value] : txn.keys()) {
+        auto q_it = blocked_queue_.find(key);
         // If the queue is emtpy, can be skipped
         if (q_it != blocked_queue_.end() && !q_it->second.empty()) {
           // If we won't be at the front of the queue, the txn will need to wait.
-          if (q_it->second.front().second <= kv.second.metadata().counter()) {
+          if (q_it->second.front().second <= value.metadata().counter()) {
             indirectly_blocked = true;
             break;
           }
@@ -44,9 +44,9 @@ VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const Transaction& txn) {
   }
 
   // add the txn to the queue for each key
-  for (const auto& kv : txn.keys()) {
-    if (static_cast<int>(kv.second.metadata().master()) == txn.internal().home()) {
-      InsertIntoBlockedQueue(kv.first, kv.second.metadata().counter(), txn);
+  for (const auto& [key, value] : txn.keys()) {
+    if (static_cast<int>(value.metadata().master()) == txn.internal().home()) {
+      InsertIntoBlockedQueue(key, value.metadata().counter(), txn);
     }
   }
   return VerifyMasterResult::WAITING;
@@ -121,9 +121,9 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
       return;
     }
     case VerifyMasterResult::VALID: {
-      for (const auto& kv : lock_only_txn->keys()) {
-        if (static_cast<int>(kv.second.metadata().master()) == lock_only_txn->internal().home()) {
-          auto q_it = blocked_queue_.find(kv.first);
+      for (const auto& [key, value] : lock_only_txn->keys()) {
+        if (static_cast<int>(value.metadata().master()) == lock_only_txn->internal().home()) {
+          auto q_it = blocked_queue_.find(key);
           DCHECK(q_it != blocked_queue_.end()) << "Transaction was not in correct blocked_queues";
           auto& front_txn_replica_id = q_it->second.front().first;
           if (front_txn_replica_id != lock_only_txn) {
@@ -134,20 +134,20 @@ void PerKeyRemasterManager::TryToUnblock(const Key& unblocked_key, RemasterOccur
       result.unblocked.push_back(lock_only_txn);
 
       // Garbage collect queue and counters
-      for (const auto& kv : lock_only_txn->keys()) {
-        if (static_cast<int>(kv.second.metadata().master()) == lock_only_txn->internal().home()) {
-          auto q_it = blocked_queue_.find(kv.first);
+      for (const auto& [key, value] : lock_only_txn->keys()) {
+        if (static_cast<int>(value.metadata().master()) == lock_only_txn->internal().home()) {
+          auto q_it = blocked_queue_.find(key);
           q_it->second.pop_front();
           if (q_it->second.size() == 0) {
-            blocked_queue_.erase(kv.first);
+            blocked_queue_.erase(key);
           }
         }
       }
 
       // Recurse on each updated queue
-      for (const auto& kv : lock_only_txn->keys()) {
-        if (static_cast<int>(kv.second.metadata().master()) == lock_only_txn->internal().home()) {
-          TryToUnblock(kv.first, result);
+      for (const auto& [key, value] : lock_only_txn->keys()) {
+        if (static_cast<int>(value.metadata().master()) == lock_only_txn->internal().home()) {
+          TryToUnblock(key, result);
         }
       }
       break;

@@ -14,9 +14,9 @@ template <typename Container, typename BaseAllocator, typename ValueFn>
 rapidjson::Value ToJsonArrayOfKeyValue(const Container& container, ValueFn value_fn,
                                        rapidjson::MemoryPoolAllocator<BaseAllocator>& alloc) {
   rapidjson::Value json_array(rapidjson::kArrayType);
-  for (const auto& pair : container) {
+  for (const auto& [key, value] : container) {
     rapidjson::Value entry(rapidjson::kArrayType);
-    entry.PushBack(pair.first, alloc).PushBack(rapidjson::Value(value_fn(pair.second)), alloc);
+    entry.PushBack(key, alloc).PushBack(rapidjson::Value(value_fn(value)), alloc);
     json_array.PushBack(std::move(entry), alloc);
   }
   return json_array;

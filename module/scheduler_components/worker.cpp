@@ -173,20 +173,20 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
 
     // We don't need to check if keys are in partition here since the assumption is that
     // the out-of-partition keys have already been removed
-    for (auto& kv : *(txn.mutable_keys())) {
+    for (auto& [key, value] : *(txn.mutable_keys())) {
       Record record;
-      if (storage_->Read(kv.first, record)) {
+      if (storage_->Read(key, record)) {
         // Check whether the store master metadata matches with the information
         // stored in the transaction
-        if (kv.second.metadata().master() != record.metadata.master) {
+        if (value.metadata().master() != record.metadata.master) {
           txn.set_status(TransactionStatus::ABORTED);
           txn.set_abort_reason("Outdated master");
           break;
         }
-        kv.second.set_value(record.value);
+        value.set_value(record.value);
       } else if (txn.procedure_case() == Transaction::kRemaster) {
         txn.set_status(TransactionStatus::ABORTED);
-        txn.set_abort_reason("Remaster non-existent key " + kv.first);
+        txn.set_abort_reason("Remaster non-existent key " + key);
         break;
       }
     }
@@ -243,17 +243,16 @@ void Worker::Commit(TxnId txn_id) {
         VLOG(3) << "Txn " << txn_id << " aborted with reason: " << txn.abort_reason();
         break;
       }
-      for (const auto& kv : txn.keys()) {
-        if (kv.second.type() == KeyType::READ) {
+      for (const auto& [key, value] : txn.keys()) {
+        if (value.type() == KeyType::READ) {
           continue;
         }
-        const auto& key = kv.first;
         if (config_->key_is_in_local_partition(key)) {
           Record record;
           if (!storage_->Read(key, record)) {
-            record.metadata = kv.second.metadata();
+            record.metadata = value.metadata();
           }
-          record.value = kv.second.new_value();
+          record.value = value.new_value();
           storage_->Write(key, record);
         }
       }

@@ -30,8 +30,8 @@ class LocalLog {
   /* For debugging */
   std::unordered_map<uint32_t, size_t> NumBufferedBatchesPerQueue() const {
     std::unordered_map<uint32_t, size_t> queue_sizes;
-    for (const auto& pair : batch_queues_) {
-      queue_sizes.insert_or_assign(pair.first, pair.second.NumBufferredItems());
+    for (const auto& [part, log] : batch_queues_) {
+      queue_sizes.insert_or_assign(part, log.NumBufferredItems());
     }
     return queue_sizes;
   }
