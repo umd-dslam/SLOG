@@ -62,48 +62,56 @@ void NetworkedModule::SetUp() {
 }
 
 bool NetworkedModule::Loop() {
-  if (poller_.Wait() <= 0) {
-    return false;
-  }
+  if (poller_.Wait() > 0) {
+    for (int i = 0; i < recv_batch_; i++) {
+      // Message from pull socket
+      if (auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */); wrapped_env != nullptr) {
+#ifdef ENABLE_WORK_MEASURING
+        auto start = std::chrono::steady_clock::now();
+#endif
 
-  for (int i = 0; i < recv_batch_; i++) {
-    // Message from pull socket
-    if (auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */); wrapped_env != nullptr) {
+        EnvelopePtr env;
+        if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
+          env.reset(new Envelope());
+          if (!DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
+            continue;
+          }
+          env->set_from(wrapped_env->from());
+        } else {
+          env = move(wrapped_env);
+        }
+
+        if (env->has_request()) {
+          OnInternalRequestReceived(move(env));
+        } else if (env->has_response()) {
+          OnInternalResponseReceived(move(env));
+        }
+
+#ifdef ENABLE_WORK_MEASURING
+        work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+      }
+
 #ifdef ENABLE_WORK_MEASURING
       auto start = std::chrono::steady_clock::now();
-#endif
-
-      EnvelopePtr env;
-      if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
-        env.reset(new Envelope());
-        if (!DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
-          continue;
-        }
-        env->set_from(wrapped_env->from());
-      } else {
-        env = move(wrapped_env);
+      if (OnCustomSocket()) {
+        work_ += (std::chrono::steady_clock::now() - start).count();
       }
-
-      if (env->has_request()) {
-        OnInternalRequestReceived(move(env));
-      } else if (env->has_response()) {
-        OnInternalResponseReceived(move(env));
-      }
-
-#ifdef ENABLE_WORK_MEASURING
-      work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
-    }
-
-#ifdef ENABLE_WORK_MEASURING
-    auto start = std::chrono::steady_clock::now();
-    if (OnPollTimeout()) {
-      work_ += (std::chrono::steady_clock::now() - start).count();
-    }
 #else
-    OnPollTimeout();
+      OnCustomSocket();
 #endif
+    }
   }
+
+#ifdef ENABLE_WORK_MEASURING
+  auto start = std::chrono::steady_clock::now();
+#endif
+
+  OnWakeUp();
+
+#ifdef ENABLE_WORK_MEASURING
+  work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
 
   return false;
 }

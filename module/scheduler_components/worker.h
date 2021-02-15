@@ -52,7 +52,7 @@ class Worker : public NetworkedModule {
   /**
    * Receives new transaction from the scheduler
    */
-  bool OnPollTimeout() final;
+  bool OnCustomSocket() final;
 
  private:
   /**

@@ -43,7 +43,7 @@ void Server::Initialize() {
                   API Requests
 ***********************************************/
 
-bool Server::OnPollTimeout() {
+bool Server::OnCustomSocket() {
   auto& socket = GetCustomSocket(0);
 
   zmq::message_t identity;

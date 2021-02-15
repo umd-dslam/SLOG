@@ -81,7 +81,7 @@ void Worker::OnInternalRequestReceived(EnvelopePtr&& env) {
   AdvanceTransaction(txn_id);
 }
 
-bool Worker::OnPollTimeout() {
+bool Worker::OnCustomSocket() {
   auto& sched_socket = GetCustomSocket(0);
 
   zmq::message_t msg;

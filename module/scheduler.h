@@ -51,7 +51,7 @@ class Scheduler : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
   // Handle responses from the workers
-  bool OnPollTimeout() final;
+  bool OnCustomSocket() final;
 
  private:
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);

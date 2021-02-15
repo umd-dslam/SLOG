@@ -97,7 +97,7 @@ class Server : public NetworkedModule {
 
   void OnInternalResponseReceived(EnvelopePtr&& env) final;
 
-  bool OnPollTimeout() final;
+  bool OnCustomSocket() final;
 
  private:
   void ProcessCompletedSubtxn(EnvelopePtr&& req);

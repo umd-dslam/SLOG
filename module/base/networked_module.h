@@ -37,7 +37,8 @@ class NetworkedModule : public Module {
   virtual void OnInternalResponseReceived(EnvelopePtr&& /* env */) {}
 
   // Returns true if want to count the time spent on this function to work measuring
-  virtual bool OnPollTimeout() { return false; }
+  virtual bool OnCustomSocket() { return false; }
+  virtual bool OnWakeUp() { return false; }
 
   void AddCustomSocket(zmq::socket_t&& new_socket);
   zmq::socket_t& GetCustomSocket(size_t i);
