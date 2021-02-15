@@ -42,7 +42,9 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
 
 Broker::~Broker() {
   running_ = false;
-  thread_.join();
+  if (thread_.joinable()) {
+    thread_.join();
+  }
 #ifdef ENABLE_WORK_MEASURING
   LOG(INFO) << "Broker stopped. Work done: " << work_;
 #endif
