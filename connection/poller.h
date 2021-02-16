@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <optional>
 #include <vector>
 #include <zmq.hpp>
 
@@ -9,7 +10,7 @@ namespace slog {
 
 class Poller {
  public:
-  Poller(std::chrono::microseconds timeout);
+  Poller(std::optional<std::chrono::microseconds> timeout);
 
   int Wait();
 
@@ -27,7 +28,7 @@ class Poller {
     std::function<void()> callback;
   };
 
-  std::chrono::microseconds poll_timeout_;
+  std::optional<std::chrono::microseconds> poll_timeout_;
   std::vector<zmq::pollitem_t> poll_items_;
   std::list<TimedCallback> timed_callbacks_;
 };

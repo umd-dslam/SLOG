@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 #include <zmq.hpp>
 
@@ -26,7 +27,7 @@ struct ChannelOption {
 class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
-                  std::chrono::milliseconds poll_timeout, int recv_batch = 5000);
+                  std::optional<std::chrono::milliseconds> poll_timeout, int recv_batch = 5000);
   ~NetworkedModule();
 
  protected:

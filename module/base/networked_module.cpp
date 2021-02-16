@@ -10,6 +10,7 @@
 
 using std::make_unique;
 using std::move;
+using std::optional;
 using std::unique_ptr;
 using std::vector;
 
@@ -18,7 +19,7 @@ namespace slog {
 using internal::Envelope;
 
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
-                                 std::chrono::milliseconds poll_timeout, int recv_batch)
+                                 optional<std::chrono::milliseconds> poll_timeout, int recv_batch)
     : Module(name),
       context_(broker->context()),
       channel_(chopt.channel),
