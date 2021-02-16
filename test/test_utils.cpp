@@ -72,13 +72,24 @@ Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const
 TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
                             const std::variant<string, int>& proc) {
   auto txn = MakeTestTransaction(config, id, keys, proc);
-  auto first_lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(0));
-  TxnHolder holder(config, first_lo);
-  for (int i = 1; i < txn->internal().involved_replicas_size(); ++i) {
+
+  vector<Transaction*> lo_txns;
+  for (int i = 0; i < txn->internal().involved_replicas_size(); ++i) {
     auto lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(i));
-    holder.AddLockOnlyTxn(lo);
+    auto partitioned_lo = GeneratePartitionedTxn(config, *lo, config->local_partition());
+    delete lo;
+    if (partitioned_lo != nullptr) {
+      lo_txns.push_back(partitioned_lo);
+    }
   }
   delete txn;
+
+  CHECK(!lo_txns.empty());
+
+  TxnHolder holder(config, lo_txns[0]);
+  for (size_t i = 1; i < lo_txns.size(); ++i) {
+    holder.AddLockOnlyTxn(lo_txns[i]);
+  }
   return holder;
 }
 

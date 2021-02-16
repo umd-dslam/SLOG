@@ -21,17 +21,6 @@ TEST(OldLockManagerTest, GetAllLocksOnFirstTry) {
   ASSERT_TRUE(result.empty());
 }
 
-TEST(OldLockManagerTest, GetAllLocksMultiPartitions) {
-  auto configs = MakeTestConfigurations("locking", 1, 2);
-  OldLockManager lock_manager;
-  // "AAAA" is in partition 0 so lock is acquired
-  auto holder1 = MakeTestTxnHolder(configs[0], 100, {{"readX", KeyType::READ, 0}, {"AAAA", KeyType::WRITE, 0}});
-  // "ZZZZ" is in partition 1 so is ignored
-  auto holder2 = MakeTestTxnHolder(configs[0], 200, {{"readX", KeyType::READ, 0}, {"ZZZZ", KeyType::WRITE, 0}});
-  ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-}
-
 TEST(OldLockManager, ReadLocks) {
   auto configs = MakeTestConfigurations("locking", 1, 1);
   OldLockManager lock_manager;
@@ -129,12 +118,4 @@ TEST(OldLockManager, AcquireLocksWithLockOnlyholder2) {
 
   auto ready_txns = lock_manager.ReleaseLocks(holder1.id());
   ASSERT_THAT(ready_txns, ElementsAre(200));
-}
-
-TEST(OldLockManager, GhostTxns) {
-  auto configs = MakeTestConfigurations("locking", 1, 2);
-  OldLockManager lock_manager;
-  // "Z" is in partition 1
-  auto holder = MakeTestTxnHolder(configs[0], 101, {{"Z", KeyType::READ, 0}});
-  ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
 }
