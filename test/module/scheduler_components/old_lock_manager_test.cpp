@@ -17,7 +17,7 @@ TEST(OldLockManagerTest, GetAllLocksOnFirstTry) {
   auto holder = MakeTestTxnHolder(
       configs[0], 1000, {{"readA", KeyType::READ, 0}, {"readB", KeyType::READ, 0}, {"writeC", KeyType::WRITE, 0}});
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  auto result = lock_manager.ReleaseLocks(holder.id());
+  auto result = lock_manager.ReleaseLocks(holder.txn_id());
   ASSERT_TRUE(result.empty());
 }
 
@@ -30,8 +30,8 @@ TEST(OldLockManager, ReadLocks) {
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.id()).empty());
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.id()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder1.txn_id()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder2.txn_id()).empty());
 }
 
 TEST(OldLockManager, WriteLocks) {
@@ -43,7 +43,7 @@ TEST(OldLockManager, WriteLocks) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::ACQUIRED);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   // The blocked txn becomes ready
-  ASSERT_EQ(lock_manager.ReleaseLocks(holder1.id()).size(), 1U);
+  ASSERT_EQ(lock_manager.ReleaseLocks(holder1.txn_id()).size(), 1U);
   // Make sure the lock is already held by holder2
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
 }
@@ -62,9 +62,9 @@ TEST(OldLockManager, ReleaseLocksAndGetManyNewHolders) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder4.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.id()).empty());
+  ASSERT_TRUE(lock_manager.ReleaseLocks(holder3.txn_id()).empty());
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1.id());
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn_id());
   // Txn 300 was removed from the wait list due to the
   // ReleaseLocks call above
   ASSERT_EQ(ready_txns.size(), 2U);
@@ -83,10 +83,10 @@ TEST(OldLockManager, PartiallyAcquiredLocks) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder3.lock_only_txn(0)), AcquireLocksResult::WAITING);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1.id());
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn_id());
   ASSERT_THAT(ready_txns, ElementsAre(200));
 
-  ready_txns = lock_manager.ReleaseLocks(holder2.id());
+  ready_txns = lock_manager.ReleaseLocks(holder2.txn_id());
   ASSERT_THAT(ready_txns, ElementsAre(300));
 }
 
@@ -101,7 +101,7 @@ TEST(OldLockManager, AcquireLocksWithLockOnlyholder1) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder1.lock_only_txn(0)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(2)), AcquireLocksResult::ACQUIRED);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder2.id());
+  auto ready_txns = lock_manager.ReleaseLocks(holder2.txn_id());
   ASSERT_THAT(ready_txns, ElementsAre(100));
 }
 
@@ -116,6 +116,6 @@ TEST(OldLockManager, AcquireLocksWithLockOnlyholder2) {
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder2.lock_only_txn(2)), AcquireLocksResult::WAITING);
 
-  auto ready_txns = lock_manager.ReleaseLocks(holder1.id());
+  auto ready_txns = lock_manager.ReleaseLocks(holder1.txn_id());
   ASSERT_THAT(ready_txns, ElementsAre(200));
 }
