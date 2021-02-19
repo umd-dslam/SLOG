@@ -16,5 +16,5 @@ TEST(MemOnlyStorageTest, ReadWriteTest) {
   Record ret;
   bool ok = storage.Read(key, ret);
   ASSERT_TRUE(ok);
-  ASSERT_EQ(value, ret.value);
+  ASSERT_EQ(value, ret.to_string());
 }

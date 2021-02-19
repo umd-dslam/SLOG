@@ -33,11 +33,43 @@ struct Metadata {
 };
 
 struct Record {
-  Record(const Value& v, uint32_t m, uint32_t c = 0) : value(v), metadata(m, c) {}
+  Record(const std::string& v, uint32_t m, uint32_t c = 0) : metadata(m, c) { SetValue(v); }
+
+  Record(const Record& other) {
+    SetValue(other.data_.get(), other.size_);
+    metadata = other.metadata;
+  }
+
+  Record& operator=(const Record& other) {
+    Record tmp(other);
+    data_.swap(tmp.data_);
+    std::swap(size_, tmp.size_);
+    std::swap(metadata, tmp.metadata);
+    return *this;
+  }
+
+  void SetValue(const std::string& v) { SetValue(v.data(), v.size()); }
+
+  void SetValue(const char* data, size_t size) {
+    size_ = size;
+    data_.reset(new char[size_]);
+    memcpy(data_.get(), data, size_);
+  }
+
+  std::string to_string() const {
+    if (data_ == nullptr) {
+      return "";
+    }
+    return std::string(data_.get(), size_);
+  }
+
   Record() = default;
 
-  Value value;
   Metadata metadata;
+
+ private:
+  std::unique_ptr<char[]> data_;
+  size_t size_ = 0;
 };
 
 enum class LockMode { UNLOCKED, READ, WRITE };
