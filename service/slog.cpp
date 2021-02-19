@@ -79,7 +79,7 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
-  auto num_threads = config->num_workers() + 6;
+  auto num_threads = config->num_workers() + 7;
   auto num_partitions = config->num_partitions();
   auto partition = config->local_partition();
 
@@ -89,21 +89,27 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
   LOG(INFO) << "Generating ~" << num_records / num_partitions << " records using " << num_threads << " threads. "
             << "Record size = " << simple_partitioning->record_size_bytes() << " bytes";
 
+  std::atomic<uint64_t> counter = 0;
+  size_t num_done = 0;
   auto GenerateFn = [&](uint64_t from_key, uint64_t to_key) {
     uint64_t start_key = from_key + (partition + num_partitions - from_key % num_partitions) % num_partitions;
     uint64_t end_key = std::min(to_key, num_records);
-    uint64_t counter = 0;
     for (uint64_t key = start_key; key < end_key; key += num_partitions) {
       int master = config->master_of_key(key);
       Record record(value, master);
       storage.Write(std::to_string(key), record);
       counter++;
     }
+    num_done++;
   };
   std::vector<std::thread> threads;
   uint64_t range = num_records / num_threads + 1;
   for (uint32_t i = 0; i < num_threads; i++) {
     threads.emplace_back(GenerateFn, i * range, (i + 1) * range);
+  }
+  while (num_done < num_threads) {
+    std::this_thread::sleep_for(5s);
+    LOG(INFO) << "Generated " << counter.load() << " records";
   }
   for (auto& t : threads) {
     t.join();

@@ -75,12 +75,6 @@ class SegmentT {
   }
 
   bool InsertOrUpdate(const KeyType& key, const ValueType& value) {
-    if (size_ >= load_factor_max_size_) {
-      rw_latch_.WLock();
-      Rehash();
-      rw_latch_.WUnlock();
-    }
-
     auto h = HashFn{}(key);
 
     rw_latch_.WLock();
@@ -121,6 +115,9 @@ class SegmentT {
     }
 
     size_++;
+    if (size_ >= load_factor_max_size_) {
+      Rehash();
+    }
 
     rw_latch_.WUnlock();
 
