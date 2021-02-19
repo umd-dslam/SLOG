@@ -53,13 +53,15 @@ void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
     txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
   }
 
-  for (auto p : txn->internal().involved_partitions()) {
-    auto new_txn = GeneratePartitionedTxn(config_, *txn, p);
+  auto& involved_partitions = txn->internal().involved_partitions();
+  for (int i = 0; i < involved_partitions.size(); ++i) {
+    bool in_place = i == involved_partitions.size() - 1;
+    auto p = involved_partitions[i];
+    auto new_txn = GeneratePartitionedTxn(config_, txn, p, in_place);
     if (new_txn != nullptr) {
       partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
     }
   }
-  delete txn;
 
   ++batch_size_;
 

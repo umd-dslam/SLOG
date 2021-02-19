@@ -102,10 +102,13 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
   return lock_only_txn;
 }
 
-Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transaction& txn, uint32_t partition) {
-  auto new_txn = new Transaction(txn);
+Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition, bool in_place) {
+  Transaction* new_txn = txn;
+  if (!in_place) {
+    new_txn = new Transaction(*txn);
+  }
 
-  vector<uint32_t> involved_replicas;
+  vector<bool> involved_replicas(config->num_replicas(), false);
 
   // Check if the generated subtxn does not intend to lock any key in its home region
   // If this is a remaster txn, it is never redundant
@@ -117,7 +120,7 @@ Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transa
       it = new_txn->mutable_keys()->erase(it);
     } else {
       auto master = it->second.metadata().master();
-      involved_replicas.push_back(master);
+      involved_replicas[master] = true;
       is_redundant &= static_cast<int>(master) != new_txn->internal().home();
 
       ++it;
@@ -132,9 +135,12 @@ Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, const Transa
 
   // Update involved replica list if needed
   if (new_txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
-    sort(involved_replicas.begin(), involved_replicas.end());
-    auto last = unique(involved_replicas.begin(), involved_replicas.end());
-    *new_txn->mutable_internal()->mutable_involved_replicas() = {involved_replicas.begin(), last};
+    new_txn->mutable_internal()->mutable_involved_replicas()->Clear();
+    for (size_t r = 0; r < involved_replicas.size(); ++r) {
+      if (involved_replicas[r]) {
+        new_txn->mutable_internal()->add_involved_replicas(r);
+      }
+    }
   }
 
   return new_txn;
@@ -170,28 +176,26 @@ void PopulateInvolvedReplicas(Transaction& txn) {
 }
 
 void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn) {
-  vector<uint32_t> involved_partitions;
-  vector<uint32_t> active_partitions;
+  vector<bool> involved_partitions(config->num_partitions(), false);
+  vector<bool> active_partitions(config->num_partitions(), false);
   for (const auto& [key, value] : txn.keys()) {
     auto partition = config->partition_of_key(key);
-    involved_partitions.push_back(partition);
+    involved_partitions[partition] = true;
     if (value.type() == KeyType::WRITE) {
-      active_partitions.push_back(partition);
+      active_partitions[partition] = true;
     }
   }
 
-  // Deduplicate involved partition list and set it to the txn
-  {
-    sort(involved_partitions.begin(), involved_partitions.end());
-    auto last = unique(involved_partitions.begin(), involved_partitions.end());
-    *txn.mutable_internal()->mutable_involved_partitions() = {involved_partitions.begin(), last};
+  for (size_t p = 0; p < involved_partitions.size(); ++p) {
+    if (involved_partitions[p]) {
+      txn.mutable_internal()->add_involved_partitions(p);
+    }
   }
 
-  // Deduplicate active partition list and set it to the txn
-  {
-    sort(active_partitions.begin(), active_partitions.end());
-    auto last = unique(active_partitions.begin(), active_partitions.end());
-    *txn.mutable_internal()->mutable_active_partitions() = {active_partitions.begin(), last};
+  for (size_t p = 0; p < active_partitions.size(); ++p) {
+    if (active_partitions[p]) {
+      txn.mutable_internal()->add_active_partitions(p);
+    }
   }
 }
 

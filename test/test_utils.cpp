@@ -76,8 +76,7 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
   vector<Transaction*> lo_txns;
   for (int i = 0; i < txn->internal().involved_replicas_size(); ++i) {
     auto lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(i));
-    auto partitioned_lo = GeneratePartitionedTxn(config, *lo, config->local_partition());
-    delete lo;
+    auto partitioned_lo = GeneratePartitionedTxn(config, lo, config->local_partition(), true);
     if (partitioned_lo != nullptr) {
       lo_txns.push_back(partitioned_lo);
     }
