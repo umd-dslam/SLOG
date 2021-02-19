@@ -356,6 +356,8 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   auto txn = txn_holder->Release();
   if (config_->return_dummy_txn()) {
     txn->mutable_keys()->clear();
+    txn->mutable_code()->clear();
+    txn->mutable_remaster()->Clear();
   }
   completed_sub_txn->set_allocated_txn(txn);
   Send(env, txn->internal().coordinating_server(), kServerChannel);
