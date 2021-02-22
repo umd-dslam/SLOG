@@ -51,8 +51,8 @@ constexpr char NEAREST[] = "nearest";
 constexpr char SP_PARTITION[] = "sp_partition";
 
 const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"}, {MP_PCT, "0"},       {MP_PARTS, "2"},
-                                    {HOT, "1000"},       {RECORDS, "10"}, {HOT_RECORDS, "2"},  {WRITES, "2"},
-                                    {VALUE_SIZE, "100"}, {NEAREST, "0"},  {SP_PARTITION, "-1"}};
+                                    {HOT, "10000"},       {RECORDS, "10"}, {HOT_RECORDS, "2"},  {WRITES, "2"},
+                                    {VALUE_SIZE, "100"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
 
 }  // namespace
 
