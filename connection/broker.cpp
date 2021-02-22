@@ -57,7 +57,7 @@ void Broker::StartInNewThread(std::optional<uint32_t> cpu) {
   running_ = true;
   thread_ = std::thread(&Broker::Run, this);
   if (cpu.has_value()) {
-    PinToCpu(pthread_self(), cpu.value());
+    PinToCpu(thread_.native_handle(), cpu.value());
   }
 }
 
