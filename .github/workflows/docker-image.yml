@@ -41,7 +41,7 @@ jobs:
     - name: Compute tag
       env:
         LOCK: ${{ matrix.lock }}
-      id: commpute_tag
+      id: compute_tag
       run: echo "::set-output name=tag::${LOCK}-${GITHUB_SHA:0:7}"
 
     - name: Extract branch name
