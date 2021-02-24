@@ -58,6 +58,7 @@ class Configuration {
   vector<TransactionEvent> disabled_tracing_events() const;
   bool return_dummy_txn() const;
   bool bypass_mh_orderer() const;
+  bool pin_to_cpus() const;
 
  private:
   internal::Configuration config_;

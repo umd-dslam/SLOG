@@ -182,9 +182,12 @@ int main(int argc, char* argv[]) {
 
   // New modules cannot be bound to the broker after it starts so start
   // the Broker only after it is used to initialized all modules above.
-  broker->StartInNewThread();
+  auto cpu = config->pin_to_cpus() ? std::optional<int>(0) : std::nullopt;
+  broker->StartInNewThread(cpu);
+  cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;
   for (auto& module : modules) {
-    module->StartInNewThread();
+    module->StartInNewThread(cpu);
+    cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;
   }
 
   // Suspense this thread until receiving SIGINT

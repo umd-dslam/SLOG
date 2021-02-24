@@ -100,4 +100,6 @@ message Configuration {
     bool return_dummy_txn = 14;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
     bool bypass_mh_orderer = 15;
+    // Pin each module to a cpu
+    bool pin_to_cpus = 16;
 }

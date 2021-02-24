@@ -363,7 +363,6 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   }
   completed_sub_txn->set_allocated_txn(txn);
   Send(env, txn->internal().coordinating_server(), kServerChannel);
-  completed_sub_txn->release_txn();
 }
 
 TransactionState& Worker::TxnState(TxnId txn_id) {

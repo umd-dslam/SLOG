@@ -171,4 +171,6 @@ bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn()
 
 bool Configuration::bypass_mh_orderer() const { return config_.bypass_mh_orderer(); }
 
+bool Configuration::pin_to_cpus() const { return config_.pin_to_cpus(); }
+
 }  // namespace slog
