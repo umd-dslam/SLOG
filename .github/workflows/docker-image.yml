@@ -53,9 +53,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         push: true
-        tags:
-          - ctring/slog:${{ steps.compute_tag.outputs.tag }}
-          - ctring/slog:${{ steps.extract_branch.outputs.branch }}
+        tags: ctring/slog:${{ steps.compute_tag.outputs.tag }},ctring/slog:${{ steps.extract_branch.outputs.branch }}
         builder: ${{ steps.buildx.outputs.name }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache
