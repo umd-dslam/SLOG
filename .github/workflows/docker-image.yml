@@ -41,15 +41,21 @@ jobs:
     - name: Compute tag
       env:
         LOCK: ${{ matrix.lock }}
-      id: tag
+      id: commpute_tag
       run: echo "::set-output name=tag::${LOCK}-${GITHUB_SHA:0:7}"
+
+    - name: Extract branch name
+      id: extract_branch
+      run: echo "::set-output name=branch::${GITHUB_REF##refs/heads/}"
 
     - name: Build and push
       id: docker_build
       uses: docker/build-push-action@v2
       with:
         push: true
-        tags: ctring/slog:${{ steps.tag.outputs.tag }}
+        tags:
+          - ctring/slog:${{ steps.compute_tag.outputs.tag }}
+          - ctring/slog:${{ steps.extract_branch.outputs.branch }}
         builder: ${{ steps.buildx.outputs.name }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache
