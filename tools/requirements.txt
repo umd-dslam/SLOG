@@ -20,3 +20,4 @@ s3transfer==0.3.3
 six==1.14.0
 urllib3==1.25.8
 websocket-client==0.57.0
+tabulate==0.8.9
