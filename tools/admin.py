@@ -24,6 +24,7 @@ from typing import Dict, List, Tuple
 from docker.models.containers import Container
 from paramiko.ssh_exception import PasswordRequiredException
 
+from common import Command, initialize_and_run_commands
 from gen_data import add_exported_gen_data_arguments
 from proto.configuration_pb2 import Configuration
 
@@ -134,7 +135,7 @@ def parse_envs(envs: List[str]) -> Dict[str, str]:
     return {env[0]: env[1] for env in env_var_tuples}
 
 
-class Command:
+class AdminCommand(Command):
     """Base class for a command.
 
     This class contains the common implementation of all commands in this tool
@@ -146,20 +147,10 @@ class Command:
     well as all class variables to describe the command.
     """
 
-    NAME = "<not_implemented>"
-    HELP = ""
-    DESCRIPTION = ""
     CONFIG_FILE_REQUIRED = True
 
     def __init__(self):
         self.config = None
-
-    def create_subparser(self, subparsers):
-        parser = subparsers.add_parser(
-            self.NAME, description=self.DESCRIPTION, help=self.HELP)
-        parser.set_defaults(run=self.__initialize_and_do_command)
-        self.add_arguments(parser)
-        return parser
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -185,7 +176,7 @@ class Command:
             help="Username of the target machines"
         )
 
-    def __initialize_and_do_command(self, args):
+    def initialize_and_do_command(self, args):
         # The initialization phase is broken down into smaller methods so
         # that subclasses can override them with different behaviors
         self.load_config(args)
@@ -213,7 +204,7 @@ class Command:
                 procs.append([None, addr.decode(), rep, part])
         
         def init_docker_client(remote_proc):
-            _, addr, rep, part = remote_proc
+            _, addr, _, _ = remote_proc
             try:
                 remote_proc[0] = self.new_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
@@ -263,7 +254,7 @@ class Command:
         )
 
 
-class GenDataCommand(Command):
+class GenDataCommand(AdminCommand):
 
     NAME = "gen_data"
     HELP = "Generate data for one or more SLOG servers"
@@ -312,7 +303,7 @@ class GenDataCommand(Command):
         wait_for_containers(containers)
         
 
-class StartCommand(Command):
+class StartCommand(AdminCommand):
 
     NAME = "start"
     HELP = "Start an SLOG cluster"
@@ -380,7 +371,7 @@ class StartCommand(Command):
             pool.map(start_container, self.remote_procs)
 
 
-class StopCommand(Command):
+class StopCommand(AdminCommand):
 
     NAME = "stop"
     HELP = "Stop an SLOG cluster"
@@ -409,7 +400,7 @@ class StopCommand(Command):
             pool.map(stop_container, self.remote_procs)
 
 
-class StatusCommand(Command):
+class StatusCommand(AdminCommand):
 
     NAME = "status"
     HELP = "Show the status of an SLOG cluster"
@@ -430,7 +421,7 @@ class StatusCommand(Command):
                 print(f"\tPartition {part} ({addr}): {status}")
 
 
-class LogsCommand(Command):
+class LogsCommand(AdminCommand):
 
     NAME = "logs"
     HELP = "Stream logs from a server"
@@ -527,7 +518,7 @@ class LogsCommand(Command):
             print(c.logs().decode(), end="")
 
 
-class LocalCommand(Command):
+class LocalCommand(AdminCommand):
 
     NAME = "local"
     HELP = "Control a cluster that run on the local machine"
@@ -606,7 +597,7 @@ class LocalCommand(Command):
             return
 
         if args.start:
-            self.__start()
+            self.__start(args)
         elif args.stop:
             self.__stop()
         elif args.remove:
@@ -614,7 +605,7 @@ class LocalCommand(Command):
         elif args.status:
             self.__status()
 
-    def __start(self):
+    def __start(self, args):
         #
         # Create a local network if one does not exist
         #
@@ -714,7 +705,7 @@ class LocalCommand(Command):
                 print(f"\tPartition {p} ({addr.decode()}): {status}")
 
 
-class BenchmarkCommand(Command):
+class BenchmarkCommand(AdminCommand):
 
     NAME = "benchmark"
     HELP = "Spawn distributed clients to run benchmark"
@@ -958,7 +949,7 @@ class BenchmarkCommand(Command):
         LOG.info("Tag: %s", tag)
 
 
-class CollectCommand(Command):
+class CollectCommand(AdminCommand):
 
     NAME = "collect"
     HELP = "Collect benchmark data from the clients"
@@ -1024,26 +1015,18 @@ class CollectCommand(Command):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(
-        description="Controls deployment and experiment of SLOG"
-    )
-    subparsers = parser.add_subparsers(dest="command name")
-    subparsers.required = True
-
-    COMMANDS = [
-        BenchmarkCommand,
-        CollectCommand,
-        GenDataCommand,
-        StartCommand,
-        StopCommand,
-        StatusCommand,
-        LogsCommand,
-        LocalCommand,
-    ]
-    for command in COMMANDS:
-        command().create_subparser(subparsers)
-
-    args = parser.parse_args()
     start_time = time.time()
-    args.run(args)
+    initialize_and_run_commands(
+        "Controls deployment and experiment of SLOG",
+        [
+            BenchmarkCommand,
+            CollectCommand,
+            GenDataCommand,
+            StartCommand,
+            StopCommand,
+            StatusCommand,
+            LogsCommand,
+            LocalCommand,
+        ]
+    )
     LOG.info("Elapsed time: %.1f sec", time.time() - start_time)
