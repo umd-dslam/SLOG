@@ -140,6 +140,52 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << endl;
 }
 
+void PrintForwarderStats(const rapidjson::Document& stats, uint32_t) {
+  const auto& batch_duration_ms_pctls = stats[FORW_BATCH_DURATION_MS_PCTLS].GetArray();
+  const auto& batch_size_pctls = stats[FORW_BATCH_SIZE_PCTLS].GetArray();
+  cout << "Batch duration percentiles (ms)\n";
+  if (batch_duration_ms_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    cout << fixed << setprecision(3);
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_duration_ms_pctls[i].GetFloat() << "\n";
+    }
+  }
+  cout << "\n";
+  cout << "Batch size percentiles\n";
+  if (batch_size_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_size_pctls[i].GetInt() << "\n";
+    }
+  }
+}
+
+void PrintMHOrdererStats(const rapidjson::Document& stats, uint32_t) {
+  const auto& batch_duration_ms_pctls = stats[MHO_BATCH_DURATION_MS_PCTLS].GetArray();
+  const auto& batch_size_pctls = stats[MHO_BATCH_SIZE_PCTLS].GetArray();
+  cout << "Batch duration percentiles (ms)\n";
+  if (batch_duration_ms_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    cout << fixed << setprecision(3);
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_duration_ms_pctls[i].GetFloat() << "\n";
+    }
+  }
+  cout << "\n";
+  cout << "Batch size percentiles\n";
+  if (batch_size_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_size_pctls[i].GetInt() << "\n";
+    }
+  }
+}
+
 void PrintSequencerStats(const rapidjson::Document& stats, uint32_t) {
   const auto& batch_duration_ms_pctls = stats[SEQ_BATCH_DURATION_MS_PCTLS].GetArray();
   const auto& batch_size_pctls = stats[SEQ_BATCH_SIZE_PCTLS].GetArray();
@@ -256,11 +302,18 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
     {"server", {api::StatsModule::SERVER, PrintServerStats}},
+    {"forwarder", {api::StatsModule::FORWARDER, PrintForwarderStats}},
+    {"mhorderer", {api::StatsModule::MHORDERER, PrintMHOrdererStats}},
     {"sequencer", {api::StatsModule::SEQUENCER, PrintSequencerStats}},
     {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}};
 
 void ExecuteStats(const char* module, uint32_t level) {
-  auto& stats_module = STATS_MODULES.at(string(module));
+  auto stats_module_it = STATS_MODULES.find(string(module));
+  if (stats_module_it == STATS_MODULES.end()) {
+    LOG(ERROR) << "Invalid module: " << module;
+    return;
+  }
+  auto& stats_module = stats_module_it->second;
 
   // 1. Construct a request for stats
   api::Request req;

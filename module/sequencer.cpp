@@ -79,45 +79,14 @@ void Sequencer::ProcessForwardTxn(EnvelopePtr&& env) {
   ++batch_size_;
 
   if (!batch_scheduled_) {
-    batch_starting_time_ = steady_clock::now();
     NewTimedCallback(batch_timeout_, [this]() {
       SendBatch();
       NewBatch();
     });
+
+    batch_starting_time_ = steady_clock::now();
     batch_scheduled_ = true;
   }
-}
-
-void Sequencer::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
-  using rapidjson::StringRef;
-
-  int level = stats_request.level();
-
-  rapidjson::Document stats;
-  stats.SetObject();
-  auto& alloc = stats.GetAllocator();
-
-  if (level == 0) {
-    collecting_stats_ = false;
-  } else if (level > 0) {
-    collecting_stats_ = true;
-  }
-
-  stats.AddMember(StringRef(SEQ_BATCH_SIZE_PCTLS), Percentiles(stat_batch_sizes_, alloc), alloc);
-  stat_batch_sizes_.clear();
-
-  stats.AddMember(StringRef(SEQ_BATCH_DURATION_MS_PCTLS), Percentiles(stat_batch_durations_ms_, alloc), alloc);
-  stat_batch_durations_ms_.clear();
-
-  // Write JSON object to a buffer and send back to the server
-  rapidjson::StringBuffer buf;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-  stats.Accept(writer);
-
-  auto env = NewEnvelope();
-  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
-  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
-  Send(move(env), kServerChannel);
 }
 
 void Sequencer::SendBatch() {
@@ -196,6 +165,44 @@ EnvelopePtr Sequencer::NewBatchRequest(internal::Batch* batch) {
   forward_batch->set_same_origin_position(batch_id_counter_ - 1);
   forward_batch->set_allocated_batch_data(batch);
   return env;
+}
+
+/**
+ * {
+ *    seq_batch_size_pctls:        [int],
+ *    seq_batch_duration_ms_pctls: [float]
+ * }
+ */
+void Sequencer::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  if (level == 0) {
+    collecting_stats_ = false;
+  } else if (level > 0) {
+    collecting_stats_ = true;
+  }
+
+  stats.AddMember(StringRef(SEQ_BATCH_SIZE_PCTLS), Percentiles(stat_batch_sizes_, alloc), alloc);
+  stat_batch_sizes_.clear();
+
+  stats.AddMember(StringRef(SEQ_BATCH_DURATION_MS_PCTLS), Percentiles(stat_batch_durations_ms_, alloc), alloc);
+  stat_batch_durations_ms_.clear();
+
+  // Write JSON object to a buffer and send back to the server
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
 }
 
 }  // namespace slog

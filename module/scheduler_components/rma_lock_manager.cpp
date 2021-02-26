@@ -201,7 +201,7 @@ vector<TxnId> RMALockManager::ReleaseLocks(TxnId txn_id) {
 /**
  * {
  *    lock_manager_type: 0,
- *    num_txns_waiting_for_lock: <number of txns waiting for lock>,
+ *    num_txns_waiting_for_lock: <int>,
  *    num_waiting_for_per_txn (lvl >= 1): [
  *      [<txn id>, <number of locks waited>],
  *      ...

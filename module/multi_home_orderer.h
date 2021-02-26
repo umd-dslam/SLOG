@@ -30,12 +30,13 @@ class MultiHomeOrderer : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
+  void ProcessForwardBatch(EnvelopePtr&& env);
+  void ProcessStatsRequest(const internal::StatsRequest& stats_request);
+
   void NewBatch();
   BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id(); }
   void AddToBatch(Transaction* txn);
   void SendBatch();
-
-  void ProcessForwardBatch(EnvelopePtr&& env);
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
@@ -45,6 +46,11 @@ class MultiHomeOrderer : public NetworkedModule {
   bool batch_scheduled_;
 
   BatchLog multi_home_batch_log_;
+
+  bool collecting_stats_;
+  steady_clock::time_point batch_starting_time_;
+  std::vector<int> stat_batch_sizes_;
+  std::vector<float> stat_batch_durations_ms_;
 };
 
 }  // namespace slog

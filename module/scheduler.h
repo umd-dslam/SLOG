@@ -54,8 +54,8 @@ class Scheduler : public NetworkedModule {
   bool OnCustomSocket() final;
 
  private:
-  void ProcessStatsRequest(const internal::StatsRequest& stats_request);
   void ProcessTransaction(EnvelopePtr&& env);
+  void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking

@@ -42,6 +42,7 @@ class Forwarder : public NetworkedModule {
  private:
   void ProcessForwardTxn(EnvelopePtr&& env);
   void ProcessLookUpMasterRequest(EnvelopePtr&& env);
+  void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   /**
    * Pre-condition: transaction type is not UNKNOWN
@@ -55,8 +56,14 @@ class Forwarder : public NetworkedModule {
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
   std::vector<internal::Envelope> partitioned_lookup_request_;
   bool lookup_request_scheduled_;
+  int batch_size_;
 
   std::mt19937 rg_;
+
+  bool collecting_stats_;
+  steady_clock::time_point batch_starting_time_;
+  std::vector<int> stat_batch_sizes_;
+  std::vector<float> stat_batch_durations_ms_;
 };
 
 }  // namespace slog

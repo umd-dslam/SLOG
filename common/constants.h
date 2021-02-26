@@ -38,6 +38,14 @@ const char NUM_PARTIALLY_COMPLETED_TXNS[] = "num_partially_completed_txns";
 const char PENDING_RESPONSES[] = "pending_responses";
 const char PARTIALLY_COMPLETED_TXNS[] = "partially_completed_txns";
 
+/* Forwarder */
+const char FORW_BATCH_SIZE_PCTLS[] = "forw_batch_size_pctls";
+const char FORW_BATCH_DURATION_MS_PCTLS[] = "forw_batch_duration_ms_pctls";
+
+/* Multi-home orderer */
+const char MHO_BATCH_SIZE_PCTLS[] = "mho_batch_size_pctls";
+const char MHO_BATCH_DURATION_MS_PCTLS[] = "mho_batch_duration_ms_pctls";
+
 /* Sequencer */
 const char SEQ_BATCH_SIZE_PCTLS[] = "seq_batch_size_pctls";
 const char SEQ_BATCH_DURATION_MS_PCTLS[] = "seq_batch_duration_ms_pctls";

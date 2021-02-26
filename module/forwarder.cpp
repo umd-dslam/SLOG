@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "common/constants.h"
+#include "common/json_utils.h"
 #include "common/monitor.h"
 #include "common/proto_utils.h"
 
@@ -36,7 +37,9 @@ Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& b
       lookup_master_index_(lookup_master_index),
       batch_timeout_(batch_timeout),
       lookup_request_scheduled_(false),
-      rg_(std::random_device()()) {
+      batch_size_(0),
+      rg_(std::random_device()()),
+      collecting_stats_(false) {
   partitioned_lookup_request_.resize(config_->num_partitions());
 }
 
@@ -47,6 +50,9 @@ void Forwarder::OnInternalRequestReceived(EnvelopePtr&& env) {
       break;
     case Request::kLookupMaster:
       ProcessLookUpMasterRequest(move(env));
+      break;
+    case Request::kStats:
+      ProcessStatsRequest(env->request().stats());
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
@@ -103,11 +109,17 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
       partitioned_lookup_request_[p].mutable_request()->mutable_lookup_master()->add_txn_ids(txn->internal().id());
     }
   }
+  batch_size_++;
   pending_transactions_.insert_or_assign(txn->internal().id(), move(env));
 
   // If the request is not scheduled to be sent yet, schedule one now
   if (!lookup_request_scheduled_) {
     NewTimedCallback(batch_timeout_, [this]() {
+      if (collecting_stats_) {
+        stat_batch_sizes_.push_back(batch_size_);
+        stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+      }
+
       auto local_rep = config_->local_replica();
       auto num_partitions = config_->num_partitions();
       for (uint32_t part = 0; part < num_partitions; part++) {
@@ -116,8 +128,11 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
           partitioned_lookup_request_[part].Clear();
         }
       }
+      batch_size_ = 0;
       lookup_request_scheduled_ = false;
     });
+
+    batch_starting_time_ = steady_clock::now();
     lookup_request_scheduled_ = true;
   }
 }
@@ -231,6 +246,44 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       Send(move(env), kMultiHomeOrdererChannel);
     }
   }
+}
+
+/**
+ * {
+ *    forw_batch_size_pctls:        [int],
+ *    forw_batch_duration_ms_pctls: [float]
+ * }
+ */
+void Forwarder::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  if (level == 0) {
+    collecting_stats_ = false;
+  } else if (level > 0) {
+    collecting_stats_ = true;
+  }
+
+  stats.AddMember(StringRef(FORW_BATCH_SIZE_PCTLS), Percentiles(stat_batch_sizes_, alloc), alloc);
+  stat_batch_sizes_.clear();
+
+  stats.AddMember(StringRef(FORW_BATCH_DURATION_MS_PCTLS), Percentiles(stat_batch_durations_ms_, alloc), alloc);
+  stat_batch_durations_ms_.clear();
+
+  // Write JSON object to a buffer and send back to the server
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
 }
 
 }  // namespace slog

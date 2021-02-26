@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "common/constants.h"
+#include "common/json_utils.h"
 #include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
@@ -21,7 +22,8 @@ MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_
     : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout),
       config_(config),
       batch_timeout_(batch_timeout),
-      batch_id_counter_(0) {
+      batch_id_counter_(0),
+      collecting_stats_(false) {
   batch_per_rep_.resize(config_->num_replicas());
   NewBatch();
 }
@@ -55,6 +57,9 @@ void MultiHomeOrderer::OnInternalRequestReceived(EnvelopePtr&& env) {
     case Request::kForwardBatch:
       // Received a batch of multi-home txn replicated from another region
       ProcessForwardBatch(move(env));
+      break;
+    case Request::kStats:
+      ProcessStatsRequest(env->request().stats());
       break;
     default:
       LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request->type_case(), Request) << "\"";
@@ -126,12 +131,19 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
       SendBatch();
       NewBatch();
     });
+
+    batch_starting_time_ = steady_clock::now();
     batch_scheduled_ = true;
   }
 }
 
 void MultiHomeOrderer::SendBatch() {
   VLOG(3) << "Finished multi-home batch " << batch_id() << " of size " << batch_size_;
+
+  if (collecting_stats_) {
+    stat_batch_sizes_.push_back(batch_size_);
+    stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+  }
 
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
@@ -146,6 +158,44 @@ void MultiHomeOrderer::SendBatch() {
     forward_batch->set_allocated_batch_data(batch_per_rep_[rep].release());
     Send(move(env), config_->MakeMachineId(rep, part), kMultiHomeOrdererChannel);
   }
+}
+
+/**
+ * {
+ *    mho_batch_size_pctls:        [int],
+ *    mho_batch_duration_ms_pctls: [float]
+ * }
+ */
+void MultiHomeOrderer::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  if (level == 0) {
+    collecting_stats_ = false;
+  } else if (level > 0) {
+    collecting_stats_ = true;
+  }
+
+  stats.AddMember(StringRef(MHO_BATCH_SIZE_PCTLS), Percentiles(stat_batch_sizes_, alloc), alloc);
+  stat_batch_sizes_.clear();
+
+  stats.AddMember(StringRef(MHO_BATCH_DURATION_MS_PCTLS), Percentiles(stat_batch_durations_ms_, alloc), alloc);
+  stat_batch_durations_ms_.clear();
+
+  // Write JSON object to a buffer and send back to the server
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
 }
 
 }  // namespace slog

@@ -59,69 +59,6 @@ void Scheduler::OnInternalRequestReceived(EnvelopePtr&& env) {
   }
 }
 
-/**
- * {
- *    num_all_txns: <number of active txns>,
- *    all_txns (lvl == 0): [<txn id>, ...],
- *    all_txns (lvl >= 1): [
- *      {
- *        id: <txn id>,
- *        done: <is done>,
- *        aborting: <is aborting>,
- *        num_lo: <num lock only txns>,
- *        expected_num_lo: <expected num lock only txns>,
- *      },
- *      ...
- *    ],
- *    ...<stats from lock manager>...
- * }
- */
-void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
-  using rapidjson::StringRef;
-
-  int level = stats_request.level();
-
-  rapidjson::Document stats;
-  stats.SetObject();
-  auto& alloc = stats.GetAllocator();
-
-  // Add stats for current transactions in the system
-  stats.AddMember(StringRef(NUM_ALL_TXNS), active_txns_.size(), alloc);
-  if (level == 0) {
-    stats.AddMember(StringRef(ALL_TXNS),
-                    ToJsonArray(
-                        active_txns_, [](const auto& p) { return p.first; }, alloc),
-                    alloc);
-  }
-
-  if (level >= 1) {
-    rapidjson::Value txns(rapidjson::kArrayType);
-    for (const auto& [txn_id, txn_holder] : active_txns_) {
-      rapidjson::Value txn_obj(rapidjson::kObjectType);
-      txn_obj.AddMember(StringRef(TXN_ID), txn_id, alloc)
-          .AddMember(StringRef(TXN_DONE), txn_holder.is_done(), alloc)
-          .AddMember(StringRef(TXN_ABORTING), txn_holder.is_aborting(), alloc)
-          .AddMember(StringRef(TXN_NUM_LO), txn_holder.num_lock_only_txns(), alloc)
-          .AddMember(StringRef(TXN_EXPECTED_NUM_LO), txn_holder.expected_num_lock_only_txns(), alloc);
-      txns.PushBack(txn_obj, alloc);
-    }
-    stats.AddMember(StringRef(ALL_TXNS), txns, alloc);
-  }
-
-  // Add stats from the lock manager
-  lock_manager_.GetStats(stats, level);
-
-  // Write JSON object to a buffer and send back to the server
-  rapidjson::StringBuffer buf;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-  stats.Accept(writer);
-
-  auto env = NewEnvelope();
-  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
-  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
-  Send(move(env), kServerChannel);
-}
-
 // Handle responses from the workers
 bool Scheduler::OnCustomSocket() {
   auto& worker_socket = GetCustomSocket(0);
@@ -312,4 +249,66 @@ void Scheduler::TriggerPreDispatchAbort(TxnId txn_id) {
 }
 #endif /* LOCK_MANAGER_DDR */
 
+/**
+ * {
+ *    num_all_txns: <number of active txns>,
+ *    all_txns (lvl == 0): [<txn id>, ...],
+ *    all_txns (lvl >= 1): [
+ *      {
+ *        id: <uint64>,
+ *        done: <bool>,
+ *        aborting: <bool>,
+ *        num_lo: <int>,
+ *        expected_num_lo: <int>,
+ *      },
+ *      ...
+ *    ],
+ *    ...<stats from lock manager>...
+ * }
+ */
+void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  // Add stats for current transactions in the system
+  stats.AddMember(StringRef(NUM_ALL_TXNS), active_txns_.size(), alloc);
+  if (level == 0) {
+    stats.AddMember(StringRef(ALL_TXNS),
+                    ToJsonArray(
+                        active_txns_, [](const auto& p) { return p.first; }, alloc),
+                    alloc);
+  }
+
+  if (level >= 1) {
+    rapidjson::Value txns(rapidjson::kArrayType);
+    for (const auto& [txn_id, txn_holder] : active_txns_) {
+      rapidjson::Value txn_obj(rapidjson::kObjectType);
+      txn_obj.AddMember(StringRef(TXN_ID), txn_id, alloc)
+          .AddMember(StringRef(TXN_DONE), txn_holder.is_done(), alloc)
+          .AddMember(StringRef(TXN_ABORTING), txn_holder.is_aborting(), alloc)
+          .AddMember(StringRef(TXN_NUM_LO), txn_holder.num_lock_only_txns(), alloc)
+          .AddMember(StringRef(TXN_EXPECTED_NUM_LO), txn_holder.expected_num_lock_only_txns(), alloc);
+      txns.PushBack(txn_obj, alloc);
+    }
+    stats.AddMember(StringRef(ALL_TXNS), txns, alloc);
+  }
+
+  // Add stats from the lock manager
+  lock_manager_.GetStats(stats, level);
+
+  // Write JSON object to a buffer and send back to the server
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
+}
 }  // namespace slog

@@ -131,7 +131,7 @@ vector<TxnId> DDRLockManager::ReleaseLocks(TxnId txn_id) {
 /**
  * {
  *    lock_manager_type: 1,
- *    num_txns_waiting_for_lock: <number of txns waiting for lock>,
+ *    num_txns_waiting_for_lock: <int>,
  *    waited_by_graph (lvl >= 1): [
  *      [<txn id>, [<waited by txn id>, ...]],
  *      ...
