@@ -60,7 +60,8 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
 /**
  * Returns nullptr if the generated txn contains no relevant key
  */
-Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition, bool in_place = false);
+Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition,
+                                    bool in_place = false);
 
 /**
  * Populate the involved_replicas field in the transaction

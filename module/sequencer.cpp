@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "common/json_utils.h"
 #include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
@@ -22,7 +23,8 @@ Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broke
     : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
       config_(config),
       batch_timeout_(batch_timeout),
-      batch_id_counter_(0) {
+      batch_id_counter_(0),
+      collecting_stats_(false) {
   partitioned_batch_.resize(config_->num_partitions());
   NewBatch();
 }
@@ -42,9 +44,20 @@ void Sequencer::NewBatch() {
 }
 
 void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
-  if (env->request().type_case() != Request::kForwardTxn) {
-    return;
+  switch (env->request().type_case()) {
+    case Request::kForwardTxn:
+      ProcessForwardTxn(move(env));
+      break;
+    case Request::kStats:
+      ProcessStatsRequest(env->request().stats());
+      break;
+    default:
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
+      break;
   }
+}
+
+void Sequencer::ProcessForwardTxn(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
 
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
@@ -66,6 +79,7 @@ void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
   ++batch_size_;
 
   if (!batch_scheduled_) {
+    batch_starting_time_ = steady_clock::now();
     NewTimedCallback(batch_timeout_, [this]() {
       SendBatch();
       NewBatch();
@@ -74,9 +88,46 @@ void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
   }
 }
 
+void Sequencer::ProcessStatsRequest(const internal::StatsRequest& stats_request) {
+  using rapidjson::StringRef;
+
+  int level = stats_request.level();
+
+  rapidjson::Document stats;
+  stats.SetObject();
+  auto& alloc = stats.GetAllocator();
+
+  if (level == 0) {
+    collecting_stats_ = false;
+  } else if (level > 0) {
+    collecting_stats_ = true;
+  }
+
+  stats.AddMember(StringRef(SEQ_BATCH_SIZE_PCTLS), Percentiles(stat_batch_sizes_, alloc), alloc);
+  stat_batch_sizes_.clear();
+
+  stats.AddMember(StringRef(SEQ_BATCH_DURATION_MS_PCTLS), Percentiles(stat_batch_durations_ms_, alloc), alloc);
+  stat_batch_durations_ms_.clear();
+
+  // Write JSON object to a buffer and send back to the server
+  rapidjson::StringBuffer buf;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+  stats.Accept(writer);
+
+  auto env = NewEnvelope();
+  env->mutable_response()->mutable_stats()->set_id(stats_request.id());
+  env->mutable_response()->mutable_stats()->set_stats_json(buf.GetString());
+  Send(move(env), kServerChannel);
+}
+
 void Sequencer::SendBatch() {
   VLOG(3) << "Finished batch " << batch_id() << " of size " << batch_size_
           << ". Sending out for ordering and replicating";
+
+  if (collecting_stats_) {
+    stat_batch_sizes_.push_back(batch_size_);
+    stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+  }
 
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();

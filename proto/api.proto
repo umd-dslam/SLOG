@@ -22,7 +22,8 @@ message TransactionRequest {
 
 enum StatsModule {
     SERVER = 0;
-    SCHEDULER = 1;
+    SEQUENCER = 1;
+    SCHEDULER = 2;
 }
 
 message StatsRequest {

@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "common/constants.h"
+#include "common/json_utils.h"
 #include "common/proto_utils.h"
 #include "connection/zmq_utils.h"
 #include "proto/api.pb.h"
@@ -139,6 +140,29 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << endl;
 }
 
+void PrintSequencerStats(const rapidjson::Document& stats, uint32_t) {
+  const auto& batch_duration_ms_pctls = stats[SEQ_BATCH_DURATION_MS_PCTLS].GetArray();
+  const auto& batch_size_pctls = stats[SEQ_BATCH_SIZE_PCTLS].GetArray();
+  cout << "Batch duration percentiles (ms)\n";
+  if (batch_duration_ms_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    cout << fixed << setprecision(3);
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_duration_ms_pctls[i].GetFloat() << "\n";
+    }
+  }
+  cout << "\n";
+  cout << "Batch size percentiles\n";
+  if (batch_size_pctls.Empty()) {
+    cout << "\tNo data\n";
+  } else {
+    for (size_t i = 0; i < kPctlLevels.size(); ++i) {
+      cout << setw(4) << kPctlLevels[i] << ": " << batch_size_pctls[i].GetInt() << "\n";
+    }
+  }
+}
+
 string LockModeStr(LockMode mode) {
   switch (mode) {
     case LockMode::UNLOCKED:
@@ -232,6 +256,7 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
     {"server", {api::StatsModule::SERVER, PrintServerStats}},
+    {"sequencer", {api::StatsModule::SEQUENCER, PrintSequencerStats}},
     {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}};
 
 void ExecuteStats(const char* module, uint32_t level) {

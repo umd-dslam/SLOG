@@ -38,6 +38,10 @@ const char NUM_PARTIALLY_COMPLETED_TXNS[] = "num_partially_completed_txns";
 const char PENDING_RESPONSES[] = "pending_responses";
 const char PARTIALLY_COMPLETED_TXNS[] = "partially_completed_txns";
 
+/* Sequencer */
+const char SEQ_BATCH_SIZE_PCTLS[] = "seq_batch_size_pctls";
+const char SEQ_BATCH_DURATION_MS_PCTLS[] = "seq_batch_duration_ms_pctls";
+
 /* Scheduler */
 const char ALL_TXNS[] = "all_txns";
 const char NUM_ALL_TXNS[] = "num_all_txns";

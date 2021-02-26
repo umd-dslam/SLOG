@@ -102,7 +102,8 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
   return lock_only_txn;
 }
 
-Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition, bool in_place) {
+Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition,
+                                    bool in_place) {
   Transaction* new_txn = txn;
   if (!in_place) {
     new_txn = new Transaction(*txn);

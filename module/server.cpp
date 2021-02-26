@@ -99,6 +99,9 @@ bool Server::OnCustomSocket() {
         case api::StatsModule::SERVER:
           ProcessStatsRequest(env->request().stats());
           break;
+        case api::StatsModule::SEQUENCER:
+          Send(move(env), kSequencerChannel);
+          break;
         case api::StatsModule::SCHEDULER:
           Send(move(env), kSchedulerChannel);
           break;
