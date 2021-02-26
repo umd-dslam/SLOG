@@ -63,7 +63,6 @@ def install_docker(instance_ips):
 
 
 def print_instance_ips(instance_ips):
-    # Output IP addresses
     print("\n================== IP ADDRESSES ==================\n")
     print(json.dumps(instance_ips, indent=2))
 
@@ -97,7 +96,7 @@ class AWSCommand(Command):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--regions", nargs="*", help="Run this script on these regions only"
+            "-r", "--regions", nargs="*", help="Run this script on these regions only"
         )
 
 
@@ -293,6 +292,10 @@ class ListInstancesCommand(AWSCommand):
             nargs="*",
             help="Filter instances by state"
         )
+        parser.add_argument(
+            "-c", type=int,
+            help="When this parameter is set, a config fragment is printed. This value is used for number of clients"
+        )
 
     def initialize_and_do_command(self, args):
         if not args.regions:
@@ -303,27 +306,44 @@ class ListInstancesCommand(AWSCommand):
         if args.state:
             filters.append({'Name': 'instance-state-name', 'Values': args.state})
 
-        info = []
-        for region in args.regions:
-            ec2 = boto3.client('ec2', region_name=region)
-            try:
-                instances = ec2.describe_instances(Filters=filters)
-                for r in instances['Reservations']:
-                    for i in r['Instances']:
-                        info.append([
-                            i.get('PublicIpAddress', ''),
-                            i['State']['Name'],
-                            i['Placement']['AvailabilityZone'],
-                            i['InstanceType'],
-                            ','.join([sg['GroupName'] for sg in i['SecurityGroups']]),
-                            i['KeyName'],
-                        ])
-            except Exception as e:
-                LOG.exception(region, e)
+        if args.c is None:
+            info = []
+            for region in args.regions:
+                ec2 = boto3.client('ec2', region_name=region)
+                try:
+                    instances = ec2.describe_instances(Filters=filters)
+                    for r in instances['Reservations']:
+                        for i in r['Instances']:
+                            info.append([
+                                i.get('PublicIpAddress', ''),
+                                i['State']['Name'],
+                                i['Placement']['AvailabilityZone'],
+                                i['InstanceType'],
+                                ','.join([sg['GroupName'] for sg in i['SecurityGroups']]),
+                                i['KeyName'],
+                            ])
+                except Exception as e:
+                    LOG.exception(region, e)
 
-        print(tabulate(info, headers=[
-            "Public IP", "State", "Availability Zone", "Type", "Security group", "Key"
-        ]))
+            print(tabulate(info, headers=[
+                "Public IP", "State", "Availability Zone", "Type", "Security group", "Key"
+            ]))
+        else:
+            instance_ips = {}
+            for region in args.regions:
+                ec2 = boto3.client('ec2', region_name=region)
+                try:
+                    instances = ec2.describe_instances(Filters=filters)
+                    ips = []
+                    for r in instances['Reservations']:
+                        for i in r['Instances']:
+                            ips.append(i.get('PublicIpAddress', ''))
+                except Exception as e:
+                    LOG.exception(region, e)
+                instance_ips[region] = ips
+
+            print_instance_ips(instance_ips)
+            print_slog_config_fragment(instance_ips, args.c)
 
 
 if __name__ == "__main__":
