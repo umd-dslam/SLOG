@@ -18,12 +18,9 @@ using internal::Envelope;
 using internal::Request;
 
 MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                                   milliseconds batch_timeout, int max_batch_size,
                                    std::chrono::milliseconds poll_timeout)
     : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout),
       config_(config),
-      batch_timeout_(batch_timeout),
-      max_batch_size_(max_batch_size),
       batch_id_counter_(0),
       collecting_stats_(false) {
   batch_per_rep_.resize(config_->num_replicas());
@@ -128,7 +125,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
 
   // If this is the first txn in the batch, schedule to send the batch at a later time
   if (batch_size_ == 1) {
-    NewTimedCallback(batch_timeout_, [this]() {
+    NewTimedCallback(config_->sequencer_batch_duration(), [this]() {
       SendBatch();
       NewBatch();
     });
@@ -137,7 +134,8 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
-  if (max_batch_size_ > 0 && batch_size_ >= max_batch_size_) {
+  auto max_batch_size = config_->sequencer_max_batch_size();
+  if (max_batch_size > 0 && batch_size_ >= max_batch_size) {
     ClearTimedCallbacks();
     SendBatch();
     NewBatch();

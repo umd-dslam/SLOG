@@ -22,13 +22,10 @@ using internal::Request;
 using internal::Response;
 
 Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-                     milliseconds batch_timeout, int max_batch_size, milliseconds poll_timeout)
+                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds poll_timeout)
     : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout),
       config_(config),
       lookup_master_index_(lookup_master_index),
-      batch_timeout_(batch_timeout),
-      max_batch_size_(max_batch_size),
       batch_size_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {
@@ -100,13 +97,14 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   // If this is the first txn in the batch, schedule to send the batch at a later time
   if (batch_size_ == 1) {
-    NewTimedCallback(batch_timeout_, [this]() { SendLookupMasterRequestBatch(); });
+    NewTimedCallback(config_->forwarder_batch_duration(), [this]() { SendLookupMasterRequestBatch(); });
 
     batch_starting_time_ = steady_clock::now();
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
-  if (max_batch_size_ > 0 && batch_size_ >= max_batch_size_) {
+  auto max_batch_size = config_->forwarder_max_batch_size();
+  if (max_batch_size > 0 && batch_size_ >= max_batch_size) {
     ClearTimedCallbacks();
     SendLookupMasterRequestBatch();
   }
