@@ -33,7 +33,7 @@ class Forwarder : public NetworkedModule {
  public:
   Forwarder(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
             const std::shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds batch_timeout,
-            milliseconds poll_timeout_ms = kModuleTimeout);
+            int max_batch_size, milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
@@ -44,6 +44,8 @@ class Forwarder : public NetworkedModule {
   void ProcessLookUpMasterRequest(EnvelopePtr&& env);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
+  void SendLookupMasterRequestBatch();
+
   /**
    * Pre-condition: transaction type is not UNKNOWN
    */
@@ -52,10 +54,9 @@ class Forwarder : public NetworkedModule {
   ConfigurationPtr config_;
   std::shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
   milliseconds batch_timeout_;
-
+  int max_batch_size_;
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
   std::vector<internal::Envelope> partitioned_lookup_request_;
-  bool lookup_request_scheduled_;
   int batch_size_;
 
   std::mt19937 rg_;

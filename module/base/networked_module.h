@@ -27,7 +27,7 @@ struct ChannelOption {
 class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
-                  std::optional<std::chrono::milliseconds> poll_timeout, int recv_retries = 100);
+                  std::optional<std::chrono::milliseconds> poll_timeout, int recv_retries = 5000);
   ~NetworkedModule();
 
  protected:
