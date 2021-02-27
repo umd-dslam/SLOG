@@ -67,4 +67,6 @@ void Poller::AddTimedCallback(microseconds timeout, std::function<void()>&& cb) 
   timed_callbacks_.push_back({.when = Clock::now() + timeout, .callback = move(cb)});
 }
 
+void Poller::ClearTimedCallbacks() { timed_callbacks_.clear(); }
+
 }  // namespace slog

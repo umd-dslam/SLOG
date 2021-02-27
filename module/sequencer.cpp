@@ -19,10 +19,11 @@ using internal::Request;
 using internal::Response;
 
 Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
-                     milliseconds poll_timeout)
+                     int max_batch_size, milliseconds poll_timeout)
     : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
       config_(config),
       batch_timeout_(batch_timeout),
+      max_batch_size_(max_batch_size),
       batch_id_counter_(0),
       collecting_stats_(false) {
   partitioned_batch_.resize(config_->num_partitions());
@@ -31,7 +32,6 @@ Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broke
 
 void Sequencer::NewBatch() {
   ++batch_id_counter_;
-  batch_scheduled_ = false;
   batch_size_ = 0;
   for (auto& batch : partitioned_batch_) {
     if (batch == nullptr) {
@@ -78,14 +78,21 @@ void Sequencer::ProcessForwardTxn(EnvelopePtr&& env) {
 
   ++batch_size_;
 
-  if (!batch_scheduled_) {
+  // If this is the first txn in the batch, schedule to send the batch at a later time
+  if (batch_size_ == 1) {
     NewTimedCallback(batch_timeout_, [this]() {
       SendBatch();
       NewBatch();
     });
 
     batch_starting_time_ = steady_clock::now();
-    batch_scheduled_ = true;
+  }
+
+  // Batch size is larger than the maximum size, send the batch immediately
+  if (max_batch_size_ > 0 && batch_size_ >= max_batch_size_) {
+    ClearTimedCallbacks();
+    SendBatch();
+    NewBatch();
   }
 }
 

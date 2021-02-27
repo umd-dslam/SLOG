@@ -115,7 +115,8 @@ void TestSlog::AddForwarder() {
 }
 
 void TestSlog::AddSequencer() {
-  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, config_->sequencer_batch_duration(), kTestModuleTimeout);
+  sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, config_->sequencer_batch_duration(),
+                                        config_->max_batch_size(), kTestModuleTimeout);
 }
 
 void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeout); }
@@ -127,8 +128,8 @@ void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config
 void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeout); }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ =
-      MakeRunnerFor<MultiHomeOrderer>(config_, broker_, config_->sequencer_batch_duration(), kTestModuleTimeout);
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, config_->sequencer_batch_duration(),
+                                                        config_->max_batch_size(), kTestModuleTimeout);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {

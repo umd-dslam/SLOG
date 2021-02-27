@@ -34,6 +34,7 @@ class Configuration {
   vector<MachineId> all_machine_ids() const;
   milliseconds forwarder_batch_duration() const;
   milliseconds sequencer_batch_duration() const;
+  int max_batch_size() const;
   uint32_t replication_factor() const;
 
   const string& local_address() const;

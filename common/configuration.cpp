@@ -88,6 +88,8 @@ milliseconds Configuration::sequencer_batch_duration() const {
   return milliseconds(config_.sequencer_batch_duration());
 }
 
+int Configuration::max_batch_size() const { return config_.max_batch_size(); }
+
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 
 vector<MachineId> Configuration::all_machine_ids() const {

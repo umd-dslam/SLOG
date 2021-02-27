@@ -86,20 +86,22 @@ message Configuration {
     }
     // Number of worker threads for processing the transactions
     uint32 num_workers = 8;
-    // How long the forwarder wait for batching
+    // How long the forwarder waits for batching
     uint64 forwarder_batch_duration = 9;
-    // How long the sequencer wait for batching
+    // How long the sequencer waits for batching
     uint64 sequencer_batch_duration = 10;
+    // Maximum number of txns in a sequencer batch. Set to 0 for unlimited batch size
+    int32 max_batch_size = 11;
     // Number of regions that need to be synchronously replicated to
-    uint32 replication_factor = 11;
+    uint32 replication_factor = 12;
     // Replication of txn batches will be delayed to simulate uneven network latency
-    ReplicationDelayExperiment replication_delay = 12;
+    ReplicationDelayExperiment replication_delay = 13;
     // Do not record specified events
-    repeated TransactionEvent disabled_tracing_events = 13;
+    repeated TransactionEvent disabled_tracing_events = 14;
     // Return dummy txns back to the client instead of full results
-    bool return_dummy_txn = 14;
+    bool return_dummy_txn = 15;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
-    bool bypass_mh_orderer = 15;
+    bool bypass_mh_orderer = 16;
     // Pin each module to a cpu
-    bool pin_to_cpus = 16;
+    bool pin_to_cpus = 17;
 }

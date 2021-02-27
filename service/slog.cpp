@@ -162,10 +162,12 @@ int main(int argc, char* argv[]) {
 
   vector<unique_ptr<slog::ModuleRunner>> modules;
   modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration()));
+  modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker, config->sequencer_batch_duration(),
+                                                          config->max_batch_size()));
   modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage, config->forwarder_batch_duration()));
-  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker, config->sequencer_batch_duration()));
+  modules.push_back(
+      MakeRunnerFor<slog::Sequencer>(config, broker, config->sequencer_batch_duration(), config->max_batch_size()));
   modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
   modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
 

@@ -34,7 +34,9 @@ void Scheduler::Initialize() {
   auto cpu = config_->pin_to_cpus() ? std::optional<int>(kWorkerChannel) : std::nullopt;
   for (auto& worker : workers_) {
     worker->StartInNewThread(cpu);
-    cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;
+    if (cpu.has_value()) {
+      cpu = std::optional<int>(*cpu + 1);
+    }
   }
 
   zmq::socket_t worker_socket(*context(), ZMQ_DEALER);

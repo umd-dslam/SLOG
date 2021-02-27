@@ -25,7 +25,7 @@ namespace slog {
 class Sequencer : public NetworkedModule {
  public:
   Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
-            milliseconds poll_timeout = kModuleTimeout);
+            int max_batch_size, milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
@@ -42,10 +42,10 @@ class Sequencer : public NetworkedModule {
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
+  int max_batch_size_;
   std::vector<std::unique_ptr<internal::Batch>> partitioned_batch_;
   BatchId batch_id_counter_;
   int batch_size_;
-  bool batch_scheduled_;
 
   std::mt19937 rg_;
 

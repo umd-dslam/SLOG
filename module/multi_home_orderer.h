@@ -24,7 +24,7 @@ namespace slog {
 class MultiHomeOrderer : public NetworkedModule {
  public:
   MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds batch_timeout,
-                   milliseconds poll_timeout = kModuleTimeout);
+                   int max_batch_size, milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
@@ -40,10 +40,10 @@ class MultiHomeOrderer : public NetworkedModule {
 
   ConfigurationPtr config_;
   milliseconds batch_timeout_;
+  int max_batch_size_;
   std::vector<std::unique_ptr<internal::Batch>> batch_per_rep_;
   BatchId batch_id_counter_;
   int batch_size_;
-  bool batch_scheduled_;
 
   BatchLog multi_home_batch_log_;
 
