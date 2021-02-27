@@ -12,7 +12,9 @@ class Poller {
  public:
   Poller(std::optional<std::chrono::microseconds> timeout);
 
-  int Wait();
+  // Returns true if it is possible that there is a message in one of the sockets
+  // If dont_wait is set to true, this always return true
+  bool NextEvent(bool dont_wait = false);
 
   void PushSocket(zmq::socket_t& socket);
 

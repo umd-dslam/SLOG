@@ -96,7 +96,7 @@ void TxnGenerator::SendTxn() {
 }
 
 bool TxnGenerator::Loop() {
-  if (poller_.Wait() > 0) {
+  if (poller_.NextEvent()) {
     if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       auto& info = txns_[res.stream_id()];
       if (info.finished) {

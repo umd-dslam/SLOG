@@ -19,14 +19,15 @@ namespace slog {
 using internal::Envelope;
 
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
-                                 optional<std::chrono::milliseconds> poll_timeout, int recv_batch)
+                                 optional<std::chrono::milliseconds> poll_timeout, int recv_retries)
     : Module(name),
       context_(broker->context()),
       channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker),
       poller_(poll_timeout),
-      recv_batch_(recv_batch) {
+      recv_retries_(recv_retries),
+      recv_retries_counter_(0) {
   broker->AddChannel(channel_, chopt.recv_raw);
   pull_socket_.bind(MakeInProcChannelAddress(channel_));
   // Remove limit on the zmq message queues
@@ -63,56 +64,52 @@ void NetworkedModule::SetUp() {
 }
 
 bool NetworkedModule::Loop() {
-  if (poller_.Wait() > 0) {
-    for (int i = 0; i < recv_batch_; i++) {
-      // Message from pull socket
-      if (auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */); wrapped_env != nullptr) {
+  if (!poller_.NextEvent(recv_retries_counter_ > 0)) {
+    return false;
+  }
+
+  if (recv_retries_counter_ == 0) {
+    recv_retries_counter_ = recv_retries_;
+  }
+
+  // Message from pull socket
+  if (auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */); wrapped_env != nullptr) {
 #ifdef ENABLE_WORK_MEASURING
-        auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 #endif
-
-        EnvelopePtr env;
-        if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
-          env.reset(new Envelope());
-          if (!DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
-            continue;
-          }
-          env->set_from(wrapped_env->from());
-        } else {
-          env = move(wrapped_env);
-        }
-
-        if (env->has_request()) {
-          OnInternalRequestReceived(move(env));
-        } else if (env->has_response()) {
-          OnInternalResponseReceived(move(env));
-        }
-
-#ifdef ENABLE_WORK_MEASURING
-        work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
+    EnvelopePtr env;
+    if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
+      env.reset(new Envelope());
+      if (DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
+        env->set_from(wrapped_env->from());
       }
-
-#ifdef ENABLE_WORK_MEASURING
-      auto start = std::chrono::steady_clock::now();
-      if (OnCustomSocket()) {
-        work_ += (std::chrono::steady_clock::now() - start).count();
-      }
-#else
-      OnCustomSocket();
-#endif
+    } else {
+      env = move(wrapped_env);
     }
+
+    if (env->has_request()) {
+      OnInternalRequestReceived(move(env));
+    } else if (env->has_response()) {
+      OnInternalResponseReceived(move(env));
+    }
+
+#ifdef ENABLE_WORK_MEASURING
+    work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
   }
 
 #ifdef ENABLE_WORK_MEASURING
   auto start = std::chrono::steady_clock::now();
+  if (OnCustomSocket()) {
+    work_ += (std::chrono::steady_clock::now() - start).count();
+  }
+#else
+  OnCustomSocket();
 #endif
 
-  OnWakeUp();
-
-#ifdef ENABLE_WORK_MEASURING
-  work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
+  if (recv_retries_counter_ > 0) {
+    recv_retries_counter_--;
+  }
 
   return false;
 }
