@@ -92,6 +92,8 @@ milliseconds Configuration::sequencer_batch_duration() const {
 
 int Configuration::sequencer_max_batch_size() const { return config_.sequencer_max_batch_size(); }
 
+uint32_t Configuration::scheduler_max_txns() const { return config_.scheduler_max_txns(); }
+
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 
 vector<MachineId> Configuration::all_machine_ids() const {
@@ -168,10 +170,12 @@ vector<TransactionEvent> Configuration::disabled_tracing_events() const {
   return res;
 };
 
-bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn(); }
-
 bool Configuration::bypass_mh_orderer() const { return config_.bypass_mh_orderer(); }
 
 bool Configuration::pin_to_cpus() const { return config_.pin_to_cpus(); }
+
+bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn(); }
+
+bool Configuration::do_not_clean_up_txn() const { return config_.do_not_clean_up_txn(); }
 
 }  // namespace slog

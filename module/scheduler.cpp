@@ -63,40 +63,41 @@ void Scheduler::OnInternalRequestReceived(EnvelopePtr&& env) {
 
 // Handle responses from the workers
 bool Scheduler::OnCustomSocket() {
-  auto& worker_socket = GetCustomSocket(0);
+  auto& worker_socket = GetCustomSocket(0); 
+  auto max_txns = config_->scheduler_max_txns();
+  
+  do {
+    zmq::message_t msg;
+    while (worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
+      auto txn_id = *msg.data<TxnId>();
+      // Release locks held by this txn then dispatch the txns that become ready thanks to this release.
+      auto unblocked_txns = lock_manager_.ReleaseLocks(txn_id);
+      for (auto unblocked_txn : unblocked_txns) {
+        Dispatch(unblocked_txn);
+      }
 
-  zmq::message_t msg;
-  if (!worker_socket.recv(msg, zmq::recv_flags::dontwait)) {
-    return false;
-  }
+      VLOG(2) << "Released locks of txn " << txn_id;
 
-  auto txn_id = *msg.data<TxnId>();
-  // Release locks held by this txn then dispatch the txns that become ready thanks to this release.
-  auto unblocked_txns = lock_manager_.ReleaseLocks(txn_id);
-  for (auto unblocked_txn : unblocked_txns) {
-    Dispatch(unblocked_txn);
-  }
-
-  VLOG(2) << "Released locks of txn " << txn_id;
-
-  auto it = active_txns_.find(txn_id);
-  DCHECK(it != active_txns_.end());
-  auto& txn_holder = it->second;
+      auto it = active_txns_.find(txn_id);
+      DCHECK(it != active_txns_.end());
+      auto& txn_holder = it->second;
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
-  auto remaster_result = txn_holder.remaster_result();
-  // If a remaster transaction, trigger any unblocked txns
-  if (remaster_result.has_value()) {
-    ProcessRemasterResult(remaster_manager_.RemasterOccured(remaster_result->first, remaster_result->second));
-  }
+      auto remaster_result = txn_holder.remaster_result();
+      // If a remaster transaction, trigger any unblocked txns
+      if (remaster_result.has_value()) {
+        ProcessRemasterResult(remaster_manager_.RemasterOccured(remaster_result->first, remaster_result->second));
+      }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || \
           defined(REMASTER_PROTOCOL_PER_KEY) */
 
-  txn_holder.SetDone();
+      txn_holder.SetDone();
 
-  if (txn_holder.is_ready_for_gc()) {
-    active_txns_.erase(it);
-  }
+      if (txn_holder.is_ready_for_gc()) {
+        active_txns_.erase(it);
+      }
+    }
+  } while (max_txns > 0 && active_txns_.size() >= max_txns);
 
   return true;
 }
