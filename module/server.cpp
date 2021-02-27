@@ -10,10 +10,16 @@ using std::move;
 
 namespace slog {
 
-void ValidateTransaction(Transaction* txn) {
+void InitializeAndValidateTransaction(const ConfigurationPtr& config, Transaction* txn) {
   txn->set_status(TransactionStatus::ABORTED);
   if (txn->keys().empty()) {
     txn->set_abort_reason("Txn accesses no key");
+    return;
+  }
+  try {
+    PopulateInvolvedPartitions(config, *txn);
+  } catch (std::invalid_argument& e) {
+    LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
     return;
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
@@ -21,7 +27,10 @@ void ValidateTransaction(Transaction* txn) {
 
 Server::Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
                std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Server", broker, kServerChannel, poll_timeout), config_(config), txn_id_counter_(0) {}
+    : NetworkedModule("Server", broker, kServerChannel, poll_timeout),
+      config_(config),
+      txn_id_counter_(0),
+      rg_(std::random_device()()) {}
 
 /***********************************************
                 Custom socket
@@ -75,7 +84,7 @@ bool Server::OnCustomSocket() {
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
 
-      ValidateTransaction(txn);
+      InitializeAndValidateTransaction(config_, txn);
       if (txn->status() == TransactionStatus::ABORTED) {
         SendTxnToClient(txn);
         break;
@@ -83,10 +92,19 @@ bool Server::OnCustomSocket() {
 
       TRACE(txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
 
+      bool is_local = false;
+      for (auto p : txn->internal().involved_partitions()) {
+        if (p == config_->local_partition()) {
+          is_local = true;
+          break;
+        }
+      }
+
       // Send to forwarder
       auto env = NewEnvelope();
       env->mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
-      Send(move(env), kForwarderChannel);
+      auto partition = is_local ? config_->local_partition() : ChooseRandomPartition(*txn, rg_);
+      Send(move(env), config_->MakeMachineId(config_->local_replica(), partition), kForwarderChannel);
       break;
     }
     case api::Request::kStats: {

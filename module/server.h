@@ -113,6 +113,8 @@ class Server : public NetworkedModule {
   TxnId txn_id_counter_;
   std::unordered_map<TxnId, PendingResponse> pending_responses_;
   std::unordered_map<TxnId, CompletedTransaction> completed_txns_;
+
+  std::mt19937 rg_;
 };
 
 }  // namespace slog

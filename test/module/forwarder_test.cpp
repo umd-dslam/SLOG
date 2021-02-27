@@ -161,7 +161,7 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
   auto txn = MakeTransaction({{"A"}, {"C", KeyType::WRITE}});
 
   test_slogs[1]->SendTxn(txn);
-  auto forwarded_txn = ReceiveOnOrdererChannel(1);
+  auto forwarded_txn = ReceiveOnOrdererChannel(0);
 
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, forwarded_txn->internal().type());
