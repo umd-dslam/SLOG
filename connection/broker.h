@@ -114,6 +114,8 @@ class Broker {
   // Messages that are sent to this broker when it is not READY yet
   vector<zmq::message_t> unhandled_incoming_messages_;
 
+  int recv_retries_;
+
   struct ChannelEntry {
     ChannelEntry(zmq::socket_t&& socket, bool send_raw) : socket(std::move(socket)), send_raw(send_raw) {}
     zmq::socket_t socket;

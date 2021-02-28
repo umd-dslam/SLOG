@@ -35,7 +35,8 @@ Broker::Broker(const ConfigurationPtr& config, const shared_ptr<zmq::context_t>&
       external_socket_(*context, ZMQ_PULL),
       internal_socket_(*context, ZMQ_PULL),
       running_(false),
-      is_synchronized_(false) {
+      is_synchronized_(false),
+      recv_retries_(0) {
   // Remove all limits on the message queue
   external_socket_.set(zmq::sockopt::rcvhwm, 0);
 }
@@ -211,52 +212,59 @@ void Broker::Run() {
                                        {static_cast<void*>(internal_socket_), 0, ZMQ_POLLIN, 0}};
   while (running_) {
     // Wait until a message arrived at one of the sockets
-    if (zmq::poll(pollitems, poll_timeout_ms_)) {
-      for (int i = 0; i < 1000; i++) {
-        if (zmq::message_t msg; external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-#ifdef ENABLE_WORK_MEASURING
-          auto start = std::chrono::steady_clock::now();
-#endif
-
-          HandleIncomingMessage(move(msg));
-
-#ifdef ENABLE_WORK_MEASURING
-          work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
-        }
-        if (auto env = RecvEnvelope(internal_socket_, true /* dont_wait */); env != nullptr) {
-#ifdef ENABLE_WORK_MEASURING
-          auto start = std::chrono::steady_clock::now();
-#endif
-
-          if (!env->has_request() || !env->request().has_broker_redirect()) {
-            continue;
-          }
-          auto tag = env->request().broker_redirect().tag();
-          if (env->request().broker_redirect().stop()) {
-            redirect_.erase(tag);
-            continue;
-          }
-          auto channel = env->request().broker_redirect().channel();
-          auto chan_it = channels_.find(channel);
-          if (chan_it == channels_.end()) {
-            LOG(ERROR) << "Invalid channel to redirect to: \"" << channel << "\".";
-            continue;
-          }
-          auto& entry = redirect_[tag];
-          entry.to = channel;
-          for (auto& msg : entry.pending_msgs) {
-            ForwardMessage(chan_it->second.socket, chan_it->second.send_raw, move(msg));
-          }
-          entry.pending_msgs.clear();
-
-#ifdef ENABLE_WORK_MEASURING
-          work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
-        }
-      }
+    if (!zmq::poll(pollitems, poll_timeout_ms_)) {
+      continue;
     }
-  }  // while-loop
+    do {
+      if (zmq::message_t msg; external_socket_.recv(msg, zmq::recv_flags::dontwait)) {
+#ifdef ENABLE_WORK_MEASURING
+        auto start = std::chrono::steady_clock::now();
+#endif
+        recv_retries_ = kRecvRetries;
+
+        HandleIncomingMessage(move(msg));
+
+#ifdef ENABLE_WORK_MEASURING
+        work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+      }
+
+      if (auto env = RecvEnvelope(internal_socket_, true /* dont_wait */); env != nullptr) {
+#ifdef ENABLE_WORK_MEASURING
+        auto start = std::chrono::steady_clock::now();
+#endif
+        recv_retries_ = kRecvRetries;
+
+        if (!env->has_request() || !env->request().has_broker_redirect()) {
+          continue;
+        }
+        auto tag = env->request().broker_redirect().tag();
+        if (env->request().broker_redirect().stop()) {
+          redirect_.erase(tag);
+          continue;
+        }
+        auto channel = env->request().broker_redirect().channel();
+        auto chan_it = channels_.find(channel);
+        if (chan_it == channels_.end()) {
+          LOG(ERROR) << "Invalid channel to redirect to: \"" << channel << "\".";
+          continue;
+        }
+        auto& entry = redirect_[tag];
+        entry.to = channel;
+        for (auto& msg : entry.pending_msgs) {
+          ForwardMessage(chan_it->second.socket, chan_it->second.send_raw, move(msg));
+        }
+        entry.pending_msgs.clear();
+
+#ifdef ENABLE_WORK_MEASURING
+        work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+      }
+      if (recv_retries_ > 0) {
+        --recv_retries_;
+      }
+    } while (recv_retries_ > 0);
+  }  // while (running_)
 }
 
 void Broker::HandleIncomingMessage(zmq::message_t&& msg) {

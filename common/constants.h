@@ -27,6 +27,8 @@ const uint32_t kPaxosDefaultLeaderPosition = 0;
 
 const size_t kLockTableSizeLimit = 1000000;
 
+const int kRecvRetries = 1000;
+
 /****************************
  *      Statistic Keys
  ****************************/

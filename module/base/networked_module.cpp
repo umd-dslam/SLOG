@@ -19,15 +19,14 @@ namespace slog {
 using internal::Envelope;
 
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
-                                 optional<std::chrono::milliseconds> poll_timeout, int recv_retries)
+                                 optional<std::chrono::milliseconds> poll_timeout)
     : Module(name),
       context_(broker->context()),
       channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker),
       poller_(poll_timeout),
-      recv_retries_(recv_retries),
-      recv_retries_counter_(0) {
+      recv_retries_(0) {
   broker->AddChannel(channel_, chopt.recv_raw);
   pull_socket_.bind(MakeInProcChannelAddress(channel_));
   // Remove limit on the zmq message queues
@@ -64,12 +63,12 @@ void NetworkedModule::SetUp() {
 }
 
 bool NetworkedModule::Loop() {
-  if (!poller_.NextEvent(recv_retries_counter_ > 0)) {
+  if (!poller_.NextEvent(recv_retries_ > 0)) {
     return false;
   }
 
-  if (recv_retries_counter_ == 0) {
-    recv_retries_counter_ = recv_retries_;
+  if (recv_retries_ <= 0) {
+    recv_retries_ = kRecvRetries;
   }
 
   // Message from pull socket
@@ -107,8 +106,8 @@ bool NetworkedModule::Loop() {
   OnCustomSocket();
 #endif
 
-  if (recv_retries_counter_ > 0) {
-    recv_retries_counter_--;
+  if (recv_retries_ > 0) {
+    recv_retries_--;
   }
 
   return false;
