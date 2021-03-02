@@ -113,22 +113,24 @@ bool NetworkedModule::Loop() {
   return false;
 }
 
-void NetworkedModule::Send(const Envelope& env, MachineId to_machine_id, Channel to_channel) {
-  sender_.Send(env, to_machine_id, to_channel);
+void NetworkedModule::Send(const Envelope& env, MachineId to_machine_id, Channel to_channel, size_t via_broker) {
+  sender_.Send(env, to_machine_id, to_channel, via_broker);
 }
 
-void NetworkedModule::Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel) {
-  sender_.Send(move(env), to_machine_id, to_channel);
+void NetworkedModule::Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel, size_t via_broker) {
+  sender_.Send(move(env), to_machine_id, to_channel, via_broker);
 }
 
 void NetworkedModule::Send(EnvelopePtr&& env, Channel to_channel) { sender_.Send(move(env), to_channel); }
 
-void NetworkedModule::Send(const Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {
-  sender_.Send(env, to_machine_ids, to_channel);
+void NetworkedModule::Send(const Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
+                           size_t via_broker) {
+  sender_.Send(env, to_machine_ids, to_channel, via_broker);
 }
 
-void NetworkedModule::Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {
-  sender_.Send(move(env), to_machine_ids, to_channel);
+void NetworkedModule::Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
+                           size_t via_broker) {
+  sender_.Send(move(env), to_machine_ids, to_channel, via_broker);
 }
 
 void NetworkedModule::NewTimedCallback(microseconds timeout, std::function<void()>&& cb) {

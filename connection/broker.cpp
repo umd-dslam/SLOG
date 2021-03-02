@@ -45,7 +45,7 @@ class BrokerThread : public Module {
   }
 
   void SetUp() final {
-    LOG(INFO) << "Binding a broker thread to: " << external_endpoint_;
+    LOG(INFO) << "Binding a broker thread to \"" << external_endpoint_ << "\"";
 
     external_socket_.bind(external_endpoint_);
     internal_socket_.bind(internal_endpoint_);
@@ -193,7 +193,7 @@ int Broker::StartInNewThreads(std::optional<uint32_t> starting_cpu) {
   auto binding_addr = config_->protocol() == "tcp" ? "*" : config_->local_address();
   auto cpu = starting_cpu;
   for (size_t i = 0; i < config_->broker_ports_size(); i++) {
-    auto internal_endpoint = MakeInProcChannelAddress(kBrokerChannel + i);
+    auto internal_endpoint = MakeInProcChannelAddress(MakeChannel(i));
     auto external_endpoint = MakeRemoteAddress(config_->protocol(), binding_addr, config_->broker_ports(i));
     auto& t = threads_.emplace_back(
         MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint, channels_, poll_timeout_ms_));

@@ -106,7 +106,7 @@ bool Worker::OnCustomSocket() {
   auto redirect_env = NewEnvelope();
   redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
   redirect_env->mutable_request()->mutable_broker_redirect()->set_channel(channel());
-  Send(move(redirect_env), kBrokerChannel);
+  Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
 
   VLOG(3) << "Initialized state for txn " << txn_id;
 
@@ -301,7 +301,7 @@ void Worker::Finish(TxnId txn_id) {
   auto redirect_env = NewEnvelope();
   redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
   redirect_env->mutable_request()->mutable_broker_redirect()->set_stop(true);
-  Send(move(redirect_env), kBrokerChannel);
+  Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
 
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
@@ -338,12 +338,15 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
     }
   }
 
+  vector<MachineId> destinations;
   for (auto p : txn.internal().active_partitions()) {
     if (p != local_partition) {
-      auto machine_id = config_->MakeMachineId(local_replica, p);
-      Send(env, std::move(machine_id), txn_id);
+      destinations.push_back(config_->MakeMachineId(local_replica, p));
     }
   }
+  // Try to use a different broker thread other than the default one so that
+  // a worker would have an exclusive pathway for information passing
+  Send(env, destinations, txn_id, config_->broker_ports_size() - 1);
 }
 
 void Worker::SendToCoordinatingServer(TxnId txn_id) {

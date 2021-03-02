@@ -31,6 +31,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
 
   common_config.set_protocol("ipc");
   common_config.add_broker_ports(0);
+  common_config.add_broker_ports(1);
   common_config.set_num_partitions(num_partitions);
   common_config.mutable_hash_partitioning()->set_partition_key_num_bytes(1);
   common_config.set_sequencer_batch_duration(1);

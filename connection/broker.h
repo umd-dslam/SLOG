@@ -53,6 +53,8 @@ class Broker {
   static std::shared_ptr<Broker> New(const ConfigurationPtr& config,
                                      std::chrono::milliseconds poll_timeout_ms = kModuleTimeout, bool blocky = false);
 
+  static Channel MakeChannel(int broker_num) { return kBrokerChannel + broker_num; }
+
   int StartInNewThreads(std::optional<uint32_t> starting_cpu = {});
   void Stop();
 

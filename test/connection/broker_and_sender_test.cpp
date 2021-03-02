@@ -53,60 +53,7 @@ TEST(BrokerAndSenderTest, PingPong) {
     Sender sender(broker->config(), broker->context());
     // Send ping
     auto ping_req = MakeEchoRequest("ping");
-    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
-
-    // Wait for pong
-    auto res = RecvEnvelope(recv_socket);
-    ASSERT_TRUE(res != nullptr);
-    ASSERT_TRUE(res->has_response());
-    ASSERT_EQ("pong", res->response().echo().data());
-  });
-
-  auto pong = thread([&]() {
-    // Set blocky to true to avoid exitting before sending the pong message
-    auto broker = Broker::New(configs[1], kTestModuleTimeout, true);
-    broker->AddChannel(PONG);
-    broker->StartInNewThreads();
-
-    auto socket = MakePullSocket(*broker->context(), PONG);
-
-    Sender sender(broker->config(), broker->context());
-
-    // Wait for ping
-    auto req = RecvEnvelope(socket);
-    ASSERT_TRUE(req != nullptr);
-    ASSERT_TRUE(req->has_request());
-    ASSERT_EQ("ping", req->request().echo().data());
-
-    // Send pong
-    auto pong_res = MakeEchoResponse("pong");
-    sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
-  });
-
-  ping.join();
-  pong.join();
-}
-
-TEST(BrokerAndSenderTest, PingPongMultithreadedBroker) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
-
-  internal::Configuration extra_config;
-  // Extra broker port so that we have multiple broker threads
-  extra_config.add_broker_ports(1);
-  ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2, extra_config);
-
-  auto ping = thread([&]() {
-    auto broker = Broker::New(configs[0], kTestModuleTimeout);
-    broker->AddChannel(PING);
-    broker->StartInNewThreads();
-
-    auto recv_socket = MakePullSocket(*broker->context(), PING);
-
-    Sender sender(broker->config(), broker->context());
-    // Send ping
-    auto ping_req = MakeEchoRequest("ping");
-    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG, 0 /* via broker */);
+    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG, 0 /* via_broker */);
 
     // Wait for pong
     auto res = RecvEnvelope(recv_socket);

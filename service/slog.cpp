@@ -112,7 +112,6 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
   for (auto& t : threads) {
     t.join();
   }
-  LOG(INFO) << "Finished data generation";
 }
 
 int main(int argc, char* argv[]) {
