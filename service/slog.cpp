@@ -25,6 +25,7 @@
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
 DEFINE_string(data_dir, "", "Directory containing intial data");
+DEFINE_uint32(data_threads, 3, "Number of threads used to generate initial data");
 
 using slog::Broker;
 using slog::ConfigurationPtr;
@@ -77,14 +78,13 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
 void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
-  auto num_threads = config->num_workers() + 7;
   auto num_partitions = config->num_partitions();
   auto partition = config->local_partition();
 
   // Create a value of specified size by repeating the character 'a'
   string value(simple_partitioning->record_size_bytes(), 'a');
 
-  LOG(INFO) << "Generating ~" << num_records / num_partitions << " records using " << num_threads << " threads. "
+  LOG(INFO) << "Generating ~" << num_records / num_partitions << " records using " << FLAGS_data_threads << " threads. "
             << "Record size = " << simple_partitioning->record_size_bytes() << " bytes";
 
   std::atomic<uint64_t> counter = 0;
@@ -101,11 +101,11 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
     num_done++;
   };
   std::vector<std::thread> threads;
-  uint64_t range = num_records / num_threads + 1;
-  for (uint32_t i = 0; i < num_threads; i++) {
+  uint64_t range = num_records / FLAGS_data_threads + 1;
+  for (uint32_t i = 0; i < FLAGS_data_threads; i++) {
     threads.emplace_back(GenerateFn, i * range, (i + 1) * range);
   }
-  while (num_done < num_threads) {
+  while (num_done < FLAGS_data_threads) {
     std::this_thread::sleep_for(5s);
     LOG(INFO) << "Generated " << counter.load() << " records";
   }
