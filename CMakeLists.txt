@@ -150,6 +150,7 @@ target_link_libraries(proto PUBLIC protobuf::libprotobuf)
 protobuf_generate_python(PROTO_PY_SRCS
   ${PROTO_PREFIX}/configuration.proto
   ${PROTO_PREFIX}/offline_data.proto
+  ${PROTO_PREFIX}/modules.proto
   ${PROTO_PREFIX}/transaction.proto)
 
 # Copy generated python code to the "tools" directory
