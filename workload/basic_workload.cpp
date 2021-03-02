@@ -56,10 +56,11 @@ const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"}, {MP_PC
 
 }  // namespace
 
-BasicWorkload::BasicWorkload(const ConfigurationPtr config, const string& data_dir, const string& params_str,
-                             const uint32_t seed, const RawParamMap extra_default_params)
+BasicWorkload::BasicWorkload(const ConfigurationPtr config, uint32_t region, const string& data_dir,
+                             const string& params_str, const uint32_t seed, const RawParamMap extra_default_params)
     : Workload(MergeParams(extra_default_params, DEFAULT_PARAMS), params_str),
       config_(config),
+      local_region_(region),
       partition_to_key_lists_(config->num_partitions()),
       rg_(seed),
       client_txn_id_counter_(0) {
@@ -146,7 +147,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     candidate_homes.resize(num_replicas);
     iota(candidate_homes.begin(), candidate_homes.end(), 0);
     if (params_.GetInt(NEAREST)) {
-      std::swap(candidate_homes[0], candidate_homes[config_->local_replica()]);
+      std::swap(candidate_homes[0], candidate_homes[local_region_]);
       shuffle(candidate_homes.begin() + 1, candidate_homes.end(), rg_);
     } else {
       shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
@@ -157,7 +158,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     candidate_homes.resize(mp_num_homes);
   } else {
     if (params_.GetInt(NEAREST)) {
-      candidate_homes.push_back(config_->local_replica());
+      candidate_homes.push_back(local_region_);
     } else {
       std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
       candidate_homes.push_back(dis(rg_));

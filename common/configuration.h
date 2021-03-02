@@ -17,16 +17,16 @@ using ConfigurationPtr = std::shared_ptr<const Configuration>;
 
 class Configuration {
  public:
-  static ConfigurationPtr FromFile(const string& file_path, const string& local_address = "",
-                                   uint32_t local_replica = 0U, uint32_t local_partition = 0U);
+  static ConfigurationPtr FromFile(const string& file_path, const string& local_address = "");
 
-  Configuration(const internal::Configuration& config, const string& local_address, uint32_t local_replica,
-                uint32_t local_partition);
+  Configuration(const internal::Configuration& config, const string& local_address);
 
   const string& protocol() const;
   const vector<string>& all_addresses() const;
   const string& address(uint32_t replica, uint32_t partition) const;
-  uint32_t broker_port() const;
+  const string& address(MachineId machine_id) const;
+  uint32_t broker_ports(int i) const;
+  uint32_t broker_ports_size() const;
   uint32_t server_port() const;
   uint32_t num_replicas() const;
   uint32_t num_partitions() const;

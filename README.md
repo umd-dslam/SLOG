@@ -149,19 +149,19 @@ replicas: {
 
 The commands to be run for the machines respectively from top to bottom are:
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.11 -replica 0 -partition 0
+$ build/slog -config examples/cluster.conf -address 192.168.2.11 
 ``` 
 
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.12 -replica 0 -partition 1
+$ build/slog -config examples/cluster.conf -address 192.168.2.12 
 ``` 
 
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.13 -replica 1 -partition 0
+$ build/slog -config examples/cluster.conf -address 192.168.2.13 
 ``` 
 
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.14 -replica 1 -partition 1
+$ build/slog -config examples/cluster.conf -address 192.168.2.14
 ```
 
 Use the client to send a write transaction to a machine in the cluster. If you changed the `port` option in the configuration file, you need to use the `--port` argument in the command to match with the new port.

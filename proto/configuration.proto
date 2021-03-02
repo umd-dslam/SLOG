@@ -72,9 +72,8 @@ message Configuration {
     // Replica groups. Each group has a list of machine addresses
     // with the size equal to number of partitions
     repeated Replica replicas = 2;
-    // Port for the zmq sockets in the broker. This is ignored if
-    // the icp protocol is used
-    uint32 broker_port = 3;
+    // Port for the zmq sockets in the broker. Each value will create a new broker thread
+    repeated uint32 broker_ports = 3;
     // Port for the server
     uint32 server_port = 4;
     // Number of partitions per replica

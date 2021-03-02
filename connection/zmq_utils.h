@@ -2,6 +2,7 @@
 
 #include <google/protobuf/any.pb.h>
 
+#include <sstream>
 #include <zmq.hpp>
 
 #include "common/types.h"
@@ -12,6 +13,12 @@ namespace slog {
 using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
 inline std::string MakeInProcChannelAddress(Channel chan) { return "inproc://channel_" + std::to_string(chan); }
+
+inline std::string MakeRemoteAddress(const std::string& protocol, const std::string& addr, uint32_t port) {
+  std::stringstream endpoint;
+  endpoint << protocol << "://" << addr << ":" << port;
+  return endpoint.str();
+}
 
 /**
  * Sends a pointer of an envelope

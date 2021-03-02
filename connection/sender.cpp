@@ -4,18 +4,19 @@ using std::move;
 
 namespace slog {
 
-Sender::Sender(const std::shared_ptr<Broker>& broker)
-    : context_(broker->context()), broker_(broker), local_machine_id_(broker->local_machine_id()) {}
+Sender::Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context)
+    : config_(config), context_(context) {}
 
-void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel) {
-  SendSerializedProto(*GetRemoteSocket(to_machine_id), envelope, local_machine_id_, to_channel);
+void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel, size_t via_broker) {
+  auto& socket = GetRemoteSocket(to_machine_id, via_broker);
+  SendSerializedProto(*socket, envelope, config_->local_machine_id(), to_channel);
 }
 
-void Sender::Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel) {
-  if (to_machine_id == local_machine_id_) {
+void Sender::Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel, size_t via_broker) {
+  if (to_machine_id == config_->local_machine_id()) {
     Send(move(envelope), to_channel);
   } else {
-    Send(*envelope, to_machine_id, to_channel);
+    Send(*envelope, to_machine_id, to_channel, via_broker);
   }
 }
 
@@ -29,53 +30,52 @@ void Sender::Send(EnvelopePtr&& envelope, Channel to_channel) {
     auto res = local_channel_to_socket_.insert_or_assign(to_channel, move(new_socket));
     it = res.first;
   }
-  envelope->set_from(local_machine_id_);
+  envelope->set_from(config_->local_machine_id());
   SendEnvelope(it->second, move(envelope));
 }
 
-void Sender::Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids,
-                  Channel to_channel) {
+void Sender::Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
+                  size_t via_broker) {
   auto serialized = SerializeProto(envelope);
   for (auto dest : to_machine_ids) {
     zmq::message_t copied;
     copied.copy(serialized);
-    SendAddressedBuffer(*GetRemoteSocket(dest), move(copied), local_machine_id_, to_channel);
+    auto& socket = GetRemoteSocket(dest, via_broker);
+    SendAddressedBuffer(*socket, move(copied), config_->local_machine_id(), to_channel);
   }
 }
 
-void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {
+void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
+                  size_t via_broker) {
   auto serialized = SerializeProto(*envelope);
   bool send_local = false;
   for (auto dest : to_machine_ids) {
-    if (dest == local_machine_id_) {
+    if (dest == config_->local_machine_id()) {
       send_local = true;
       continue;
     }
     zmq::message_t copied;
     copied.copy(serialized);
-    SendAddressedBuffer(*GetRemoteSocket(dest), move(copied), local_machine_id_, to_channel);
+    auto& socket = GetRemoteSocket(dest, via_broker);
+    SendAddressedBuffer(*socket, move(copied), config_->local_machine_id(), to_channel);
   }
   if (send_local) {
     Send(std::move(envelope), to_channel);
   }
 }
 
-zmq::socket_t* Sender::GetRemoteSocket(MachineId to_machine_id) {
+Sender::SocketPtr& Sender::GetRemoteSocket(MachineId machine_id, size_t broker_id) {
   // Lazily establish a new connection when necessary
-  auto it = machine_id_to_socket_.find(to_machine_id);
-  if (it == machine_id_to_socket_.end()) {
-    if (auto br = broker_.lock()) {
-      zmq::socket_t new_socket(*context_, ZMQ_PUSH);
-      new_socket.set(zmq::sockopt::sndhwm, 0);
-      new_socket.connect(br->GetEndpointByMachineId(to_machine_id));
-      auto res = machine_id_to_socket_.insert_or_assign(to_machine_id, move(new_socket));
-      it = res.first;
-    } else {
-      // Broker has been destroyed. This can only happen during cleaning up
-      return nullptr;
-    }
+  auto ins = machine_id_to_sockets_.try_emplace(machine_id, config_->broker_ports_size());
+  auto& socket = ins.first->second[broker_id];
+  if (socket == nullptr) {
+    socket = std::make_unique<zmq::socket_t>(*context_, ZMQ_PUSH);
+    socket->set(zmq::sockopt::sndhwm, 0);
+    auto endpoint =
+        MakeRemoteAddress(config_->protocol(), config_->address(machine_id), config_->broker_ports(broker_id));
+    socket->connect(endpoint);
   }
-  return &it->second;
+  return socket;
 }
 
 }  // namespace slog

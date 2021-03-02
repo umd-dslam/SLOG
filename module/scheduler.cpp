@@ -63,9 +63,9 @@ void Scheduler::OnInternalRequestReceived(EnvelopePtr&& env) {
 
 // Handle responses from the workers
 bool Scheduler::OnCustomSocket() {
-  auto& worker_socket = GetCustomSocket(0); 
+  auto& worker_socket = GetCustomSocket(0);
   auto max_txns = config_->scheduler_max_txns();
-  
+
   do {
     zmq::message_t msg;
     while (worker_socket.recv(msg, zmq::recv_flags::dontwait)) {

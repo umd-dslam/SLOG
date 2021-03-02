@@ -8,7 +8,6 @@ namespace slog {
 
 const auto kModuleTimeout = 1000ms;
 
-const Channel kBrokerChannel = 0;
 const Channel kServerChannel = 1;
 const Channel kForwarderChannel = 2;
 const Channel kSequencerChannel = 3;
@@ -18,8 +17,9 @@ const Channel kSchedulerChannel = 6;
 const Channel kLocalPaxos = 7;
 const Channel kGlobalPaxos = 8;
 const Channel kWorkerChannel = 9;
-// Always set to the last channel + 1
-const Channel kMaxChannel = 10;
+// Broker channels range from kBrokerChannel to kMaxChannel - 1
+const Channel kBrokerChannel = 10;
+const Channel kMaxChannel = 15;
 
 const uint32_t kMaxNumMachines = 1000;
 

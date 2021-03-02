@@ -30,7 +30,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   string addr = "/tmp/test_" + prefix;
 
   common_config.set_protocol("ipc");
-  common_config.set_broker_port(0);
+  common_config.add_broker_ports(0);
   common_config.set_num_partitions(num_partitions);
   common_config.mutable_hash_partitioning()->set_partition_key_num_bytes(1);
   common_config.set_sequencer_batch_duration(1);
@@ -52,7 +52,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
       common_config.set_server_port(dis(re));
       int i = rep * num_partitions + part;
       string local_addr = addr + to_string(i);
-      configs.push_back(std::make_shared<Configuration>(common_config, local_addr, rep, part));
+      configs.push_back(std::make_shared<Configuration>(common_config, local_addr));
     }
   }
 
@@ -142,10 +142,10 @@ zmq::pollitem_t TestSlog::GetPollItemForChannel(Channel channel) {
           ZMQ_POLLIN, 0 /* revent */};
 }
 
-unique_ptr<Sender> TestSlog::NewSender() { return std::make_unique<Sender>(broker_); }
+unique_ptr<Sender> TestSlog::NewSender() { return std::make_unique<Sender>(broker_->config(), broker_->context()); }
 
 void TestSlog::StartInNewThreads() {
-  broker_->StartInNewThread();
+  broker_->StartInNewThreads();
   if (server_) {
     server_->StartInNewThread();
     string endpoint = "tcp://localhost:" + to_string(config_->server_port());

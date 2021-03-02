@@ -24,7 +24,7 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
       context_(broker->context()),
       channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
-      sender_(broker),
+      sender_(broker->config(), broker->context()),
       poller_(poll_timeout),
       recv_retries_(0) {
   broker->AddChannel(channel_, chopt.recv_raw);

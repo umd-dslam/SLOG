@@ -37,7 +37,7 @@ inline void TraceTxnEvent(TxnOrBatch txn, TransactionEvent event) {
 }
 
 #ifdef ENABLE_TRACING
-#define INIT_TRACING(config) InitializeTracing(config)
+#define INIT_TRACING(config) slog::InitializeTracing(config)
 #define TRACE(txn, event) TraceTxnEvent(txn, event)
 #else
 #define INIT_TRACING(config)

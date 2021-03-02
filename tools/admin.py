@@ -7,7 +7,6 @@ starting a cluster, stopping a cluster, getting status, and more.
 import collections
 import ipaddress
 import itertools
-import json
 import logging
 import os
 import shutil
@@ -16,7 +15,6 @@ import time
 import docker
 import google.protobuf.text_format as text_format
 
-from argparse import ArgumentParser
 from datetime import datetime
 from multiprocessing.dummy import Pool
 from typing import Dict, List, Tuple
@@ -342,8 +340,6 @@ class StartCommand(AdminCommand):
                 f"slog "
                 f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
                 f"--address {addr} "
-                f"--replica {rep} "
-                f"--partition {part} "
                 f"--data-dir {CONTAINER_DATA_DIR} "
             )
             client.containers.run(
@@ -649,8 +645,6 @@ class LocalCommand(AdminCommand):
                     f"slog "
                     f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
                     f"--address {addr} "
-                    f"--replica {r} "
-                    f"--partition {p} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
                 container_name = f"slog_{r}_{p}"

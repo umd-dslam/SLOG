@@ -56,10 +56,10 @@ class PaxosTest : public ::testing::Test {
   void AddAndStartNewPaxos(const ConfigurationPtr& config, const vector<MachineId>& members, MachineId me) {
     auto broker = Broker::New(config, kTestModuleTimeout);
     auto paxos = make_shared<TestSimulatedMultiPaxos>(broker, members, me);
-    auto sender = make_unique<Sender>(broker);
+    auto sender = make_unique<Sender>(broker->config(), broker->context());
     auto paxos_runner = new ModuleRunner(paxos);
 
-    broker->StartInNewThread();
+    broker->StartInNewThreads();
     paxos_runner->StartInNewThread();
 
     brokers_.emplace_back(broker);

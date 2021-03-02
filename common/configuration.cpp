@@ -8,6 +8,7 @@
 
 #include <fstream>
 
+#include "common/constants.h"
 #include "common/proto_utils.h"
 
 namespace slog {
@@ -30,8 +31,7 @@ using google::protobuf::io::FileInputStream;
 using google::protobuf::io::ZeroCopyInputStream;
 using std::string;
 
-ConfigurationPtr Configuration::FromFile(const string& file_path, const string& local_address, uint32_t local_replica,
-                                         uint32_t local_partition) {
+ConfigurationPtr Configuration::FromFile(const string& file_path, const string& local_address) {
   int fd = open(file_path.c_str(), O_RDONLY);
   if (fd < 0) {
     LOG(FATAL) << "Configuration file error: " << strerror(errno);
@@ -44,19 +44,26 @@ ConfigurationPtr Configuration::FromFile(const string& file_path, const string& 
   delete input;
   close(fd);
 
-  return std::make_shared<Configuration>(config, local_address, local_replica, local_partition);
+  return std::make_shared<Configuration>(config, local_address);
 }
 
-Configuration::Configuration(const internal::Configuration& config, const string& local_address, uint32_t local_replica,
-                             uint32_t local_partition)
-    : config_(config), local_address_(local_address), local_replica_(local_replica), local_partition_(local_partition) {
-  for (const auto& replica : config.replicas()) {
+Configuration::Configuration(const internal::Configuration& config, const string& local_address)
+    : config_(config), local_address_(local_address) {
+  for (int r = 0; r < config_.replicas_size(); r++) {
+    auto& replica = config.replicas(r);
     CHECK_EQ((uint32_t)replica.addresses_size(), config.num_partitions())
         << "Number of addresses in each replica must match number of partitions.";
-    for (const auto& addr : replica.addresses()) {
-      all_addresses_.push_back(addr);
+    for (int p = 0; p < replica.addresses_size(); p++) {
+      auto& address = replica.addresses(p);
+      all_addresses_.push_back(address);
+      if (address == local_address) {
+        local_replica_ = r;
+        local_partition_ = p;
+      }
     }
   }
+  CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
+      << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
 }
 
 const string& Configuration::protocol() const { return config_.protocol(); }
@@ -67,13 +74,16 @@ const string& Configuration::address(uint32_t replica, uint32_t partition) const
   return config_.replicas(replica).addresses(partition);
 }
 
+const string& Configuration::address(MachineId machine_id) const { return all_addresses_[machine_id]; }
+
 uint32_t Configuration::num_replicas() const { return config_.replicas_size(); }
 
 uint32_t Configuration::num_partitions() const { return config_.num_partitions(); }
 
 uint32_t Configuration::num_workers() const { return std::max(config_.num_workers(), 1U); }
 
-uint32_t Configuration::broker_port() const { return config_.broker_port(); }
+uint32_t Configuration::broker_ports(int i) const { return config_.broker_ports(i); }
+uint32_t Configuration::broker_ports_size() const { return config_.broker_ports_size(); }
 
 uint32_t Configuration::server_port() const { return config_.server_port(); }
 

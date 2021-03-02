@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Load the config
-  auto config = Configuration::FromFile(FLAGS_config, "", FLAGS_r);
+  auto config = Configuration::FromFile(FLAGS_config, "");
 
   // Setup zmq context
   zmq::context_t context;
@@ -96,9 +96,9 @@ int main(int argc, char* argv[]) {
     // Select the workload
     unique_ptr<Workload> workload;
     if (FLAGS_wl == "basic") {
-      workload = make_unique<BasicWorkload>(config, FLAGS_data_dir, FLAGS_params, seed + i);
+      workload = make_unique<BasicWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "remastering") {
-      workload = make_unique<RemasteringWorkload>(config, FLAGS_data_dir, FLAGS_params, seed + i);
+      workload = make_unique<RemasteringWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
     } else {
       LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
     }

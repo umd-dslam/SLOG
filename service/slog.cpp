@@ -24,8 +24,6 @@
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
-DEFINE_uint32(replica, 0, "Replica number of the local machine");
-DEFINE_uint32(partition, 0, "Partition number of the local machine");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 
 using slog::Broker;
@@ -114,6 +112,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
   for (auto& t : threads) {
     t.join();
   }
+  LOG(INFO) << "Finished data generation";
 }
 
 int main(int argc, char* argv[]) {
@@ -133,7 +132,7 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Remastering disabled";
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
-  auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address, FLAGS_replica, FLAGS_partition);
+  auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address);
   const auto& all_addresses = config->all_addresses();
   CHECK(std::find(all_addresses.begin(), all_addresses.end(), config->local_address()) != all_addresses.end())
       << "The configuration does not contain the provided "
@@ -183,8 +182,8 @@ int main(int argc, char* argv[]) {
   // New modules cannot be bound to the broker after it starts so start
   // the Broker only after it is used to initialized all modules above.
   auto cpu = config->pin_to_cpus() ? std::optional<int>(0) : std::nullopt;
-  broker->StartInNewThread(cpu);
-  cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;
+  auto num_brokers = broker->StartInNewThreads(cpu);
+  cpu = cpu.has_value() ? std::optional<int>(*cpu + num_brokers) : std::nullopt;
   for (auto& module : modules) {
     module->StartInNewThread(cpu);
     cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;

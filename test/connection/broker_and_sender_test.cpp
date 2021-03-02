@@ -46,11 +46,11 @@ TEST(BrokerAndSenderTest, PingPong) {
   auto ping = thread([&]() {
     auto broker = Broker::New(configs[0], kTestModuleTimeout);
     broker->AddChannel(PING);
-    broker->StartInNewThread();
+    broker->StartInNewThreads();
 
     auto recv_socket = MakePullSocket(*broker->context(), PING);
 
-    Sender sender(broker);
+    Sender sender(broker->config(), broker->context());
     // Send ping
     auto ping_req = MakeEchoRequest("ping");
     sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
@@ -66,11 +66,11 @@ TEST(BrokerAndSenderTest, PingPong) {
     // Set blocky to true to avoid exitting before sending the pong message
     auto broker = Broker::New(configs[1], kTestModuleTimeout, true);
     broker->AddChannel(PONG);
-    broker->StartInNewThread();
+    broker->StartInNewThreads();
 
     auto socket = MakePullSocket(*broker->context(), PONG);
 
-    Sender sender(broker);
+    Sender sender(broker->config(), broker->context());
 
     // Wait for ping
     auto req = RecvEnvelope(socket);
@@ -87,6 +87,59 @@ TEST(BrokerAndSenderTest, PingPong) {
   pong.join();
 }
 
+TEST(BrokerAndSenderTest, PingPongMultithreadedBroker) {
+  const Channel PING = 1;
+  const Channel PONG = 2;
+
+  internal::Configuration extra_config;
+  // Extra broker port so that we have multiple broker threads
+  extra_config.add_broker_ports(1);
+  ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2, extra_config);
+
+  auto ping = thread([&]() {
+    auto broker = Broker::New(configs[0], kTestModuleTimeout);
+    broker->AddChannel(PING);
+    broker->StartInNewThreads();
+
+    auto recv_socket = MakePullSocket(*broker->context(), PING);
+
+    Sender sender(broker->config(), broker->context());
+    // Send ping
+    auto ping_req = MakeEchoRequest("ping");
+    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG, 0 /* via broker */);
+
+    // Wait for pong
+    auto res = RecvEnvelope(recv_socket);
+    ASSERT_TRUE(res != nullptr);
+    ASSERT_TRUE(res->has_response());
+    ASSERT_EQ("pong", res->response().echo().data());
+  });
+
+  auto pong = thread([&]() {
+    // Set blocky to true to avoid exitting before sending the pong message
+    auto broker = Broker::New(configs[1], kTestModuleTimeout, true);
+    broker->AddChannel(PONG);
+    broker->StartInNewThreads();
+
+    auto socket = MakePullSocket(*broker->context(), PONG);
+
+    Sender sender(broker->config(), broker->context());
+
+    // Wait for ping
+    auto req = RecvEnvelope(socket);
+    ASSERT_TRUE(req != nullptr);
+    ASSERT_TRUE(req->has_request());
+    ASSERT_EQ("ping", req->request().echo().data());
+
+    // Send pong
+    auto pong_res = MakeEchoResponse("pong");
+    sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING, 1 /* via broker */);
+  });
+
+  ping.join();
+  pong.join();
+}
+
 TEST(BrokerTest, LocalPingPong) {
   const Channel PING = 1;
   const Channel PONG = 2;
@@ -95,10 +148,10 @@ TEST(BrokerTest, LocalPingPong) {
   broker->AddChannel(PING);
   broker->AddChannel(PONG);
 
-  broker->StartInNewThread();
+  broker->StartInNewThreads();
 
   auto ping = thread([&]() {
-    Sender sender(broker);
+    Sender sender(broker->config(), broker->context());
     auto socket = MakePullSocket(*broker->context(), PING);
 
     // Send ping
@@ -111,7 +164,7 @@ TEST(BrokerTest, LocalPingPong) {
   });
 
   auto pong = thread([&]() {
-    Sender sender(broker);
+    Sender sender(broker->config(), broker->context());
     auto socket = MakePullSocket(*broker->context(), PONG);
 
     // Wait for ping
@@ -136,11 +189,11 @@ TEST(BrokerTest, MultiSend) {
   auto ping = thread([&]() {
     auto broker = Broker::New(configs[0], kTestModuleTimeout);
     broker->AddChannel(PING);
-    broker->StartInNewThread();
+    broker->StartInNewThreads();
 
     auto socket = MakePullSocket(*broker->context(), PING);
 
-    Sender sender(broker);
+    Sender sender(broker->config(), broker->context());
     // Send ping
     auto ping_req = MakeEchoRequest("ping");
     vector<MachineId> dests;
@@ -163,11 +216,11 @@ TEST(BrokerTest, MultiSend) {
     pongs[i] = thread([&configs, i]() {
       auto broker = Broker::New(configs[i + 1], kTestModuleTimeout);
       broker->AddChannel(PONG);
-      broker->StartInNewThread();
+      broker->StartInNewThreads();
 
       auto socket = MakePullSocket(*broker->context(), PONG);
 
-      Sender sender(broker);
+      Sender sender(broker->config(), broker->context());
 
       // Wait for ping
       auto req = RecvEnvelope(socket);
@@ -199,8 +252,8 @@ TEST(BrokerTest, CreateRedirection) {
   auto ping_broker = Broker::New(configs[0], kTestModuleTimeout);
   auto ping_socket = MakePullSocket(*ping_broker->context(), PING);
   ping_broker->AddChannel(PING);
-  ping_broker->StartInNewThread();
-  Sender ping_sender(ping_broker);
+  ping_broker->StartInNewThreads();
+  Sender ping_sender(ping_broker->config(), ping_broker->context());
 
   // Establish a redirection from TAG to the PING channel at the ping machine.
   // We do it early so that hopefully the redirection is established by the time
@@ -217,8 +270,8 @@ TEST(BrokerTest, CreateRedirection) {
   auto pong_broker = Broker::New(configs[1], kTestModuleTimeout);
   auto pong_socket = MakePullSocket(*pong_broker->context(), PONG);
   pong_broker->AddChannel(PONG);
-  pong_broker->StartInNewThread();
-  Sender pong_sender(pong_broker);
+  pong_broker->StartInNewThreads();
+  Sender pong_sender(pong_broker->config(), pong_broker->context());
 
   // Send ping message with a tag of the pong machine.
   {
@@ -274,15 +327,15 @@ TEST(BrokerTest, RemoveRedirection) {
   auto ping_broker = Broker::New(configs[0], kTestModuleTimeout);
   auto ping_socket = MakePullSocket(*ping_broker->context(), PING);
   ping_broker->AddChannel(PING);
-  ping_broker->StartInNewThread();
-  Sender ping_sender(ping_broker);
+  ping_broker->StartInNewThreads();
+  Sender ping_sender(ping_broker->config(), ping_broker->context());
 
   // Initialize pong machine
   auto pong_broker = Broker::New(configs[1], kTestModuleTimeout);
   auto pong_socket = MakePullSocket(*pong_broker->context(), PONG);
   pong_broker->AddChannel(PONG);
-  pong_broker->StartInNewThread();
-  Sender pong_sender(pong_broker);
+  pong_broker->StartInNewThreads();
+  Sender pong_sender(pong_broker->config(), pong_broker->context());
 
   // Establish a redirection from TAG to the PONG channel at the pong machine
   {
