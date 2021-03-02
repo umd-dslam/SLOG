@@ -140,6 +140,7 @@ protobuf_generate_cpp(PROTO_CPP_SRCS PROTO_CPP_HEADERS
   ${PROTO_PREFIX}/configuration.proto
   ${PROTO_PREFIX}/internal.proto
   ${PROTO_PREFIX}/offline_data.proto
+  ${PROTO_PREFIX}/modules.proto
   ${PROTO_PREFIX}/transaction.proto)
 add_library(proto ${PROTO_CPP_SRCS} ${PROTO_CPP_HEADERS})
 target_include_directories(proto PUBLIC ${CMAKE_BINARY_DIR})

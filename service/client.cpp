@@ -117,7 +117,7 @@ void ExecuteTxn(const char* txn_file) {
     } else
 
 struct StatsModule {
-  api::StatsModule api_enum;
+  ModuleId api_enum;
   function<void(const rapidjson::Document&, uint32_t level)> print_func;
 };
 
@@ -301,11 +301,11 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
 }
 
 const unordered_map<string, StatsModule> STATS_MODULES = {
-    {"server", {api::StatsModule::SERVER, PrintServerStats}},
-    {"forwarder", {api::StatsModule::FORWARDER, PrintForwarderStats}},
-    {"mhorderer", {api::StatsModule::MHORDERER, PrintMHOrdererStats}},
-    {"sequencer", {api::StatsModule::SEQUENCER, PrintSequencerStats}},
-    {"scheduler", {api::StatsModule::SCHEDULER, PrintSchedulerStats}}};
+    {"server", {ModuleId::SERVER, PrintServerStats}},
+    {"forwarder", {ModuleId::FORWARDER, PrintForwarderStats}},
+    {"mhorderer", {ModuleId::MHORDERER, PrintMHOrdererStats}},
+    {"sequencer", {ModuleId::SEQUENCER, PrintSequencerStats}},
+    {"scheduler", {ModuleId::SCHEDULER, PrintSchedulerStats}}};
 
 void ExecuteStats(const char* module, uint32_t level) {
   auto stats_module_it = STATS_MODULES.find(string(module));

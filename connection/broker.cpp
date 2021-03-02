@@ -183,26 +183,29 @@ void Broker::AddChannel(Channel chan, bool send_raw) {
   channels_.emplace_back(chan, send_raw);
 }
 
-int Broker::StartInNewThreads(std::optional<uint32_t> starting_cpu) {
+void Broker::StartInNewThreads() {
   DCHECK(!running_) << "Broker is already running";
   if (running_) {
-    return threads_.size();
+    return;
   }
   running_ = true;
 
   auto binding_addr = config_->protocol() == "tcp" ? "*" : config_->local_address();
-  auto cpu = starting_cpu;
+  auto cpus = config_->cpu_pinnings(ModuleId::BROKER);
   for (size_t i = 0; i < config_->broker_ports_size(); i++) {
     auto internal_endpoint = MakeInProcChannelAddress(MakeChannel(i));
     auto external_endpoint = MakeRemoteAddress(config_->protocol(), binding_addr, config_->broker_ports(i));
+
     auto& t = threads_.emplace_back(
         MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint, channels_, poll_timeout_ms_));
-    t->StartInNewThread(cpu);
-    if (cpu.has_value()) {
-      cpu = cpu.value() + 1;
+
+    std::optional<uint32_t> cpu = {};
+    if (i < cpus.size()) {
+      cpu = cpus[i];
     }
+
+    t->StartInNewThread(cpu);
   }
-  return threads_.size();
 }
 
 void Broker::Stop() {

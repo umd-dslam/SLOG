@@ -1,0 +1,15 @@
+syntax = "proto3";
+package slog;
+
+enum ModuleId {
+  BROKER = 0;
+  SERVER = 1;
+  MHORDERER = 2;
+  LOCALPAXOS = 3;
+  GLOBALPAXOS = 4;
+  FORWARDER = 5;
+  SEQUENCER = 6;
+  INTERLEAVER = 7;
+  SCHEDULER = 8;
+  WORKER = 9;
+}

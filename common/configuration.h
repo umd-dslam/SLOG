@@ -60,7 +60,7 @@ class Configuration {
   uint32_t replication_delay_amount_ms() const;
   vector<TransactionEvent> disabled_tracing_events() const;
   bool bypass_mh_orderer() const;
-  bool pin_to_cpus() const;
+  vector<int> cpu_pinnings(ModuleId module) const;
   bool return_dummy_txn() const;
   bool do_not_clean_up_txn() const;
 

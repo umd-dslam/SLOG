@@ -11,6 +11,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from proto import modules_pb2 as proto_dot_modules__pb2
 from proto import transaction_pb2 as proto_dot_transaction__pb2
 
 
@@ -20,9 +21,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\x1a\x17proto/transaction.proto\"D\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\x12&\n\x07\x63lients\x18\x02 \x03(\x0b\x32\x15.slog.internal.Client\"(\n\x06\x43lient\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0c\x12\r\n\x05procs\x18\x02 \x01(\r\"H\n\x1aReplicationDelayExperiment\x12\x11\n\tdelay_pct\x18\x01 \x01(\r\x12\x17\n\x0f\x64\x65lay_amount_ms\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"D\n\x12SimplePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"\xd9\x05\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x14\n\x0c\x62roker_ports\x18\x03 \x03(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12@\n\x13simple_partitioning\x18\x07 \x01(\x0b\x32!.slog.internal.SimplePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12 \n\x18\x66orwarder_batch_duration\x18\t \x01(\x04\x12 \n\x18\x66orwarder_max_batch_size\x18\n \x01(\x05\x12 \n\x18sequencer_batch_duration\x18\x0b \x01(\x04\x12 \n\x18sequencer_max_batch_size\x18\x0c \x01(\x05\x12\x1a\n\x12scheduler_max_txns\x18\r \x01(\r\x12\x1a\n\x12replication_factor\x18\x0e \x01(\r\x12\x44\n\x11replication_delay\x18\x0f \x01(\x0b\x32).slog.internal.ReplicationDelayExperiment\x12\x37\n\x17\x64isabled_tracing_events\x18\x10 \x03(\x0e\x32\x16.slog.TransactionEvent\x12\x19\n\x11\x62ypass_mh_orderer\x18\x11 \x01(\x08\x12\x13\n\x0bpin_to_cpus\x18\x12 \x01(\x08\x12\x18\n\x10return_dummy_txn\x18\x13 \x01(\x08\x12\x1b\n\x13\x64o_not_clean_up_txn\x18\x14 \x01(\x08\x42\x0e\n\x0cpartitioningb\x06proto3'
+  serialized_pb=b'\n\x19proto/configuration.proto\x12\rslog.internal\x1a\x13proto/modules.proto\x1a\x17proto/transaction.proto\"D\n\x07Replica\x12\x11\n\taddresses\x18\x01 \x03(\x0c\x12&\n\x07\x63lients\x18\x02 \x03(\x0b\x32\x15.slog.internal.Client\"(\n\x06\x43lient\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0c\x12\r\n\x05procs\x18\x02 \x01(\r\"H\n\x1aReplicationDelayExperiment\x12\x11\n\tdelay_pct\x18\x01 \x01(\r\x12\x17\n\x0f\x64\x65lay_amount_ms\x18\x02 \x01(\r\"3\n\x10HashPartitioning\x12\x1f\n\x17partition_key_num_bytes\x18\x01 \x01(\r\"D\n\x12SimplePartitioning\x12\x13\n\x0bnum_records\x18\x01 \x01(\x04\x12\x19\n\x11record_size_bytes\x18\x02 \x01(\r\"9\n\nCpuPinning\x12\x1e\n\x06module\x18\x01 \x01(\x0e\x32\x0e.slog.ModuleId\x12\x0b\n\x03\x63pu\x18\x02 \x01(\r\"\xf5\x05\n\rConfiguration\x12\x10\n\x08protocol\x18\x01 \x01(\x0c\x12(\n\x08replicas\x18\x02 \x03(\x0b\x32\x16.slog.internal.Replica\x12\x14\n\x0c\x62roker_ports\x18\x03 \x03(\r\x12\x13\n\x0bserver_port\x18\x04 \x01(\r\x12\x16\n\x0enum_partitions\x18\x05 \x01(\r\x12<\n\x11hash_partitioning\x18\x06 \x01(\x0b\x32\x1f.slog.internal.HashPartitioningH\x00\x12@\n\x13simple_partitioning\x18\x07 \x01(\x0b\x32!.slog.internal.SimplePartitioningH\x00\x12\x13\n\x0bnum_workers\x18\x08 \x01(\r\x12 \n\x18\x66orwarder_batch_duration\x18\t \x01(\x04\x12 \n\x18\x66orwarder_max_batch_size\x18\n \x01(\x05\x12 \n\x18sequencer_batch_duration\x18\x0b \x01(\x04\x12 \n\x18sequencer_max_batch_size\x18\x0c \x01(\x05\x12\x1a\n\x12scheduler_max_txns\x18\r \x01(\r\x12\x1a\n\x12replication_factor\x18\x0e \x01(\r\x12\x44\n\x11replication_delay\x18\x0f \x01(\x0b\x32).slog.internal.ReplicationDelayExperiment\x12\x37\n\x17\x64isabled_tracing_events\x18\x10 \x03(\x0e\x32\x16.slog.TransactionEvent\x12\x19\n\x11\x62ypass_mh_orderer\x18\x11 \x01(\x08\x12/\n\x0c\x63pu_pinnings\x18\x12 \x03(\x0b\x32\x19.slog.internal.CpuPinning\x12\x18\n\x10return_dummy_txn\x18\x13 \x01(\x08\x12\x1b\n\x13\x64o_not_clean_up_txn\x18\x14 \x01(\x08\x42\x0e\n\x0cpartitioningb\x06proto3'
   ,
-  dependencies=[proto_dot_transaction__pb2.DESCRIPTOR,])
+  dependencies=[proto_dot_modules__pb2.DESCRIPTOR,proto_dot_transaction__pb2.DESCRIPTOR,])
 
 
 
@@ -61,8 +62,8 @@ _REPLICA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=69,
-  serialized_end=137,
+  serialized_start=90,
+  serialized_end=158,
 )
 
 
@@ -100,8 +101,8 @@ _CLIENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=139,
-  serialized_end=179,
+  serialized_start=160,
+  serialized_end=200,
 )
 
 
@@ -139,8 +140,8 @@ _REPLICATIONDELAYEXPERIMENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=181,
-  serialized_end=253,
+  serialized_start=202,
+  serialized_end=274,
 )
 
 
@@ -171,8 +172,8 @@ _HASHPARTITIONING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=255,
-  serialized_end=306,
+  serialized_start=276,
+  serialized_end=327,
 )
 
 
@@ -210,8 +211,47 @@ _SIMPLEPARTITIONING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=308,
-  serialized_end=376,
+  serialized_start=329,
+  serialized_end=397,
+)
+
+
+_CPUPINNING = _descriptor.Descriptor(
+  name='CpuPinning',
+  full_name='slog.internal.CpuPinning',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='module', full_name='slog.internal.CpuPinning.module', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='cpu', full_name='slog.internal.CpuPinning.cpu', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=399,
+  serialized_end=456,
 )
 
 
@@ -343,9 +383,9 @@ _CONFIGURATION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pin_to_cpus', full_name='slog.internal.Configuration.pin_to_cpus', index=17,
-      number=18, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
+      name='cpu_pinnings', full_name='slog.internal.Configuration.cpu_pinnings', index=17,
+      number=18, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -380,16 +420,18 @@ _CONFIGURATION = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=379,
-  serialized_end=1108,
+  serialized_start=459,
+  serialized_end=1216,
 )
 
 _REPLICA.fields_by_name['clients'].message_type = _CLIENT
+_CPUPINNING.fields_by_name['module'].enum_type = proto_dot_modules__pb2._MODULEID
 _CONFIGURATION.fields_by_name['replicas'].message_type = _REPLICA
 _CONFIGURATION.fields_by_name['hash_partitioning'].message_type = _HASHPARTITIONING
 _CONFIGURATION.fields_by_name['simple_partitioning'].message_type = _SIMPLEPARTITIONING
 _CONFIGURATION.fields_by_name['replication_delay'].message_type = _REPLICATIONDELAYEXPERIMENT
 _CONFIGURATION.fields_by_name['disabled_tracing_events'].enum_type = proto_dot_transaction__pb2._TRANSACTIONEVENT
+_CONFIGURATION.fields_by_name['cpu_pinnings'].message_type = _CPUPINNING
 _CONFIGURATION.oneofs_by_name['partitioning'].fields.append(
   _CONFIGURATION.fields_by_name['hash_partitioning'])
 _CONFIGURATION.fields_by_name['hash_partitioning'].containing_oneof = _CONFIGURATION.oneofs_by_name['partitioning']
@@ -401,6 +443,7 @@ DESCRIPTOR.message_types_by_name['Client'] = _CLIENT
 DESCRIPTOR.message_types_by_name['ReplicationDelayExperiment'] = _REPLICATIONDELAYEXPERIMENT
 DESCRIPTOR.message_types_by_name['HashPartitioning'] = _HASHPARTITIONING
 DESCRIPTOR.message_types_by_name['SimplePartitioning'] = _SIMPLEPARTITIONING
+DESCRIPTOR.message_types_by_name['CpuPinning'] = _CPUPINNING
 DESCRIPTOR.message_types_by_name['Configuration'] = _CONFIGURATION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -438,6 +481,13 @@ SimplePartitioning = _reflection.GeneratedProtocolMessageType('SimplePartitionin
   # @@protoc_insertion_point(class_scope:slog.internal.SimplePartitioning)
   })
 _sym_db.RegisterMessage(SimplePartitioning)
+
+CpuPinning = _reflection.GeneratedProtocolMessageType('CpuPinning', (_message.Message,), {
+  'DESCRIPTOR' : _CPUPINNING,
+  '__module__' : 'proto.configuration_pb2'
+  # @@protoc_insertion_point(class_scope:slog.internal.CpuPinning)
+  })
+_sym_db.RegisterMessage(CpuPinning)
 
 Configuration = _reflection.GeneratedProtocolMessageType('Configuration', (_message.Message,), {
   'DESCRIPTOR' : _CONFIGURATION,

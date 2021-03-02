@@ -158,18 +158,18 @@ int main(int argc, char* argv[]) {
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
-  vector<unique_ptr<slog::ModuleRunner>> modules;
-  modules.push_back(MakeRunnerFor<slog::Server>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::LocalPaxos>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage));
-  modules.push_back(MakeRunnerFor<slog::Sequencer>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Interleaver>(config, broker));
-  modules.push_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage));
+  vector<pair<unique_ptr<slog::ModuleRunner>, slog::ModuleId>> modules;
+  modules.emplace_back(MakeRunnerFor<slog::Server>(config, broker), slog::ModuleId::SERVER);
+  modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker), slog::ModuleId::MHORDERER);
+  modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(config, broker), slog::ModuleId::LOCALPAXOS);
+  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage), slog::ModuleId::FORWARDER);
+  modules.emplace_back(MakeRunnerFor<slog::Sequencer>(config, broker), slog::ModuleId::SEQUENCER);
+  modules.emplace_back(MakeRunnerFor<slog::Interleaver>(config, broker), slog::ModuleId::INTERLEAVER);
+  modules.emplace_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage), slog::ModuleId::SCHEDULER);
 
   // One region is selected to globally order the multihome batches
   if (config->leader_replica_for_multi_home_ordering() == config->local_replica()) {
-    modules.push_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker));
+    modules.emplace_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker), slog::ModuleId::GLOBALPAXOS);
   }
 
   // Block SIGINT from here so that the new threads inherit the block mask
@@ -180,12 +180,13 @@ int main(int argc, char* argv[]) {
 
   // New modules cannot be bound to the broker after it starts so start
   // the Broker only after it is used to initialized all modules above.
-  auto cpu = config->pin_to_cpus() ? std::optional<int>(0) : std::nullopt;
-  auto num_brokers = broker->StartInNewThreads(cpu);
-  cpu = cpu.has_value() ? std::optional<int>(*cpu + num_brokers) : std::nullopt;
-  for (auto& module : modules) {
+  broker->StartInNewThreads();
+  for (auto& [module, id] : modules) {
+    std::optional<uint32_t> cpu;
+    if (auto cpus = config->cpu_pinnings(id); !cpus.empty()) {
+      cpu = cpus.front();
+    }
     module->StartInNewThread(cpu);
-    cpu = cpu.has_value() ? std::optional<int>(*cpu + 1) : std::nullopt;
   }
 
   // Suspense this thread until receiving SIGINT
@@ -194,7 +195,7 @@ int main(int argc, char* argv[]) {
 
   // Shutdown all threads
   for (auto& module : modules) {
-    module->Stop();
+    module.first->Stop();
   }
   broker->Stop();
 

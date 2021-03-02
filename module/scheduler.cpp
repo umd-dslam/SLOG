@@ -31,12 +31,14 @@ Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& b
 }
 
 void Scheduler::Initialize() {
-  auto cpu = config_->pin_to_cpus() ? std::optional<int>(kWorkerChannel) : std::nullopt;
+  auto cpus = config_->cpu_pinnings(ModuleId::WORKER);
+  size_t i = 0;
   for (auto& worker : workers_) {
-    worker->StartInNewThread(cpu);
-    if (cpu.has_value()) {
-      cpu = std::optional<int>(*cpu + 1);
+    std::optional<uint32_t> cpu = {};
+    if (i < cpus.size()) {
+      cpu = cpus[i++];
     }
+    worker->StartInNewThread(cpu);
   }
 
   zmq::socket_t worker_socket(*context(), ZMQ_DEALER);

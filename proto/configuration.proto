@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "proto/modules.proto";
 import "proto/transaction.proto";
 
 package slog.internal;
@@ -62,6 +63,11 @@ message SimplePartitioning {
     uint32 record_size_bytes = 2;
 }
 
+message CpuPinning {
+    ModuleId module = 1;
+    uint32 cpu = 2;
+}
+
 /**
  * The schema of a configuration file.
  */
@@ -104,7 +110,7 @@ message Configuration {
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
     bool bypass_mh_orderer = 17;
     // Pin each module to a cpu
-    bool pin_to_cpus = 18;
+    repeated CpuPinning cpu_pinnings = 18;
     // Return dummy txns back to the client instead of full results
     bool return_dummy_txn = 19;
     // Do not deallocate txns in the worker

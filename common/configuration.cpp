@@ -182,7 +182,15 @@ vector<TransactionEvent> Configuration::disabled_tracing_events() const {
 
 bool Configuration::bypass_mh_orderer() const { return config_.bypass_mh_orderer(); }
 
-bool Configuration::pin_to_cpus() const { return config_.pin_to_cpus(); }
+vector<int> Configuration::cpu_pinnings(ModuleId module) const {
+  vector<int> cpus;
+  for (auto& entry : config_.cpu_pinnings()) {
+    if (entry.module() == module) {
+      cpus.push_back(entry.cpu());
+    }
+  }
+  return cpus;
+}
 
 bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn(); }
 

@@ -55,7 +55,7 @@ class Broker {
 
   static Channel MakeChannel(int broker_num) { return kBrokerChannel + broker_num; }
 
-  int StartInNewThreads(std::optional<uint32_t> starting_cpu = {});
+  void StartInNewThreads();
   void Stop();
 
   void AddChannel(Channel chan, bool send_raw = false);

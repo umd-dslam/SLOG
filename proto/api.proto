@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "proto/modules.proto";
 import "proto/transaction.proto";
 
 package slog.api;
@@ -20,16 +21,8 @@ message TransactionRequest {
     Transaction txn = 1;
 }
 
-enum StatsModule {
-    SERVER = 0;
-    FORWARDER = 1;
-    MHORDERER = 2;
-    SEQUENCER = 3;
-    SCHEDULER = 4;
-}
-
 message StatsRequest {
-    StatsModule module = 1;
+    ModuleId module = 1;
     // Level of details, starting from 0
     uint32 level = 2;
 }

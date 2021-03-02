@@ -114,19 +114,19 @@ bool Server::OnCustomSocket() {
 
       // Send to appropriate module based on provided information
       switch (request.stats().module()) {
-        case api::StatsModule::SERVER:
+        case ModuleId::SERVER:
           ProcessStatsRequest(env->request().stats());
           break;
-        case api::StatsModule::FORWARDER:
+        case ModuleId::FORWARDER:
           Send(move(env), kForwarderChannel);
           break;
-        case api::StatsModule::MHORDERER:
+        case ModuleId::MHORDERER:
           Send(move(env), kMultiHomeOrdererChannel);
           break;
-        case api::StatsModule::SEQUENCER:
+        case ModuleId::SEQUENCER:
           Send(move(env), kSequencerChannel);
           break;
-        case api::StatsModule::SCHEDULER:
+        case ModuleId::SCHEDULER:
           Send(move(env), kSchedulerChannel);
           break;
         default:
