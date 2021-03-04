@@ -200,11 +200,6 @@ void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn
   }
 }
 
-uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
-  std::uniform_int_distribution<> idx(0, txn.internal().involved_partitions_size() - 1);
-  return txn.internal().involved_partitions(idx(rg));
-}
-
 void MergeTransaction(Transaction& txn, const Transaction& other) {
   if (txn.internal().id() != other.internal().id()) {
     std::ostringstream oss;

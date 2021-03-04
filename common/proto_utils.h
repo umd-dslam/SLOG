@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <random>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -73,11 +72,6 @@ void PopulateInvolvedReplicas(Transaction& txn);
  * Populate the involved_partitions field in the transaction
  */
 void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn);
-
-/**
- * Pick a random partition among the involved partitions of a txn
- */
-uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg);
 
 /**
  * Merges the results of two transactions

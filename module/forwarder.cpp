@@ -20,6 +20,14 @@ namespace slog {
 using internal::Envelope;
 using internal::Request;
 using internal::Response;
+namespace {
+
+uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
+  std::uniform_int_distribution<> idx(0, txn.internal().involved_partitions_size() - 1);
+  return txn.internal().involved_partitions(idx(rg));
+}
+
+}  // namespace
 
 Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds poll_timeout)
@@ -52,6 +60,13 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->mutable_txn();
 
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
+
+  try {
+    PopulateInvolvedPartitions(config_, *txn);
+  } catch (std::invalid_argument& e) {
+    LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
+    return;
+  }
 
   bool need_remote_lookup = false;
   for (auto& [key, value] : *txn->mutable_keys()) {
