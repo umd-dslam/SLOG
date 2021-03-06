@@ -242,6 +242,8 @@ int main(int argc, char* argv[]) {
       if (!profiles) {
         throw std::runtime_error(std::string("Cannot open file: ") + file_name);
       }
+      profiles << "Workload: " << FLAGS_wl << "\nParams: " << FLAGS_params << "\nNum txns: " << FLAGS_txns
+               << "\nSending rate: " << FLAGS_rate << "\n";
       const int kCellWidth = 12;
       for (const auto& info : txn_infos) {
         profiles << *info.txn;
