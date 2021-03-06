@@ -38,6 +38,7 @@ void ModuleRunner::StartInNewThread(std::optional<uint32_t> cpu) {
   }
   running_ = true;
   thread_ = std::thread(&ModuleRunner::Run, this);
+  SetThreadName(thread_.native_handle(), module_->name().c_str());
   if (cpu.has_value()) {
     PinToCpu(thread_.native_handle(), cpu.value());
     LOG(INFO) << module_->name() << " - pinned to CPU " << cpu.value();
