@@ -19,7 +19,7 @@ class SimpleRemasterManager : public RemasterManager {
   SimpleRemasterManager() = default;
   SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
 
-  VerifyMasterResult VerifyMaster(const Transaction& txn) final;
+  VerifyMasterResult VerifyMaster(Transaction& txn) final;
   RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) final;
   RemasterOccurredResult ReleaseTransaction(const Transaction& txn_holder) final;
 
@@ -35,7 +35,7 @@ class SimpleRemasterManager : public RemasterManager {
   shared_ptr<const Storage<Key, Record>> storage_;
 
   // One queue is kept per local log
-  unordered_map<uint32_t, list<const Transaction*>> blocked_queue_;
+  unordered_map<uint32_t, list<Transaction*>> blocked_queue_;
 };
 
 }  // namespace slog

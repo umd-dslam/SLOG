@@ -15,8 +15,8 @@ namespace slog {
 
 enum class VerifyMasterResult { VALID, WAITING, ABORT };
 struct RemasterOccurredResult {
-  list<const Transaction*> unblocked;
-  list<const Transaction*> should_abort;
+  list<Transaction*> unblocked;
+  list<Transaction*> should_abort;
 };
 
 /**
@@ -40,7 +40,7 @@ class RemasterManager {
    * - If Aborted, the counters were behind and the transaction
    * needs to be aborted.
    */
-  virtual VerifyMasterResult VerifyMaster(const Transaction& txn) = 0;
+  virtual VerifyMasterResult VerifyMaster(Transaction& txn) = 0;
 
   /**
    * Updates the queue of transactions waiting for remasters,

@@ -9,7 +9,7 @@ namespace slog {
 PerKeyRemasterManager::PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
     : storage_(storage) {}
 
-VerifyMasterResult PerKeyRemasterManager::VerifyMaster(const Transaction& txn) {
+VerifyMasterResult PerKeyRemasterManager::VerifyMaster(Transaction& txn) {
   if (txn.keys().empty()) {
     // None of the keys in this txn are in this partition
     return VerifyMasterResult::VALID;
@@ -75,7 +75,7 @@ RemasterOccurredResult PerKeyRemasterManager::ReleaseTransaction(const Transacti
   return result;
 }
 
-void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter, const Transaction& txn) {
+void PerKeyRemasterManager::InsertIntoBlockedQueue(const Key& key, const uint32_t counter, Transaction& txn) {
   auto entry = make_pair(&txn, counter);
 
   // Iterate until at end or counter is smaller than next element. Maintains priority queue
