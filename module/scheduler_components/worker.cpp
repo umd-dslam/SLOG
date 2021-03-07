@@ -72,6 +72,13 @@ void Worker::OnInternalRequestReceived(EnvelopePtr&& env) {
   if (state.remote_reads_waiting_on == 0) {
     if (state.phase == TransactionState::Phase::WAIT_REMOTE_READ) {
       state.phase = TransactionState::Phase::EXECUTE;
+
+      // Remove the redirection at broker for this txn
+      auto redirect_env = NewEnvelope();
+      redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
+      redirect_env->mutable_request()->mutable_broker_redirect()->set_stop(true);
+      Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
+
       VLOG(3) << "Execute txn " << txn_id << " after receving all remote read results";
     } else {
       LOG(FATAL) << "Invalid phase";
@@ -101,12 +108,6 @@ bool Worker::OnCustomSocket() {
   DCHECK(ok) << "Transaction " << txn_id << " has already been dispatched to this worker";
 
   iter->second.phase = TransactionState::Phase::READ_LOCAL_STORAGE;
-
-  // Establish a redirection at broker for this txn so that we can receive remote reads
-  auto redirect_env = NewEnvelope();
-  redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
-  redirect_env->mutable_request()->mutable_broker_redirect()->set_channel(channel());
-  Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
 
   VLOG(3) << "Initialized state for txn " << txn_id;
 
@@ -206,6 +207,12 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
     VLOG(3) << "Execute txn " << txn_id << " without remote reads";
     state.phase = TransactionState::Phase::EXECUTE;
   } else {
+    // Establish a redirection at broker for this txn so that we can receive remote reads
+    auto redirect_env = NewEnvelope();
+    redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
+    redirect_env->mutable_request()->mutable_broker_redirect()->set_channel(channel());
+    Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
+
     VLOG(3) << "Defer executing txn " << txn_id << " until having enough remote reads";
     state.phase = TransactionState::Phase::WAIT_REMOTE_READ;
   }
@@ -297,12 +304,6 @@ void Worker::Finish(TxnId txn_id) {
   *msg.data<TxnId>() = txn_id;
   GetCustomSocket(0).send(msg, zmq::send_flags::none);
 
-  // Remove the redirection at broker for this txn
-  auto redirect_env = NewEnvelope();
-  redirect_env->mutable_request()->mutable_broker_redirect()->set_tag(txn_id);
-  redirect_env->mutable_request()->mutable_broker_redirect()->set_stop(true);
-  Send(move(redirect_env), Broker::MakeChannel(config_->broker_ports_size() - 1));
-
   // Done with this txn. Remove it from the state map
   txn_states_.erase(txn_id);
 
@@ -367,7 +368,7 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   completed_sub_txn->set_allocated_txn(txn);
   Send(env, txn->internal().coordinating_server(), kServerChannel);
 
-  if (!config_->do_not_clean_up_txn()) {
+  if (config_->do_not_clean_up_txn()) {
     // This is an intentional memory leak
     completed_sub_txn->release_txn();
   }
