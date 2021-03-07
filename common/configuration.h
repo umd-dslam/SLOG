@@ -63,6 +63,7 @@ class Configuration {
   vector<int> cpu_pinnings(ModuleId module) const;
   bool return_dummy_txn() const;
   bool do_not_clean_up_txn() const;
+  int recv_retries() const;
 
  private:
   internal::Configuration config_;

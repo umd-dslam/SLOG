@@ -68,6 +68,7 @@ class NetworkedModule : public Module {
   std::vector<zmq::socket_t> custom_sockets_;
   Sender sender_;
   Poller poller_;
+  int recv_retries_start_;
   int recv_retries_;
   std::string debug_info_;
 

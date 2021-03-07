@@ -26,6 +26,7 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker->config(), broker->context()),
       poller_(poll_timeout),
+      recv_retries_start_(broker->config()->recv_retries()),
       recv_retries_(0) {
   broker->AddChannel(channel_, chopt.recv_raw);
   pull_socket_.bind(MakeInProcChannelAddress(channel_));
@@ -63,12 +64,8 @@ void NetworkedModule::SetUp() {
 }
 
 bool NetworkedModule::Loop() {
-  if (!poller_.NextEvent(recv_retries_ > 0)) {
+  if (!poller_.NextEvent(recv_retries_ > 0 /* dont_wait */)) {
     return false;
-  }
-
-  if (recv_retries_ <= 0) {
-    recv_retries_ = kRecvRetries;
   }
 
   // Message from pull socket
@@ -76,6 +73,8 @@ bool NetworkedModule::Loop() {
 #ifdef ENABLE_WORK_MEASURING
     auto start = std::chrono::steady_clock::now();
 #endif
+    recv_retries_ = recv_retries_start_;
+
     EnvelopePtr env;
     if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
       env.reset(new Envelope());
@@ -99,12 +98,14 @@ bool NetworkedModule::Loop() {
 
 #ifdef ENABLE_WORK_MEASURING
   auto start = std::chrono::steady_clock::now();
-  if (OnCustomSocket()) {
-    work_ += (std::chrono::steady_clock::now() - start).count();
-  }
-#else
-  OnCustomSocket();
 #endif
+  if (OnCustomSocket()) {
+    recv_retries_ = recv_retries_start_;
+
+#ifdef ENABLE_WORK_MEASURING
+    work_ += (std::chrono::steady_clock::now() - start).count();
+#endif
+  }
 
   if (recv_retries_ > 0) {
     recv_retries_--;

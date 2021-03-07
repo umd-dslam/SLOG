@@ -196,4 +196,6 @@ bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn()
 
 bool Configuration::do_not_clean_up_txn() const { return config_.do_not_clean_up_txn(); }
 
+int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1000 : config_.recv_retries(); }
+
 }  // namespace slog

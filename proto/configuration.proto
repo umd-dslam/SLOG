@@ -115,4 +115,6 @@ message Configuration {
     bool return_dummy_txn = 19;
     // Do not deallocate txns in the worker
     bool do_not_clean_up_txn = 20;
+    // Number of retries after receiving something
+    int32 recv_retries = 21;
 }
