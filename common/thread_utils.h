@@ -7,9 +7,7 @@
 
 namespace slog {
 
-inline void SetThreadName(pthread_t thread, const char* name) {
-  pthread_setname_np(thread, name);
-}
+inline void SetThreadName(pthread_t thread, const char* name) { pthread_setname_np(thread, name); }
 
 inline void PinToCpu(pthread_t thread, int cpu) {
   cpu_set_t cpuset;

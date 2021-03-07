@@ -20,19 +20,21 @@ TEST(ConcurrentHashMapTest, SerialBasicOperations) {
     ASSERT_TRUE(map.Get(result, to_string(i)));
     ASSERT_EQ(result, "foo");
   }
+  for (size_t i = 0; i < 10; i++) {
+    auto val = map.GetUnsafe(to_string(i));
+    ASSERT_NE(val, nullptr);
+    ASSERT_EQ(*val, "foo");
+  }
   ASSERT_TRUE(map.InsertOrUpdate("0", "bar"));
   ASSERT_TRUE(map.Get(result, "0"));
   ASSERT_EQ(result, "bar");
 
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 10; i++) {
     ASSERT_TRUE(map.Erase(to_string(i)));
   }
-  for (size_t i = 0; i < 5; i++) {
+  for (size_t i = 0; i < 10; i++) {
     ASSERT_FALSE(map.Get(result, to_string(i)));
-  }
-  for (size_t i = 5; i < 10; i++) {
-    ASSERT_TRUE(map.Get(result, to_string(i)));
-    ASSERT_EQ(result, "foo");
+    ASSERT_EQ(map.GetUnsafe(to_string(i)), nullptr);
   }
 }
 

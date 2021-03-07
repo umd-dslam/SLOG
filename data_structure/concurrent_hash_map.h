@@ -74,6 +74,19 @@ class SegmentT {
     return found;
   }
 
+  ValueType* GetUnsafe(const KeyType& key) {
+    auto h = HashFn{}(key);
+    auto idx = GetIndex(buckets_->count, h);
+    auto node = buckets_->bucket_roots[idx];
+    while (node) {
+      if (key == node->key) {
+        return &node->value;
+      }
+      node = node->next;
+    }
+    return nullptr;
+  }
+
   bool InsertOrUpdate(const KeyType& key, const ValueType& value) {
     auto h = HashFn{}(key);
 
@@ -232,6 +245,11 @@ class ConcurrentHashMap {
         delete segment;
       }
     }
+  }
+
+  ValueType* GetUnsafe(const KeyType& key) {
+    auto idx = PickSegment(key);
+    return EnsureSegment(idx)->GetUnsafe(key);
   }
 
   bool Get(ValueType& res, const KeyType& key) const {

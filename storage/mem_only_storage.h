@@ -12,9 +12,12 @@ class MemOnlyStorage :
     public Storage<K, R>,
     public LookupMasterIndex<K, M> {
 public:
-
   bool Read(const K& key, R& result) const final {
     return table_.Get(result, key);
+  }
+
+  R* Read(const K& key) final {
+    return table_.GetUnsafe(key);
   }
 
   void Write(const K& key, const R& record) final {

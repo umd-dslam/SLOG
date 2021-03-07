@@ -18,7 +18,7 @@
 namespace slog {
 
 struct TransactionState {
-  enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, COMMIT, FINISH };
+  enum class Phase { READ_LOCAL_STORAGE, WAIT_REMOTE_READ, EXECUTE, FINISH };
 
   TransactionState(TxnHolder* txn_holder)
       : txn_holder(txn_holder), remote_reads_waiting_on(0), phase(Phase::READ_LOCAL_STORAGE) {}
@@ -72,11 +72,6 @@ class Worker : public NetworkedModule {
   void Execute(TxnId txn_id);
 
   /**
-   * Applies the writes to local storage
-   */
-  void Commit(TxnId txn_id);
-
-  /**
    * Returns the result back to the scheduler and cleans up the transaction state
    */
   void Finish(TxnId txn_id);
@@ -90,7 +85,7 @@ class Worker : public NetworkedModule {
 
   ConfigurationPtr config_;
   std::shared_ptr<Storage<Key, Record>> storage_;
-  std::unique_ptr<Commands> commands_;
+  std::unique_ptr<Commands<Key, Record>> commands_;
 
   std::unordered_map<TxnId, TransactionState> txn_states_;
 };

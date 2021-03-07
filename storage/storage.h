@@ -6,6 +6,7 @@ template <typename K, typename R>
 class Storage {
 public:
   virtual bool Read(const K& key, R& result) const = 0;
+  virtual R* Read(const K& key) = 0;
 
   virtual void Write(const K& key, const R& record) = 0;
 

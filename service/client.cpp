@@ -300,12 +300,11 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
   cout << endl;
 }
 
-const unordered_map<string, StatsModule> STATS_MODULES = {
-    {"server", {ModuleId::SERVER, PrintServerStats}},
-    {"forwarder", {ModuleId::FORWARDER, PrintForwarderStats}},
-    {"mhorderer", {ModuleId::MHORDERER, PrintMHOrdererStats}},
-    {"sequencer", {ModuleId::SEQUENCER, PrintSequencerStats}},
-    {"scheduler", {ModuleId::SCHEDULER, PrintSchedulerStats}}};
+const unordered_map<string, StatsModule> STATS_MODULES = {{"server", {ModuleId::SERVER, PrintServerStats}},
+                                                          {"forwarder", {ModuleId::FORWARDER, PrintForwarderStats}},
+                                                          {"mhorderer", {ModuleId::MHORDERER, PrintMHOrdererStats}},
+                                                          {"sequencer", {ModuleId::SEQUENCER, PrintSequencerStats}},
+                                                          {"scheduler", {ModuleId::SCHEDULER, PrintSchedulerStats}}};
 
 void ExecuteStats(const char* module, uint32_t level) {
   auto stats_module_it = STATS_MODULES.find(string(module));

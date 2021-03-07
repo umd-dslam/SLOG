@@ -65,6 +65,9 @@ struct Record {
 
   Record() = default;
 
+  char* data() { return data_.get(); }
+  size_t size() { return size_; }
+
   Metadata metadata;
 
  private:

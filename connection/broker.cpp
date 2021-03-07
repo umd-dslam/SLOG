@@ -23,8 +23,8 @@ namespace {
 class BrokerThread : public Module {
  public:
   BrokerThread(const shared_ptr<zmq::context_t>& context, const string& internal_endpoint,
-               const string& external_endpoint, const vector<pair<Channel, bool>>& channels,
-               int recv_retries_start_, std::chrono::milliseconds poll_timeout_ms)
+               const string& external_endpoint, const vector<pair<Channel, bool>>& channels, int recv_retries_start_,
+               std::chrono::milliseconds poll_timeout_ms)
       : Module("Broker"),
         external_socket_(*context, ZMQ_PULL),
         internal_socket_(*context, ZMQ_PULL),
@@ -198,8 +198,8 @@ void Broker::StartInNewThreads() {
     auto internal_endpoint = MakeInProcChannelAddress(MakeChannel(i));
     auto external_endpoint = MakeRemoteAddress(config_->protocol(), binding_addr, config_->broker_ports(i));
 
-    auto& t = threads_.emplace_back(
-        MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint, channels_, config_->recv_retries(), poll_timeout_ms_));
+    auto& t = threads_.emplace_back(MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint,
+                                                                channels_, config_->recv_retries(), poll_timeout_ms_));
 
     std::optional<uint32_t> cpu = {};
     if (i < cpus.size()) {

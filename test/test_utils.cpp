@@ -36,6 +36,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   common_config.mutable_hash_partitioning()->set_partition_key_num_bytes(1);
   common_config.set_sequencer_batch_duration(1);
   common_config.set_forwarder_batch_duration(1);
+  common_config.set_commands(internal::Commands::KEY_VALUE);
   for (int r = 0; r < num_replicas; r++) {
     auto replica = common_config.add_replicas();
     for (int p = 0; p < num_partitions; p++) {

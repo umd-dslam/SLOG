@@ -14,6 +14,8 @@
 
 namespace slog {
 
+using std::make_unique;
+
 using internal::Envelope;
 using internal::Request;
 using internal::Response;
@@ -22,9 +24,13 @@ Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
                const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout),
       config_(config),
-      storage_(storage),
-      // TODO: change this dynamically based on selected experiment
-      commands_(new KeyValueCommands()) {}
+      storage_(storage) {
+  if (config_->commands() == internal::Commands::DUMMY) {
+    commands_ = make_unique<DummyCommands<Key, Record>>();
+  } else {
+    commands_ = make_unique<KeyValueCommands<Key, Record>>();
+  }
+}
 
 void Worker::Initialize() {
   zmq::socket_t sched_socket(*context(), ZMQ_DEALER);
@@ -133,11 +139,6 @@ void Worker::AdvanceTransaction(TxnId txn_id) {
         Execute(txn_id);
       }
       [[fallthrough]];
-    case TransactionState::Phase::COMMIT:
-      if (state.phase == TransactionState::Phase::COMMIT) {
-        Commit(txn_id);
-      }
-      [[fallthrough]];
     case TransactionState::Phase::FINISH:
       Finish(txn_id);
       // Never fallthrough after this point because Finish and PreAbort
@@ -224,65 +225,28 @@ void Worker::Execute(TxnId txn_id) {
 
   switch (txn.procedure_case()) {
     case Transaction::kCode: {
-      if (txn.status() == TransactionStatus::ABORTED) {
-        break;
+      if (txn.status() != TransactionStatus::ABORTED) {
+        commands_->Execute(txn, *storage_);
       }
-      // Execute the transaction code
-      commands_->Execute(txn);
-      break;
-    }
-    case Transaction::kRemaster:
-      txn.set_status(TransactionStatus::COMMITTED);
-      break;
-    default:
-      LOG(FATAL) << "Procedure is not set";
-  }
-  state.phase = TransactionState::Phase::COMMIT;
-}
 
-void Worker::Commit(TxnId txn_id) {
-  auto& state = TxnState(txn_id);
-  auto& txn = state.txn_holder->txn();
-  switch (txn.procedure_case()) {
-    case Transaction::kCode: {
-      // Apply all writes to local storage if the transaction is not aborted
-      if (txn.status() != TransactionStatus::COMMITTED) {
+      if (txn.status() == TransactionStatus::ABORTED) {
         VLOG(3) << "Txn " << txn_id << " aborted with reason: " << txn.abort_reason();
-        break;
+      } else {
+        VLOG(3) << "Committed txn " << txn_id;
       }
-      for (const auto& [key, value] : txn.keys()) {
-        if (value.type() == KeyType::READ) {
-          continue;
-        }
-        if (config_->key_is_in_local_partition(key)) {
-          Record record;
-          if (!storage_->Read(key, record)) {
-            record.metadata = value.metadata();
-          }
-          record.SetValue(value.new_value());
-          storage_->Write(key, record);
-        }
-      }
-      for (const auto& key : txn.deleted_keys()) {
-        if (config_->key_is_in_local_partition(key)) {
-          storage_->Delete(key);
-        }
-      }
-      VLOG(3) << "Committed txn " << txn_id;
       break;
     }
     case Transaction::kRemaster: {
+      txn.set_status(TransactionStatus::COMMITTED);
       auto key_it = txn.keys().begin();
       const auto& key = key_it->first;
-      if (config_->key_is_in_local_partition(key)) {
-        Record record;
-        storage_->Read(key, record);
-        auto new_counter = key_it->second.metadata().counter() + 1;
-        record.metadata = Metadata(txn.remaster().new_master(), new_counter);
-        storage_->Write(key, record);
+      Record record;
+      storage_->Read(key, record);
+      auto new_counter = key_it->second.metadata().counter() + 1;
+      record.metadata = Metadata(txn.remaster().new_master(), new_counter);
+      storage_->Write(key, record);
 
-        state.txn_holder->SetRemasterResult(key, new_counter);
-      }
+      state.txn_holder->SetRemasterResult(key, new_counter);
       break;
     }
     default:

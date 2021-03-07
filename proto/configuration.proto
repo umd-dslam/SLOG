@@ -68,6 +68,11 @@ message CpuPinning {
     uint32 cpu = 2;
 }
 
+enum Commands {
+    KEY_VALUE = 0;
+    DUMMY = 1;
+}
+
 /**
  * The schema of a configuration file.
  */
@@ -115,6 +120,8 @@ message Configuration {
     bool return_dummy_txn = 19;
     // Do not deallocate txns in the worker
     bool do_not_clean_up_txn = 20;
-    // Number of retries after receiving something
+    // Number of retries after calling zmq::recv something
     int32 recv_retries = 21;
+    // Type of commands to run while executing a txn 
+    Commands commands = 22;
 }

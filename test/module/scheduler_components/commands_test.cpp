@@ -3,11 +3,13 @@
 #include <gtest/gtest.h>
 
 #include "common/proto_utils.h"
+#include "storage/mem_only_storage.h"
 
 using namespace std;
 using namespace slog;
 
 TEST(CommandsTest, SimpleKeyValueProcedures) {
+  MemOnlyStorage<Key, Record, Metadata> storage;
   auto txn = MakeTransaction(
       {{"key1", KeyType::READ}, {"key2", KeyType::WRITE}, {"key3", KeyType::WRITE}, {"key4", KeyType::WRITE}},
       "GET  key1\n"
@@ -16,8 +18,8 @@ TEST(CommandsTest, SimpleKeyValueProcedures) {
       "COPY key1 key3\n");
   txn->mutable_keys()->at("key1").set_value("value1");
 
-  KeyValueCommands proc;
-  proc.Execute(*txn);
+  KeyValueCommands<Key, Record> proc;
+  proc.Execute(*txn, storage);
   ASSERT_EQ(txn->status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn->keys_size(), 4);
   ASSERT_EQ(txn->keys().at("key1").type(), KeyType::READ);
@@ -31,30 +33,33 @@ TEST(CommandsTest, SimpleKeyValueProcedures) {
 }
 
 TEST(CommandsTest, KeyValueAbortedNotEnoughArgs) {
+  MemOnlyStorage<Key, Record, Metadata> storage;
   auto txn = MakeTransaction({{"key1", KeyType::WRITE}}, "SET key1");
 
-  KeyValueCommands proc;
-  proc.Execute(*txn);
+  KeyValueCommands<Key, Record> proc;
+  proc.Execute(*txn, storage);
   ASSERT_EQ(txn->status(), TransactionStatus::ABORTED);
 }
 
 TEST(CommandsTest, KeyValueAbortedInvalidCommand) {
+  MemOnlyStorage<Key, Record, Metadata> storage;
   auto txn = MakeTransaction({{"key1"}}, "WRONG");
 
-  KeyValueCommands proc;
-  proc.Execute(*txn);
+  KeyValueCommands<Key, Record> proc;
+  proc.Execute(*txn, storage);
   ASSERT_EQ(txn->status(), TransactionStatus::ABORTED);
 }
 
 TEST(CommandsTest, KeyValueOnlyWritesKeysInWriteSet) {
+  MemOnlyStorage<Key, Record, Metadata> storage;
   auto txn = MakeTransaction({{"key1"}, {"key2", KeyType::WRITE}, {"key3", KeyType::WRITE}},
                              "GET key1\n"
                              "SET key2 value2\n"
                              "SET key4 value4\n"
                              "DEL key3");
 
-  KeyValueCommands proc;
-  proc.Execute(*txn);
+  KeyValueCommands<Key, Record> proc;
+  proc.Execute(*txn, storage);
   ASSERT_EQ(txn->status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn->keys_size(), 3);
   ASSERT_EQ(txn->keys().at("key2").new_value(), "value2");

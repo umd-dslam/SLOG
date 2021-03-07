@@ -64,6 +64,7 @@ class Configuration {
   bool return_dummy_txn() const;
   bool do_not_clean_up_txn() const;
   int recv_retries() const;
+  internal::Commands commands() const;
 
  private:
   internal::Configuration config_;

@@ -198,4 +198,6 @@ bool Configuration::do_not_clean_up_txn() const { return config_.do_not_clean_up
 
 int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1000 : config_.recv_retries(); }
 
+internal::Commands Configuration::commands() const { return config_.commands(); }
+
 }  // namespace slog
