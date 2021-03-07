@@ -59,16 +59,16 @@ class Scheduler : public NetworkedModule {
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
   // Send single-home and lock-only transactions for counter checking
-  void SendToRemasterManager(const Transaction& txn);
+  void SendToRemasterManager(Transaction& txn);
   // Send transactions to lock manager or abort them
   void ProcessRemasterResult(RemasterOccurredResult result);
 #endif
 
   // Send all transactions for locks
-  void SendToLockManager(const Transaction& txn);
+  void SendToLockManager(Transaction& txn);
 
   // Send txn to worker
-  void Dispatch(TxnId txn_id);
+  void Dispatch(TxnId txn_id, bool is_fast);
 
   /**
    * Aborts
