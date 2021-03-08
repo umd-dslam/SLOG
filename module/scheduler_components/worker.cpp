@@ -25,10 +25,16 @@ Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& br
     : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout),
       config_(config),
       storage_(storage) {
-  if (config_->commands() == internal::Commands::DUMMY) {
-    commands_ = make_unique<DummyCommands<Key, Record>>();
-  } else {
-    commands_ = make_unique<KeyValueCommands<Key, Record>>();
+  switch (config_->commands()) {
+    case internal::Commands::DUMMY:
+      commands_ = make_unique<DummyCommands<Key, Record>>(config, storage);
+      break;
+    case internal::Commands::NOOP:
+      commands_ = make_unique<NoopCommands<Key, Record>>();
+      break;
+    default:
+      commands_ = make_unique<KeyValueCommands<Key, Record>>(config, storage);
+      break;
   }
 }
 
@@ -176,16 +182,15 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
     // We don't need to check if keys are in partition here since the assumption is that
     // the out-of-partition keys have already been removed
     for (auto& [key, value] : *(txn.mutable_keys())) {
-      Record record;
-      if (storage_->Read(key, record)) {
+      if (auto record = storage_->Read(key); record != nullptr) {
         // Check whether the store master metadata matches with the information
         // stored in the transaction
-        if (value.metadata().master() != record.metadata.master) {
+        if (value.metadata().master() != record->metadata.master) {
           txn.set_status(TransactionStatus::ABORTED);
           txn.set_abort_reason("Outdated master");
           break;
         }
-        value.set_value(record.to_string());
+        value.set_value(record->to_string());
       } else if (txn.procedure_case() == Transaction::kRemaster) {
         txn.set_status(TransactionStatus::ABORTED);
         txn.set_abort_reason("Remaster non-existent key " + key);
@@ -226,7 +231,7 @@ void Worker::Execute(TxnId txn_id) {
   switch (txn.procedure_case()) {
     case Transaction::kCode: {
       if (txn.status() != TransactionStatus::ABORTED) {
-        commands_->Execute(txn, *storage_);
+        commands_->Execute(txn);
       }
 
       if (txn.status() == TransactionStatus::ABORTED) {

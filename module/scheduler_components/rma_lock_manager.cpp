@@ -173,9 +173,6 @@ vector<TxnId> RMALockManager::ReleaseLocks(TxnId txn_id) {
       if (old_mode != LockMode::UNLOCKED) {
         num_locked_keys_--;
       }
-      if (lock_table_.size() > kLockTableSizeLimit) {
-        lock_table_.erase(key_replica);
-      }
     }
 
     for (auto new_txn : new_grantees) {

@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/configuration.h"
 #include "common/string_utils.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
@@ -18,7 +19,7 @@ class Commands {
  public:
   virtual ~Commands() = default;
 
-  virtual void Execute(Transaction& txn, Storage<K, R>& storage) = 0;
+  virtual void Execute(Transaction& txn) = 0;
 };
 
 template <typename K, typename R>
@@ -26,8 +27,14 @@ class KeyValueCommands : public Commands<K, R> {
   const static std::string kSpace;
   const static std::unordered_map<std::string, size_t> kCommands;
 
+  ConfigurationPtr config_;
+  std::shared_ptr<Storage<K, R>> storage_;
+
  public:
-  void Execute(Transaction& txn, Storage<K, R>& storage) final {
+  KeyValueCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage) 
+    : config_(config), storage_(storage) {}
+
+  void Execute(Transaction& txn) final {
     Reset();
     auto& keys = *txn.mutable_keys();
 
@@ -76,23 +83,21 @@ class KeyValueCommands : public Commands<K, R> {
       txn.set_status(TransactionStatus::COMMITTED);
 
       for (const auto& [key, value] : txn.keys()) {
-        if (value.type() == KeyType::READ) {
+        if (!config_->key_is_in_local_partition(key) || value.type() == KeyType::READ) {
           continue;
         }
-        // Keys in the txn at this point are guaranteed to belong to
-        // the current partition so no partition check is needed
-        if (auto record = storage.Read(key); record != nullptr) {
+        if (auto record = storage_->Read(key); record != nullptr) {
           record->metadata = value.metadata();
           record->SetValue(value.new_value());
         } else {
           R new_record;
           new_record.metadata = value.metadata();
           new_record.SetValue(value.new_value());
-          storage.Write(key, new_record);
+          storage_->Write(key, new_record);
         }
       }
       for (const auto& key : txn.deleted_keys()) {
-        storage.Delete(key);
+        storage_->Delete(key);
       }
     }
   }
@@ -147,14 +152,20 @@ const std::unordered_map<std::string, size_t> KeyValueCommands<K, R>::kCommands 
 
 template <typename K, typename R>
 class DummyCommands : public Commands<K, R> {
+  ConfigurationPtr config_;
+  std::shared_ptr<Storage<K, R>> storage_;
+
  public:
-  void Execute(Transaction& txn, Storage<K, R>& storage) final {
+  DummyCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage) 
+    : config_(config), storage_(storage) {}
+
+  void Execute(Transaction& txn) final {
     // This loop comes from the old SLOG implementation
     for (const auto& [key, value] : txn.keys()) {
-      if (value.type() == KeyType::READ) {
+      if (!config_->key_is_in_local_partition(key) || value.type() == KeyType::READ) {
         continue;
       }
-      if (auto record = storage.Read(key); record != nullptr) {
+      if (auto record = storage_->Read(key); record != nullptr) {
         for (size_t j = 0; j < std::min((size_t)8, record->size()); j++) {
           auto data = record->data();
           if (data[j] + 1 > 'z') {
@@ -164,8 +175,16 @@ class DummyCommands : public Commands<K, R> {
           }
         }
       }
-      txn.set_status(TransactionStatus::COMMITTED);
     }
+    txn.set_status(TransactionStatus::COMMITTED);
+  }
+};
+
+template <typename K, typename R>
+class NoopCommands : public Commands<K, R> {
+ public:
+  void Execute(Transaction& txn) final {
+    txn.set_status(TransactionStatus::COMMITTED);
   }
 };
 

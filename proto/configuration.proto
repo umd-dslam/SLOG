@@ -71,6 +71,7 @@ message CpuPinning {
 enum Commands {
     KEY_VALUE = 0;
     DUMMY = 1;
+    NOOP = 2;
 }
 
 /**
