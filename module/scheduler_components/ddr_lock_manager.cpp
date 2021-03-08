@@ -57,7 +57,7 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
       }
       case KeyType::WRITE: {
         auto b_txns = lock_queue_tail.AcquireWriteLock(txn_id);
-        blocking_txns.insert(blocking_txns.begin(), b_txns.begin(), b_txns.end());
+        blocking_txns.insert(blocking_txns.end(), b_txns.begin(), b_txns.end());
         break;
       }
       default:
