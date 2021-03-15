@@ -62,7 +62,6 @@ class Configuration {
   bool bypass_mh_orderer() const;
   vector<int> cpu_pinnings(ModuleId module) const;
   bool return_dummy_txn() const;
-  bool do_not_clean_up_txn() const;
   int recv_retries() const;
   internal::Commands commands() const;
 

@@ -119,10 +119,8 @@ message Configuration {
     repeated CpuPinning cpu_pinnings = 18;
     // Return dummy txns back to the client instead of full results
     bool return_dummy_txn = 19;
-    // Do not deallocate txns in the worker
-    bool do_not_clean_up_txn = 20;
     // Number of retries after calling zmq::recv something
-    int32 recv_retries = 21;
+    int32 recv_retries = 20;
     // Type of commands to run while executing a txn 
-    Commands commands = 22;
+    Commands commands = 21;
 }

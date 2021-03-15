@@ -336,11 +336,6 @@ void Worker::SendToCoordinatingServer(TxnId txn_id) {
   }
   completed_sub_txn->set_allocated_txn(txn);
   Send(env, txn->internal().coordinating_server(), kServerChannel);
-
-  if (config_->do_not_clean_up_txn()) {
-    // This is an intentional memory leak
-    completed_sub_txn->release_txn();
-  }
 }
 
 TransactionState& Worker::TxnState(TxnId txn_id) {
