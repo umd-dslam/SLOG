@@ -36,7 +36,6 @@ class Configuration {
   int forwarder_max_batch_size() const;
   milliseconds sequencer_batch_duration() const;
   int sequencer_max_batch_size() const;
-  uint32_t scheduler_max_txns() const;
   uint32_t replication_factor() const;
 
   const string& local_address() const;
