@@ -36,6 +36,16 @@ void Server::Initialize() {
 
   LOG(INFO) << "Bound Server to: " << endpoint;
 
+  // Tell other machines that the current one is online
+  internal::Envelope env;
+  env.mutable_request()->mutable_signal();
+  for (MachineId m : config_->all_machine_ids()) {
+    if (m != config_->local_machine_id()) {
+      offline_machines_.insert(m);
+      Send(env, m, kServerChannel);
+    }
+  }
+
   AddCustomSocket(move(client_socket));
 }
 
@@ -130,12 +140,21 @@ bool Server::OnCustomSocket() {
 ***********************************************/
 
 void Server::OnInternalRequestReceived(EnvelopePtr&& env) {
-  if (env->request().type_case() != internal::Request::kCompletedSubtxn) {
-    LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), internal::Request)
-               << "\"";
-    return;
+  switch (env->request().type_case()) {
+    case internal::Request::kSignal:
+      LOG(INFO) << "Machine " << env->from() << " is online";
+      offline_machines_.erase(env->from());
+      if (offline_machines_.empty()) {
+        LOG(INFO) << "All machines are online";
+      }
+      break;
+    case internal::Request::kCompletedSubtxn:
+      ProcessCompletedSubtxn(move(env));
+      break;
+    default:
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), internal::Request)
+                 << "\"";
   }
-  ProcessCompletedSubtxn(move(env));
 }
 
 void Server::ProcessCompletedSubtxn(EnvelopePtr&& env) {

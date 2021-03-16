@@ -6,6 +6,7 @@
 #include <set>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <zmq.hpp>
 
@@ -113,6 +114,8 @@ class Server : public NetworkedModule {
   TxnId txn_id_counter_;
   std::unordered_map<TxnId, PendingResponse> pending_responses_;
   std::unordered_map<TxnId, CompletedTransaction> completed_txns_;
+
+  std::unordered_set<MachineId> offline_machines_;
 };
 
 }  // namespace slog

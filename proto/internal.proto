@@ -45,7 +45,7 @@ message Envelope {
 message Request {
     oneof type {
         EchoRequest echo = 1;
-        BrokerReady broker_ready = 2;
+        Signal signal = 2;
         BrokerRedirect broker_redirect = 3;
         ForwardTransaction forward_txn = 4;
         LookupMasterRequest lookup_master = 5;
@@ -68,13 +68,9 @@ message EchoRequest {
 }
 
 /**
- * Used by the Broker to notify others its presence. Some
- * identifiers are included so that the receivers can build a
- * map of the whole network.
+ * Generic signal message
  */
-message BrokerReady {
-    bytes ip_address = 1;
-    uint32 machine_id = 2;
+ message Signal {
 }
 
 message BrokerRedirect {
