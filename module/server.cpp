@@ -10,6 +10,7 @@ using std::move;
 
 namespace slog {
 
+namespace {
 void ValidateTransaction(Transaction* txn) {
   txn->set_status(TransactionStatus::ABORTED);
   if (txn->keys().empty()) {
@@ -17,6 +18,30 @@ void ValidateTransaction(Transaction* txn) {
     return;
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
+}
+} // namespace
+
+Server::CompletedTransaction::CompletedTransaction(size_t involved_partitions) : remaining_partitions_(involved_partitions) {}
+
+bool Server::CompletedTransaction::AddSubTxn(EnvelopePtr&& new_req) {
+  DCHECK(new_req != nullptr);
+
+  remaining_partitions_--;
+
+  if (req_ == nullptr) {
+    req_ = std::move(new_req);
+  } else {
+    auto& subtxn = new_req->request().completed_subtxn();
+    auto txn = req_->mutable_request()->mutable_completed_subtxn()->mutable_txn();
+    MergeTransaction(*txn, subtxn.txn());
+  }
+
+  return remaining_partitions_ == 0;
+}
+
+Transaction* Server::CompletedTransaction::ReleaseTxn() {
+  if (req_ == nullptr) return nullptr;
+  return req_->mutable_request()->mutable_completed_subtxn()->release_txn();
 }
 
 Server::Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
@@ -168,7 +193,7 @@ void Server::ProcessCompletedSubtxn(EnvelopePtr&& env) {
     return;
   }
 
-  auto res = completed_txns_.try_emplace(txn_id, config_, txn_internal->involved_partitions_size());
+  auto res = completed_txns_.try_emplace(txn_id, txn_internal->involved_partitions_size());
   auto& completed_txn = res.first->second;
   if (completed_txn.AddSubTxn(std::move(env))) {
     SendTxnToClient(completed_txn.ReleaseTxn());

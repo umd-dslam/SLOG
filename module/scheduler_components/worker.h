@@ -78,8 +78,6 @@ class Worker : public NetworkedModule {
 
   void NotifyOtherPartitions(TxnId txn_id);
 
-  void SendToCoordinatingServer(TxnId txn_id);
-
   // Precondition: txn_id must exists in txn states table
   TransactionState& TxnState(TxnId txn_id);
 

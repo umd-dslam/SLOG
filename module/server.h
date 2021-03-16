@@ -20,56 +20,6 @@
 
 namespace slog {
 
-struct PendingResponse {
-  zmq::message_t identity;
-  uint32_t stream_id;
-
-  explicit PendingResponse(zmq::message_t&& identity, uint32_t stream_id)
-      : identity(std::move(identity)), stream_id(stream_id) {}
-};
-
-class CompletedTransaction {
- public:
-  explicit CompletedTransaction(const ConfigurationPtr& config, size_t involved_partitions)
-      : required_copies_(config->replication_factor()), replicating_partitions_(involved_partitions) {
-    partition_counters_.resize(config->num_partitions());
-  }
-
-  bool AddSubTxn(EnvelopePtr&& new_req) {
-    DCHECK(new_req != nullptr);
-    auto& subtxn = new_req->request().completed_subtxn();
-
-    DCHECK(subtxn.partition() < partition_counters_.size());
-    auto counter = ++partition_counters_[subtxn.partition()];
-    if (counter == 1) {
-      if (req_ == nullptr) {
-        req_ = std::move(new_req);
-      } else {
-        auto txn = req_->mutable_request()->mutable_completed_subtxn()->mutable_txn();
-        MergeTransaction(*txn, subtxn.txn());
-      }
-    }
-    if (counter == required_copies_) {
-      replicating_partitions_--;
-    }
-
-    return replicating_partitions_ == 0;
-  }
-
-  Transaction* ReleaseTxn() {
-    if (req_ == nullptr) return nullptr;
-    return req_->mutable_request()->mutable_completed_subtxn()->release_txn();
-  }
-
- private:
-  EnvelopePtr req_;
-  uint32_t required_copies_;
-  // Number of partitions that are still not fully replicated
-  size_t replicating_partitions_;
-  // Count number of subtxn copies received for each partition
-  std::vector<uint32_t> partition_counters_;
-};
-
 /**
  * A Server serves external requests from the clients.
  *
@@ -112,7 +62,25 @@ class Server : public NetworkedModule {
   ConfigurationPtr config_;
 
   TxnId txn_id_counter_;
+
+  struct PendingResponse {
+    zmq::message_t identity;
+    uint32_t stream_id;
+
+    explicit PendingResponse(zmq::message_t&& identity, uint32_t stream_id)
+        : identity(std::move(identity)), stream_id(stream_id) {}
+  };
   std::unordered_map<TxnId, PendingResponse> pending_responses_;
+
+  class CompletedTransaction {
+   public:
+    CompletedTransaction(size_t involved_partitions);
+    bool AddSubTxn(EnvelopePtr&& new_req);
+    Transaction* ReleaseTxn();
+   private:
+    EnvelopePtr req_;
+    size_t remaining_partitions_;
+  };
   std::unordered_map<TxnId, CompletedTransaction> completed_txns_;
 
   std::unordered_set<MachineId> offline_machines_;
