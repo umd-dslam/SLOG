@@ -132,15 +132,12 @@ int main(int argc, char* argv[]) {
 #endif /* REMASTER_PROTOCOL_SIMPLE */
 
   auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address);
-  const auto& all_addresses = config->all_addresses();
-  CHECK(std::find(all_addresses.begin(), all_addresses.end(), config->local_address()) != all_addresses.end())
-      << "The configuration does not contain the provided "
-      << "local machine ID: \"" << config->local_address() << "\"";
-  CHECK_LT(config->local_replica(), config->num_replicas()) << "Replica numbers must be within number of replicas";
-  CHECK_LT(config->local_partition(), config->num_partitions())
-      << "Partition number must be within number of partitions";
 
   INIT_TRACING(config);
+
+  for (size_t i = 0; i < config->num_replicas(); i++) {
+    LOG(INFO) << "Latency to " << i << ": " << config->latency(i) << " ms";
+  }
 
   if (config->return_dummy_txn()) {
     LOG(WARNING) << "Dummy transactions will be returned";

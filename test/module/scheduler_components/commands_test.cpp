@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 
 #include "common/proto_utils.h"
-#include "test/test_utils.h"
 #include "storage/mem_only_storage.h"
+#include "test/test_utils.h"
 
 using namespace std;
 using namespace slog;

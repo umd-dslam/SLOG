@@ -10,6 +10,7 @@
 
 #include "common/constants.h"
 #include "common/proto_utils.h"
+#include "common/string_utils.h"
 
 namespace slog {
 
@@ -49,6 +50,7 @@ ConfigurationPtr Configuration::FromFile(const string& file_path, const string& 
 
 Configuration::Configuration(const internal::Configuration& config, const string& local_address)
     : config_(config), local_address_(local_address) {
+  bool local_address_is_valid = false;
   for (int r = 0; r < config_.replicas_size(); r++) {
     auto& replica = config.replicas(r);
     CHECK_EQ((uint32_t)replica.addresses_size(), config.num_partitions())
@@ -57,13 +59,32 @@ Configuration::Configuration(const internal::Configuration& config, const string
       auto& address = replica.addresses(p);
       all_addresses_.push_back(address);
       if (address == local_address) {
+        local_address_is_valid = true;
         local_replica_ = r;
         local_partition_ = p;
       }
     }
   }
+
+  CHECK(local_address_is_valid) << "The configuration does not contain the provided local machine ID: \""
+                                << local_address_ << "\"";
+
   CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
       << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
+
+  if (!config.replica_latency().empty()) {
+    CHECK_EQ(config.replica_latency_size(), config_.replicas_size())
+        << "Number of latency string must match number of replicas";
+
+    auto latency_str = Split(config.replica_latency(local_replica_), ",");
+    CHECK_EQ(latency_str.size(), config_.replicas_size()) << "Number of latency values must match number of replicas";
+    for (size_t i = 0; i < latency_str.size(); i++) {
+      auto lat = std::stoul(latency_str[i]);
+      latency_.push_back(lat);
+      ordered_latency_.emplace_back(lat, i);
+    }
+    std::sort(ordered_latency_.begin(), ordered_latency_.end());
+  }
 }
 
 const string& Configuration::protocol() const { return config_.protocol(); }
@@ -195,5 +216,11 @@ bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn()
 int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1000 : config_.recv_retries(); }
 
 internal::Commands Configuration::commands() const { return config_.commands(); }
+
+uint32_t Configuration::latency(size_t i) const { return latency_.empty() ? 0 : latency_[i]; }
+
+std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const {
+  return ordered_latency_.empty() ? std::make_pair(0U, n) : ordered_latency_[n];
+};
 
 }  // namespace slog

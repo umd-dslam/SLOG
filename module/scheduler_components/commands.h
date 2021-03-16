@@ -31,8 +31,8 @@ class KeyValueCommands : public Commands<K, R> {
   std::shared_ptr<Storage<K, R>> storage_;
 
  public:
-  KeyValueCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage) 
-    : config_(config), storage_(storage) {}
+  KeyValueCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage)
+      : config_(config), storage_(storage) {}
 
   void Execute(Transaction& txn) final {
     Reset();
@@ -156,8 +156,8 @@ class DummyCommands : public Commands<K, R> {
   std::shared_ptr<Storage<K, R>> storage_;
 
  public:
-  DummyCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage) 
-    : config_(config), storage_(storage) {}
+  DummyCommands(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage)
+      : config_(config), storage_(storage) {}
 
   void Execute(Transaction& txn) final {
     // This loop comes from the old SLOG implementation
@@ -183,9 +183,7 @@ class DummyCommands : public Commands<K, R> {
 template <typename K, typename R>
 class NoopCommands : public Commands<K, R> {
  public:
-  void Execute(Transaction& txn) final {
-    txn.set_status(TransactionStatus::COMMITTED);
-  }
+  void Execute(Transaction& txn) final { txn.set_status(TransactionStatus::COMMITTED); }
 };
 
 }  // namespace slog

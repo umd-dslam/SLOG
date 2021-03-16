@@ -12,4 +12,6 @@ size_t NextNTokens(std::vector<std::string>& tokens, const std::string& str, con
 
 std::string Trim(std::string str);
 
+std::vector<std::string> Split(const std::string& str, const std::string& delims);
+
 }  // namespace slog

@@ -57,12 +57,15 @@ class Configuration {
 
   uint32_t replication_delay_pct() const;
   uint32_t replication_delay_amount_ms() const;
+
   vector<TransactionEvent> disabled_tracing_events() const;
   bool bypass_mh_orderer() const;
   vector<int> cpu_pinnings(ModuleId module) const;
   bool return_dummy_txn() const;
   int recv_retries() const;
   internal::Commands commands() const;
+  uint32_t latency(size_t i) const;
+  std::pair<uint32_t, size_t> nth_latency(size_t n) const;
 
  private:
   internal::Configuration config_;
@@ -71,6 +74,8 @@ class Configuration {
   uint32_t local_partition_;
 
   vector<string> all_addresses_;
+  vector<uint32_t> latency_;
+  vector<std::pair<uint32_t, size_t>> ordered_latency_;
 };
 
 }  // namespace slog

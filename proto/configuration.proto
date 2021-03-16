@@ -105,7 +105,7 @@ message Configuration {
     uint64 sequencer_batch_duration = 11;
     // Maximum number of txns in a sequencer batch. Set to 0 for unlimited batch size
     int32 sequencer_max_batch_size = 12;
-    // Number of regions that need to be synchronously replicated to
+    // Number of replicas that need to be synchronously replicated to
     uint32 replication_factor = 13;
     // Replication of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 14;
@@ -121,4 +121,10 @@ message Configuration {
     int32 recv_retries = 19;
     // Type of commands to run while executing a txn 
     Commands commands = 20;
+    // Latency between replicas. This is a list of strings each of which corresponds to a replica
+    // specified in `replicas`. Each string is a comma-separated list of integer values. The number
+    // of values is the same as number of replica. Each value is the one-way latency in ms between
+    // the corresponding replicas. For example, ['0,90', '80,0'] means the latency from replica 0 
+    // to replica 1 is 90ms, and the latency from replica 1 to replica 0 is 80ms.
+    repeated bytes replica_latency = 21;
 }

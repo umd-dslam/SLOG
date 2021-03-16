@@ -53,4 +53,15 @@ string Trim(string str) {
   return str;
 }
 
+vector<string> Split(const std::string& str, const std::string& delims) {
+  vector<string> res;
+  string token;
+  size_t pos = NextToken(token, str, delims, 0);
+  while (pos != std::string::npos) {
+    res.push_back(token);
+    pos = NextToken(token, str, delims, pos);
+  }
+  return res;
+}
+
 }  // namespace slog
