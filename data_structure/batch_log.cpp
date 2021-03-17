@@ -10,12 +10,21 @@ namespace slog {
 BatchLog::BatchLog() {}
 
 void BatchLog::AddBatch(BatchPtr&& batch) {
-  batches_.insert_or_assign(batch->id(), move(batch));
+  auto batch_id = batch->id();
+  batches_.insert_or_assign(batch_id, move(batch));
   UpdateReadyBatches();
 }
 
-void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id) {
+void BatchLog::AddReplication(BatchId batch_id) {
+  auto it = replication_.find(batch_id);
+  DCHECK(it != replication_.end());
+  it->second--;
+  UpdateReadyBatches();
+}
+
+void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id, int replication_remaining) {
   slots_.Insert(slot_id, batch_id);
+  replication_.insert_or_assign(batch_id, replication_remaining);
   UpdateReadyBatches();
 }
 
@@ -23,7 +32,7 @@ bool BatchLog::HasNextBatch() const { return !ready_batches_.empty(); }
 
 std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
   if (!HasNextBatch()) {
-    throw std::runtime_error("NextBatch() was called when there is no batch");
+    throw std::runtime_error("NextBatch() was called when there is no ready batch");
   }
   auto next_slot = ready_batches_.front().first;
   auto next_batch_id = ready_batches_.front().second;
@@ -39,10 +48,14 @@ std::pair<SlotId, BatchPtr> BatchLog::NextBatch() {
 void BatchLog::UpdateReadyBatches() {
   while (slots_.HasNext()) {
     auto next_batch_id = slots_.Peek();
-    if (batches_.count(next_batch_id) == 0) {
+    auto batch_it = batches_.find(next_batch_id);
+    auto rep_it = replication_.find(next_batch_id);
+    if (batch_it != batches_.end() && rep_it != replication_.end() && rep_it->second == 0) {
+      replication_.erase(rep_it);
+      ready_batches_.push(slots_.Next());
+    } else {
       break;
     }
-    ready_batches_.push(slots_.Next());
   }
 }
 

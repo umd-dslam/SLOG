@@ -101,7 +101,7 @@ TEST_F(E2ETest, MultiPartitionTxn) {
 }
 
 TEST_F(E2ETest, MultiHomeTxn) {
-  for (size_t i = 0; i < NUM_MACHINES; i++) {
+  for (size_t i = 2; i < 3; i++) {
     auto txn = MakeTransaction({{"A", KeyType::READ}, {"C", KeyType::WRITE}}, "GET A SET C newC");
 
     test_slogs[i]->SendTxn(txn);

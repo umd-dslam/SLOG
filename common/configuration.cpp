@@ -50,10 +50,15 @@ ConfigurationPtr Configuration::FromFile(const string& file_path, const string& 
 
 Configuration::Configuration(const internal::Configuration& config, const string& local_address)
     : config_(config), local_address_(local_address) {
+  CHECK_LE(config_.replication_factor(), config_.replicas_size())
+      << "Replication factor must not exceed number of replicas";
+  CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
+      << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
+
   bool local_address_is_valid = false;
   for (int r = 0; r < config_.replicas_size(); r++) {
-    auto& replica = config.replicas(r);
-    CHECK_EQ((uint32_t)replica.addresses_size(), config.num_partitions())
+    auto& replica = config_.replicas(r);
+    CHECK_EQ((uint32_t)replica.addresses_size(), config_.num_partitions())
         << "Number of addresses in each replica must match number of partitions.";
     for (int p = 0; p < replica.addresses_size(); p++) {
       auto& address = replica.addresses(p);
@@ -69,22 +74,28 @@ Configuration::Configuration(const internal::Configuration& config, const string
   CHECK(local_address_is_valid) << "The configuration does not contain the provided local machine ID: \""
                                 << local_address_ << "\"";
 
-  CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
-      << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
-
-  if (!config.replica_latency().empty()) {
-    CHECK_EQ(config.replica_latency_size(), config_.replicas_size())
+  if (!config_.replica_latency().empty()) {
+    CHECK_EQ(config_.replica_latency_size(), config_.replicas_size())
         << "Number of latency string must match number of replicas";
 
-    auto latency_str = Split(config.replica_latency(local_replica_), ",");
+    auto latency_str = Split(config_.replica_latency(local_replica_), ",");
     CHECK_EQ(latency_str.size(), config_.replicas_size()) << "Number of latency values must match number of replicas";
     for (size_t i = 0; i < latency_str.size(); i++) {
-      auto lat = std::stoul(latency_str[i]);
-      latency_.push_back(lat);
-      ordered_latency_.emplace_back(lat, i);
+      if (i != local_replica_) {
+        auto lat = std::stoul(latency_str[i]);
+        latency_.push_back(lat);
+        ordered_latency_.emplace_back(lat, i);
+      }
     }
-    std::sort(ordered_latency_.begin(), ordered_latency_.end());
+  } else {
+    for (int i = 0; i < config_.replicas_size(); i++) {
+      if (i != local_replica_) {
+        latency_.push_back(0);
+        ordered_latency_.emplace_back(0, i);
+      }
+    }
   }
+  std::sort(ordered_latency_.begin(), ordered_latency_.end());
 }
 
 const string& Configuration::protocol() const { return config_.protocol(); }
@@ -217,10 +228,10 @@ int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1
 
 internal::Commands Configuration::commands() const { return config_.commands(); }
 
-uint32_t Configuration::latency(size_t i) const { return latency_.empty() ? 0 : latency_[i]; }
+uint32_t Configuration::latency(size_t i) const { return latency_[i]; }
 
 std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const {
-  return ordered_latency_.empty() ? std::make_pair(0U, n) : ordered_latency_[n];
+  return ordered_latency_[n];
 };
 
 }  // namespace slog

@@ -64,6 +64,7 @@ class Interleaver : public NetworkedModule {
   std::unordered_map<uint32_t, BatchLog> single_home_logs_;
   LocalLog local_log_;
   std::vector<MachineId> other_partitions_;
+  std::vector<bool> need_ack_from_replica_;
 
   std::mt19937 rg_;
 };

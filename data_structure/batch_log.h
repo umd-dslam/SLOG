@@ -16,7 +16,8 @@ class BatchLog {
   BatchLog();
 
   void AddBatch(BatchPtr&& batch);
-  void AddSlot(SlotId slot_id, BatchId batch_id);
+  void AddSlot(SlotId slot_id, BatchId batch_id, int replication_remaining = 0);
+  void AddReplication(BatchId batch_id);
 
   bool HasNextBatch() const;
   std::pair<SlotId, BatchPtr> NextBatch();
@@ -32,6 +33,7 @@ class BatchLog {
 
   AsyncLog<BatchId> slots_;
   std::unordered_map<BatchId, BatchPtr> batches_;
+  std::unordered_map<BatchId, int> replication_;
   std::queue<std::pair<SlotId, BatchId>> ready_batches_;
 };
 
