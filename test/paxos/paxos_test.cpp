@@ -32,7 +32,7 @@ class TestSimulatedMultiPaxos : public SimulatedMultiPaxos {
   }
 
  protected:
-  void OnCommit(uint32_t slot, uint32_t value, bool) final {
+  void OnCommit(uint32_t slot, uint32_t value, MachineId) final {
     {
       lock_guard<mutex> g(m_);
       CHECK(committed_ == nullptr) << "The result needs to be read before committing another one";

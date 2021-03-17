@@ -22,6 +22,7 @@ Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broke
     : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
       config_(config),
       batch_id_counter_(0),
+      rg_(std::random_device()()),
       collecting_stats_(false) {
   partitioned_batch_.resize(config_->num_partitions());
   NewBatch();

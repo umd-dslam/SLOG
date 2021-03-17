@@ -51,10 +51,9 @@ void Leader::HandleRequest(const Envelope& req) {
 
 void Leader::ProcessCommitRequest(const internal::PaxosCommitRequest& commit) {
   auto slot = commit.slot();
-  auto value = commit.value();
 
   // Report to the paxos user
-  paxos_.OnCommit(slot, value, is_elected_);
+  paxos_.OnCommit(slot, commit.value(), commit.leader());
 
   if (slot >= next_empty_slot_) {
     next_empty_slot_ = slot + 1;
@@ -76,6 +75,7 @@ void Leader::HandleResponse(const Envelope& res) {
       auto paxos_commit = env->mutable_request()->mutable_paxos_commit();
       paxos_commit->set_slot(slot);
       paxos_commit->set_value(instance.value);
+      paxos_commit->set_leader(me_);
       paxos_.SendSameChannel(move(env), members_);
     }
   } else if (res.response().has_paxos_commit()) {

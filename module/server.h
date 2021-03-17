@@ -77,6 +77,7 @@ class Server : public NetworkedModule {
     CompletedTransaction(size_t involved_partitions);
     bool AddSubTxn(EnvelopePtr&& new_req);
     Transaction* ReleaseTxn();
+
    private:
     EnvelopePtr req_;
     size_t remaining_partitions_;

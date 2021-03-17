@@ -22,14 +22,15 @@ vector<MachineId> GetMembers(const ConfigurationPtr& config) {
 
 GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                          std::chrono::milliseconds poll_timeout)
-    : SimulatedMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {
+    : SimulatedMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout),
+      local_machine_id_(config->local_machine_id()) {
   for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
     multihome_orderers_.push_back(config->MakeMachineId(rep, config->leader_partition_for_multi_home_ordering()));
   }
 }
 
-void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, bool is_leader) {
-  if (!is_leader) {
+void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
+  if (local_machine_id_ != leader) {
     return;
   }
   auto env = NewEnvelope();
@@ -43,11 +44,12 @@ LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>&
                        std::chrono::milliseconds poll_timeout)
     : SimulatedMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
 
-void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, bool) {
+void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
   auto env = NewEnvelope();
   auto order = env->mutable_request()->mutable_local_queue_order();
   order->set_queue_id(value);
   order->set_slot(slot);
+  order->set_leader(leader);
   Send(std::move(env), kInterleaverChannel);
 }
 

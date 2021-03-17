@@ -19,9 +19,10 @@ void ValidateTransaction(Transaction* txn) {
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
 }
-} // namespace
+}  // namespace
 
-Server::CompletedTransaction::CompletedTransaction(size_t involved_partitions) : remaining_partitions_(involved_partitions) {}
+Server::CompletedTransaction::CompletedTransaction(size_t involved_partitions)
+    : remaining_partitions_(involved_partitions) {}
 
 bool Server::CompletedTransaction::AddSubTxn(EnvelopePtr&& new_req) {
   DCHECK(new_req != nullptr);

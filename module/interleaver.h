@@ -19,10 +19,10 @@ namespace slog {
 class LocalLog {
  public:
   void AddBatchId(uint32_t queue_id, uint32_t position, BatchId batch_id);
-  void AddSlot(SlotId slot_id, uint32_t queue_id);
+  void AddSlot(SlotId slot_id, uint32_t queue_id, MachineId leader);
 
   bool HasNextBatch() const;
-  std::pair<SlotId, BatchId> NextBatch();
+  std::pair<SlotId, std::pair<BatchId, MachineId>> NextBatch();
 
   /* For debugging */
   size_t NumBufferedSlots() const { return slots_.NumBufferredItems(); }
@@ -40,11 +40,11 @@ class LocalLog {
   void UpdateReadyBatches();
 
   // Used to decide the next queue to choose a batch from
-  AsyncLog<uint32_t> slots_;
+  AsyncLog<std::pair<uint32_t, MachineId>> slots_;
   // Batches from a partition form a queue
   std::unordered_map<uint32_t, AsyncLog<BatchId>> batch_queues_;
   // Chosen batches
-  std::queue<std::pair<SlotId, BatchId>> ready_batches_;
+  std::queue<std::pair<SlotId, std::pair<BatchId, MachineId>>> ready_batches_;
 };
 
 class Interleaver : public NetworkedModule {
@@ -63,6 +63,9 @@ class Interleaver : public NetworkedModule {
   ConfigurationPtr config_;
   std::unordered_map<uint32_t, BatchLog> single_home_logs_;
   LocalLog local_log_;
+  std::vector<MachineId> other_partitions_;
+
+  std::mt19937 rg_;
 };
 
 }  // namespace slog

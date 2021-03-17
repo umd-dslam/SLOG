@@ -35,7 +35,7 @@ class AsyncLog {
 
   const T& Peek() { return log_.at(next_); }
 
-  std::pair<T, uint32_t> Next() {
+  std::pair<uint32_t, T> Next() {
     if (!HasNext()) {
       throw std::runtime_error("Next item does not exist");
     }

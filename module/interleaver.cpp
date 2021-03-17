@@ -21,14 +21,14 @@ void LocalLog::AddBatchId(uint32_t queue_id, uint32_t position, BatchId batch_id
   UpdateReadyBatches();
 }
 
-void LocalLog::AddSlot(SlotId slot_id, uint32_t queue_id) {
-  slots_.Insert(slot_id, queue_id);
+void LocalLog::AddSlot(SlotId slot_id, uint32_t queue_id, MachineId leader) {
+  slots_.Insert(slot_id, std::make_pair(queue_id, leader));
   UpdateReadyBatches();
 }
 
 bool LocalLog::HasNextBatch() const { return !ready_batches_.empty(); }
 
-std::pair<SlotId, BatchId> LocalLog::NextBatch() {
+std::pair<SlotId, std::pair<BatchId, MachineId>> LocalLog::NextBatch() {
   if (!HasNextBatch()) {
     throw std::runtime_error("NextBatch() was called when there is no batch");
   }
@@ -39,7 +39,7 @@ std::pair<SlotId, BatchId> LocalLog::NextBatch() {
 
 void LocalLog::UpdateReadyBatches() {
   while (slots_.HasNext()) {
-    auto next_queue_id = slots_.Peek();
+    auto [next_queue_id, leader] = slots_.Peek();
     if (batch_queues_.count(next_queue_id) == 0) {
       break;
     }
@@ -49,13 +49,21 @@ void LocalLog::UpdateReadyBatches() {
     }
     auto slot_id = slots_.Next().first;
     auto batch_id = next_queue.Next().second;
-    ready_batches_.emplace(slot_id, batch_id);
+    ready_batches_.emplace(slot_id, std::make_pair(batch_id, leader));
   }
 }
 
 Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
                          std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout), config_(config) {}
+    : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout),
+      config_(config),
+      rg_(std::random_device()()) {
+  for (uint32_t p = 0; p < config_->num_partitions(); p++) {
+    if (p != config_->local_partition()) {
+      other_partitions_.push_back(config_->MakeMachineId(config->local_replica(), p));
+    }
+  }
+}
 
 void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
   auto request = env->mutable_request();
@@ -63,7 +71,7 @@ void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
     auto& order = request->local_queue_order();
     VLOG(1) << "Received local queue order. Slot id: " << order.slot() << ". Queue id: " << order.queue_id();
 
-    local_log_.AddSlot(order.slot(), order.queue_id());
+    local_log_.AddSlot(order.slot(), order.queue_id(), order.leader());
 
   } else if (request->type_case() == Request::kForwardBatch) {
     auto forward_batch = request->mutable_forward_batch();
@@ -91,10 +99,15 @@ void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
       case internal::ForwardBatch::kBatchOrder: {
         auto& batch_order = forward_batch->batch_order();
 
-        VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
-                << "]. Slot: " << batch_order.slot();
+        VLOG(1) << "Received order for batch " << batch_order.batch_id() << " (home = " << batch_order.home()
+                << ") from [" << env->from() << "]. Slot: " << batch_order.slot();
 
-        single_home_logs_[from_replica].AddSlot(batch_order.slot(), batch_order.batch_id());
+        // If this batch order comes from another replica, send this order to other partitions in the local replica
+        if (from_replica != config_->local_replica()) {
+          Send(*env, other_partitions_, kInterleaverChannel);
+        }
+
+        single_home_logs_[batch_order.home()].AddSlot(batch_order.slot(), batch_order.batch_id());
         break;
       }
       default:
@@ -107,24 +120,31 @@ void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
 
 void Interleaver::AdvanceLogs() {
   // Advance local log
-  auto local_partition = config_->local_partition();
   auto local_replica = config_->local_replica();
   while (local_log_.HasNextBatch()) {
     auto next_batch = local_log_.NextBatch();
     auto slot_id = next_batch.first;
-    auto batch_id = next_batch.second;
+    auto [batch_id, leader] = next_batch.second;
 
-    // Replicate the batch id and slot id to the corresponding partition in other regions
-    Envelope env;
-    auto forward_batch_order = env.mutable_request()->mutable_forward_batch()->mutable_batch_order();
-    forward_batch_order->set_batch_id(batch_id);
-    forward_batch_order->set_slot(slot_id);
-    auto num_replicas = config_->num_replicas();
-    for (uint32_t rep = 0; rep < num_replicas; rep++) {
-      if (rep != local_replica) {
-        Send(env, config_->MakeMachineId(rep, local_partition), kInterleaverChannel);
+    // Each entry in the local log is associated with a leader. If the current machine is the leader, it
+    // is in charged of replicating the batch id and slot id to other regions
+    if (config_->local_machine_id() == leader) {
+      Envelope env;
+      auto forward_batch_order = env.mutable_request()->mutable_forward_batch()->mutable_batch_order();
+      forward_batch_order->set_batch_id(batch_id);
+      forward_batch_order->set_slot(slot_id);
+      forward_batch_order->set_home(local_replica);
+      std::uniform_int_distribution<> rnd(0, config_->num_partitions() - 1);
+      auto part = rnd(rg_);
+      vector<MachineId> destinations;
+      for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
+        if (rep != local_replica) {
+          destinations.push_back(config_->MakeMachineId(rep, part));
+        }
       }
+      Send(env, destinations, kInterleaverChannel);
     }
+
     single_home_logs_[local_replica].AddSlot(slot_id, batch_id);
   }
 

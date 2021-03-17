@@ -21,6 +21,7 @@ message Batch {
 message BatchOrder {
     uint32 batch_id = 1;
     uint32 slot = 2;
+    uint32 home = 3;
 }
 
 message Envelope {
@@ -110,9 +111,9 @@ message PaxosAcceptRequest {
 }
 
 message PaxosCommitRequest {
-    uint32 ballot = 1;
-    uint32 slot = 2;
-    uint32 value = 3;
+    uint32 slot = 1;
+    uint32 value = 2;
+    uint32 leader = 3;
 }
 
 message LocalQueueOrder {
@@ -120,6 +121,7 @@ message LocalQueueOrder {
     // batch queue is generated from
     uint32 queue_id = 1;
     uint32 slot = 2;
+    uint32 leader = 3;
 }
 
 message RemoteReadResult {
