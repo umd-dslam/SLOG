@@ -31,7 +31,7 @@ class Sequencer : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
-  void ProcessForwardTxn(EnvelopePtr&& env);
+  void BatchTxn(Transaction* txn);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void NewBatch();

@@ -42,22 +42,28 @@ void Sequencer::NewBatch() {
 }
 
 void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
-  switch (env->request().type_case()) {
-    case Request::kForwardTxn:
-      ProcessForwardTxn(move(env));
+  auto request = env->mutable_request();
+  switch (request->type_case()) {
+    case Request::kForwardTxn: {
+      auto txn = request->mutable_forward_txn()->release_txn();
+      if (txn->internal().sequencer_delay_ms() > 0) {
+        auto delay = std::chrono::milliseconds(txn->internal().sequencer_delay_ms());
+        NewTimedCallback(delay, [this, txn]() { BatchTxn(txn); });
+      } else {
+        BatchTxn(txn);
+      }
       break;
+    }
     case Request::kStats:
-      ProcessStatsRequest(env->request().stats());
+      ProcessStatsRequest(request->stats());
       break;
     default:
-      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(env->request().type_case(), Request) << "\"";
+      LOG(ERROR) << "Unexpected request type received: \"" << CASE_NAME(request->type_case(), Request) << "\"";
       break;
   }
 }
 
-void Sequencer::ProcessForwardTxn(EnvelopePtr&& env) {
-  auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
-
+void Sequencer::BatchTxn(Transaction* txn) {
   TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {

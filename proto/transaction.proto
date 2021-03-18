@@ -66,14 +66,15 @@ message TransactionInternal {
     TransactionType type = 2;
     int32 home = 3;
     uint32 coordinating_server = 4;
-    repeated uint32 involved_partitions = 5;
-    repeated uint32 active_partitions = 6;
-    repeated uint32 involved_replicas = 7;
+    int32 sequencer_delay_ms = 5;
+    repeated uint32 involved_partitions = 6;
+    repeated uint32 active_partitions = 7;
+    repeated uint32 involved_replicas = 8;
 
     // for recording time of different events of txn
-    repeated TransactionEvent events = 8;
-    repeated int64 event_times = 9;    // when the events took place
-    repeated uint32 event_machines = 10; // where the events took place
+    repeated TransactionEvent events = 9;
+    repeated int64 event_times = 10;    // when the events took place
+    repeated uint32 event_machines = 11; // where the events took place
 }
 
 message RemasterProcedure {

@@ -230,8 +230,6 @@ internal::Commands Configuration::commands() const { return config_.commands(); 
 
 uint32_t Configuration::latency(size_t i) const { return latency_[i]; }
 
-std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const {
-  return ordered_latency_[n];
-};
+std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const { return ordered_latency_[n]; };
 
 }  // namespace slog
