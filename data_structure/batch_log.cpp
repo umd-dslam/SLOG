@@ -16,15 +16,13 @@ void BatchLog::AddBatch(BatchPtr&& batch) {
 }
 
 void BatchLog::AddReplication(BatchId batch_id) {
-  auto it = replication_.find(batch_id);
-  DCHECK(it != replication_.end());
-  it->second--;
+  replication_[batch_id]--;
   UpdateReadyBatches();
 }
 
-void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id, int replication_remaining) {
+void BatchLog::AddSlot(SlotId slot_id, BatchId batch_id, int replication_factor) {
   slots_.Insert(slot_id, batch_id);
-  replication_.insert_or_assign(batch_id, replication_remaining);
+  replication_[batch_id] += replication_factor;
   UpdateReadyBatches();
 }
 

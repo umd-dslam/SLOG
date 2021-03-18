@@ -124,6 +124,7 @@ void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
           // If this batch order comes from another replica, send this order to other partitions in the local replica
           if (from_replica != config_->local_replica()) {
             Send(*env, other_partitions_, kInterleaverChannel);
+            // Ack back if needed
             if (batch_order.need_ack()) {
               Envelope env_ack;
               env_ack.mutable_request()->mutable_batch_order_ack()->set_batch_id(batch_id);

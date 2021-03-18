@@ -16,7 +16,7 @@ class BatchLog {
   BatchLog();
 
   void AddBatch(BatchPtr&& batch);
-  void AddSlot(SlotId slot_id, BatchId batch_id, int replication_remaining = 0);
+  void AddSlot(SlotId slot_id, BatchId batch_id, int replication_factor = 0);
   void AddReplication(BatchId batch_id);
 
   bool HasNextBatch() const;
