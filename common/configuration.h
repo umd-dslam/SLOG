@@ -66,6 +66,7 @@ class Configuration {
   internal::Commands commands() const;
   uint32_t latency(size_t i) const;
   std::pair<uint32_t, size_t> nth_latency(size_t n) const;
+  bool synchronized_batching() const;
 
  private:
   internal::Configuration config_;

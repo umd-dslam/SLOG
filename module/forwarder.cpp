@@ -239,13 +239,30 @@ void Forwarder::Forward(EnvelopePtr&& env) {
     TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
     if (config_->bypass_mh_orderer()) {
-      // Send the txn directly to sequencers of involved replicas to generate lock-only txns
       auto part = ChooseRandomPartition(*txn, rg_);
-      vector<MachineId> destinations;
-      for (auto rep : txn_internal->involved_replicas()) {
-        destinations.push_back(config_->MakeMachineId(rep, part));
+
+      if (config_->synchronized_batching()) {
+        // If synchronized batching is on, compute the batching delay based on latency between the current
+        // replica to the involved replicas
+        uint32_t max_latency = 0;
+        for (auto rep : txn_internal->involved_replicas()) {
+          max_latency = std::max(max_latency, config_->latency(rep));
+        }
+        // Send the txn directly to sequencers of involved replicas to generate lock-only txns
+        auto txn = env->mutable_request()->mutable_forward_txn()->mutable_txn();
+        for (auto rep : txn_internal->involved_replicas()) {
+          auto delay = max_latency - config_->latency(rep);
+          txn->mutable_internal()->set_sequencer_delay_ms(delay);
+          Send(*env, config_->MakeMachineId(rep, part), kSequencerChannel);
+        }
+      } else {
+        // Send the txn directly to sequencers of involved replicas to generate lock-only txns
+        vector<MachineId> destinations;
+        for (auto rep : txn_internal->involved_replicas()) {
+          destinations.push_back(config_->MakeMachineId(rep, part));
+        }
+        Send(*env, destinations, kSequencerChannel);
       }
-      Send(*env, destinations, kSequencerChannel);
     } else {
       // Send the txn to the orderer to form a global order
       Send(move(env), kMultiHomeOrdererChannel);

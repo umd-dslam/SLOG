@@ -89,7 +89,7 @@ Configuration::Configuration(const internal::Configuration& config, const string
     }
   } else {
     for (int i = 0; i < config_.replicas_size(); i++) {
-      if (i != local_replica_) {
+      if (i != static_cast<int>(local_replica_)) {
         latency_.push_back(0);
         ordered_latency_.emplace_back(0, i);
       }
@@ -231,5 +231,7 @@ internal::Commands Configuration::commands() const { return config_.commands(); 
 uint32_t Configuration::latency(size_t i) const { return latency_[i]; }
 
 std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const { return ordered_latency_[n]; };
+
+bool Configuration::synchronized_batching() const { return config_.synchronized_batching(); }
 
 }  // namespace slog

@@ -127,4 +127,7 @@ message Configuration {
     // the corresponding replicas. For example, ['0,90', '80,0'] means the latency from replica 0 
     // to replica 1 is 90ms, and the latency from replica 1 to replica 0 is 80ms.
     repeated bytes replica_latency = 21;
+    // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
+    // txns are put into the batches at approximately the same time
+    bool synchronized_batching = 22;
 }
