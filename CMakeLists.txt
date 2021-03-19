@@ -262,13 +262,6 @@ endif()
 add_executable(slog service/slog.cpp service/service_utils.h)
 target_link_libraries(slog PRIVATE slog-core gflags::gflags)
 
-add_executable(benchmark service/benchmark.cpp service/service_utils.h)
-target_link_libraries(benchmark
-  PRIVATE
-    slog-core
-    gflags::gflags
-)
-
 if (BUILD_SLOG_CLIENT)
   add_executable(client service/client.cpp service/service_utils.h)
   target_link_libraries(client
@@ -277,6 +270,20 @@ if (BUILD_SLOG_CLIENT)
       gflags::gflags
   )
 endif()
+
+add_executable(benchmark service/benchmark.cpp service/service_utils.h)
+target_link_libraries(benchmark
+  PRIVATE
+    slog-core
+    gflags::gflags
+)
+
+add_executable(scheduler_benchmark service/scheduler_benchmark.cpp)
+target_link_libraries(scheduler_benchmark
+  PRIVATE
+    slog-core
+    gflags::gflags
+)
 
 #========================================
 #                Tests

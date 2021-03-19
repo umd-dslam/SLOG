@@ -24,6 +24,7 @@ FROM ubuntu:focal AS runner
     COPY --from=builder /src/build/slog .
     COPY --from=builder /src/build/client .
     COPY --from=builder /src/build/benchmark .
+    COPY --from=builder /src/build/scheduler_benchmark .
     COPY --from=builder /src/examples/*.conf ./
     COPY --from=builder /src/tools/ tools/
 
