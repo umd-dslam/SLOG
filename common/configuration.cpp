@@ -55,7 +55,7 @@ Configuration::Configuration(const internal::Configuration& config, const string
   CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
       << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
 
-  bool local_address_is_valid = false;
+  bool local_address_is_valid = local_address_.empty();
   for (int r = 0; r < config_.replicas_size(); r++) {
     auto& replica = config_.replicas(r);
     CHECK_EQ((uint32_t)replica.addresses_size(), config_.num_partitions())
