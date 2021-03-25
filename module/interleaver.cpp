@@ -64,7 +64,7 @@ Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker
     }
   }
   need_ack_from_replica_.resize(config->num_replicas());
-  for (size_t r = 0; r < config->replication_factor() - 1; r++) {
+  for (size_t r = 1; r < config->replication_factor(); r++) {
     need_ack_from_replica_[config->nth_latency(r).second] = true;
   }
 }

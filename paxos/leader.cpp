@@ -14,6 +14,11 @@ using internal::Response;
 
 Leader::Leader(SimulatedMultiPaxos& paxos, const vector<MachineId>& members, MachineId me)
     : paxos_(paxos), members_(members), me_(me), next_empty_slot_(0) {
+  // Number of acceptors is the largest odd number smaller than or equal to the number of members
+  size_t num_acceptors_ = ((members_.size() - 1) / 2) * 2 + 1;
+  for (size_t i = 0; i < num_acceptors_; i++) {
+    acceptors_.push_back(members_[i]);
+  }
   auto it = std::find(members.begin(), members.end(), me);
   is_member_ = it != members.end();
   if (is_member_) {
@@ -70,7 +75,7 @@ void Leader::HandleResponse(const Envelope& res) {
     auto& instance = it->second;
     ++instance.num_accepts;
 
-    if (instance.num_accepts == static_cast<int>(members_.size() / 2 + 1)) {
+    if (instance.num_accepts == static_cast<int>(acceptors_.size() / 2 + 1)) {
       auto env = paxos_.NewEnvelope();
       auto paxos_commit = env->mutable_request()->mutable_paxos_commit();
       paxos_commit->set_slot(slot);
@@ -102,7 +107,7 @@ void Leader::StartNewInstance(uint32_t value) {
   paxos_accept->set_value(value);
   next_empty_slot_++;
 
-  paxos_.SendSameChannel(move(env), members_);
+  paxos_.SendSameChannel(move(env), acceptors_);
 }
 
 bool Leader::IsMember() const { return is_member_; }

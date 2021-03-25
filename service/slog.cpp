@@ -138,6 +138,9 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < config->num_replicas(); i++) {
     LOG(INFO) << "Latency to " << i << ": " << config->latency(i) << " ms";
   }
+  for (size_t i = 0; i < config->num_replicas(); i++) {
+    LOG(INFO) << i << " lowest latency: " << config->nth_latency(i).first << " ms";
+  }
 
   if (config->return_dummy_txn()) {
     LOG(WARNING) << "Dummy transactions will be returned";

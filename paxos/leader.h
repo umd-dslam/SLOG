@@ -49,6 +49,7 @@ class Leader {
   SimulatedMultiPaxos& paxos_;
 
   const vector<MachineId> members_;
+  vector<MachineId> acceptors_;
   const MachineId me_;
   bool is_elected_;
   bool is_member_;
