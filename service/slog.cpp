@@ -130,17 +130,18 @@ int main(int argc, char* argv[]) {
 #else
   LOG(INFO) << "Remastering disabled";
 #endif /* REMASTER_PROTOCOL_SIMPLE */
-
+  
+  CHECK(!FLAGS_address.empty()) << "Address must not be empty";
   auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address);
 
   INIT_TRACING(config);
 
-  for (size_t i = 0; i < config->num_replicas(); i++) {
-    LOG(INFO) << "Latency to " << i << ": " << config->latency(i) << " ms";
+  std::ostringstream os;
+  for (size_t i = 1; i < config->num_replicas(); i++) {
+    auto [lat, rep] = config->nth_latency(i);
+    os << "(rep=" << rep << " | " << lat << " ms) ";
   }
-  for (size_t i = 0; i < config->num_replicas(); i++) {
-    LOG(INFO) << i << " lowest latency: " << config->nth_latency(i).first << " ms";
-  }
+  LOG(INFO) << "Latency order: " << os.str();
 
   if (config->return_dummy_txn()) {
     LOG(WARNING) << "Dummy transactions will be returned";
