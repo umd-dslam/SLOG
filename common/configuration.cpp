@@ -49,7 +49,7 @@ ConfigurationPtr Configuration::FromFile(const string& file_path, const string& 
 }
 
 Configuration::Configuration(const internal::Configuration& config, const string& local_address)
-    : config_(config), local_address_(local_address) {
+    : config_(config), local_address_(local_address), local_replica_(0), local_partition_(0) {
   CHECK_LE(config_.replication_factor(), config_.replicas_size())
       << "Replication factor must not exceed number of replicas";
   CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
