@@ -21,6 +21,12 @@ using std::make_shared;
 using std::string;
 using std::vector;
 
+struct TxnInfo {
+  using TimePoint = std::chrono::system_clock::time_point;
+  Transaction* txn;
+  TimePoint sent_at;
+};
+
 string Join(const vector<string> parts, char delim = ';') {
   string result;
   bool first = true;
@@ -89,20 +95,23 @@ int main(int argc, char* argv[]) {
 
   // Send transactions to the scheduler
   LOG(INFO) << "Sending all transactions through the scheduler";
+  std::unordered_map<TxnId, TxnInfo::TimePoint> sent_at;
   Sender sender(config, broker->context());
   for (auto txn : transactions) {
     auto env = std::make_unique<internal::Envelope>();
     env->mutable_request()->mutable_forward_txn()->set_allocated_txn(txn);
     sender.Send(std::move(env), kSchedulerChannel);
+    sent_at[txn->internal().id()] = std::chrono::system_clock::now();
   }
 
   // Receive the results
   LOG(INFO) << "Collecting results";
-  vector<Transaction*> results;
+  vector<TxnInfo> results;
   for (size_t i = 0; i < transactions.size(); i++) {
     auto env = RecvEnvelope(result_socket);
     auto txn = env->mutable_request()->mutable_completed_subtxn()->release_txn();
-    results.push_back(txn);
+    auto txn_id = txn->internal().id();
+    results.push_back({.txn = txn, .sent_at = sent_at[txn_id]});
   }
 
   auto duration = duration_cast<milliseconds>(std::chrono::steady_clock::now() - start_time);
@@ -121,7 +130,7 @@ int main(int argc, char* argv[]) {
   results.resize(sample_size);
 
   // Output the results
-  const vector<string> kTxnColumns = {"txn_id", "reads", "writes"};
+  const vector<string> kTxnColumns = {"txn_id", "sent_at", "reads", "writes"};
   const vector<string> kEventsColumns = {"txn_id", "event_id",
                                          "time",  // microseconds since epoch
                                          "machine"};
@@ -131,7 +140,8 @@ int main(int argc, char* argv[]) {
   CSVWriter event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns);
 
   std::unordered_map<int, string> enames;
-  for (const auto& txn : results) {
+  for (const auto& info : results) {
+    auto txn = info.txn;
     auto& txn_internal = txn->internal();
     vector<string> reads, writes;
     for (const auto& [k, v] : txn->keys()) {
@@ -141,7 +151,8 @@ int main(int argc, char* argv[]) {
         writes.push_back(k);
       }
     }
-    profiles << txn_internal.id() << Join(reads) << Join(writes) << csvendl;
+    profiles << txn_internal.id() << duration_cast<microseconds>(info.sent_at.time_since_epoch()).count() << Join(reads)
+             << Join(writes) << csvendl;
     for (int i = 0; i < txn_internal.events_size(); i++) {
       auto event = txn_internal.events(i);
       enames[event] = ENUM_NAME(event, TransactionEvent);
