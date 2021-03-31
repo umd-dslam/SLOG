@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
 #else
   LOG(INFO) << "Remastering disabled";
 #endif /* REMASTER_PROTOCOL_SIMPLE */
-  
+
   CHECK(!FLAGS_address.empty()) << "Address must not be empty";
   auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address);
 

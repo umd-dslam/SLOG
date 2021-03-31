@@ -12,20 +12,18 @@ namespace slog {
 bool LockState::AcquireReadLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
-      holders_.insert(txn_id);
+      holders_.push_back(txn_id);
       mode = LockMode::READ;
       return true;
     case LockMode::READ:
-      if (waiters_.empty()) {
-        holders_.insert(txn_id);
+      if (waiter_queue_.empty()) {
+        holders_.push_back(txn_id);
         return true;
       } else {
-        waiters_.insert(txn_id);
         waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
         return false;
       }
     case LockMode::WRITE:
-      waiters_.insert(txn_id);
       waiter_queue_.push_back(make_pair(txn_id, LockMode::READ));
       return false;
     default:
@@ -36,12 +34,11 @@ bool LockState::AcquireReadLock(TxnId txn_id) {
 bool LockState::AcquireWriteLock(TxnId txn_id) {
   switch (mode) {
     case LockMode::UNLOCKED:
-      holders_.insert(txn_id);
+      holders_.push_back(txn_id);
       mode = LockMode::WRITE;
       return true;
     case LockMode::READ:
     case LockMode::WRITE:
-      waiters_.insert(txn_id);
       waiter_queue_.push_back(make_pair(txn_id, LockMode::WRITE));
       return false;
     default:
@@ -49,31 +46,35 @@ bool LockState::AcquireWriteLock(TxnId txn_id) {
   }
 }
 
-bool LockState::Contains(TxnId txn_id) { return holders_.count(txn_id) > 0 || waiters_.count(txn_id) > 0; }
+bool LockState::Contains(TxnId txn_id) {
+  return std::find(holders_.begin(), holders_.end(), txn_id) != holders_.end() ||
+         std::find_if(waiter_queue_.begin(), waiter_queue_.end(),
+                      [txn_id](auto& pair) { return pair.first == txn_id; }) != waiter_queue_.end();
+}
 
-unordered_set<TxnId> LockState::Release(TxnId txn_id) {
+vector<TxnId> LockState::Release(TxnId txn_id) {
   // If the transaction is not among the lock holders, find and remove it in
   // the queue of waiters
-  if (holders_.count(txn_id) == 0) {
+  auto it = std::find(holders_.begin(), holders_.end(), txn_id);
+  if (it == holders_.end()) {
     waiter_queue_.erase(std::remove_if(waiter_queue_.begin(), waiter_queue_.end(),
                                        [txn_id](auto& pair) { return pair.first == txn_id; }),
                         waiter_queue_.end());
-    waiters_.erase(txn_id);
     // No new transaction get the lock
     return {};
   }
 
-  holders_.erase(txn_id);
+  holders_.erase(it);
 
   // If there are still holders for this lock, do nothing
   if (!holders_.empty()) {
-    // No new transaction get the lock
+    // No new transaction gets the lock
     return {};
   }
 
   // If all holders release the lock but there is no waiter, the current state is
   // changed to unlocked
-  if (waiters_.empty()) {
+  if (waiter_queue_.empty()) {
     mode = LockMode::UNLOCKED;
     // No new transaction get the lock
     return {};
@@ -84,8 +85,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
     // Gives the READ lock to all read transactions at the head of the queue
     do {
       auto txn_id = waiter_queue_.front().first;
-      holders_.insert(txn_id);
-      waiters_.erase(txn_id);
+      holders_.push_back(txn_id);
       waiter_queue_.pop_front();
     } while (!waiter_queue_.empty() && waiter_queue_.front().second == LockMode::READ);
 
@@ -93,8 +93,7 @@ unordered_set<TxnId> LockState::Release(TxnId txn_id) {
 
   } else if (front.second == LockMode::WRITE) {
     // Give the WRITE lock to a single transaction at the head of the queue
-    holders_.insert(front.first);
-    waiters_.erase(front.first);
+    holders_.push_back(front.first);
     waiter_queue_.pop_front();
     mode = LockMode::WRITE;
   }

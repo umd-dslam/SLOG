@@ -35,20 +35,19 @@ class LockState {
  public:
   bool AcquireReadLock(TxnId txn_id);
   bool AcquireWriteLock(TxnId txn_id);
-  unordered_set<TxnId> Release(TxnId txn_id);
+  vector<TxnId> Release(TxnId txn_id);
   bool Contains(TxnId txn_id);
 
   LockMode mode = LockMode::UNLOCKED;
 
   /* For debugging */
-  const unordered_set<TxnId>& GetHolders() const { return holders_; }
+  const vector<TxnId>& GetHolders() const { return holders_; }
 
   /* For debugging */
   const list<pair<TxnId, LockMode>>& GetWaiters() const { return waiter_queue_; }
 
  private:
-  unordered_set<TxnId> holders_;
-  unordered_set<TxnId> waiters_;
+  vector<TxnId> holders_;
   list<pair<TxnId, LockMode>> waiter_queue_;
 };
 
