@@ -21,7 +21,7 @@ const Channel kWorkerChannel = 9;
 const Channel kBrokerChannel = 10;
 const Channel kMaxChannel = 15;
 
-const uint32_t kMaxNumMachines = 1000;
+const uint32_t kMaxNumMachines = 100;
 
 const uint32_t kPaxosDefaultLeaderPosition = 0;
 

@@ -97,7 +97,7 @@ void Leader::HandleResponse(const Envelope& res) {
   }
 }
 
-void Leader::StartNewInstance(uint32_t value) {
+void Leader::StartNewInstance(uint64_t value) {
   instances_.try_emplace(next_empty_slot_, ballot_, value);
 
   auto env = paxos_.NewEnvelope();

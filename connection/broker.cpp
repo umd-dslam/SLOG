@@ -166,7 +166,7 @@ class BrokerThread : public Module {
     std::optional<Channel> to;
     vector<zmq::message_t> pending_msgs;
   };
-  unordered_map<Channel, RedirectEntry> redirect_;
+  unordered_map<uint64_t, RedirectEntry> redirect_;
 };
 }  // namespace
 

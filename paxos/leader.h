@@ -20,10 +20,10 @@ using EnvelopePtr = unique_ptr<internal::Envelope>;
 class SimulatedMultiPaxos;
 
 struct PaxosInstance {
-  PaxosInstance(uint32_t ballot, uint32_t value) : ballot(ballot), value(value), num_accepts(0), num_commits(0) {}
+  PaxosInstance(uint32_t ballot, uint64_t value) : ballot(ballot), value(value), num_accepts(0), num_commits(0) {}
 
   uint32_t ballot;
-  uint32_t value;
+  uint64_t value;
   int num_accepts;
   int num_commits;
 };
@@ -44,7 +44,7 @@ class Leader {
 
  private:
   void ProcessCommitRequest(const internal::PaxosCommitRequest& commit);
-  void StartNewInstance(uint32_t value);
+  void StartNewInstance(uint64_t value);
 
   SimulatedMultiPaxos& paxos_;
 

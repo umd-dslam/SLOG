@@ -18,13 +18,13 @@ TEST(LocalLogTest, InOrder) {
   ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */, 0 /* leader */);
-  ASSERT_EQ(make_pair(0U, make_pair(100U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, make_pair(100UL, 0)), interleaver.NextBatch());
 
   interleaver.AddBatchId(222 /* queue_id */, 0 /* position */, 200 /* batch_id */);
   ASSERT_FALSE(interleaver.HasNextBatch());
 
   interleaver.AddSlot(1 /* slot_id */, 222 /* queue_id */, 1 /* leader */);
-  ASSERT_EQ(make_pair(1U, make_pair(200U, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, make_pair(200UL, 1)), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
@@ -38,16 +38,16 @@ TEST(LocalLogTest, BatchesComeFirst) {
   interleaver.AddBatchId(333 /* queue_id */, 1 /* position */, 400 /* batch_id */);
 
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */, 0 /* leader */);
-  ASSERT_EQ(make_pair(0U, make_pair(200U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, make_pair(200UL, 0)), interleaver.NextBatch());
 
   interleaver.AddSlot(1 /* slot_id */, 333 /* queue_id */, 1 /* leader */);
-  ASSERT_EQ(make_pair(1U, make_pair(300U, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, make_pair(300UL, 1)), interleaver.NextBatch());
 
   interleaver.AddSlot(2 /* slot_id */, 222 /* queue_id */, 2 /* leader */);
-  ASSERT_EQ(make_pair(2U, make_pair(100U, 2)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, make_pair(100UL, 2)), interleaver.NextBatch());
 
   interleaver.AddSlot(3 /* slot_id */, 333 /* queue_id */, 3 /* leader */);
-  ASSERT_EQ(make_pair(3U, make_pair(400U, 3)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(3U, make_pair(400UL, 3)), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
@@ -61,16 +61,16 @@ TEST(LocalLogTest, SlotsComeFirst) {
   interleaver.AddSlot(0 /* slot_id */, 111 /* queue_id */, 0 /* leader */);
 
   interleaver.AddBatchId(111 /* queue_id */, 0 /* position */, 200 /* batch_id */);
-  ASSERT_EQ(make_pair(0U, make_pair(200U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, make_pair(200UL, 0)), interleaver.NextBatch());
 
   interleaver.AddBatchId(333 /* queue_id */, 0 /* position */, 300 /* batch_id */);
-  ASSERT_EQ(make_pair(1U, make_pair(300U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, make_pair(300UL, 0)), interleaver.NextBatch());
 
   interleaver.AddBatchId(222 /* queue_id */, 0 /* position */, 100 /* batch_id */);
-  ASSERT_EQ(make_pair(2U, make_pair(100U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, make_pair(100UL, 0)), interleaver.NextBatch());
 
   interleaver.AddBatchId(333 /* queue_id */, 1 /* position */, 400 /* batch_id */);
-  ASSERT_EQ(make_pair(3U, make_pair(400U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(3U, make_pair(400UL, 0)), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
@@ -88,10 +88,10 @@ TEST(LocalLogTest, MultipleNextBatches) {
   interleaver.AddSlot(2 /* slot_id */, 111 /* queue_id */, 1 /* leader */);
   interleaver.AddSlot(0 /* slot_id */, 222 /* queue_id */, 1 /* leader */);
 
-  ASSERT_EQ(make_pair(0U, make_pair(100U, 1)), interleaver.NextBatch());
-  ASSERT_EQ(make_pair(1U, make_pair(400U, 1)), interleaver.NextBatch());
-  ASSERT_EQ(make_pair(2U, make_pair(300U, 1)), interleaver.NextBatch());
-  ASSERT_EQ(make_pair(3U, make_pair(200U, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, make_pair(100UL, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, make_pair(400UL, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, make_pair(300UL, 1)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(3U, make_pair(200UL, 1)), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }
@@ -113,9 +113,9 @@ TEST(LocalLogTest, SameOriginOutOfOrder) {
   interleaver.AddSlot(2 /* slot_id */, 111 /* queue_id */, 0 /* leader */);
   ASSERT_TRUE(interleaver.HasNextBatch());
 
-  ASSERT_EQ(make_pair(0U, make_pair(100U, 0)), interleaver.NextBatch());
-  ASSERT_EQ(make_pair(1U, make_pair(200U, 0)), interleaver.NextBatch());
-  ASSERT_EQ(make_pair(2U, make_pair(300U, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(0U, make_pair(100UL, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(1U, make_pair(200UL, 0)), interleaver.NextBatch());
+  ASSERT_EQ(make_pair(2U, make_pair(300UL, 0)), interleaver.NextBatch());
 
   ASSERT_FALSE(interleaver.HasNextBatch());
 }

@@ -5,7 +5,7 @@ import "proto/transaction.proto";
 package slog.internal;
 
 message Batch {
-    uint32 id = 1;
+    uint64 id = 1;
     repeated Transaction transactions = 2;
     // All txns in this batch has this same type.
     // Can either be SINGLE_HOME or MULTI_HOME. 
@@ -19,7 +19,7 @@ message Batch {
 }
 
 message BatchOrder {
-    uint32 batch_id = 1;
+    uint64 batch_id = 1;
     uint32 slot = 2;
     uint32 home = 3;
     bool need_ack = 4;
@@ -77,7 +77,7 @@ message EchoRequest {
 }
 
 message BrokerRedirect {
-    uint32 tag = 1;
+    uint64 tag = 1;
     uint32 channel = 2;
     bool stop = 3;
 }
@@ -87,7 +87,7 @@ message ForwardTransaction {
 }
 
 message LookupMasterRequest {
-    repeated uint32 txn_ids = 1;
+    repeated uint64 txn_ids = 1;
     repeated string keys = 2;
 }
 
@@ -103,22 +103,22 @@ message ForwardBatch {
 }
 
 message BatchOrderAck {
-    uint32 batch_id = 1;
+    uint64 batch_id = 1;
 }
 
 message PaxosPropose {
-    uint32 value = 1;
+    uint64 value = 1;
 }
 
 message PaxosAcceptRequest {
     uint32 ballot = 1;
     uint32 slot = 2;
-    uint32 value = 3;
+    uint64 value = 3;
 }
 
 message PaxosCommitRequest {
     uint32 slot = 1;
-    uint32 value = 2;
+    uint64 value = 2;
     uint32 leader = 3;
 }
 
@@ -131,7 +131,7 @@ message LocalQueueOrder {
 }
 
 message RemoteReadResult {
-    uint32 txn_id = 1;
+    uint64 txn_id = 1;
     uint32 partition = 2;
     map<string, ValueEntry> reads = 3;
     bool will_abort = 4;
@@ -144,7 +144,7 @@ message CompletedSubtransaction {
 }
 
 message StatsRequest {
-    uint32 id = 1;
+    uint64 id = 1;
     uint32 level = 2;
 }
 
@@ -172,7 +172,7 @@ message EchoResponse {
 }
 
 message LookupMasterResponse {
-    repeated uint32 txn_ids = 1;
+    repeated uint64 txn_ids = 1;
     map<string, MasterMetadata> master_metadata = 2;
 }
 
@@ -186,6 +186,6 @@ message PaxosCommitResponse {
 }
 
 message StatsResponse {
-    uint32 id = 1;
+    uint64 id = 1;
     bytes stats_json = 2;
 }
