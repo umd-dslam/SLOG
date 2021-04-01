@@ -136,6 +136,8 @@ int main(int argc, char* argv[]) {
 
   INIT_TRACING(config);
 
+  LOG(INFO) << "Local replica: " << config->local_replica();
+  LOG(INFO) << "Local partition: " << config->local_partition();
   std::ostringstream os;
   for (size_t i = 1; i < config->num_replicas(); i++) {
     auto [lat, rep] = config->nth_latency(i);

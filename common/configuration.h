@@ -51,7 +51,7 @@ class Configuration {
   uint32_t partition_of_key(const Key& key) const;
   bool key_is_in_local_partition(const Key& key) const;
   // Only work with simple partitioning
-  uint32_t partition_of_key(uint32_t key) const;
+  int partition_of_key(uint32_t key) const;
   uint32_t master_of_key(uint32_t key) const;
   const internal::SimplePartitioning* simple_partitioning() const;
 
@@ -71,8 +71,8 @@ class Configuration {
  private:
   internal::Configuration config_;
   string local_address_;
-  uint32_t local_replica_;
-  uint32_t local_partition_;
+  int local_replica_;
+  int local_partition_;
 
   vector<string> all_addresses_;
   vector<uint32_t> latency_;

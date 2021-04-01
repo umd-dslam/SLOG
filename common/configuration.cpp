@@ -186,7 +186,7 @@ bool Configuration::key_is_in_local_partition(const Key& key) const {
   return partition_of_key(key) == local_partition_;
 }
 
-uint32_t Configuration::partition_of_key(uint32_t key) const { return key % num_partitions(); }
+int Configuration::partition_of_key(uint32_t key) const { return key % num_partitions(); }
 
 uint32_t Configuration::master_of_key(uint32_t key) const { return (key / num_partitions()) % num_replicas(); }
 
