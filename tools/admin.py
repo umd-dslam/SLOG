@@ -785,6 +785,11 @@ class BenchmarkCommand(AdminCommand):
                  "use -e GLOG_v=1 to turn on verbose logging at level 1."
         )
         parser.add_argument(
+            "--seed", type=int,
+            default=-1,
+            help="Seed for the randomization in the benchmark. Set to -1 for random seed"
+        )
+        parser.add_argument(
             "--cleanup", action="store_true",
             help="Clean up all running benchmarks then exit"
         )
@@ -887,6 +892,7 @@ class BenchmarkCommand(AdminCommand):
                 f"--txns {num_txns} "
                 f"--workers {args.workers} "
                 f"--sample {args.sample} "
+                f"--seed {args.seed} "
                 f"--txn_profiles"
             )
             container = client.containers.run(
