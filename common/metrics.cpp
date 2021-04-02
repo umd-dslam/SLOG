@@ -93,8 +93,8 @@ void MetricsRepositoryManager::RegisterCurrentThread() {
 
 void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
   try {
-    CSVWriter txn_events_csv(dir + "txn_events.csv", {"event_id", "time", "partition", "replica"});
-    CSVWriter event_names_csv(dir + "event_names.csv", {"id", "event"});
+    CSVWriter txn_events_csv(dir + "/txn_events.csv", {"event_id", "time", "partition", "replica"});
+    CSVWriter event_names_csv(dir + "/event_names.csv", {"id", "event"});
 
     std::list<TransactionEventMetrics::Data> txn_events_data;
     std::lock_guard<std::mutex> guard(mut_);
@@ -111,7 +111,7 @@ void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
     for (auto e : event_names) {
       event_names_csv << e.first << e.second << csvendl;
     }
-    LOG(INFO) << "Metrics written to: \"" << dir << "\"";
+    LOG(INFO) << "Metrics written to: \"" << dir << "/\"";
   } catch (std::runtime_error& e) {
     LOG(ERROR) << e.what();
   }

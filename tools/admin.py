@@ -38,6 +38,7 @@ HOST_DATA_DIR = "/var/tmp"
 
 SLOG_IMG = "ctring/slog"
 SLOG_CONTAINER_NAME = "slog"
+SLOG_CLIENT_CONTAINER_NAME = "slog_client"
 SLOG_DATA_MOUNT = docker.types.Mount(
     target=CONTAINER_DATA_DIR,
     source=HOST_DATA_DIR,
@@ -57,7 +58,6 @@ RemoteProcess = collections.namedtuple(
         'docker_client',
         'address',
         'replica',
-        'partition',
         'procnum',
     ]
 )
@@ -133,6 +133,35 @@ def parse_envs(envs: List[str]) -> Dict[str, str]:
     return {env[0]: env[1] for env in env_var_tuples}
 
 
+def download_and_untar_data(addresses, user, out_dir, tag):
+    out_path = os.path.join(out_dir, tag)
+    if os.path.exists(out_path):
+        shutil.rmtree(out_path, ignore_errors=True)
+        LOG.info("Removed existing directory: %s", out_path)
+
+    os.makedirs(out_path)
+    LOG.info(f"Created directory: {out_path}")
+
+    commands = []
+    for addr in addresses:
+        data_path = os.path.join(HOST_DATA_DIR, tag)
+        data_tar_file = f'{addr}.tar.gz'
+        data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
+        out_tar_path = os.path.join(out_path, data_tar_file)
+        out_addr_path = os.path.join(out_path, addr)
+
+        os.makedirs(out_addr_path, exist_ok=True)
+        cmd = (
+            f'ssh {user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
+            f'rsync -vh --inplace {user}@{addr}:{data_tar_path} {out_path} && '
+            f'tar -xzf {out_tar_path} -C {out_addr_path}'
+        )
+        commands.append(f'({cmd}) & ')
+
+    LOG.info("Executing commands:\n%s", '\n'.join(commands))
+    os.system(''.join(commands) + ' wait')       
+
+
 class AdminCommand(Command):
     """Base class for a command.
 
@@ -197,12 +226,12 @@ class AdminCommand(Command):
         procs = []
         # Create a docker client for each node
         for rep, rep_info in enumerate(self.config.replicas):
-            for part, addr in enumerate(rep_info.addresses):
+            for addr in rep_info.addresses:
                 # Use None as a placeholder for the first value
-                procs.append([None, addr.decode(), rep, part])
+                procs.append([None, addr.decode(), rep])
         
         def init_docker_client(remote_proc):
-            _, addr, _, _ = remote_proc
+            _, addr, _ = remote_proc
             try:
                 remote_proc[0] = self.new_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
@@ -335,7 +364,7 @@ class StartCommand(AdminCommand):
             pool.map(clean_up, self.remote_procs)
 
         def start_container(remote_proc):
-            client, addr, rep, part, *_ = remote_proc
+            client, addr, *_ = remote_proc
             shell_cmd = (
                 f"slog "
                 f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
@@ -804,7 +833,7 @@ class BenchmarkCommand(AdminCommand):
             for c in r.clients:
                 # Create a list of processes per machine
                 proc_lists.append([
-                    [None, c.address.decode(), rep, None, procnum] for procnum in range(c.procs)
+                    [None, c.address.decode(), rep, procnum] for procnum in range(c.procs)
                 ])
         
         # Interleave the lists of processes across machines
@@ -815,7 +844,7 @@ class BenchmarkCommand(AdminCommand):
         ]
 
         def init_docker_client(proc):
-            _, addr, rep, _, procnum = proc
+            addr = proc[1]
             try:
                 proc[0] = self.new_client(args.user, addr)         
                 LOG.info("Connected to %s", addr)
@@ -832,8 +861,8 @@ class BenchmarkCommand(AdminCommand):
             pool.map(init_docker_client, procs)
 
         self.remote_procs = [
-            RemoteProcess(docker_client, addr, rep, None, procnum)
-            for docker_client, addr, rep, _, procnum in procs
+            RemoteProcess(docker_client, addr, rep, procnum)
+            for docker_client, addr, rep, procnum in procs
         ]
 
     def do_command(self, args):
@@ -848,11 +877,11 @@ class BenchmarkCommand(AdminCommand):
         else:
             tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        parent_dir = os.path.join(CONTAINER_DATA_DIR, f"slog-benchmark-{tag}")
+        parent_dir = os.path.join(CONTAINER_DATA_DIR, tag)
 
         # Clean up everything
         def clean_up(remote_proc):
-            client, addr, _, _, proc = remote_proc
+            client, addr, _, proc = remote_proc
             container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
             cleanup_container(client, container_name, addr=addr)
             client.containers.run(
@@ -873,7 +902,7 @@ class BenchmarkCommand(AdminCommand):
 
         def benchmark_runner(proc_and_params):
             proc, num_txns, duration = proc_and_params
-            client, addr, rep, _, procnum = proc
+            client, addr, rep, procnum = proc
 
             if num_txns is None:
                 num_txns = args.rate * duration
@@ -949,9 +978,9 @@ class BenchmarkCommand(AdminCommand):
         LOG.info("Tag: %s", tag)
 
 
-class CollectCommand(AdminCommand):
+class CollectClientCommand(AdminCommand):
 
-    NAME = "collect"
+    NAME = "collect_client"
     HELP = "Collect benchmark data from the clients"
 
     def add_arguments(self, parser):
@@ -982,36 +1011,80 @@ class CollectCommand(AdminCommand):
         pass
 
     def do_command(self, args):
-        name = f"slog-benchmark-{args.tag}"
-        out_path = os.path.join(args.out_dir, name)
-        
-        if os.path.exists(out_path):
-            shutil.rmtree(out_path, ignore_errors=True)
-            LOG.info("Removed existing directory: %s", out_path)
+        client_out_dir = os.path.join(args.out_dir, "client")
+        addresses = [
+            c.address.decode() 
+            for r in self.config.replicas
+            for c in r.clients
+        ]
+        download_and_untar_data(addresses, args.user, client_out_dir, args.tag)
 
-        os.makedirs(out_path)
-        LOG.info(f"Created directory: {out_path}")
 
-        commands = []
-        for r in self.config.replicas:
-            for c in r.clients:
-                addr = c.address.decode()
-                data_path = os.path.join(HOST_DATA_DIR, name)
-                data_tar_file = f'{addr}.tar.gz'
-                data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
-                out_tar_path = os.path.join(out_path, data_tar_file)
-                out_addr_path = os.path.join(out_path, addr)
+class CollectServerCommand(AdminCommand):
 
-                os.makedirs(out_addr_path, exist_ok=True)
-                cmd = (
-                    f'ssh {args.user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
-                    f'rsync -vh --inplace {args.user}@{addr}:{data_tar_path} {out_path} && '
-                    f'tar -xzf {out_tar_path} -C {out_addr_path}'
+    NAME = "collect_server"
+    HELP = "Collect metrics data from the servers"
+
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument(
+            "tag",
+            help="Tag of the metrics data"
+        )
+        parser.add_argument(
+            "--out-dir",
+            default='',
+            help="Directory to put the collected data"
+        )
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("--flush-only", action="store_true", help="Only trigger flushing metrics to disk")
+        group.add_argument("--download-only", action="store_true", help="Only download the data files")
+
+    def do_command(self, args):
+        if len(self.remote_procs) == 0:
+            return
+
+        if not args.download_only:
+            def clean_up(remote_proc):
+                client, addr, *_ = remote_proc
+                cleanup_container(client, SLOG_CLIENT_CONTAINER_NAME, addr=addr)
+
+            with Pool(processes=len(self.remote_procs)) as pool:
+                pool.map(clean_up, self.remote_procs)
+
+            def trigger_flushing_metrics(remote_proc):
+                client, addr, *_ = remote_proc
+                out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
+                mkdir_cmd = f"mkdir -p {out_dir}"
+                shell_cmd = f"client metrics {out_dir}"
+                client.containers.run(
+                    args.image,
+                    name=SLOG_CLIENT_CONTAINER_NAME,
+                    command=[
+                        "/bin/sh", "-c",
+                        f"{mkdir_cmd} && {shell_cmd}"
+                    ],
+                    # Mount a directory on the host into the container
+                    mounts=[SLOG_DATA_MOUNT],
+                    # Expose all ports from container to host
+                    network_mode="host",
+                    # Avoid hanging this tool after starting the server
+                    detach=True,
                 )
-                commands.append(f'({cmd}) & ')
-    
-        LOG.info("Executing commands:\n%s", '\n'.join(commands))
-        os.system(''.join(commands) + ' wait')
+                LOG.info("%s: Triggered flushing metrics to disk", addr)
+
+            with Pool(processes=len(self.remote_procs)) as pool:
+                pool.map(trigger_flushing_metrics, self.remote_procs)
+
+        if args.flush_only:
+            return
+        server_out_dir = os.path.join(args.out_dir, "server")
+        addresses = [
+            a.decode()
+            for r in self.config.replicas
+            for a in r.addresses
+        ]
+        download_and_untar_data(addresses, args.user, server_out_dir, args.tag)
 
 
 if __name__ == "__main__":
@@ -1020,7 +1093,8 @@ if __name__ == "__main__":
         "Controls deployment and experiment of SLOG",
         [
             BenchmarkCommand,
-            CollectCommand,
+            CollectClientCommand,
+            CollectServerCommand,
             GenDataCommand,
             StartCommand,
             StopCommand,
