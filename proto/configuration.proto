@@ -110,7 +110,7 @@ message Configuration {
     // Replication of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 14;
     // Do not record specified events
-    repeated TransactionEvent disabled_tracing_events = 15;
+    repeated TransactionEvent disabled_events = 15;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
     bool bypass_mh_orderer = 16;
     // Pin each module to a cpu

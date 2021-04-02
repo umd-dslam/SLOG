@@ -111,7 +111,7 @@ bool Worker::OnCustomSocket() {
   auto& txn = txn_holder->txn();
   auto txn_id = txn.internal().id();
 
-  TRACE(txn.mutable_internal(), TransactionEvent::ENTER_WORKER);
+  RECORD(txn.mutable_internal(), TransactionEvent::ENTER_WORKER);
 
   // Create a state for the new transaction
   auto [iter, ok] = txn_states_.try_emplace(txn_id, txn_holder);
@@ -263,7 +263,7 @@ void Worker::Finish(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto txn = state.txn_holder->Release();
 
-  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
+  RECORD(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 
   // Send the txn back to the coordinating server if it is in the same region.
   // This must happen before the sending to scheduler below. Otherwise,

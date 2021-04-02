@@ -98,7 +98,7 @@ void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
         case internal::ForwardBatch::kBatchData: {
           auto batch = BatchPtr{forward_batch->release_batch_data()};
 
-          TRACE(batch.get(), TransactionEvent::ENTER_INTERLEAVER_IN_BATCH);
+          RECORD(batch.get(), TransactionEvent::ENTER_INTERLEAVER_IN_BATCH);
 
           VLOG(1) << "Received data for batch " << batch->id() << " from [" << env->from()
                   << "]. Number of txns: " << batch->transactions_size();
@@ -202,7 +202,7 @@ void Interleaver::EmitBatch(BatchPtr&& batch) {
 
   auto transactions = Unbatch(batch.get());
   for (auto txn : transactions) {
-    TRACE(txn->mutable_internal(), TransactionEvent::EXIT_INTERLEAVER);
+    RECORD(txn->mutable_internal(), TransactionEvent::EXIT_INTERLEAVER);
 
     auto env = NewEnvelope();
     auto forward_txn = env->mutable_request()->mutable_forward_txn();

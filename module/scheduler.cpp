@@ -108,7 +108,7 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
   auto ins = active_txns_.try_emplace(txn_id, config_, txn);
 
   if (ins.second) {
-    TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
+    RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
 
     VLOG(2) << "Accepted " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
             << txn->internal().home() << ")";
@@ -181,7 +181,7 @@ void Scheduler::SendToLockManager(Transaction& txn) {
 
   VLOG(2) << "Trying to acquires locks of txn " << txn_id;
 
-  TRACE(txn.mutable_internal(), TransactionEvent::ENTER_LOCK_MANAGER);
+  RECORD(txn.mutable_internal(), TransactionEvent::ENTER_LOCK_MANAGER);
 
   switch (lock_manager_.AcquireLocks(txn)) {
     case AcquireLocksResult::ACQUIRED:
@@ -204,9 +204,9 @@ void Scheduler::Dispatch(TxnId txn_id, bool is_fast) {
   auto& txn_holder = it->second;
 
   if (is_fast) {
-    TRACE(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED_FAST);
+    RECORD(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED_FAST);
   } else {
-    TRACE(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED_SLOW);
+    RECORD(txn_holder.txn().mutable_internal(), TransactionEvent::DISPATCHED_SLOW);
   }
 
   zmq::message_t msg(sizeof(TxnHolder*));

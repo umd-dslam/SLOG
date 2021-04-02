@@ -57,15 +57,18 @@ class MetricsRepositoryManager {
 using MetricsRepositoryManagerPtr = std::shared_ptr<MetricsRepositoryManager>;
 
 extern uint32_t gLocalMachineId;
-extern uint64_t gDisabledTracingEvents;
+extern uint64_t gDisabledEvents;
 
-void InitializeTracing(const ConfigurationPtr& config);
+void InitializeRecording(const ConfigurationPtr& config);
 
 template <typename TxnOrBatchPtr>
-inline void TraceTxnEvent(TxnOrBatchPtr txn, TransactionEvent event) {
+inline void RecordTxnEvent(TxnOrBatchPtr txn, TransactionEvent event) {
   using Clock = std::chrono::system_clock;
   auto now = duration_cast<microseconds>(Clock::now().time_since_epoch()).count();
-  if (!((gDisabledTracingEvents >> event) & 1) && txn != nullptr) {
+  if ((gDisabledEvents >> event) & 1) {
+    return;
+  }
+  if (txn != nullptr) {
     txn->mutable_events()->Add(event);
     txn->mutable_event_times()->Add(now);
     txn->mutable_event_machines()->Add(gLocalMachineId);
@@ -75,12 +78,12 @@ inline void TraceTxnEvent(TxnOrBatchPtr txn, TransactionEvent event) {
   }
 }
 
-#ifdef ENABLE_TRACING
-#define INIT_TRACING(config) slog::InitializeTracing(config)
-#define TRACE(txn, event) TraceTxnEvent(txn, event)
+#ifdef ENABLE_TXN_EVENT_RECORDING
+#define INIT_RECORDING(config) slog::InitializeRecording(config)
+#define RECORD(txn, event) RecordTxnEvent(txn, event)
 #else
-#define INIT_TRACING(config)
-#define TRACE(txn, event)
+#define INIT_RECORDING(config)
+#define RECORD(txn, event)
 #endif
 
 // Helper function for quickly monitor throughput at a certain place

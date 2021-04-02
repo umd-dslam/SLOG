@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
   CHECK(!FLAGS_address.empty()) << "Address must not be empty";
   auto config = slog::Configuration::FromFile(FLAGS_config, FLAGS_address);
 
-  INIT_TRACING(config);
+  INIT_RECORDING(config);
 
   LOG(INFO) << "Local replica: " << config->local_replica();
   LOG(INFO) << "Local partition: " << config->local_partition();

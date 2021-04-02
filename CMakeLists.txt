@@ -13,16 +13,16 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 #               Options
 #========================================
 
-option(BUILD_SLOG_CLIENT      "Build the client"                      ON)
-option(BUILD_SLOG_TESTS       "Build the tests"                       ON)
-option(ENABLE_TRACING         "Enable transaction racing"             ON)
-option(ENABLE_WORK_MEASURING  "Enable work measuring for each module" OFF)
+option(BUILD_SLOG_CLIENT           "Build the client"                      ON)
+option(BUILD_SLOG_TESTS            "Build the tests"                       ON)
+option(ENABLE_TXN_EVENT_RECORDING  "Enable transaction events recording"   ON)
+option(ENABLE_WORK_MEASURING       "Enable work measuring for each module" OFF)
 set(REMASTER_PROTOCOL "COUNTERLESS" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
 message(STATUS "Options:")
 message(STATUS "  BUILD_SLOG_CLIENT = ${BUILD_SLOG_CLIENT}")
-message(STATUS "  ENABLE_TRACING = ${ENABLE_TRACING}")
+message(STATUS "  ENABLE_TXN_EVENT_RECORDING = ${ENABLE_TXN_EVENT_RECORDING}")
 message(STATUS "  ENABLE_WORK_MEASURING = ${ENABLE_WORK_MEASURING}")
 message(STATUS "  REMASTER_PROTOCOL = ${REMASTER_PROTOCOL}")
 message(STATUS "  LOCK_MANAGER = ${LOCK_MANAGER}")
@@ -246,8 +246,8 @@ if (ENABLE_REMASTER)
   target_compile_definitions(slog-core PUBLIC ENABLE_REMASTER)
 endif()
 
-if (ENABLE_TRACING)
-  target_compile_definitions(slog-core PUBLIC ENABLE_TRACING)
+if (ENABLE_TXN_EVENT_RECORDING)
+  target_compile_definitions(slog-core PUBLIC ENABLE_TXN_EVENT_RECORDING)
 endif()
 
 if (ENABLE_WORK_MEASURING)

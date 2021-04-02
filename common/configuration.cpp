@@ -183,7 +183,7 @@ uint32_t Configuration::partition_of_key(const Key& key) const {
 }
 
 bool Configuration::key_is_in_local_partition(const Key& key) const {
-  return partition_of_key(key) == local_partition_;
+  return partition_of_key(key) == static_cast<uint32_t>(local_partition_);
 }
 
 int Configuration::partition_of_key(uint32_t key) const { return key % num_partitions(); }
@@ -198,10 +198,10 @@ uint32_t Configuration::replication_delay_pct() const { return config_.replicati
 
 uint32_t Configuration::replication_delay_amount_ms() const { return config_.replication_delay().delay_amount_ms(); }
 
-vector<TransactionEvent> Configuration::disabled_tracing_events() const {
+vector<TransactionEvent> Configuration::disabled_events() const {
   vector<TransactionEvent> res;
-  res.reserve(config_.disabled_tracing_events_size());
-  for (auto e : config_.disabled_tracing_events()) {
+  res.reserve(config_.disabled_events_size());
+  for (auto e : config_.disabled_events()) {
     res.push_back(TransactionEvent(e));
   }
   return res;

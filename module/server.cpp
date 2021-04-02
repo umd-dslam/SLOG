@@ -107,7 +107,7 @@ bool Server::OnCustomSocket() {
       auto txn = request.mutable_txn()->release_txn();
       auto txn_internal = txn->mutable_internal();
 
-      TRACE(txn_internal, TransactionEvent::ENTER_SERVER);
+      RECORD(txn_internal, TransactionEvent::ENTER_SERVER);
 
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
@@ -118,7 +118,7 @@ bool Server::OnCustomSocket() {
         break;
       }
 
-      TRACE(txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
+      RECORD(txn_internal, TransactionEvent::EXIT_SERVER_TO_FORWARDER);
 
       // Send to forwarder
       auto env = NewEnvelope();
@@ -195,7 +195,7 @@ void Server::ProcessCompletedSubtxn(EnvelopePtr&& env) {
   auto completed_subtxn = env->mutable_request()->mutable_completed_subtxn();
   auto txn_internal = completed_subtxn->mutable_txn()->mutable_internal();
 
-  TRACE(txn_internal, TransactionEvent::RETURN_TO_SERVER);
+  RECORD(txn_internal, TransactionEvent::RETURN_TO_SERVER);
 
   auto txn_id = completed_subtxn->txn().internal().id();
   if (pending_responses_.count(txn_id) == 0) {
@@ -265,7 +265,7 @@ void Server::OnInternalResponseReceived(EnvelopePtr&& env) {
 ***********************************************/
 
 void Server::SendTxnToClient(Transaction* txn) {
-  TRACE(txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
+  RECORD(txn->mutable_internal(), TransactionEvent::EXIT_SERVER_TO_CLIENT);
 
   api::Response response;
   auto txn_response = response.mutable_txn();

@@ -64,7 +64,7 @@ void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
 }
 
 void Sequencer::BatchTxn(Transaction* txn) {
-  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
+  RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
     txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
@@ -121,7 +121,7 @@ void Sequencer::SendBatch() {
     for (uint32_t part = 0; part < num_partitions; part++) {
       auto env = NewBatchRequest(partitioned_batch_[part].release());
 
-      TRACE(env->mutable_request()->mutable_forward_batch()->mutable_batch_data(),
+      RECORD(env->mutable_request()->mutable_forward_batch()->mutable_batch_data(),
             TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
       vector<MachineId> destinations;

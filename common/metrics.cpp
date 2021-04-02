@@ -122,17 +122,17 @@ void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
  */
 
 uint32_t gLocalMachineId = 0;
-uint64_t gDisabledTracingEvents = 0;
+uint64_t gDisabledEvents = 0;
 
-void InitializeTracing(const ConfigurationPtr& config) {
+void InitializeRecording(const ConfigurationPtr& config) {
   gLocalMachineId = config->local_machine_id();
-  auto events = config->disabled_tracing_events();
+  auto events = config->disabled_events();
   for (auto e : events) {
     if (e == TransactionEvent::ALL) {
-      gDisabledTracingEvents = ~0;
+      gDisabledEvents = ~0;
       return;
     }
-    gDisabledTracingEvents |= (1 << e);
+    gDisabledEvents |= (1 << e);
   }
 }
 

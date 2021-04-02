@@ -59,7 +59,7 @@ void Forwarder::OnInternalRequestReceived(EnvelopePtr&& env) {
 void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->mutable_txn();
 
-  TRACE(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
+  RECORD(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
   try {
     PopulateInvolvedPartitions(config_, *txn);
@@ -219,7 +219,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
     if (home_replica == config_->local_replica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
 
-      TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+      RECORD(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
 
       Send(move(env), kSequencerChannel);
     } else {
@@ -229,14 +229,14 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       VLOG(3) << "Forwarding txn " << txn_id << " to its home region (rep: " << home_replica << ", part: " << partition
               << ")";
 
-      TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
+      RECORD(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_SEQUENCER);
 
       Send(*env, random_machine_in_home_replica, kSequencerChannel);
     }
   } else if (txn_type == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
     VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
 
-    TRACE(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
+    RECORD(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
     if (config_->bypass_mh_orderer()) {
       auto part = ChooseRandomPartition(*txn, rg_);

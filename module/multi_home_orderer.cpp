@@ -46,7 +46,7 @@ void MultiHomeOrderer::OnInternalRequestReceived(EnvelopePtr&& env) {
       // Received a new multi-home txn
       auto txn = request->mutable_forward_txn()->release_txn();
 
-      TRACE(txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
+      RECORD(txn->mutable_internal(), TransactionEvent::ENTER_MULTI_HOME_ORDERER);
 
       AddToBatch(txn);
       break;
@@ -70,7 +70,7 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
     case internal::ForwardBatch::kBatchData: {
       auto batch = BatchPtr(forward_batch->release_batch_data());
 
-      TRACE(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
+      RECORD(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
 
       VLOG(1) << "Received data for MULTI-HOME batch " << batch->id() << " from [" << env->from()
               << "]. Number of txns: " << batch->transactions_size();
@@ -99,7 +99,7 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
 
     auto transactions = Unbatch(batch.get());
     for (auto txn : transactions) {
-      TRACE(txn->mutable_internal(), TransactionEvent::EXIT_MULTI_HOME_ORDERER);
+      RECORD(txn->mutable_internal(), TransactionEvent::EXIT_MULTI_HOME_ORDERER);
 
       auto env = NewEnvelope();
       auto forward_txn = env->mutable_request()->mutable_forward_txn();
