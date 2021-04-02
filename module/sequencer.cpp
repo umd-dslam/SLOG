@@ -5,7 +5,6 @@
 #include <algorithm>
 
 #include "common/json_utils.h"
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
 #include "paxos/simulated_multi_paxos.h"
@@ -18,9 +17,10 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, milliseconds poll_timeout)
-    : NetworkedModule("Sequencer", broker, kSequencerChannel, poll_timeout),
-      config_(config),
+Sequencer::Sequencer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
+                     milliseconds poll_timeout)
+    : NetworkedModule("Sequencer", broker, kSequencerChannel, metrics_manager, poll_timeout),
+      config_(broker->config()),
       batch_id_counter_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {

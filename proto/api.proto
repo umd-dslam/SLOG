@@ -14,6 +14,7 @@ message Request {
     oneof type {
         TransactionRequest txn = 2;
         StatsRequest stats = 3;
+        WriteMetricsRequest metrics = 4;
     }
 }
 
@@ -27,6 +28,10 @@ message StatsRequest {
     uint32 level = 2;
 }
 
+message WriteMetricsRequest {
+    bytes prefix = 1;
+}
+
 /***********************************************
                     RESPONSES
 ***********************************************/
@@ -36,6 +41,7 @@ message Response {
     oneof type {
         TransactionResponse txn = 2;
         StatsResponse stats = 3;
+        WriteMetricsResponse metrics = 4;
     }
 }
 
@@ -46,4 +52,7 @@ message TransactionResponse {
 
 message StatsResponse {
     bytes stats_json = 1;
+}
+
+message WriteMetricsResponse {
 }

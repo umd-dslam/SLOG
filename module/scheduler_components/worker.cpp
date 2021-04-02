@@ -8,7 +8,6 @@
 
 #include <thread>
 
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/scheduler.h"
 
@@ -20,20 +19,20 @@ using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
-Worker::Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
-               const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, poll_timeout),
-      config_(config),
+Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const shared_ptr<Storage<Key, Record>>& storage,
+               const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
+    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, metrics_manager, poll_timeout),
+      config_(broker->config()),
       storage_(storage) {
   switch (config_->commands()) {
     case internal::Commands::DUMMY:
-      commands_ = make_unique<DummyCommands<Key, Record>>(config, storage);
+      commands_ = make_unique<DummyCommands<Key, Record>>(config_, storage);
       break;
     case internal::Commands::NOOP:
       commands_ = make_unique<NoopCommands<Key, Record>>();
       break;
     default:
-      commands_ = make_unique<KeyValueCommands<Key, Record>>(config, storage);
+      commands_ = make_unique<KeyValueCommands<Key, Record>>(config_, storage);
       break;
   }
 }

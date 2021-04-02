@@ -20,10 +20,11 @@ vector<MachineId> GetMembers(const ConfigurationPtr& config) {
 
 }  // namespace
 
-GlobalPaxos::GlobalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                         std::chrono::milliseconds poll_timeout)
-    : SimulatedMultiPaxos(kGlobalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout),
-      local_machine_id_(config->local_machine_id()) {
+GlobalPaxos::GlobalPaxos(const shared_ptr<Broker>& broker, std::chrono::milliseconds poll_timeout)
+    : SimulatedMultiPaxos(kGlobalPaxos, broker, GetMembers(broker->config()), broker->config()->local_machine_id(),
+                          poll_timeout),
+      local_machine_id_(broker->config()->local_machine_id()) {
+  auto& config = broker->config();
   for (uint32_t rep = 0; rep < config->num_replicas(); rep++) {
     multihome_orderers_.push_back(config->MakeMachineId(rep, config->leader_partition_for_multi_home_ordering()));
   }
@@ -40,9 +41,9 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
   Send(std::move(env), multihome_orderers_, kMultiHomeOrdererChannel);
 }
 
-LocalPaxos::LocalPaxos(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                       std::chrono::milliseconds poll_timeout)
-    : SimulatedMultiPaxos(kLocalPaxos, broker, GetMembers(config), config->local_machine_id(), poll_timeout) {}
+LocalPaxos::LocalPaxos(const shared_ptr<Broker>& broker, std::chrono::milliseconds poll_timeout)
+    : SimulatedMultiPaxos(kLocalPaxos, broker, GetMembers(broker->config()), broker->config()->local_machine_id(),
+                          poll_timeout) {}
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
   auto env = NewEnvelope();

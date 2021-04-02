@@ -4,7 +4,6 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "proto/internal.pb.h"
 
@@ -53,19 +52,19 @@ void LocalLog::UpdateReadyBatches() {
   }
 }
 
-Interleaver::Interleaver(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+Interleaver::Interleaver(const shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                          std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Interleaver", broker, kInterleaverChannel, poll_timeout),
-      config_(config),
+    : NetworkedModule("Interleaver", broker, kInterleaverChannel, metrics_manager, poll_timeout),
+      config_(broker->config()),
       rg_(std::random_device()()) {
   for (uint32_t p = 0; p < config_->num_partitions(); p++) {
     if (p != config_->local_partition()) {
-      other_partitions_.push_back(config_->MakeMachineId(config->local_replica(), p));
+      other_partitions_.push_back(config_->MakeMachineId(config_->local_replica(), p));
     }
   }
-  need_ack_from_replica_.resize(config->num_replicas());
-  for (size_t r = 1; r < config->replication_factor(); r++) {
-    need_ack_from_replica_[config->nth_latency(r).second] = true;
+  need_ack_from_replica_.resize(config_->num_replicas());
+  for (size_t r = 1; r < config_->replication_factor(); r++) {
+    need_ack_from_replica_[config_->nth_latency(r).second] = true;
   }
 }
 

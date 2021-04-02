@@ -31,7 +31,7 @@ namespace slog {
  */
 class Server : public NetworkedModule {
  public:
-  Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+  Server(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
          std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
@@ -60,7 +60,6 @@ class Server : public NetworkedModule {
   TxnId NextTxnId();
 
   ConfigurationPtr config_;
-
   TxnId txn_id_counter_;
 
   struct PendingResponse {

@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "common/types.h"
 #include "data_structure/batch_log.h"
 #include "module/base/networked_module.h"
@@ -49,7 +50,7 @@ class LocalLog {
 
 class Interleaver : public NetworkedModule {
  public:
-  Interleaver(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+  Interleaver(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
               std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:

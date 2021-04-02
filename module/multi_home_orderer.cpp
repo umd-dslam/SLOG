@@ -4,7 +4,6 @@
 
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "module/ticker.h"
 #include "paxos/simulated_multi_paxos.h"
@@ -17,10 +16,10 @@ using internal::Batch;
 using internal::Envelope;
 using internal::Request;
 
-MultiHomeOrderer::MultiHomeOrderer(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
+MultiHomeOrderer::MultiHomeOrderer(const shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                                    std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, poll_timeout),
-      config_(config),
+    : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, metrics_manager, poll_timeout),
+      config_(broker->config()),
       batch_id_counter_(0),
       collecting_stats_(false) {
   batch_per_rep_.resize(config_->num_replicas());

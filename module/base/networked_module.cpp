@@ -19,9 +19,11 @@ namespace slog {
 using internal::Envelope;
 
 NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+                                 const MetricsRepositoryManagerPtr& metrics_manager,
                                  optional<std::chrono::milliseconds> poll_timeout)
     : Module(name),
       context_(broker->context()),
+      metrics_manager_(metrics_manager),
       channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
       sender_(broker->config(), broker->context()),
@@ -59,6 +61,10 @@ void NetworkedModule::SetUp() {
   VLOG(1) << "Thread info: " << debug_info_;
 
   poller_.PushSocket(pull_socket_);
+
+  if (metrics_manager_ != nullptr) {
+    metrics_manager_->RegisterCurrentThread();
+  }
 
   Initialize();
 }

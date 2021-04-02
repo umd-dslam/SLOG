@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "common/json_utils.h"
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 #include "common/types.h"
 #include "proto/internal.pb.h"
@@ -17,11 +16,12 @@ namespace slog {
 using internal::Request;
 using internal::Response;
 
-Scheduler::Scheduler(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                     const shared_ptr<Storage<Key, Record>>& storage, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Scheduler", broker, {kSchedulerChannel, false /* recv_raw */}, poll_timeout), config_(config) {
-  for (size_t i = 0; i < config->num_workers(); i++) {
-    workers_.push_back(MakeRunnerFor<Worker>(config, broker, Worker::MakeChannel(i), storage, poll_timeout));
+Scheduler::Scheduler(const shared_ptr<Broker>& broker, const shared_ptr<Storage<Key, Record>>& storage,
+                     const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
+    : NetworkedModule("Scheduler", broker, {kSchedulerChannel, false /* recv_raw */}, metrics_manager, poll_timeout),
+      config_(broker->config()) {
+  for (size_t i = 0; i < config_->num_workers(); i++) {
+    workers_.push_back(MakeRunnerFor<Worker>(broker, Worker::MakeChannel(i), storage, metrics_manager, poll_timeout));
   }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)

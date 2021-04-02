@@ -6,7 +6,6 @@
 
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/monitor.h"
 #include "common/proto_utils.h"
 
 using std::move;
@@ -29,10 +28,11 @@ uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
 
 }  // namespace
 
-Forwarder::Forwarder(const ConfigurationPtr& config, const shared_ptr<Broker>& broker,
-                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index, milliseconds poll_timeout)
-    : NetworkedModule("Forwarder", broker, kForwarderChannel, poll_timeout),
-      config_(config),
+Forwarder::Forwarder(const shared_ptr<Broker>& broker,
+                     const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
+                     const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
+    : NetworkedModule("Forwarder", broker, kForwarderChannel, metrics_manager, poll_timeout),
+      config_(broker->config()),
       lookup_master_index_(lookup_master_index),
       batch_size_(0),
       rg_(std::random_device()()),

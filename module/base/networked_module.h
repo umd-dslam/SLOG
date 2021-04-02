@@ -5,6 +5,7 @@
 #include <zmq.hpp>
 
 #include "common/constants.h"
+#include "common/metrics.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "connection/poller.h"
@@ -27,6 +28,7 @@ struct ChannelOption {
 class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+                  const MetricsRepositoryManagerPtr& metrics_manager,
                   std::optional<std::chrono::milliseconds> poll_timeout);
   ~NetworkedModule();
 
@@ -57,12 +59,14 @@ class NetworkedModule : public Module {
   const std::shared_ptr<zmq::context_t> context() const;
 
   Channel channel() const { return channel_; }
+  MetricsRepositoryManager& metrics_manager() { return *metrics_manager_; }
 
  private:
   void SetUp() final;
   bool Loop() final;
 
   std::shared_ptr<zmq::context_t> context_;
+  MetricsRepositoryManagerPtr metrics_manager_;
   Channel channel_;
   zmq::socket_t pull_socket_;
   std::vector<zmq::socket_t> custom_sockets_;

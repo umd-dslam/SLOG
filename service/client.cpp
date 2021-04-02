@@ -339,6 +339,20 @@ void ExecuteStats(const char* module, uint32_t level) {
   }
 }
 
+void ExecuteMetrics(const std::string& prefix) {
+  api::Request req;
+  req.mutable_metrics()->set_prefix(prefix);
+
+  SendSerializedProtoWithEmptyDelim(server_socket, req);
+
+  api::Response res;
+  if (!RecvDeserializedProtoWithEmptyDelim(server_socket, res)) {
+    LOG(FATAL) << "Malformed response";
+  } else {
+    LOG(INFO) << "Metrics flushed";
+  }
+}
+
 int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
   string endpoint = "tcp://" + FLAGS_host + ":" + to_string(FLAGS_port);
@@ -368,6 +382,17 @@ int main(int argc, char* argv[]) {
       level = std::stoul(argv[3]);
     }
     ExecuteStats(argv[2], level);
+  } else if (strcmp(argv[1], "metrics") == 0) {
+    if (cmd_argc > 2) {
+      LOG(ERROR) << "Invalid number of arguments for the \"metrics\" command:\n"
+                 << "Usage: metrics [<prefix>]";
+      return 1;
+    }
+    std::string prefix;
+    if (cmd_argc == 2) {
+      prefix = argv[2];
+    }
+    ExecuteMetrics(prefix);
   } else {
     LOG(ERROR) << "Invalid command: " << argv[1];
   }

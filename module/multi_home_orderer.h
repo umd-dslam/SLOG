@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "connection/broker.h"
 #include "data_structure/batch_log.h"
 #include "module/base/networked_module.h"
@@ -23,7 +24,7 @@ namespace slog {
  */
 class MultiHomeOrderer : public NetworkedModule {
  public:
-  MultiHomeOrderer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+  MultiHomeOrderer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                    milliseconds poll_timeout = kModuleTimeout);
 
  protected:

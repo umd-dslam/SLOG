@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/networked_module.h"
@@ -31,9 +32,9 @@ namespace slog {
  */
 class Forwarder : public NetworkedModule {
  public:
-  Forwarder(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+  Forwarder(const std::shared_ptr<Broker>& broker,
             const std::shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-            milliseconds poll_timeout_ms = kModuleTimeout);
+            const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout_ms = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;

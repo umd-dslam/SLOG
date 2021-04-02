@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
   // Prepare the modules
   auto broker = Broker::New(config);
   broker->AddChannel(kServerChannel);
-  auto scheduler = MakeRunnerFor<Scheduler>(config, broker, storage);
+  auto scheduler = MakeRunnerFor<Scheduler>(broker, storage, nullptr);
 
   broker->StartInNewThreads();
   scheduler->StartInNewThread();

@@ -5,7 +5,7 @@
 
 #include "common/configuration.h"
 #include "common/constants.h"
-#include "common/monitor.h"
+#include "common/metrics.h"
 #include "common/offline_data_reader.h"
 #include "common/types.h"
 #include "connection/broker.h"
@@ -161,18 +161,20 @@ int main(int argc, char* argv[]) {
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
+  auto metrics_manager = make_shared<slog::MetricsRepositoryManager>(config);
+
   vector<pair<unique_ptr<slog::ModuleRunner>, slog::ModuleId>> modules;
-  modules.emplace_back(MakeRunnerFor<slog::Server>(config, broker), slog::ModuleId::SERVER);
-  modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(config, broker), slog::ModuleId::MHORDERER);
-  modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(config, broker), slog::ModuleId::LOCALPAXOS);
-  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(config, broker, storage), slog::ModuleId::FORWARDER);
-  modules.emplace_back(MakeRunnerFor<slog::Sequencer>(config, broker), slog::ModuleId::SEQUENCER);
-  modules.emplace_back(MakeRunnerFor<slog::Interleaver>(config, broker), slog::ModuleId::INTERLEAVER);
-  modules.emplace_back(MakeRunnerFor<slog::Scheduler>(config, broker, storage), slog::ModuleId::SCHEDULER);
+  modules.emplace_back(MakeRunnerFor<slog::Server>(broker, metrics_manager), slog::ModuleId::SERVER);
+  modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(broker, metrics_manager), slog::ModuleId::MHORDERER);
+  modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(broker), slog::ModuleId::LOCALPAXOS);
+  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(broker, storage, metrics_manager), slog::ModuleId::FORWARDER);
+  modules.emplace_back(MakeRunnerFor<slog::Sequencer>(broker, metrics_manager), slog::ModuleId::SEQUENCER);
+  modules.emplace_back(MakeRunnerFor<slog::Interleaver>(broker, metrics_manager), slog::ModuleId::INTERLEAVER);
+  modules.emplace_back(MakeRunnerFor<slog::Scheduler>(broker, storage, metrics_manager), slog::ModuleId::SCHEDULER);
 
   // One region is selected to globally order the multihome batches
   if (config->leader_replica_for_multi_home_ordering() == config->local_replica()) {
-    modules.emplace_back(MakeRunnerFor<slog::GlobalPaxos>(config, broker), slog::ModuleId::GLOBALPAXOS);
+    modules.emplace_back(MakeRunnerFor<slog::GlobalPaxos>(broker), slog::ModuleId::GLOBALPAXOS);
   }
 
   // Block SIGINT from here so that the new threads inherit the block mask

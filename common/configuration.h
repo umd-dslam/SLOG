@@ -68,6 +68,8 @@ class Configuration {
   std::pair<uint32_t, size_t> nth_latency(size_t n) const;
   bool synchronized_batching() const;
 
+  uint32_t sample_rate() const;
+
  private:
   internal::Configuration config_;
   string local_address_;

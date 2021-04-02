@@ -7,6 +7,7 @@
 #include <zmq.hpp>
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "common/txn_holder.h"
 #include "common/types.h"
 #include "module/base/networked_module.h"
@@ -35,8 +36,8 @@ struct TransactionState {
  */
 class Worker : public NetworkedModule {
  public:
-  Worker(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker, Channel channel,
-         const std::shared_ptr<Storage<Key, Record>>& storage,
+  Worker(const std::shared_ptr<Broker>& broker, Channel channel, const std::shared_ptr<Storage<Key, Record>>& storage,
+         const MetricsRepositoryManagerPtr& metrics_manager,
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
   static Channel MakeChannel(int worker_num) { return kMaxChannel + worker_num; }

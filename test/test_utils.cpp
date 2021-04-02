@@ -109,22 +109,22 @@ void TestSlog::Data(Key&& key, Record&& record) {
   storage_->Write(key, record);
 }
 
-void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(broker_, nullptr, kTestModuleTimeout); }
 
-void TestSlog::AddForwarder() { forwarder_ = MakeRunnerFor<Forwarder>(config_, broker_, storage_, kTestModuleTimeout); }
+void TestSlog::AddForwarder() { forwarder_ = MakeRunnerFor<Forwarder>(broker_, storage_, nullptr, kTestModuleTimeout); }
 
-void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddSequencer() { sequencer_ = MakeRunnerFor<Sequencer>(broker_, nullptr, kTestModuleTimeout); }
 
-void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddInterleaver() { interleaver_ = MakeRunnerFor<Interleaver>(broker_, nullptr, kTestModuleTimeout); }
 
-void TestSlog::AddScheduler() { scheduler_ = MakeRunnerFor<Scheduler>(config_, broker_, storage_, kTestModuleTimeout); }
+void TestSlog::AddScheduler() { scheduler_ = MakeRunnerFor<Scheduler>(broker_, storage_, nullptr, kTestModuleTimeout); }
 
-void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddLocalPaxos() { local_paxos_ = MakeRunnerFor<LocalPaxos>(broker_, kTestModuleTimeout); }
 
-void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(config_, broker_, kTestModuleTimeout); }
+void TestSlog::AddGlobalPaxos() { global_paxos_ = MakeRunnerFor<GlobalPaxos>(broker_, kTestModuleTimeout); }
 
 void TestSlog::AddMultiHomeOrderer() {
-  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(config_, broker_, kTestModuleTimeout);
+  multi_home_orderer_ = MakeRunnerFor<MultiHomeOrderer>(broker_, nullptr, kTestModuleTimeout);
 }
 
 void TestSlog::AddOutputChannel(Channel channel) {

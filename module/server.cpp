@@ -2,7 +2,6 @@
 
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/monitor.h"
 #include "connection/zmq_utils.h"
 #include "proto/internal.pb.h"
 
@@ -45,12 +44,14 @@ Transaction* Server::CompletedTransaction::ReleaseTxn() {
   return req_->mutable_request()->mutable_completed_subtxn()->release_txn();
 }
 
-Server::Server(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+Server::Server(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Server", broker, kServerChannel, poll_timeout), config_(config), txn_id_counter_(0) {}
+    : NetworkedModule("Server", broker, kServerChannel, metrics_manager, poll_timeout),
+      config_(broker->config()),
+      txn_id_counter_(0) {}
 
 /***********************************************
-                Custom socket
+                Initialization
 ***********************************************/
 
 void Server::Initialize() {
@@ -151,6 +152,13 @@ bool Server::OnCustomSocket() {
           LOG(ERROR) << "Invalid module for stats request";
           break;
       }
+      break;
+    }
+    case api::Request::kMetrics: {
+      metrics_manager().AggregateAndFlushToDisk(request.metrics().prefix());
+      api::Response response;
+      response.mutable_metrics();
+      SendResponseToClient(txn_id, std::move(response));
       break;
     }
     default:

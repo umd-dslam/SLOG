@@ -130,4 +130,6 @@ message Configuration {
     // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
     // txns are put into the batches at approximately the same time
     bool synchronized_batching = 22;
+    // Percentage of metrics to sample
+    uint32 sample_rate = 23;
 }

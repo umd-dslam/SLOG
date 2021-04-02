@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "common/txn_holder.h"
 #include "common/types.h"
 #include "connection/broker.h"
@@ -41,8 +42,8 @@ namespace slog {
 
 class Scheduler : public NetworkedModule {
  public:
-  Scheduler(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
-            const std::shared_ptr<Storage<Key, Record>>& storage,
+  Scheduler(const std::shared_ptr<Broker>& broker, const std::shared_ptr<Storage<Key, Record>>& storage,
+            const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:

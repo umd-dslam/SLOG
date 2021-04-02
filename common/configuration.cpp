@@ -231,4 +231,6 @@ std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const { return 
 
 bool Configuration::synchronized_batching() const { return config_.synchronized_batching(); }
 
+uint32_t Configuration::sample_rate() const { return config_.sample_rate(); }
+
 }  // namespace slog

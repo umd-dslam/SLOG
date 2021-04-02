@@ -4,6 +4,7 @@
 #include <random>
 
 #include "common/configuration.h"
+#include "common/metrics.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/networked_module.h"
@@ -24,7 +25,7 @@ namespace slog {
  */
 class Sequencer : public NetworkedModule {
  public:
-  Sequencer(const ConfigurationPtr& config, const std::shared_ptr<Broker>& broker,
+  Sequencer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
             milliseconds poll_timeout = kModuleTimeout);
 
  protected:
