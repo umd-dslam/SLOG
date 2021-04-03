@@ -68,16 +68,37 @@ Interleaver::Interleaver(const shared_ptr<Broker>& broker, const MetricsReposito
   }
 }
 
+void Interleaver::Initialize() {
+  zmq::socket_t local_queue_socket(*context(), ZMQ_PULL);
+  local_queue_socket.set(zmq::sockopt::rcvhwm, 0);
+  local_queue_socket.bind(MakeInProcChannelAddress(kLocalQueueChannel));
+
+  AddCustomSocket(std::move(local_queue_socket));
+}
+
+bool Interleaver::OnCustomSocket() {
+  auto& socket = GetCustomSocket(0);
+  auto env = RecvEnvelope(socket, true /* dont_wait */);
+  if (env == nullptr) {
+    return false;
+  }
+  auto request = env->mutable_request();
+  if (request->type_case() != Request::kLocalQueueOrder) {
+    LOG(ERROR) << "Only local queue order messages are expected on this socket";
+    return false;
+  }
+  auto& order = request->local_queue_order();
+  VLOG(1) << "Received local queue order. Slot id: " << order.slot() << ". Queue id: " << order.queue_id();
+
+  local_log_.AddSlot(order.slot(), order.queue_id(), order.leader());
+
+  AdvanceLogs();
+  return true;
+}
+
 void Interleaver::OnInternalRequestReceived(EnvelopePtr&& env) {
   auto request = env->mutable_request();
   switch (request->type_case()) {
-    case Request::kLocalQueueOrder: {
-      auto& order = request->local_queue_order();
-      VLOG(1) << "Received local queue order. Slot id: " << order.slot() << ". Queue id: " << order.queue_id();
-
-      local_log_.AddSlot(order.slot(), order.queue_id(), order.leader());
-      break;
-    }
     case Request::kBatchOrderAck: {
       auto from_replica = config_->UnpackMachineId(env->from()).first;
 

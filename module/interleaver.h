@@ -54,6 +54,8 @@ class Interleaver : public NetworkedModule {
               std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
+  void Initialize() final;
+  bool OnCustomSocket() final;
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:

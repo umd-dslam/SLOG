@@ -13,12 +13,13 @@ const Channel kForwarderChannel = 2;
 const Channel kSequencerChannel = 3;
 const Channel kMultiHomeOrdererChannel = 4;
 const Channel kInterleaverChannel = 5;
-const Channel kSchedulerChannel = 6;
-const Channel kLocalPaxos = 7;
-const Channel kGlobalPaxos = 8;
-const Channel kWorkerChannel = 9;
+const Channel kLocalQueueChannel = 6;
+const Channel kSchedulerChannel = 7;
+const Channel kLocalPaxos = 8;
+const Channel kGlobalPaxos = 9;
+const Channel kWorkerChannel = 10;
 // Broker channels range from kBrokerChannel to kMaxChannel - 1
-const Channel kBrokerChannel = 10;
+const Channel kBrokerChannel = 11;
 const Channel kMaxChannel = 15;
 
 const uint32_t kMaxNumMachines = 100;

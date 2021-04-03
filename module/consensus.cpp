@@ -51,7 +51,7 @@ void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
   order->set_queue_id(value);
   order->set_slot(slot);
   order->set_leader(leader);
-  Send(std::move(env), kInterleaverChannel);
+  Send(std::move(env), kLocalQueueChannel);
 }
 
 }  // namespace slog

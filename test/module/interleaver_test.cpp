@@ -138,6 +138,10 @@ class InterleaverTest : public ::testing::Test {
   }
 
   void SendToInterleaver(int from, int to, const Envelope& req) { senders_[from]->Send(req, to, kInterleaverChannel); }
+  void SendToLocalQueue(int from, int to, const Envelope& req) {
+    auto copied = std::make_unique<Envelope>(req);
+    senders_[from]->Send(std::move(copied), to, kLocalQueueChannel);
+  }
 
   Transaction* ReceiveTxn(int i) {
     auto req_env = slogs_[i]->ReceiveFromOutputChannel(kSchedulerChannel);
@@ -188,8 +192,8 @@ TEST_F(InterleaverTest, BatchDataBeforeBatchOrder) {
     local_queue_order->set_queue_id(0);
     local_queue_order->set_slot(0);
     local_queue_order->set_leader(0);
-    SendToInterleaver(0, 0, req);
-    SendToInterleaver(1, 1, req);
+    SendToLocalQueue(0, 0, req);
+    SendToLocalQueue(1, 1, req);
 
     // The batch order is replicated across all machines
     for (int i = 0; i < NUM_MACHINES; i++) {
@@ -217,8 +221,8 @@ TEST_F(InterleaverTest, BatchOrderBeforeBatchData) {
     local_queue_order->set_queue_id(0);
     local_queue_order->set_slot(0);
     local_queue_order->set_leader(0);
-    SendToInterleaver(0, 0, req);
-    SendToInterleaver(1, 1, req);
+    SendToLocalQueue(0, 0, req);
+    SendToLocalQueue(1, 1, req);
   }
 
   // Replicate batch data to all machines
@@ -278,8 +282,8 @@ TEST_F(InterleaverTest, TwoBatches) {
     local_queue_order1->set_slot(0);
     local_queue_order1->set_queue_id(1);
     local_queue_order1->set_leader(0);
-    SendToInterleaver(0, 0, req1);
-    SendToInterleaver(1, 1, req1);
+    SendToLocalQueue(0, 0, req1);
+    SendToLocalQueue(1, 1, req1);
 
     for (int i = 0; i < NUM_MACHINES; i++) {
       auto txn = ReceiveTxn(i);
@@ -292,8 +296,8 @@ TEST_F(InterleaverTest, TwoBatches) {
     local_queue_order2->set_slot(1);
     local_queue_order2->set_queue_id(0);
     local_queue_order2->set_leader(1);
-    SendToInterleaver(0, 0, req2);
-    SendToInterleaver(1, 1, req2);
+    SendToLocalQueue(0, 0, req2);
+    SendToLocalQueue(1, 1, req2);
 
     for (int i = 0; i < NUM_MACHINES; i++) {
       auto txn = ReceiveTxn(i);
