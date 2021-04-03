@@ -221,8 +221,8 @@ int main(int argc, char* argv[]) {
       auto& txn_internal = info.txn->internal();
       writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
                     << info.profile.is_multi_partition
-                    << duration_cast<microseconds>(info.sent_at.time_since_epoch()).count()
-                    << duration_cast<microseconds>(info.recv_at.time_since_epoch()).count() << csvendl;
+                    << info.sent_at.time_since_epoch().count()
+                    << info.recv_at.time_since_epoch().count() << csvendl;
 
       for (int i = 0; i < txn_internal.events_size(); i++) {
         auto event = txn_internal.events(i);

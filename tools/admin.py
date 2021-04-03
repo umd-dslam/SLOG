@@ -133,8 +133,7 @@ def parse_envs(envs: List[str]) -> Dict[str, str]:
     return {env[0]: env[1] for env in env_var_tuples}
 
 
-def download_and_untar_data(addresses, user, out_dir, tag):
-    out_path = os.path.join(out_dir, tag)
+def download_and_untar_data(addresses, user, tag, out_path):
     if os.path.exists(out_path):
         shutil.rmtree(out_path, ignore_errors=True)
         LOG.info("Removed existing directory: %s", out_path)
@@ -1011,13 +1010,13 @@ class CollectClientCommand(AdminCommand):
         pass
 
     def do_command(self, args):
-        client_out_dir = os.path.join(args.out_dir, "client")
+        client_out_dir = os.path.join(args.out_dir, args.tag, "client")
         addresses = [
             c.address.decode() 
             for r in self.config.replicas
             for c in r.clients
         ]
-        download_and_untar_data(addresses, args.user, client_out_dir, args.tag)
+        download_and_untar_data(addresses, args.user, args.tag, client_out_dir)
 
 
 class CollectServerCommand(AdminCommand):
@@ -1078,13 +1077,13 @@ class CollectServerCommand(AdminCommand):
 
         if args.flush_only:
             return
-        server_out_dir = os.path.join(args.out_dir, "server")
+        server_out_dir = os.path.join(args.out_dir, args.tag, "server")
         addresses = [
             a.decode()
             for r in self.config.replicas
             for a in r.addresses
         ]
-        download_and_untar_data(addresses, args.user, server_out_dir, args.tag)
+        download_and_untar_data(addresses, args.user, args.tag, server_out_dir)
 
 
 if __name__ == "__main__":
