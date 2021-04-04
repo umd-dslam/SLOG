@@ -122,7 +122,7 @@ void Sequencer::SendBatch() {
       auto env = NewBatchRequest(partitioned_batch_[part].release());
 
       RECORD(env->mutable_request()->mutable_forward_batch()->mutable_batch_data(),
-            TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+             TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
       vector<MachineId> destinations;
       for (uint32_t rep = 0; rep < num_replicas; rep++) {

@@ -220,8 +220,7 @@ int main(int argc, char* argv[]) {
       CHECK(info.txn != nullptr);
       auto& txn_internal = info.txn->internal();
       writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
-                    << info.profile.is_multi_partition
-                    << info.sent_at.time_since_epoch().count()
+                    << info.profile.is_multi_partition << info.sent_at.time_since_epoch().count()
                     << info.recv_at.time_since_epoch().count() << csvendl;
 
       for (int i = 0; i < txn_internal.events_size(); i++) {

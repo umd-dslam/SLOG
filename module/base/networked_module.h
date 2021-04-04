@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <vector>
 #include <zmq.hpp>
@@ -39,11 +40,12 @@ class NetworkedModule : public Module {
 
   virtual void OnInternalResponseReceived(EnvelopePtr&& /* env */) {}
 
-  // Returns true if want to count the time spent on this function to work measuring
+  // Returns true if useful work was done
   virtual bool OnCustomSocket() { return false; }
 
   void AddCustomSocket(zmq::socket_t&& new_socket);
   zmq::socket_t& GetCustomSocket(size_t i);
+  void SetMainVsCustomSocketWeights(std::array<int, 2> weights) { weights_ = weights; }
 
   inline static EnvelopePtr NewEnvelope() { return std::make_unique<internal::Envelope>(); }
   void Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel, size_t via_broker = 0);
@@ -74,6 +76,12 @@ class NetworkedModule : public Module {
   Poller poller_;
   int recv_retries_start_;
   int recv_retries_;
+
+  // Weights for the main socket and the custom sockets
+  std::array<int, 2> weights_;
+  std::array<int, 2> counters_;
+  uint8_t current_;
+
   std::string debug_info_;
 
   std::atomic<uint64_t> work_ = 0;
