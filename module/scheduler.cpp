@@ -118,6 +118,8 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
       return;
     }
 
+    RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER_LO);
+
     VLOG(2) << "Added " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
             << txn->internal().home() << ")";
   }
