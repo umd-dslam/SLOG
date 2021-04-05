@@ -44,7 +44,7 @@ struct ResultWriters {
 
   ResultWriters()
       : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
-        events(FLAGS_out_dir + "/events.csv", kEventsColumns),
+        events(FLAGS_out_dir + "/txn_events.csv", kEventsColumns),
         event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns),
         summary(FLAGS_out_dir + "/summary.csv", kSummaryColumns) {}
 
