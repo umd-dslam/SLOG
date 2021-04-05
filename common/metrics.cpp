@@ -15,8 +15,11 @@ using time_point_t = std::chrono::system_clock::time_point;
 
 class TransactionEventMetrics {
  public:
-  TransactionEventMetrics(const ConfigurationPtr& config, const sample_mask_t& sample_mask)
-      : config_(config), sample_mask_(sample_mask), sample_count_(TransactionEvent_descriptor()->value_count(), 0) {}
+  TransactionEventMetrics(const sample_mask_t& sample_mask, uint32_t local_replica, uint32_t local_partition)
+      : sample_mask_(sample_mask),
+        local_replica_(local_replica),
+        local_partition_(local_partition),
+        sample_count_(TransactionEvent_descriptor()->value_count(), 0) {}
 
   time_point_t RecordEvent(TransactionEvent event) {
     auto now = std::chrono::system_clock::now();
@@ -25,8 +28,8 @@ class TransactionEventMetrics {
     if (sample_mask_[sample_count_[sample_index]++]) {
       txn_events_.push_back({.event = event,
                              .time = now.time_since_epoch().count(),
-                             .partition = config_->local_partition(),
-                             .replica = config_->local_replica()});
+                             .partition = local_partition_,
+                             .replica = local_replica_});
     }
     return now;
   }
@@ -41,8 +44,9 @@ class TransactionEventMetrics {
   std::list<Data>& data() { return txn_events_; }
 
  private:
-  const ConfigurationPtr config_;
   sample_mask_t sample_mask_;
+  uint32_t local_replica_;
+  uint32_t local_partition_;
   std::vector<uint8_t> sample_count_;
   std::list<Data> txn_events_;
 };
@@ -54,7 +58,8 @@ class TransactionEventMetrics {
 MetricsRepository::MetricsRepository(const ConfigurationPtr& config, const sample_mask_t& sample_mask)
     : config_(config),
       sample_mask_(sample_mask),
-      txn_event_metrics_(new TransactionEventMetrics(config, sample_mask)) {}
+      txn_event_metrics_(new TransactionEventMetrics(sample_mask, config->local_replica(), config->local_partition())) {
+}
 
 time_point_t MetricsRepository::RecordTxnEvent(TransactionEvent event) {
   std::lock_guard<SpinLatch> guard(latch_);
@@ -62,7 +67,8 @@ time_point_t MetricsRepository::RecordTxnEvent(TransactionEvent event) {
 }
 
 std::unique_ptr<TransactionEventMetrics> MetricsRepository::Reset() {
-  auto new_txn_event_metrics = std::make_unique<TransactionEventMetrics>(config_, sample_mask_);
+  auto new_txn_event_metrics =
+      std::make_unique<TransactionEventMetrics>(sample_mask_, config_->local_replica(), config_->local_partition());
   std::lock_guard<SpinLatch> guard(latch_);
   txn_event_metrics_.swap(new_txn_event_metrics);
   return new_txn_event_metrics;
