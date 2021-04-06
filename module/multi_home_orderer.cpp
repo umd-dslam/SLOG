@@ -78,8 +78,8 @@ void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
       multi_home_batch_log_.AddBatch(std::move(batch));
       break;
     }
-    case internal::ForwardBatch::kBatchOrder: {
-      auto& batch_order = forward_batch->batch_order();
+    case internal::ForwardBatch::kRemoteBatchOrder: {
+      auto& batch_order = forward_batch->remote_batch_order();
 
       VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
               << "]. Slot: " << batch_order.slot();

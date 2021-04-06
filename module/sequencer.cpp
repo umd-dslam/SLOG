@@ -110,9 +110,11 @@ void Sequencer::SendBatch() {
     stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
   }
 
+  auto local_replica = config_->local_replica();
+  auto local_partition = config_->local_partition();
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
-  paxos_propose->set_value(config_->local_partition());
+  paxos_propose->set_value(local_partition);
   Send(move(paxos_env), kLocalPaxos);
 
   if (!SendBatchDelayed()) {
@@ -124,11 +126,19 @@ void Sequencer::SendBatch() {
       RECORD(env->mutable_request()->mutable_forward_batch()->mutable_batch_data(),
              TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
+      bool send_local = false;
       vector<MachineId> destinations;
       for (uint32_t rep = 0; rep < num_replicas; rep++) {
-        destinations.push_back(config_->MakeMachineId(rep, part));
+        if (part == local_partition && rep == local_replica) {
+          send_local = true;
+        } else {
+          destinations.push_back(config_->MakeMachineId(rep, part));
+        }
       }
-      Send(move(env), destinations, kInterleaverChannel);
+      Send(*env, destinations, kInterleaverChannel);
+      if (send_local) {
+        Send(move(env), kLocalLogChannel);
+      }
     }
   }
 }
@@ -151,7 +161,12 @@ bool Sequencer::SendBatchDelayed() {
     auto env = NewBatchRequest(partitioned_batch_[part].release());
 
     // Send to the partition in the local replica immediately
-    Send(*env, config_->MakeMachineId(config_->local_replica(), part), kInterleaverChannel);
+    if (part == config_->local_partition()) {
+      auto copied_env = std::make_unique<internal::Envelope>(*env);
+      Send(move(copied_env), kLocalLogChannel);
+    } else {
+      Send(*env, config_->MakeMachineId(config_->local_replica(), part), kInterleaverChannel);
+    }
 
     NewTimedCallback(milliseconds(delay_ms), [this, part, delayed_env = env.release()]() {
       VLOG(3) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();

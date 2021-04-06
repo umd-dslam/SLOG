@@ -59,6 +59,7 @@ class Interleaver : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
+  void ProcessForwardBatch(EnvelopePtr&& env);
   void AdvanceLogs();
 
   void EmitBatch(BatchPtr&& batch);

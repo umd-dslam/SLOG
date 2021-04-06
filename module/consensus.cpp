@@ -35,7 +35,7 @@ void GlobalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
     return;
   }
   auto env = NewEnvelope();
-  auto order = env->mutable_request()->mutable_forward_batch()->mutable_batch_order();
+  auto order = env->mutable_request()->mutable_forward_batch()->mutable_remote_batch_order();
   order->set_slot(slot);
   order->set_batch_id(value);
   Send(std::move(env), multihome_orderers_, kMultiHomeOrdererChannel);
@@ -47,11 +47,11 @@ LocalPaxos::LocalPaxos(const shared_ptr<Broker>& broker, std::chrono::millisecon
 
 void LocalPaxos::OnCommit(uint32_t slot, uint32_t value, MachineId leader) {
   auto env = NewEnvelope();
-  auto order = env->mutable_request()->mutable_local_queue_order();
+  auto order = env->mutable_request()->mutable_forward_batch()->mutable_local_batch_order();
   order->set_queue_id(value);
   order->set_slot(slot);
   order->set_leader(leader);
-  Send(std::move(env), kLocalQueueChannel);
+  Send(std::move(env), kLocalLogChannel);
 }
 
 }  // namespace slog

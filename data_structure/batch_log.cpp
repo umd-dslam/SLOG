@@ -15,7 +15,7 @@ void BatchLog::AddBatch(BatchPtr&& batch) {
   UpdateReadyBatches();
 }
 
-void BatchLog::AddReplication(BatchId batch_id) {
+void BatchLog::AckReplication(BatchId batch_id) {
   replication_[batch_id]--;
   UpdateReadyBatches();
 }

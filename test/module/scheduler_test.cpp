@@ -8,24 +8,6 @@
 using namespace std;
 using namespace slog;
 
-internal::Request MakeBatch(BatchId batch_id, const vector<Transaction*>& txns, TransactionType batch_type) {
-  internal::Request req;
-  auto batch = req.mutable_forward_batch()->mutable_batch_data();
-  batch->set_id(batch_id);
-  batch->set_transaction_type(batch_type);
-  for (auto txn : txns) {
-    batch->mutable_transactions()->AddAllocated(txn);
-  }
-  return req;
-}
-
-internal::Request MakeBatchOrder(uint32_t slot, uint32_t batch_id) {
-  internal::Request req;
-  req.mutable_forward_batch()->mutable_batch_order()->set_slot(slot);
-  req.mutable_forward_batch()->mutable_batch_order()->set_batch_id(batch_id);
-  return req;
-}
-
 class SchedulerTest : public ::testing::Test {
  protected:
   static const size_t kNumMachines = 6;

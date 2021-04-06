@@ -25,24 +25,23 @@ class SequencerTest : public ::testing::TestWithParam<bool> {
       configs_ = MakeTestConfigurations("sequencer", 2, 2);
     }
 
-    slog_[0] = make_unique<TestSlog>(configs_[0]);
-    slog_[0]->AddSequencer();
-    slog_[0]->AddOutputChannel(kInterleaverChannel);
-    slog_[0]->StartInNewThreads();
-    sender_ = slog_[0]->NewSender();
-
-    for (int i = 1; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
       slog_[i] = make_unique<TestSlog>(configs_[i]);
       slog_[i]->AddSequencer();
       slog_[i]->AddOutputChannel(kInterleaverChannel);
-      slog_[i]->StartInNewThreads();
+      slog_[i]->AddOutputChannel(kLocalLogChannel);
+    }
+    sender_ = slog_[0]->NewSender();
+    for (auto& slog : slog_) {
+      slog->StartInNewThreads();
     }
   }
 
   void SendToSequencer(EnvelopePtr&& req) { sender_->Send(std::move(req), kSequencerChannel); }
 
   internal::Batch* ReceiveBatch(int i) {
-    auto req_env = slog_[i]->ReceiveFromOutputChannel(kInterleaverChannel);
+    // Iff i is the id of the sender (0), check the local log channel instead
+    auto req_env = slog_[i]->ReceiveFromOutputChannel(i == 0 ? kLocalLogChannel : kInterleaverChannel);
     if (req_env == nullptr) {
       return nullptr;
     }

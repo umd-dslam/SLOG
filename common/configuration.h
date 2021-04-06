@@ -67,8 +67,8 @@ class Configuration {
   uint32_t latency(size_t i) const;
   std::pair<uint32_t, size_t> nth_latency(size_t n) const;
   bool synchronized_batching() const;
-
   uint32_t sample_rate() const;
+  std::array<int, 2> interleaver_remote_to_local_ratio() const;
 
  private:
   internal::Configuration config_;

@@ -17,7 +17,7 @@ class BatchLog {
 
   void AddBatch(BatchPtr&& batch);
   void AddSlot(SlotId slot_id, BatchId batch_id, int replication_factor = 0);
-  void AddReplication(BatchId batch_id);
+  void AckReplication(BatchId batch_id);
 
   bool HasNextBatch() const;
   std::pair<SlotId, BatchPtr> NextBatch();

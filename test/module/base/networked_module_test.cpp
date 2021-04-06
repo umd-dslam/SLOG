@@ -15,6 +15,8 @@ class TestModule : public NetworkedModule {
         socket_number_(socket_number),
         weights_(weights) {}
 
+  const std::string& result() const { return result_; }
+
  protected:
   void Initialize() final {
     zmq::socket_t socket(*context(), ZMQ_PULL);
@@ -23,7 +25,7 @@ class TestModule : public NetworkedModule {
     SetMainVsCustomSocketWeights(weights_);
   }
 
-  void OnInternalRequestReceived(EnvelopePtr&&) final { cout << "#"; }
+  void OnInternalRequestReceived(EnvelopePtr&&) final { result_ += "#"; }
 
   bool OnCustomSocket() final {
     auto& socket = GetCustomSocket(0);
@@ -31,13 +33,14 @@ class TestModule : public NetworkedModule {
     if (env == nullptr) {
       return false;
     }
-    cout << "*";
+    result_ += "*";
     return true;
   }
 
  private:
   int socket_number_;
   array<int, 2> weights_;
+  std::string result_;
 };
 
 void SendEmptyEnv(Sender& sender, int socket_number) {
@@ -52,54 +55,66 @@ int main() {
   auto broker = Broker::New(config);
   Sender sender(config, broker->context());
 
-  int msgs = 50;
+  int msgs = 100;
   int socket_number = 0;
 
   {
-    auto m1 = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({1, 1}));
-    m1->StartInNewThread();
+    auto m = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({1, 1}));
     cout << "1:1" << endl;
     for (int i = 0; i < msgs; i++) {
       SendEmptyEnv(sender, socket_number);
       SendEmptyEnv(sender, socket_number + 1);
     }
-    this_thread::sleep_for(100ms);
-    cout << endl;
+    m->StartInNewThread();
+    this_thread::sleep_for(500ms);
+    cout << static_pointer_cast<TestModule>(m->module())->result() << endl;
   }
   {
     socket_number += 2;
-    auto m1 = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({5, 1}));
-    m1->StartInNewThread();
+    auto m = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({5, 1}));
     cout << "5:1" << endl;
     for (int i = 0; i < msgs; i++) {
       SendEmptyEnv(sender, socket_number);
       SendEmptyEnv(sender, socket_number + 1);
     }
-    this_thread::sleep_for(100ms);
-    cout << endl;
+    m->StartInNewThread();
+    this_thread::sleep_for(500ms);
+    cout << static_pointer_cast<TestModule>(m->module())->result() << endl;
   }
   {
     socket_number += 2;
-    auto m1 = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({10, 1}));
-    m1->StartInNewThread();
+    auto m = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({10, 1}));
     cout << "10:1" << endl;
     for (int i = 0; i < msgs; i++) {
       SendEmptyEnv(sender, socket_number);
       SendEmptyEnv(sender, socket_number + 1);
     }
-    this_thread::sleep_for(100ms);
-    cout << endl;
+    m->StartInNewThread();
+    this_thread::sleep_for(500ms);
+    cout << static_pointer_cast<TestModule>(m->module())->result() << endl;
   }
   {
     socket_number += 2;
-    auto m1 = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({3, 2}));
-    m1->StartInNewThread();
+    auto m = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({1, 10}));
+    cout << "1:10" << endl;
+    for (int i = 0; i < msgs; i++) {
+      SendEmptyEnv(sender, socket_number);
+      SendEmptyEnv(sender, socket_number + 1);
+    }
+    m->StartInNewThread();
+    this_thread::sleep_for(500ms);
+    cout << static_pointer_cast<TestModule>(m->module())->result() << endl;
+  }
+  {
+    socket_number += 2;
+    auto m = MakeRunnerFor<TestModule>(broker, socket_number, array<int, 2>({3, 2}));
     cout << "3:2" << endl;
     for (int i = 0; i < msgs; i++) {
       SendEmptyEnv(sender, socket_number);
       SendEmptyEnv(sender, socket_number + 1);
     }
-    this_thread::sleep_for(100ms);
-    cout << endl;
+    m->StartInNewThread();
+    this_thread::sleep_for(500ms);
+    cout << static_pointer_cast<TestModule>(m->module())->result() << endl;
   }
 }
