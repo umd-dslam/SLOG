@@ -72,7 +72,7 @@ class KeyValueCommands : public Commands<K, R> {
                   << ". Actual value = " << it->second.value();
         }
       } else if (cmd_ == "SLEEP") {
-        std::this_thread::sleep_for(std::chrono::seconds(std::stoi(args_[0])));
+        std::this_thread::sleep_for(std::chrono::milliseconds(std::stoi(args_[0])));
       }
     }
 
