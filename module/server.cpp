@@ -100,17 +100,17 @@ bool Server::OnCustomSocket() {
   // While this is called txn id, we use it for any kind of request
   auto txn_id = NextTxnId();
   auto res = pending_responses_.try_emplace(txn_id, move(identity), request.stream_id());
-  DCHECK(res.second) << "Duplicate transaction id: " << txn_id;
+  CHECK(res.second) << "Duplicate transaction id: " << txn_id;
 
   switch (request.type_case()) {
     case api::Request::kTxn: {
       auto txn = request.mutable_txn()->release_txn();
       auto txn_internal = txn->mutable_internal();
 
-      RECORD(txn_internal, TransactionEvent::ENTER_SERVER);
-
       txn_internal->set_id(txn_id);
       txn_internal->set_coordinating_server(config_->local_machine_id());
+
+      RECORD(txn_internal, TransactionEvent::ENTER_SERVER);
 
       ValidateTransaction(txn);
       if (txn->status() == TransactionStatus::ABORTED) {

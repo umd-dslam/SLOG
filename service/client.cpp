@@ -388,7 +388,7 @@ int main(int argc, char* argv[]) {
                  << "Usage: metrics [<prefix>]";
       return 1;
     }
-    std::string prefix;
+    std::string prefix = ".";
     if (cmd_argc == 2) {
       prefix = argv[2];
     }

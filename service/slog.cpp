@@ -204,5 +204,7 @@ int main(int argc, char* argv[]) {
   }
   broker->Stop();
 
+  metrics_manager->AggregateAndFlushToDisk(".");
+
   return 0;
 }
