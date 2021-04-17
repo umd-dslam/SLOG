@@ -43,8 +43,8 @@ jobs:
         LOCK: ${{ matrix.lock }}
       id: compute_tag
       run: |
-        echo "::set-output name=sha::${LOCK}-${GITHUB_SHA:0:7}\n"
-        echo "::set-output name=branch::${LOCK}-${GITHUB_REF##refs/heads/}\n"
+        echo "::set-output name=sha::${LOCK}-${GITHUB_SHA:0:7}"
+        echo "::set-output name=branch::${LOCK}-${GITHUB_REF##refs/heads/}"
 
     - name: Build and push
       id: docker_build
