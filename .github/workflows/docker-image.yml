@@ -42,18 +42,16 @@ jobs:
       env:
         LOCK: ${{ matrix.lock }}
       id: compute_tag
-      run: echo "::set-output name=tag::${LOCK}-${GITHUB_SHA:0:7}"
-
-    - name: Extract branch name
-      id: extract_branch
-      run: echo "::set-output name=branch::${GITHUB_REF##refs/heads/}"
+      run: |
+        echo "::set-output name=sha::${LOCK}-${GITHUB_SHA:0:7}\n"
+        echo "::set-output name=branch::${LOCK}-${GITHUB_REF##refs/heads/}\n"
 
     - name: Build and push
       id: docker_build
       uses: docker/build-push-action@v2
       with:
         push: true
-        tags: ctring/slog:${{ steps.compute_tag.outputs.tag }},ctring/slog:${{ steps.extract_branch.outputs.branch }}
+        tags: ctring/slog:${{ steps.compute_tag.outputs.sha }},ctring/slog:${{ steps.compute_tag.outputs.branch }}
         builder: ${{ steps.buildx.outputs.name }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache

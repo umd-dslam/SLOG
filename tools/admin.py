@@ -1055,13 +1055,14 @@ class CollectServerCommand(AdminCommand):
                 client, addr, *_ = remote_proc
                 out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
                 mkdir_cmd = f"mkdir -p {out_dir}"
-                shell_cmd = f"client metrics {out_dir}"
+                cp_config_cmd = f"cp {CONTAINER_SLOG_CONFIG_FILE_PATH} {out_dir}"
+                metrics_cmd = f"client metrics {out_dir}"
                 client.containers.run(
                     args.image,
                     name=SLOG_CLIENT_CONTAINER_NAME,
                     command=[
                         "/bin/sh", "-c",
-                        f"{mkdir_cmd} && {shell_cmd}"
+                        f"{mkdir_cmd} && {cp_config_cmd} && {metrics_cmd}"
                     ],
                     # Mount a directory on the host into the container
                     mounts=[SLOG_DATA_MOUNT],
