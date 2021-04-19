@@ -11,6 +11,7 @@ namespace {
 vector<MachineId> GetMembers(const ConfigurationPtr& config) {
   auto local_rep = config->local_replica();
   vector<MachineId> members;
+  members.reserve(config->num_partitions());
   // Enlist all machines in the same region as members
   for (uint32_t part = 0; part < config->num_partitions(); part++) {
     members.push_back(config->MakeMachineId(local_rep, part));

@@ -205,6 +205,8 @@ void Interleaver::AdvanceLogs() {
       auto part = rnd(rg_);
 
       vector<MachineId> destinations, ack_destinations;
+      destinations.reserve(config_->num_replicas());
+      ack_destinations.reserve(config_->replication_factor());
       for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
         if (rep == local_replica) {
           continue;

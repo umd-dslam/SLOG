@@ -258,6 +258,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       } else {
         // Send the txn directly to sequencers of involved replicas to generate lock-only txns
         vector<MachineId> destinations;
+        destinations.reserve(txn_internal->involved_replicas_size());
         for (auto rep : txn_internal->involved_replicas()) {
           destinations.push_back(config_->MakeMachineId(rep, part));
         }

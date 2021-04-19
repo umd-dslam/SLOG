@@ -128,6 +128,7 @@ void Sequencer::SendBatch() {
 
       bool send_local = false;
       vector<MachineId> destinations;
+      destinations.reserve(num_replicas);
       for (uint32_t rep = 0; rep < num_replicas; rep++) {
         if (part == local_partition && rep == local_replica) {
           send_local = true;
@@ -172,6 +173,7 @@ bool Sequencer::SendBatchDelayed() {
       VLOG(3) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();
       // Replicate batch to all replicas EXCEPT local replica
       vector<MachineId> destinations;
+      destinations.reserve(config_->num_replicas());
       for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
         if (rep != config_->local_replica()) {
           destinations.push_back(config_->MakeMachineId(rep, part));
