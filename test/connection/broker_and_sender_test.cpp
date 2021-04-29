@@ -24,17 +24,15 @@ zmq::socket_t MakePullSocket(zmq::context_t& context, Channel chan) {
   return socket;
 }
 
-EnvelopePtr MakeEchoRequest(const std::string& data) {
+EnvelopePtr MakePing(int64_t time) {
   auto env = std::make_unique<internal::Envelope>();
-  auto echo = env->mutable_request()->mutable_echo();
-  echo->set_data(data);
+  env->mutable_request()->mutable_ping()->set_time(time);
   return env;
 }
 
-EnvelopePtr MakeEchoResponse(const std::string& data) {
+EnvelopePtr MakePong(int64_t time) {
   auto env = std::make_unique<internal::Envelope>();
-  auto echo = env->mutable_response()->mutable_echo();
-  echo->set_data(data);
+  env->mutable_response()->mutable_pong()->set_time(time);
   return env;
 }
 
@@ -52,14 +50,14 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     Sender sender(broker->config(), broker->context());
     // Send ping
-    auto ping_req = MakeEchoRequest("ping");
+    auto ping_req = MakePing(99);
     sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG, 0 /* via_broker */);
 
     // Wait for pong
     auto res = RecvEnvelope(recv_socket);
     ASSERT_TRUE(res != nullptr);
     ASSERT_TRUE(res->has_response());
-    ASSERT_EQ("pong", res->response().echo().data());
+    ASSERT_EQ(99, res->response().pong().time());
   });
 
   auto pong = thread([&]() {
@@ -76,10 +74,10 @@ TEST(BrokerAndSenderTest, PingPong) {
     auto req = RecvEnvelope(socket);
     ASSERT_TRUE(req != nullptr);
     ASSERT_TRUE(req->has_request());
-    ASSERT_EQ("ping", req->request().echo().data());
+    ASSERT_EQ(99, req->request().ping().time());
 
     // Send pong
-    auto pong_res = MakeEchoResponse("pong");
+    auto pong_res = MakePong(99);
     sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING, 1 /* via broker */);
   });
 
@@ -102,12 +100,12 @@ TEST(BrokerTest, LocalPingPong) {
     auto socket = MakePullSocket(*broker->context(), PING);
 
     // Send ping
-    sender.Send(MakeEchoRequest("ping"), PONG);
+    sender.Send(MakePing(99), PONG);
 
     // Wait for pong
     auto res = RecvEnvelope(socket);
     ASSERT_TRUE(res != nullptr);
-    ASSERT_EQ("pong", res->response().echo().data());
+    ASSERT_EQ(99, res->response().pong().time());
   });
 
   auto pong = thread([&]() {
@@ -117,10 +115,10 @@ TEST(BrokerTest, LocalPingPong) {
     // Wait for ping
     auto req = RecvEnvelope(socket);
     ASSERT_TRUE(req != nullptr);
-    ASSERT_EQ("ping", req->request().echo().data());
+    ASSERT_EQ(99, req->request().ping().time());
 
     // Send pong
-    sender.Send(MakeEchoResponse("pong"), PING);
+    sender.Send(MakePong(99), PING);
   });
 
   ping.join();
@@ -142,7 +140,7 @@ TEST(BrokerTest, MultiSend) {
 
     Sender sender(broker->config(), broker->context());
     // Send ping
-    auto ping_req = MakeEchoRequest("ping");
+    auto ping_req = MakePing(99);
     vector<MachineId> dests;
     for (int i = 0; i < NUM_PONGS; i++) {
       dests.push_back(configs[0]->MakeMachineId(0, i + 1));
@@ -154,7 +152,7 @@ TEST(BrokerTest, MultiSend) {
       auto res = RecvEnvelope(socket);
       ASSERT_TRUE(res != nullptr);
       ASSERT_TRUE(res->has_response());
-      ASSERT_EQ("pong", res->response().echo().data());
+      ASSERT_EQ(99, res->response().pong().time());
     }
   });
 
@@ -173,10 +171,10 @@ TEST(BrokerTest, MultiSend) {
       auto req = RecvEnvelope(socket);
       ASSERT_TRUE(req != nullptr);
       ASSERT_TRUE(req->has_request());
-      ASSERT_EQ("ping", req->request().echo().data());
+      ASSERT_EQ(99, req->request().ping().time());
 
       // Send pong
-      auto pong_res = MakeEchoResponse("pong");
+      auto pong_res = MakePong(99);
       sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
 
       this_thread::sleep_for(200ms);
@@ -222,7 +220,7 @@ TEST(BrokerTest, CreateRedirection) {
 
   // Send ping message with a tag of the pong machine.
   {
-    auto ping_req = MakeEchoRequest("ping");
+    auto ping_req = MakePing(99);
     ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
@@ -245,12 +243,12 @@ TEST(BrokerTest, CreateRedirection) {
     auto ping_req = RecvEnvelope(pong_socket);
     ASSERT_TRUE(ping_req != nullptr);
     ASSERT_TRUE(ping_req->has_request());
-    ASSERT_EQ("ping", ping_req->request().echo().data());
+    ASSERT_EQ(99, ping_req->request().ping().time());
   }
 
   // Send pong
   {
-    auto pong_res = MakeEchoResponse("pong");
+    auto pong_res = MakePong(99);
     pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
   }
 
@@ -260,7 +258,7 @@ TEST(BrokerTest, CreateRedirection) {
     auto pong_res = RecvEnvelope(ping_socket);
     ASSERT_TRUE(pong_res != nullptr);
     ASSERT_TRUE(pong_res->has_response());
-    ASSERT_EQ("pong", pong_res->response().echo().data());
+    ASSERT_EQ(99, pong_res->response().pong().time());
   }
 }
 
@@ -295,7 +293,7 @@ TEST(BrokerTest, RemoveRedirection) {
 
   // Send ping message with a tag of the pong machine.
   {
-    auto ping_req = MakeEchoRequest("ping");
+    auto ping_req = MakePing(99);
     ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
@@ -304,7 +302,7 @@ TEST(BrokerTest, RemoveRedirection) {
     auto ping_req = RecvEnvelope(pong_socket);
     ASSERT_TRUE(ping_req != nullptr);
     ASSERT_TRUE(ping_req->has_request());
-    ASSERT_EQ("ping", ping_req->request().echo().data());
+    ASSERT_EQ(99, ping_req->request().ping().time());
   }
 
   // Remove the redirection
@@ -318,7 +316,7 @@ TEST(BrokerTest, RemoveRedirection) {
 
   // Send ping message again
   {
-    auto ping_req = MakeEchoRequest("ping");
+    auto ping_req = MakePing(99);
     ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 

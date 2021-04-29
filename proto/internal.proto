@@ -54,7 +54,7 @@ message Envelope {
  */
 message Request {
     oneof type {
-        EchoRequest echo = 1;
+        Ping ping = 1;
         Signal signal = 2;
         BrokerRedirect broker_redirect = 3;
         ForwardTransaction forward_txn = 4;
@@ -70,11 +70,9 @@ message Request {
     }
 }
 
-/**
- * For debugging and testing purposes
- */
-message EchoRequest {
-    bytes data = 1;
+message Ping {
+    int64 time = 1;
+    uint32 target = 2;
 }
 
 /**
@@ -156,7 +154,7 @@ message StatsRequest {
  */
 message Response {
     oneof type {
-        EchoResponse echo = 1;
+        Pong pong = 1;
         LookupMasterResponse lookup_master = 2;
         PaxosAcceptResponse paxos_accept = 3;
         PaxosCommitResponse paxos_commit = 4;
@@ -167,8 +165,9 @@ message Response {
 /**
  * For debugging and testing purposes
  */
-message EchoResponse {
-    bytes data = 1;
+message Pong {
+    int64 time = 1;
+    uint32 target = 2;
 }
 
 message LookupMasterResponse {
