@@ -73,6 +73,7 @@ message Request {
 message Ping {
     int64 time = 1;
     uint32 target = 2;
+    uint32 from_channel = 3;
 }
 
 /**
