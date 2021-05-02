@@ -100,26 +100,27 @@ message Configuration {
     int32 sequencer_max_batch_size = 12;
     // Number of replicas that need to be synchronously replicated to
     uint32 replication_factor = 13;
+    // Order of replicas for synchronous replication. This is a list of strings each of which corresponds
+    // to a replica. Each string is an ordered comma-separated list of replica ids that the current replica
+    // will synchronously replicate to based on replication order. The current replica will be ignored if exists
+    // in the list. For example, ['1,2', '2,1,0', ''] means that, with a replication factor of 3, replica 0 will
+    // synchronously replicate to 1 and 2, replica 1 will replicate to 2 and 0, and replica 2 will not synchronously
+    // replicate to anywhere.
+    repeated bytes replication_order = 14;
     // Replication of txn batches will be delayed to simulate uneven network latency
-    ReplicationDelayExperiment replication_delay = 14;
+    ReplicationDelayExperiment replication_delay = 15;
     // Do not record specified events
-    repeated TransactionEvent disabled_events = 15;
+    repeated TransactionEvent disabled_events = 16;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
-    bool bypass_mh_orderer = 16;
+    bool bypass_mh_orderer = 17;
     // Pin each module to a cpu
-    repeated CpuPinning cpu_pinnings = 17;
+    repeated CpuPinning cpu_pinnings = 18;
     // Return dummy txns back to the client instead of full results
-    bool return_dummy_txn = 18;
+    bool return_dummy_txn = 19;
     // Number of retries after calling zmq::recv something
-    int32 recv_retries = 19;
+    int32 recv_retries = 20;
     // Type of commands to run while executing a txn 
-    Commands commands = 20;
-    // Latency between replicas. This is a list of strings each of which corresponds to a replica
-    // specified in `replicas`. Each string is a comma-separated list of integer values. The number
-    // of values is the same as number of replica. Each value is the one-way latency in ms between
-    // the corresponding replicas. For example, ['0,90', '80,0'] means the latency from replica 0 
-    // to replica 1 is 90ms, and the latency from replica 1 to replica 0 is 80ms.
-    repeated bytes replica_latency = 21;
+    Commands commands = 21;
     // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
     // txns are put into the batches at approximately the same time
     bool synchronized_batching = 22;

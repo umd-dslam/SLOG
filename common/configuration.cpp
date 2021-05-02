@@ -74,25 +74,16 @@ Configuration::Configuration(const internal::Configuration& config, const string
   CHECK(local_address_is_valid) << "The configuration does not contain the provided local machine ID: \""
                                 << local_address_ << "\"";
 
-  if (!config_.replica_latency().empty()) {
-    CHECK_EQ(config_.replica_latency_size(), config_.replicas_size())
-        << "Number of latency string must match number of replicas";
-
-    auto latency_str = Split(config_.replica_latency(local_replica_), ",");
-    CHECK_EQ(latency_str.size(), config_.replicas_size()) << "Number of latency values must match number of replicas";
-    for (size_t i = 0; i < latency_str.size(); i++) {
-      auto lat = std::stoul(latency_str[i]);
-      latency_.push_back(lat);
-      ordered_latency_.emplace_back(lat, i);
-    }
-  } else {
-    for (int i = 0; i < config_.replicas_size(); i++) {
-      latency_.push_back(0);
-      ordered_latency_.emplace_back(0, i);
+  if (config_.replication_order_size() > local_replica_) {
+    auto order_str = Split(config_.replication_order(local_replica_), ",");
+    for (auto rstr : order_str) {
+      auto r = std::stol(rstr);
+      CHECK_LT(r, config_.replicas_size()) << "Invalid replica specified in the replication order";
+      if (r != local_replica_) {
+        replication_order_.push_back(r);
+      }
     }
   }
-  std::swap(ordered_latency_[0], ordered_latency_[local_replica_]);
-  std::sort(ordered_latency_.begin() + 1, ordered_latency_.end());
 }
 
 const string& Configuration::protocol() const { return config_.protocol(); }
@@ -225,9 +216,7 @@ int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1
 
 internal::Commands Configuration::commands() const { return config_.commands(); }
 
-uint32_t Configuration::latency(size_t i) const { return latency_[i]; }
-
-std::pair<uint32_t, size_t> Configuration::nth_latency(size_t n) const { return ordered_latency_[n]; };
+const vector<uint32_t> Configuration::replication_order() const { return replication_order_; }
 
 bool Configuration::synchronized_batching() const { return config_.synchronized_batching(); }
 

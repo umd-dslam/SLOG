@@ -139,11 +139,10 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Local replica: " << config->local_replica();
   LOG(INFO) << "Local partition: " << config->local_partition();
   std::ostringstream os;
-  for (size_t i = 1; i < config->num_replicas(); i++) {
-    auto [lat, rep] = config->nth_latency(i);
-    os << "(rep=" << rep << " | " << lat << " ms) ";
+  for (auto r : config->replication_order()) {
+    os << r << " ";
   }
-  LOG(INFO) << "Latency order: " << os.str();
+  LOG(INFO) << "Replication order: " << os.str();
 
   if (config->return_dummy_txn()) {
     LOG(WARNING) << "Dummy transactions will be returned";
