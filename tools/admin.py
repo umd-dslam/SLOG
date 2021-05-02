@@ -898,7 +898,7 @@ class BenchmarkCommand(AdminCommand):
 
         # Clean up everything
         def clean_up(remote_proc):
-            client, addr, _ = remote_proc
+            client, addr, *_ = remote_proc
             container_name = f'{BENCHMARK_CONTAINER_NAME}'
             cleanup_container(client, container_name, addr=addr)
             client.containers.run(
@@ -918,7 +918,7 @@ class BenchmarkCommand(AdminCommand):
             return
 
         def benchmark_runner(proc):
-            client, addr, rep = proc
+            client, addr, rep, *_ = proc
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
