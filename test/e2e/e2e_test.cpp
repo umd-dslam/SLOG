@@ -25,6 +25,8 @@ class E2ETest : public ::testing::Test {
   void SetUp() {
     auto custom_config = CustomConfig();
     custom_config.set_replication_factor(2);
+    custom_config.add_replication_order("1");
+    custom_config.add_replication_order("0");
     configs = MakeTestConfigurations("e2e", 2 /* num_replicas */, 2 /* num_partitions */, custom_config);
 
     for (size_t i = 0; i < NUM_MACHINES; i++) {
