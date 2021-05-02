@@ -133,7 +133,19 @@ def parse_envs(envs: List[str]) -> Dict[str, str]:
     return {env[0]: env[1] for env in env_var_tuples}
 
 
-def download_and_untar_data(addresses, user, tag, out_path):
+def fetch_data(machines, user, tag, out_path):
+    '''Fetch data from remote machines
+
+    @param machines  list of machine info dicts. Each dict has the following format:
+                     {
+                        'address': address of the machine,
+                        'name': name of directory containing the 
+                                fetched data for this machine
+                      }
+    @param user      username used to ssh to the machines
+    @param tag       tag of the data to fetch
+    @param output    directory containing the fetched data
+    '''
     if os.path.exists(out_path):
         shutil.rmtree(out_path, ignore_errors=True)
         LOG.info("Removed existing directory: %s", out_path)
@@ -142,18 +154,19 @@ def download_and_untar_data(addresses, user, tag, out_path):
     LOG.info(f"Created directory: {out_path}")
 
     commands = []
-    for addr in addresses:
+    for m in machines:
+        addr = m['address']
         data_path = os.path.join(HOST_DATA_DIR, tag)
-        data_tar_file = f'{addr}.tar.gz'
+        data_tar_file = f'{m["name"]}.tar.gz'
         data_tar_path = os.path.join(HOST_DATA_DIR, data_tar_file)
         out_tar_path = os.path.join(out_path, data_tar_file)
-        out_addr_path = os.path.join(out_path, addr)
+        out_final_path = os.path.join(out_path, m['name'])
 
-        os.makedirs(out_addr_path, exist_ok=True)
+        os.makedirs(out_final_path, exist_ok=True)
         cmd = (
             f'ssh {user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
             f'rsync -vh --inplace {user}@{addr}:{data_tar_path} {out_path} && '
-            f'tar -xzf {out_tar_path} -C {out_addr_path}'
+            f'tar -xzf {out_tar_path} -C {out_final_path}'
         )
         commands.append(f'({cmd}) & ')
 
@@ -989,12 +1002,15 @@ class CollectClientCommand(AdminCommand):
 
     def do_command(self, args):
         client_out_dir = os.path.join(args.out_dir, args.tag, "client")
-        addresses = [
-            c.decode() 
-            for r in self.config.replicas
+        machines = [
+            {
+                'address': c.decode(),
+                'name': f"{i}-{c.decode()}"
+            }
+            for i, r in enumerate(self.config.replicas)
             for c in r.client_addresses
         ]
-        download_and_untar_data(addresses, args.user, args.tag, client_out_dir)
+        fetch_data(machines, args.user, args.tag, client_out_dir)
 
 
 class CollectServerCommand(AdminCommand):
@@ -1057,12 +1073,15 @@ class CollectServerCommand(AdminCommand):
         if args.flush_only:
             return
         server_out_dir = os.path.join(args.out_dir, args.tag, "server")
-        addresses = [
-            a.decode()
-            for r in self.config.replicas
-            for a in r.addresses
+        machines = [
+            {
+                'address': a.decode(),
+                'name': f"{r}-{p}-{a.decode()}"
+            }
+            for r, rep in enumerate(self.config.replicas)
+            for p, a in enumerate(rep.addresses)
         ]
-        download_and_untar_data(addresses, args.user, args.tag, server_out_dir)
+        fetch_data(machines, args.user, args.tag, server_out_dir)
 
 
 if __name__ == "__main__":
