@@ -65,7 +65,7 @@ Interleaver::Interleaver(const shared_ptr<Broker>& broker, const MetricsReposito
   need_ack_from_replica_.resize(config_->num_replicas());
   auto replication_factor = static_cast<size_t>(config_->replication_factor());
   const auto& replication_order = config_->replication_order();
-  for (size_t r = 0; r < std::min(replication_order.size(), replication_factor-1); r++) {
+  for (size_t r = 0; r < std::min(replication_order.size(), replication_factor - 1); r++) {
     need_ack_from_replica_[replication_order[r]] = true;
   }
 }
