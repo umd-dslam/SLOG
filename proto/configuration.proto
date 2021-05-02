@@ -11,15 +11,8 @@ message Replica {
     // If protocol is "tcp", these are IP addresses.
     // If protocol is "icp", these are filesystem paths.
     repeated bytes addresses = 1;
-    // List of clients used for benchmarking. This field is only used by the admin tool
-    repeated Client clients = 2;
-}
-
-message Client {
-    // Address of the client
-    bytes address = 1;
-    // Number of benchmark processes to run
-    uint32 procs = 2;
+    // List of machines used for benchmarking. This field is only used by the admin tool
+    repeated bytes client_addresses = 2;
 }
 
 message ReplicationDelayExperiment {

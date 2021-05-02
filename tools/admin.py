@@ -58,7 +58,6 @@ RemoteProcess = collections.namedtuple(
         'docker_client',
         'address',
         'replica',
-        'procnum',
     ]
 )
 
@@ -232,7 +231,7 @@ class AdminCommand(Command):
         def init_docker_client(remote_proc):
             _, addr, _ = remote_proc
             try:
-                remote_proc[0] = self.new_client(args.user, addr)
+                remote_proc[0] = self.new_docker_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
             except PasswordRequiredException as e:
                 LOG.error(
@@ -246,7 +245,7 @@ class AdminCommand(Command):
         with Pool(processes=len(procs)) as pool:
             pool.map(init_docker_client, procs)
 
-        self.remote_procs = [RemoteProcess(*m, None) for m in procs if m[0] is not None]
+        self.remote_procs = [RemoteProcess(*m) for m in procs if m[0] is not None]
 
     def pull_slog_image(self, args):
         if len(self.remote_procs) == 0 or args.no_pull:
@@ -271,7 +270,7 @@ class AdminCommand(Command):
     ##############################
     #       Helper methods
     ##############################
-    def new_client(self, user, addr):
+    def new_docker_client(self, user, addr):
         """
         Gets a new Docker client for a given address.
         """
@@ -477,6 +476,11 @@ class LogsCommand(AdminCommand):
             default=SLOG_CONTAINER_NAME,
             help="Name of the Docker container to show logs from"
         )
+        parser.add_argument(
+            "--client",
+            action="store_true",
+            help="Use the client address lists"
+        )
 
     def init_remote_processes(self, args):
         """
@@ -490,10 +494,16 @@ class LogsCommand(AdminCommand):
                     self.addr = args.a
                 else:
                     # Check if the given address is specified in the config
-                    addr_is_in_replica = (
-                        args.a.encode() in rep.addresses
-                        for rep in self.config.replicas
-                    )
+                    if args.client:
+                        addr_is_in_replica = (
+                            args.a.encode() in rep.client_addresses
+                            for rep in self.config.replicas
+                        )
+                    else:
+                        addr_is_in_replica = (
+                            args.a.encode() in rep.addresses
+                            for rep in self.config.replicas
+                        )
                     if any(addr_is_in_replica):
                         self.addr = args.a
                     else:
@@ -505,9 +515,12 @@ class LogsCommand(AdminCommand):
                 if self.config is None:
                     raise Exception('The "-rp" flag requires a valid config file')
                 r, p = args.rp
-                self.addr = self.config.replicas[r].addresses[p].decode()
+                if args.client:
+                    self.addr = self.config.replicas[r].client_addresses[p].decode()
+                else:
+                    self.addr = self.config.replicas[r].addresses[p].decode()
 
-            self.client = self.new_client(args.user, self.addr)
+            self.client = self.new_docker_client(args.user, self.addr)
             LOG.info("Connected to %s", self.addr)
         except PasswordRequiredException as e:
             LOG.error(
@@ -761,21 +774,14 @@ class BenchmarkCommand(AdminCommand):
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
-        group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument(
-            "--num-txns", type=int,
-            help="Number of transactions sent per client"
-        )
-        group.add_argument(
-            "--duration", type=int,
-            help="How long the benchmark is run in seconds"
+        parser.add_argument(
+            "--txns", type=int, required=True,
+            help="Number of transactions generated per benchmark machine"
         )
         parser.add_argument(
-            "--steps", type=int, default=1,
-            help=(
-                "Can only be used with --duration. Step up from 0 client to "
-                "all clients in given number of steps"
-            )
+            "--duration", type=int,
+            default=0,
+            help="How long the benchmark is run in seconds"
         )
         parser.add_argument(
             "--tag",
@@ -791,15 +797,19 @@ class BenchmarkCommand(AdminCommand):
             default="",
             help="Parameters of the workload"
         )
-        parser.add_argument(
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument(
             "--rate", type=int,
-            default=1000,
             help="Maximum number of transactions sent per second"
+        )
+        group.add_argument(
+            "--clients", type=int,
+            help="Number of clients sending synchronized txns"
         )
         parser.add_argument(
             "--workers", type=int,
             default=1,
-            help="Number of threads for each client"
+            help="Number of threads for each benchmark machine"
         )
         parser.add_argument(
             "--sample", type=int,
@@ -827,25 +837,17 @@ class BenchmarkCommand(AdminCommand):
         Override this method because the clients of this command are created from
         the addresses specified in a json file instead of from the configuration file
         """
-        proc_lists = []
-        for rep, r in enumerate(self.config.replicas):
-            for c in r.clients:
-                # Create a list of processes per machine
-                proc_lists.append([
-                    [None, c.address.decode(), rep, procnum] for procnum in range(c.procs)
-                ])
+        procs = []
+        # Create a docker client for each node
+        for rep, rep_info in enumerate(self.config.replicas):
+            for addr in rep_info.client_addresses:
+                # Use None as a placeholder for the first value
+                procs.append([None, addr.decode(), rep])
         
-        # Interleave the lists of processes across machines
-        proc_lists = itertools.zip_longest(*proc_lists)
-        procs = [
-            proc for proc_list in proc_lists 
-            for proc in proc_list if proc is not None
-        ]
-
         def init_docker_client(proc):
             addr = proc[1]
             try:
-                proc[0] = self.new_client(args.user, addr)         
+                proc[0] = self.new_docker_client(args.user, addr)         
                 LOG.info("Connected to %s", addr)
             except PasswordRequiredException as e:
                 LOG.error(
@@ -859,10 +861,7 @@ class BenchmarkCommand(AdminCommand):
         with Pool(processes=len(procs)) as pool:
             pool.map(init_docker_client, procs)
 
-        self.remote_procs = [
-            RemoteProcess(docker_client, addr, rep, procnum)
-            for docker_client, addr, rep, procnum in procs
-        ]
+        self.remote_procs = [RemoteProcess(*p) for p in procs]
 
     def do_command(self, args):
         # Prepare a command to update the config file
@@ -876,17 +875,17 @@ class BenchmarkCommand(AdminCommand):
         else:
             tag = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        parent_dir = os.path.join(CONTAINER_DATA_DIR, tag)
+        out_dir = os.path.join(CONTAINER_DATA_DIR, tag)
 
         # Clean up everything
         def clean_up(remote_proc):
-            client, addr, _, proc = remote_proc
-            container_name = f'{BENCHMARK_CONTAINER_NAME}_{proc}'
+            client, addr, _ = remote_proc
+            container_name = f'{BENCHMARK_CONTAINER_NAME}'
             cleanup_container(client, container_name, addr=addr)
             client.containers.run(
                 args.image,
                 name=container_name,
-                command=["/bin/sh", "-c", f"rm -rf {parent_dir}"],
+                command=["/bin/sh", "-c", f"rm -rf {out_dir}"],
                 # Mount a directory on the host into the container
                 mounts=[SLOG_DATA_MOUNT],
             )
@@ -899,14 +898,8 @@ class BenchmarkCommand(AdminCommand):
         if args.cleanup:
             return
 
-        def benchmark_runner(proc_and_params):
-            proc, num_txns, duration = proc_and_params
-            client, addr, rep, procnum = proc
-
-            if num_txns is None:
-                num_txns = args.rate * duration
-
-            out_dir = os.path.join(parent_dir, str(procnum))
+        def benchmark_runner(proc):
+            client, addr, rep = proc
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
@@ -914,18 +907,23 @@ class BenchmarkCommand(AdminCommand):
                 f"--r {rep} "
                 f"--data-dir {CONTAINER_DATA_DIR} "
                 f"--out-dir {out_dir} "
+                f"--duration {args.duration} "
                 f"--wl {args.workload} "
                 f'--params "{args.params}" '
-                f"--rate {args.rate} "
-                f"--txns {num_txns} "
+                f"--txns {args.txns} "
                 f"--workers {args.workers} "
                 f"--sample {args.sample} "
                 f"--seed {args.seed} "
-                f"--txn_profiles"
+                f"--txn_profiles "
+            )
+            shell_cmd += (
+                f"--rate {args.rate} " 
+                if args.rate is not None else 
+                f"--clients {args.clients}"
             )
             container = client.containers.run(
                 args.image,
-                name=f'{BENCHMARK_CONTAINER_NAME}_{procnum}',
+                name=f'{BENCHMARK_CONTAINER_NAME}',
                 command=[
                     "/bin/sh", "-c",
                     f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
@@ -945,35 +943,10 @@ class BenchmarkCommand(AdminCommand):
             )
             return container, addr
         
-        num_procs = len(self.remote_procs)
-        duration = args.duration
-        batch_size = (num_procs + 1) // args.steps if duration else num_procs
-        
-        containers = []
-        COMPENSATE = 1 # compensation for the overhead at each step
-        steps = range(0, num_procs, batch_size)
-        remaining_steps = len(steps)
-        step_duration = duration // len(steps) if duration else 0
-        for s, i in enumerate(steps):
-            remaining_steps -= 1
-            batch = self.remote_procs[i:i + batch_size]
-            proc_and_params = zip(
-                batch,
-                itertools.repeat(args.num_txns),
-                itertools.repeat(duration + remaining_steps * COMPENSATE if duration else None),
-            )
-            with Pool(processes=len(batch)) as pool:
-                containers += pool.map(benchmark_runner, proc_and_params)
-            LOG.info("Step %d: started %d clients", s + 1, len(batch))
-
-            if duration:
-                time.sleep(step_duration)
-                duration -= step_duration
-                # Avoid duration reach 0, which makes the benchmark run forever
-                duration = max(duration, 1)
+        with Pool(processes=len(self.remote_procs)) as pool:
+            containers = pool.map(benchmark_runner, self.remote_procs)
 
         wait_for_containers(containers)
-
         LOG.info("Tag: %s", tag)
 
 
@@ -1012,9 +985,9 @@ class CollectClientCommand(AdminCommand):
     def do_command(self, args):
         client_out_dir = os.path.join(args.out_dir, args.tag, "client")
         addresses = [
-            c.address.decode() 
+            c.decode() 
             for r in self.config.replicas
-            for c in r.clients
+            for c in r.client_addresses
         ]
         download_and_untar_data(addresses, args.user, args.tag, client_out_dir)
 
