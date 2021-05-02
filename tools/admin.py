@@ -38,6 +38,7 @@ HOST_DATA_DIR = "/var/tmp"
 
 SLOG_IMG = "ctring/slog"
 SLOG_CONTAINER_NAME = "slog"
+SLOG_BENCHMMARK_CONTAINER_NAME = "benchmark"
 SLOG_CLIENT_CONTAINER_NAME = "slog_client"
 SLOG_DATA_MOUNT = docker.types.Mount(
     target=CONTAINER_DATA_DIR,
@@ -473,7 +474,6 @@ class LogsCommand(AdminCommand):
         )
         parser.add_argument(
             "--container",
-            default=SLOG_CONTAINER_NAME,
             help="Name of the Docker container to show logs from"
         )
         parser.add_argument(
@@ -538,9 +538,14 @@ class LogsCommand(AdminCommand):
     def do_command(self, args):
         if self.client is None:
             return
-
+        if args.container is not None:
+            container = args.container
+        elif args.client:
+            container = SLOG_BENCHMMARK_CONTAINER_NAME
+        else:
+            container = SLOG_CONTAINER_NAME
         try:
-            c = self.client.containers.get(args.container)
+            c = self.client.containers.get(container)
         except docker.errors.NotFound:
             LOG.error("Cannot find container \"%s\"", args.container)
             return
