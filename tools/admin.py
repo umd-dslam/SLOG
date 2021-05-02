@@ -59,6 +59,7 @@ RemoteProcess = collections.namedtuple(
         'docker_client',
         'address',
         'replica',
+        'partition',
     ]
 )
 
@@ -238,12 +239,12 @@ class AdminCommand(Command):
         procs = []
         # Create a docker client for each node
         for rep, rep_info in enumerate(self.config.replicas):
-            for addr in rep_info.addresses:
+            for part, addr in enumerate(rep_info.addresses):
                 # Use None as a placeholder for the first value
-                procs.append([None, addr.decode(), rep])
+                procs.append([None, addr.decode(), rep, part])
         
         def init_docker_client(remote_proc):
-            _, addr, _ = remote_proc
+            addr = remote_proc[1]
             try:
                 remote_proc[0] = self.new_docker_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
@@ -560,7 +561,7 @@ class LogsCommand(AdminCommand):
         try:
             c = self.client.containers.get(container)
         except docker.errors.NotFound:
-            LOG.error("Cannot find container \"%s\"", args.container)
+            LOG.error("Cannot find container \"%s\"", container)
             return
 
         if args.follow:
@@ -858,10 +859,10 @@ class BenchmarkCommand(AdminCommand):
         procs = []
         # Create a docker client for each node
         for rep, rep_info in enumerate(self.config.replicas):
-            for addr in rep_info.client_addresses:
+            for i, addr in enumerate(rep_info.client_addresses):
                 # Use None as a placeholder for the first value
-                procs.append([None, addr.decode(), rep])
-        
+                procs.append([None, addr.decode(), rep, i])
+
         def init_docker_client(proc):
             addr = proc[1]
             try:
