@@ -74,13 +74,7 @@ def print_slog_config_fragment(instance_ips, num_clients):
     for _, ips in enumerate(ip_groups):
         client_ips, server_ips = ips[:num_clients], ips[num_clients:]
         servers = [f'  addresses: "{ip}"' for ip in server_ips]
-        clients = [
-            '  clients: {\n'
-            f'    address: "{ip}"\n'
-            '    procs: 1\n'
-            '  }'
-            for ip in client_ips
-        ]
+        clients = [f'  client_addresses: "{ip}"' for ip in client_ips]
         slog_configs.append(
             'replicas: {\n' + 
                 '\n'.join(servers) +
