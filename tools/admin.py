@@ -933,7 +933,7 @@ class BenchmarkCommand(AdminCommand):
                 f"--workers {args.workers} "
                 f"--sample {args.sample} "
                 f"--seed {args.seed} "
-                f"--txn_profiles "
+                f"--txn_profiles 0 "
             )
             shell_cmd += (
                 f"--rate {args.rate} " 
