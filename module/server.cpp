@@ -46,16 +46,14 @@ Transaction* Server::CompletedTransaction::ReleaseTxn() {
 
 Server::Server(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Server", broker, kServerChannel, metrics_manager, poll_timeout),
-      config_(broker->config()),
-      txn_id_counter_(0) {}
+    : NetworkedModule("Server", broker, kServerChannel, metrics_manager, poll_timeout), txn_id_counter_(0) {}
 
 /***********************************************
                 Initialization
 ***********************************************/
 
 void Server::Initialize() {
-  string endpoint = "tcp://*:" + std::to_string(config_->server_port());
+  string endpoint = "tcp://*:" + std::to_string(config()->server_port());
   zmq::socket_t client_socket(*context(), ZMQ_ROUTER);
   client_socket.set(zmq::sockopt::rcvhwm, 0);
   client_socket.set(zmq::sockopt::sndhwm, 0);
@@ -66,8 +64,8 @@ void Server::Initialize() {
   // Tell other machines that the current one is online
   internal::Envelope env;
   env.mutable_request()->mutable_signal();
-  for (MachineId m : config_->all_machine_ids()) {
-    if (m != config_->local_machine_id()) {
+  for (MachineId m : config()->all_machine_ids()) {
+    if (m != config()->local_machine_id()) {
       offline_machines_.insert(m);
       Send(env, m, kServerChannel);
     }
@@ -108,7 +106,7 @@ bool Server::OnCustomSocket() {
       auto txn_internal = txn->mutable_internal();
 
       txn_internal->set_id(txn_id);
-      txn_internal->set_coordinating_server(config_->local_machine_id());
+      txn_internal->set_coordinating_server(config()->local_machine_id());
 
       RECORD(txn_internal, TransactionEvent::ENTER_SERVER);
 
@@ -292,7 +290,7 @@ void Server::SendResponseToClient(TxnId txn_id, api::Response&& res) {
 
 TxnId Server::NextTxnId() {
   txn_id_counter_++;
-  return txn_id_counter_ * kMaxNumMachines + config_->local_machine_id();
+  return txn_id_counter_ * kMaxNumMachines + config()->local_machine_id();
 }
 
 }  // namespace slog

@@ -85,8 +85,6 @@ class Scheduler : public NetworkedModule {
 
   void MaybeCleanUpTxn(TxnId txn_id);
 
-  ConfigurationPtr config_;
-
 #if defined(REMASTER_PROTOCOL_SIMPLE)
   SimpleRemasterManager remaster_manager_;
 #elif defined(REMASTER_PROTOCOL_PER_KEY)

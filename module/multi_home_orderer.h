@@ -35,11 +35,10 @@ class MultiHomeOrderer : public NetworkedModule {
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void NewBatch();
-  BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config_->local_machine_id(); }
+  BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config()->local_machine_id(); }
   void AddToBatch(Transaction* txn);
   void SendBatch();
 
-  ConfigurationPtr config_;
   std::vector<std::unique_ptr<internal::Batch>> batch_per_rep_;
   BatchId batch_id_counter_;
   int batch_size_;

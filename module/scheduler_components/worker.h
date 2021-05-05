@@ -82,7 +82,6 @@ class Worker : public NetworkedModule {
   // Precondition: txn_id must exists in txn states table
   TransactionState& TxnState(TxnId txn_id);
 
-  ConfigurationPtr config_;
   std::shared_ptr<Storage<Key, Record>> storage_;
   std::unique_ptr<Commands<Key, Record>> commands_;
 

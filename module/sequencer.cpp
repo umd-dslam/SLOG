@@ -20,11 +20,10 @@ using internal::Response;
 Sequencer::Sequencer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                      milliseconds poll_timeout)
     : NetworkedModule("Sequencer", broker, kSequencerChannel, metrics_manager, poll_timeout),
-      config_(broker->config()),
       batch_id_counter_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {
-  partitioned_batch_.resize(config_->num_partitions());
+  partitioned_batch_.resize(config()->num_partitions());
   NewBatch();
 }
 
@@ -67,14 +66,14 @@ void Sequencer::BatchTxn(Transaction* txn) {
   RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SEQUENCER);
 
   if (txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
-    txn = GenerateLockOnlyTxn(txn, config_->local_replica(), true /* in_place */);
+    txn = GenerateLockOnlyTxn(txn, config()->local_replica(), true /* in_place */);
   }
 
   auto num_involved_partitions = txn->internal().involved_partitions_size();
   for (int i = 0; i < num_involved_partitions; ++i) {
     bool in_place = i == (num_involved_partitions - 1);
     auto p = txn->internal().involved_partitions(i);
-    auto new_txn = GeneratePartitionedTxn(config_, txn, p, in_place);
+    auto new_txn = GeneratePartitionedTxn(config(), txn, p, in_place);
     if (new_txn != nullptr) {
       partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
     }
@@ -84,7 +83,7 @@ void Sequencer::BatchTxn(Transaction* txn) {
 
   // If this is the first txn in the batch, schedule to send the batch at a later time
   if (batch_size_ == 1) {
-    NewTimedCallback(config_->sequencer_batch_duration(), [this]() {
+    NewTimedCallback(config()->sequencer_batch_duration(), [this]() {
       SendBatch();
       NewBatch();
     });
@@ -93,7 +92,7 @@ void Sequencer::BatchTxn(Transaction* txn) {
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
-  auto max_batch_size = config_->sequencer_max_batch_size();
+  auto max_batch_size = config()->sequencer_max_batch_size();
   if (max_batch_size > 0 && batch_size_ >= max_batch_size) {
     ClearTimedCallbacks();
     SendBatch();
@@ -110,16 +109,16 @@ void Sequencer::SendBatch() {
     stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
   }
 
-  auto local_replica = config_->local_replica();
-  auto local_partition = config_->local_partition();
+  auto local_replica = config()->local_replica();
+  auto local_partition = config()->local_partition();
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
   paxos_propose->set_value(local_partition);
   Send(move(paxos_env), kLocalPaxos);
 
   if (!SendBatchDelayed()) {
-    auto num_partitions = config_->num_partitions();
-    auto num_replicas = config_->num_replicas();
+    auto num_partitions = config()->num_partitions();
+    auto num_replicas = config()->num_replicas();
     for (uint32_t part = 0; part < num_partitions; part++) {
       auto env = NewBatchRequest(partitioned_batch_[part].release());
 
@@ -133,7 +132,7 @@ void Sequencer::SendBatch() {
         if (part == local_partition && rep == local_replica) {
           send_local = true;
         } else {
-          destinations.push_back(config_->MakeMachineId(rep, part));
+          destinations.push_back(config()->MakeMachineId(rep, part));
         }
       }
       Send(*env, destinations, kInterleaverChannel);
@@ -145,38 +144,38 @@ void Sequencer::SendBatch() {
 }
 
 bool Sequencer::SendBatchDelayed() {
-  if (!config_->replication_delay_pct()) {
+  if (!config()->replication_delay_pct()) {
     return false;
   }
 
-  std::bernoulli_distribution is_delayed(config_->replication_delay_pct() / 100.0);
+  std::bernoulli_distribution is_delayed(config()->replication_delay_pct() / 100.0);
   if (!is_delayed(rg_)) {
     return false;
   }
 
-  auto delay_ms = config_->replication_delay_amount_ms();
+  auto delay_ms = config()->replication_delay_amount_ms();
 
   VLOG(3) << "Delay batch " << batch_id() << " for " << delay_ms << " ms";
 
-  for (uint32_t part = 0; part < config_->num_partitions(); part++) {
+  for (uint32_t part = 0; part < config()->num_partitions(); part++) {
     auto env = NewBatchRequest(partitioned_batch_[part].release());
 
     // Send to the partition in the local replica immediately
-    if (part == config_->local_partition()) {
+    if (part == config()->local_partition()) {
       auto copied_env = std::make_unique<internal::Envelope>(*env);
       Send(move(copied_env), kLocalLogChannel);
     } else {
-      Send(*env, config_->MakeMachineId(config_->local_replica(), part), kInterleaverChannel);
+      Send(*env, config()->MakeMachineId(config()->local_replica(), part), kInterleaverChannel);
     }
 
     NewTimedCallback(milliseconds(delay_ms), [this, part, delayed_env = env.release()]() {
       VLOG(3) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();
       // Replicate batch to all replicas EXCEPT local replica
       vector<MachineId> destinations;
-      destinations.reserve(config_->num_replicas());
-      for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
-        if (rep != config_->local_replica()) {
-          destinations.push_back(config_->MakeMachineId(rep, part));
+      destinations.reserve(config()->num_replicas());
+      for (uint32_t rep = 0; rep < config()->num_replicas(); rep++) {
+        if (rep != config()->local_replica()) {
+          destinations.push_back(config()->MakeMachineId(rep, part));
         }
       }
       Send(*delayed_env, destinations, kInterleaverChannel);

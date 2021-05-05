@@ -19,10 +19,9 @@ using internal::Request;
 MultiHomeOrderer::MultiHomeOrderer(const shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                                    std::chrono::milliseconds poll_timeout)
     : NetworkedModule("MultiHomeOrderer", broker, kMultiHomeOrdererChannel, metrics_manager, poll_timeout),
-      config_(broker->config()),
       batch_id_counter_(0),
       collecting_stats_(false) {
-  batch_per_rep_.resize(config_->num_replicas());
+  batch_per_rep_.resize(config()->num_replicas());
   NewBatch();
 }
 
@@ -124,7 +123,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
 
   // If this is the first txn in the batch, schedule to send the batch at a later time
   if (batch_size_ == 1) {
-    NewTimedCallback(config_->sequencer_batch_duration(), [this]() {
+    NewTimedCallback(config()->sequencer_batch_duration(), [this]() {
       SendBatch();
       NewBatch();
     });
@@ -133,7 +132,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
-  auto max_batch_size = config_->sequencer_max_batch_size();
+  auto max_batch_size = config()->sequencer_max_batch_size();
   if (max_batch_size > 0 && batch_size_ >= max_batch_size) {
     ClearTimedCallbacks();
     SendBatch();
@@ -152,15 +151,15 @@ void MultiHomeOrderer::SendBatch() {
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
   paxos_propose->set_value(batch_id());
-  Send(move(paxos_env), config_->MakeMachineId(config_->leader_replica_for_multi_home_ordering(), 0), kGlobalPaxos);
+  Send(move(paxos_env), config()->MakeMachineId(config()->leader_replica_for_multi_home_ordering(), 0), kGlobalPaxos);
 
   // Replicate new batch to other regions
-  auto part = config_->leader_partition_for_multi_home_ordering();
-  for (uint32_t rep = 0; rep < config_->num_replicas(); rep++) {
+  auto part = config()->leader_partition_for_multi_home_ordering();
+  for (uint32_t rep = 0; rep < config()->num_replicas(); rep++) {
     auto env = NewEnvelope();
     auto forward_batch = env->mutable_request()->mutable_forward_batch();
     forward_batch->set_allocated_batch_data(batch_per_rep_[rep].release());
-    Send(move(env), config_->MakeMachineId(rep, part), kMultiHomeOrdererChannel);
+    Send(move(env), config()->MakeMachineId(rep, part), kMultiHomeOrdererChannel);
   }
 }
 

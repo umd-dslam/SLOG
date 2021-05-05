@@ -59,7 +59,6 @@ class Server : public NetworkedModule {
 
   TxnId NextTxnId();
 
-  ConfigurationPtr config_;
   TxnId txn_id_counter_;
 
   struct PendingResponse {

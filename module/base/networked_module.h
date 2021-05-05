@@ -58,7 +58,8 @@ class NetworkedModule : public Module {
   void NewTimedCallback(microseconds timeout, std::function<void()>&& cb);
   void ClearTimedCallbacks();
 
-  const std::shared_ptr<zmq::context_t> context() const;
+  const std::shared_ptr<zmq::context_t> context() const { return context_; }
+  const ConfigurationPtr& config() const { return config_; }
 
   Channel channel() const { return channel_; }
   MetricsRepositoryManager& metrics_manager() { return *metrics_manager_; }
@@ -68,6 +69,7 @@ class NetworkedModule : public Module {
   bool Loop() final;
 
   std::shared_ptr<zmq::context_t> context_;
+  ConfigurationPtr config_;
   MetricsRepositoryManagerPtr metrics_manager_;
   Channel channel_;
   zmq::socket_t pull_socket_;

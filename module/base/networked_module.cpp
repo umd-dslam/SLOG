@@ -23,6 +23,7 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
                                  optional<std::chrono::milliseconds> poll_timeout)
     : Module(name),
       context_(broker->context()),
+      config_(broker->config()),
       metrics_manager_(metrics_manager),
       channel_(chopt.channel),
       pull_socket_(*context_, ZMQ_PULL),
@@ -55,8 +56,6 @@ void NetworkedModule::AddCustomSocket(zmq::socket_t&& new_socket) {
 }
 
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_.at(i); }
-
-const std::shared_ptr<zmq::context_t> NetworkedModule::context() const { return context_; }
 
 void NetworkedModule::SetUp() {
   VLOG(1) << "Thread info: " << debug_info_;

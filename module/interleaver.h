@@ -64,7 +64,6 @@ class Interleaver : public NetworkedModule {
 
   void EmitBatch(BatchPtr&& batch);
 
-  ConfigurationPtr config_;
   std::unordered_map<uint32_t, BatchLog> single_home_logs_;
   LocalLog local_log_;
   std::vector<MachineId> other_partitions_;
