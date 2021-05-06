@@ -233,11 +233,10 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       Send(*env, random_machine_in_home_replica, kSequencerChannel);
     }
   } else if (txn_type == TransactionType::MULTI_HOME_OR_LOCK_ONLY) {
-    VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
-
     RECORD(txn_internal, TransactionEvent::EXIT_FORWARDER_TO_MULTI_HOME_ORDERER);
 
     if (config()->bypass_mh_orderer()) {
+      VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the sequencer.";
       auto part = ChooseRandomPartition(*txn, rg_);
       // Send the txn directly to sequencers of involved replicas to generate lock-only txns
       vector<MachineId> destinations;
@@ -247,6 +246,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       }
       Send(*env, destinations, kSequencerChannel);
     } else {
+      VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the orderer.";
       // Send the txn to the orderer to form a global order
       Send(move(env), kMultiHomeOrdererChannel);
     }
