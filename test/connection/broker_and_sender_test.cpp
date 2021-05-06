@@ -145,7 +145,7 @@ TEST(BrokerTest, MultiSend) {
     for (int i = 0; i < NUM_PONGS; i++) {
       dests.push_back(configs[0]->MakeMachineId(0, i + 1));
     }
-    sender.Send(*ping_req, dests, PONG);
+    sender.Send(*ping_req, dests, PONG, 0);
 
     // Wait for pongs
     for (int i = 0; i < NUM_PONGS; i++) {
@@ -175,7 +175,7 @@ TEST(BrokerTest, MultiSend) {
 
       // Send pong
       auto pong_res = MakePong(99);
-      sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
+      sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING, 0);
 
       this_thread::sleep_for(200ms);
     });
@@ -221,7 +221,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
   }
 
   // The pong machine does not know which channel to forward to yet at this point
@@ -249,7 +249,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send pong
   {
     auto pong_res = MakePong(99);
-    pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
+    pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG, 0);
   }
 
   // We should be able to receive pong here since we already establish a redirection at
@@ -294,7 +294,7 @@ TEST(BrokerTest, RemoveRedirection) {
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
   }
 
   // Now we can the ping message here
@@ -317,7 +317,7 @@ TEST(BrokerTest, RemoveRedirection) {
   // Send ping message again
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
   }
 
   // The redirection is removed so we shouldn't be able to receive anything here

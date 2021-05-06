@@ -332,7 +332,7 @@ void Worker::NotifyOtherPartitions(TxnId txn_id) {
   }
   // Try to use a different broker thread other than the default one so that
   // a worker would have an exclusive pathway for information passing
-  Send(env, destinations, txn_id, config()->broker_ports_size() - 1);
+  Send(env, destinations, txn_id, config()->broker_ports(config()->broker_ports_size() - 1));
 }
 
 TransactionState& Worker::TxnState(TxnId txn_id) {
