@@ -137,9 +137,7 @@ class InterleaverTest : public ::testing::Test {
     }
   }
 
-  void SendToInterleaver(int from, int to, const Envelope& req) {
-    senders_[from]->Send(req, to, kInterleaverChannel);
-  }
+  void SendToInterleaver(int from, int to, const Envelope& req) { senders_[from]->Send(req, to, kInterleaverChannel); }
   void SendToLocalQueue(int from, int to, const Envelope& req) {
     auto copied = std::make_unique<Envelope>(req);
     senders_[from]->Send(std::move(copied), to, kLocalLogChannel);
