@@ -7,16 +7,16 @@ namespace slog {
 Sender::Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context)
     : config_(config), context_(context) {}
 
-void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel, uint32_t port) {
-  auto& socket = GetRemoteSocket(to_machine_id, port);
+void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel) {
+  auto& socket = GetRemoteSocket(to_machine_id, to_channel);
   SendSerializedProto(*socket, envelope, config_->local_machine_id(), to_channel);
 }
 
-void Sender::Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel, uint32_t port) {
+void Sender::Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel) {
   if (to_machine_id == config_->local_machine_id()) {
     Send(move(envelope), to_channel);
   } else {
-    Send(*envelope, to_machine_id, to_channel, port);
+    Send(*envelope, to_machine_id, to_channel);
   }
 }
 
@@ -34,19 +34,18 @@ void Sender::Send(EnvelopePtr&& envelope, Channel to_channel) {
   SendEnvelope(it->second, move(envelope));
 }
 
-void Sender::Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
-                  uint32_t port) {
+void Sender::Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids,
+                  Channel to_channel) {
   auto serialized = SerializeProto(envelope);
   for (auto dest : to_machine_ids) {
     zmq::message_t copied;
     copied.copy(serialized);
-    auto& socket = GetRemoteSocket(dest, port);
+    auto& socket = GetRemoteSocket(dest, to_channel);
     SendAddressedBuffer(*socket, move(copied), config_->local_machine_id(), to_channel);
   }
 }
 
-void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
-                  uint32_t port) {
+void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel) {
   auto serialized = SerializeProto(*envelope);
   bool send_local = false;
   for (auto dest : to_machine_ids) {
@@ -56,7 +55,7 @@ void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machi
     }
     zmq::message_t copied;
     copied.copy(serialized);
-    auto& socket = GetRemoteSocket(dest, port);
+    auto& socket = GetRemoteSocket(dest, to_channel);
     SendAddressedBuffer(*socket, move(copied), config_->local_machine_id(), to_channel);
   }
   if (send_local) {
@@ -64,7 +63,14 @@ void Sender::Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machi
   }
 }
 
-Sender::SocketPtr& Sender::GetRemoteSocket(MachineId machine_id, uint32_t port) {
+Sender::SocketPtr& Sender::GetRemoteSocket(MachineId machine_id, Channel channel) {
+  uint32_t port;
+  if (channel >= kMaxChannel) {
+    port = config_->broker_ports(config_->broker_ports_size() - 1);
+  } else {
+    port = config_->broker_ports(0);
+  }
+
   // Lazily establish a new connection when necessary
   uint64_t machine_id_and_port = (static_cast<uint64_t>(machine_id) << 32) | port;
   auto ins = machine_id_and_port_to_sockets_.try_emplace(machine_id_and_port, nullptr);

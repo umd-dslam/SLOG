@@ -22,9 +22,8 @@ class Sender {
    * @param envelope Request or response to be sent
    * @param to_machine_id Id of the machine that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
-   * @param port Port to send to on the other machine
    */
-  void Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel, uint32_t port);
+  void Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel);
 
   /**
    * Send a request or response to a given channel of a given machine. Use local send
@@ -32,9 +31,8 @@ class Sender {
    * @param envelope Request or response to be sent
    * @param to_machine_id Id of the machine that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
-   * @param port Port to send to on the other machine
    */
-  void Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel, uint32_t port);
+  void Send(EnvelopePtr&& envelope, MachineId to_machine_id, Channel to_channel);
 
   /**
    * Send a request or response to the same machine given a channel
@@ -49,10 +47,8 @@ class Sender {
    * @param request_or_response Request or response to be sent
    * @param to_machine_ids Ids of the machines that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
-   * @param port Port to send to on the other machine
    */
-  void Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
-            uint32_t port);
+  void Send(const internal::Envelope& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
 
   /**
    * Send a request or response to a given channel of a list of machines.
@@ -61,13 +57,12 @@ class Sender {
    * @param request_or_response Request or response to be sent
    * @param to_machine_ids Ids of the machines that this message is sent to
    * @param to_channel Channel on the machine that this message is sent to
-   * @param port Port to send to on the other machine
    */
-  void Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel, uint32_t port);
+  void Send(EnvelopePtr&& envelope, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
 
  private:
   using SocketPtr = std::unique_ptr<zmq::socket_t>;
-  SocketPtr& GetRemoteSocket(MachineId machine_id, uint32_t port);
+  SocketPtr& GetRemoteSocket(MachineId machine_id, Channel channel);
 
   ConfigurationPtr config_;
   // Keep a pointer to context here to make sure that the below sockets

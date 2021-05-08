@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <optional>
 #include <vector>
 #include <zmq.hpp>
 
@@ -48,15 +47,11 @@ class NetworkedModule : public Module {
   void SetMainVsCustomSocketWeights(std::array<int, 2> weights) { weights_ = weights; }
 
   inline static EnvelopePtr NewEnvelope() { return std::make_unique<internal::Envelope>(); }
-  void Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel,
-            std::optional<uint32_t> port = std::nullopt);
-  void Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel,
-            std::optional<uint32_t> port = std::nullopt);
+  void Send(const internal::Envelope& env, MachineId to_machine_id, Channel to_channel);
+  void Send(EnvelopePtr&& env, MachineId to_machine_id, Channel to_channel);
   void Send(EnvelopePtr&& env, Channel to_channel);
-  void Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
-            std::optional<uint32_t> port = std::nullopt);
-  void Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel,
-            std::optional<uint32_t> port = std::nullopt);
+  void Send(const internal::Envelope& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
+  void Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
 
   void NewTimedCallback(microseconds timeout, std::function<void()>&& cb);
   void ClearTimedCallbacks();

@@ -51,7 +51,7 @@ TEST(BrokerAndSenderTest, PingPong) {
     Sender sender(broker->config(), broker->context());
     // Send ping
     auto ping_req = MakePing(99);
-    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG, 0 /* via_broker */);
+    sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), PONG);
 
     // Wait for pong
     auto res = RecvEnvelope(recv_socket);
@@ -78,7 +78,7 @@ TEST(BrokerAndSenderTest, PingPong) {
 
     // Send pong
     auto pong_res = MakePong(99);
-    sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING, 1 /* via broker */);
+    sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), PING);
   });
 
   ping.join();
@@ -145,7 +145,7 @@ TEST(BrokerTest, MultiSend) {
     for (int i = 0; i < NUM_PONGS; i++) {
       dests.push_back(configs[0]->MakeMachineId(0, i + 1));
     }
-    sender.Send(*ping_req, dests, PONG, 0);
+    sender.Send(*ping_req, dests, PONG);
 
     // Wait for pongs
     for (int i = 0; i < NUM_PONGS; i++) {
@@ -175,7 +175,7 @@ TEST(BrokerTest, MultiSend) {
 
       // Send pong
       auto pong_res = MakePong(99);
-      sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING, 0);
+      sender.Send(*pong_res, configs[i + 1]->MakeMachineId(0, 0), PING);
 
       this_thread::sleep_for(200ms);
     });
@@ -208,7 +208,7 @@ TEST(BrokerTest, CreateRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PING);
-    ping_sender.Send(move(env), kBrokerChannel);
+    ping_sender.Send(move(env), kBrokerChannel + 1);
   }
 
   // Initialize pong machine
@@ -221,7 +221,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // The pong machine does not know which channel to forward to yet at this point
@@ -235,7 +235,7 @@ TEST(BrokerTest, CreateRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PONG);
-    pong_sender.Send(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel + 1);
   }
 
   // Now we can receive the ping message
@@ -249,7 +249,7 @@ TEST(BrokerTest, CreateRedirection) {
   // Send pong
   {
     auto pong_res = MakePong(99);
-    pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG, 0);
+    pong_sender.Send(*pong_res, configs[1]->MakeMachineId(0, 0), TAG);
   }
 
   // We should be able to receive pong here since we already establish a redirection at
@@ -288,13 +288,13 @@ TEST(BrokerTest, RemoveRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_channel(PONG);
-    pong_sender.Send(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel + 1);
   }
 
   // Send ping message with a tag of the pong machine.
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // Now we can the ping message here
@@ -311,13 +311,13 @@ TEST(BrokerTest, RemoveRedirection) {
     auto redirect = env->mutable_request()->mutable_broker_redirect();
     redirect->set_tag(TAG);
     redirect->set_stop(true);
-    pong_sender.Send(move(env), kBrokerChannel);
+    pong_sender.Send(move(env), kBrokerChannel + 1);
   }
 
   // Send ping message again
   {
     auto ping_req = MakePing(99);
-    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG, 0);
+    ping_sender.Send(*ping_req, configs[0]->MakeMachineId(0, 1), TAG);
   }
 
   // The redirection is removed so we shouldn't be able to receive anything here
