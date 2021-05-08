@@ -44,12 +44,6 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
   debug_info_ = os.str();
 }
 
-NetworkedModule::~NetworkedModule() {
-#ifdef ENABLE_WORK_MEASURING
-  LOG(INFO) << name() << " - work done: " << work_;
-#endif
-}
-
 void NetworkedModule::AddCustomSocket(zmq::socket_t&& new_socket) {
   auto& sock = custom_sockets_.emplace_back(move(new_socket));
   poller_.PushSocket(sock);
@@ -83,10 +77,6 @@ bool NetworkedModule::Loop() {
       got_message = true;
       recv_retries_ = recv_retries_start_;
 
-#ifdef ENABLE_WORK_MEASURING
-      auto start = std::chrono::steady_clock::now();
-#endif
-
       EnvelopePtr env;
       if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
         env.reset(new Envelope());
@@ -110,24 +100,13 @@ bool NetworkedModule::Loop() {
       } else if (env->has_response()) {
         OnInternalResponseReceived(move(env));
       }
-
-#ifdef ENABLE_WORK_MEASURING
-      work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
     }
   }
 
   if (current_ == 1) {
-#ifdef ENABLE_WORK_MEASURING
-    auto start = std::chrono::steady_clock::now();
-#endif
     if (OnCustomSocket()) {
       got_message = true;
       recv_retries_ = recv_retries_start_;
-
-#ifdef ENABLE_WORK_MEASURING
-      work_ += (std::chrono::steady_clock::now() - start).count();
-#endif
     }
   }
 

@@ -30,7 +30,6 @@ class NetworkedModule : public Module {
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                   const MetricsRepositoryManagerPtr& metrics_manager,
                   std::optional<std::chrono::milliseconds> poll_timeout);
-  ~NetworkedModule();
 
  protected:
   virtual void Initialize(){};
