@@ -166,8 +166,10 @@ int main(int argc, char* argv[]) {
   modules.emplace_back(MakeRunnerFor<slog::Server>(broker, metrics_manager), slog::ModuleId::SERVER);
   modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(broker, metrics_manager), slog::ModuleId::MHORDERER);
   modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(broker), slog::ModuleId::LOCALPAXOS);
-  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(broker, storage, metrics_manager), slog::ModuleId::FORWARDER);
-  modules.emplace_back(MakeRunnerFor<slog::Sequencer>(broker, metrics_manager), slog::ModuleId::SEQUENCER);
+  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(broker->context(), broker->config(), storage, metrics_manager),
+                       slog::ModuleId::FORWARDER);
+  modules.emplace_back(MakeRunnerFor<slog::Sequencer>(broker->context(), broker->config(), metrics_manager),
+                       slog::ModuleId::SEQUENCER);
   modules.emplace_back(MakeRunnerFor<slog::Interleaver>(broker, metrics_manager), slog::ModuleId::INTERLEAVER);
   modules.emplace_back(MakeRunnerFor<slog::Scheduler>(broker, storage, metrics_manager), slog::ModuleId::SCHEDULER);
 

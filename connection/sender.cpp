@@ -68,7 +68,16 @@ Sender::SocketPtr& Sender::GetRemoteSocket(MachineId machine_id, Channel channel
   if (channel >= kMaxChannel) {
     port = config_->broker_ports(config_->broker_ports_size() - 1);
   } else {
-    port = config_->broker_ports(0);
+    switch (channel) {
+      case kForwarderChannel:
+        port = config_->forwarder_port();
+        break;
+      case kSequencerChannel:
+        port = config_->sequencer_port();
+        break;
+      default:
+        port = config_->broker_ports(0);
+    }
   }
 
   // Lazily establish a new connection when necessary

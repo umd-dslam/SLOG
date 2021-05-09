@@ -18,30 +18,43 @@ namespace slog {
 
 using internal::Envelope;
 
-NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
+                                 const ConfigurationPtr& config, Channel channel,
                                  const MetricsRepositoryManagerPtr& metrics_manager,
-                                 optional<std::chrono::milliseconds> poll_timeout)
+                                 std::optional<std::chrono::milliseconds> poll_timeout)
     : Module(name),
-      context_(broker->context()),
-      config_(broker->config()),
+      context_(context),
+      config_(config),
+      channel_(channel),
+      port_(std::nullopt),
       metrics_manager_(metrics_manager),
-      channel_(chopt.channel),
-      pull_socket_(*context_, ZMQ_PULL),
-      sender_(broker->config(), broker->context()),
+      inproc_socket_(*context_, ZMQ_PULL),
+      sender_(config, context),
       poller_(poll_timeout),
-      recv_retries_start_(broker->config()->recv_retries()),
+      recv_retries_start_(config->recv_retries()),
       recv_retries_(0),
       weights_({1, 1}),
       counters_({0, 0}),
       current_(0) {
-  broker->AddChannel(channel_, chopt.recv_raw);
-  poller_.PushSocket(pull_socket_);
-
-  auto& config = broker->config();
   std::ostringstream os;
   os << "module = " << name << ", rep = " << config->local_replica() << ", part = " << config->local_partition()
      << ", machine_id = " << config->local_machine_id();
   debug_info_ = os.str();
+}
+
+NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+                                 const MetricsRepositoryManagerPtr& metrics_manager,
+                                 optional<std::chrono::milliseconds> poll_timeout)
+    : NetworkedModule(name, broker->context(), broker->config(), chopt.channel, metrics_manager, poll_timeout) {
+  broker->AddChannel(channel_, chopt.recv_raw);
+}
+
+NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
+                                 const ConfigurationPtr& config, uint32_t port, Channel channel,
+                                 const MetricsRepositoryManagerPtr& metrics_manager,
+                                 std::optional<std::chrono::milliseconds> poll_timeout)
+    : NetworkedModule(name, context, config, channel, metrics_manager, poll_timeout) {
+  port_ = port;
 }
 
 void NetworkedModule::AddCustomSocket(zmq::socket_t&& new_socket) {
@@ -54,9 +67,20 @@ zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_socket
 void NetworkedModule::SetUp() {
   VLOG(1) << "Thread info: " << debug_info_;
 
-  pull_socket_.bind(MakeInProcChannelAddress(channel_));
-  // Remove limit on the zmq message queues
-  pull_socket_.set(zmq::sockopt::rcvhwm, 0);
+  inproc_socket_.bind(MakeInProcChannelAddress(channel_));
+  inproc_socket_.set(zmq::sockopt::rcvhwm, 0);
+  poller_.PushSocket(inproc_socket_);
+
+  if (port_.has_value()) {
+    outproc_socket_ = zmq::socket_t(*context_, ZMQ_PULL);
+    auto addr = MakeRemoteAddress(config_->protocol(), config_->local_address(), port_.value(), true /* binding */);
+    outproc_socket_.bind(addr);
+    outproc_socket_.set(zmq::sockopt::rcvhwm, 0);
+
+    LOG(INFO) << "Bound " << name() << " to \"" << addr << "\"";
+
+    poller_.PushSocket(outproc_socket_);
+  }
 
   if (metrics_manager_ != nullptr) {
     metrics_manager_->RegisterCurrentThread();
@@ -72,33 +96,18 @@ bool NetworkedModule::Loop() {
 
   bool got_message = false;
   if (current_ == 0) {
-    auto wrapped_env = RecvEnvelope(pull_socket_, true /* dont_wait */);
-    if (wrapped_env != nullptr) {
+    if (OnEnvelopeReceived(RecvEnvelope(inproc_socket_, true /* dont_wait */))) {
       got_message = true;
       recv_retries_ = recv_retries_start_;
+    }
 
-      EnvelopePtr env;
-      if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
-        env.reset(new Envelope());
-        if (DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
-          env->set_from(wrapped_env->from());
+    if (outproc_socket_.handle() != ZMQ_NULLPTR) {
+      if (zmq::message_t msg; outproc_socket_.recv(msg, zmq::recv_flags::dontwait)) {
+        auto env = DeserializeEnvelope(msg);
+        if (OnEnvelopeReceived(move(env))) {
+          got_message = true;
+          recv_retries_ = recv_retries_start_;
         }
-      } else {
-        env = move(wrapped_env);
-      }
-
-      if (env->has_request()) {
-        if (env->request().has_ping()) {
-          Envelope pong_env;
-          auto pong = pong_env.mutable_response()->mutable_pong();
-          pong->set_time(env->request().ping().time());
-          pong->set_target(env->request().ping().target());
-          Send(move(pong_env), env->from(), env->request().ping().from_channel());
-        } else {
-          OnInternalRequestReceived(move(env));
-        }
-      } else if (env->has_response()) {
-        OnInternalResponseReceived(move(env));
       }
     }
   }
@@ -125,6 +134,37 @@ bool NetworkedModule::Loop() {
   }
 
   return false;
+}
+
+bool NetworkedModule::OnEnvelopeReceived(EnvelopePtr&& wrapped_env) {
+  if (wrapped_env == nullptr) {
+    return false;
+  }
+  EnvelopePtr env;
+  if (wrapped_env->type_case() == Envelope::TypeCase::kRaw) {
+    env.reset(new Envelope());
+    if (DeserializeProto(*env, wrapped_env->raw().data(), wrapped_env->raw().size())) {
+      env->set_from(wrapped_env->from());
+    }
+  } else {
+    env = move(wrapped_env);
+  }
+
+  if (env->has_request()) {
+    if (env->request().has_ping()) {
+      Envelope pong_env;
+      auto pong = pong_env.mutable_response()->mutable_pong();
+      pong->set_time(env->request().ping().time());
+      pong->set_target(env->request().ping().target());
+      Send(move(pong_env), env->from(), env->request().ping().from_channel());
+    } else {
+      OnInternalRequestReceived(move(env));
+    }
+  } else if (env->has_response()) {
+    OnInternalResponseReceived(move(env));
+  }
+
+  return true;
 }
 
 void NetworkedModule::Send(const Envelope& env, MachineId to_machine_id, Channel to_channel) {

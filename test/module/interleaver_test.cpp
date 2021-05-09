@@ -131,7 +131,7 @@ class InterleaverTest : public ::testing::Test {
     for (int i = 0; i < 4; i++) {
       slogs_[i] = make_unique<TestSlog>(configs[i]);
       slogs_[i]->AddInterleaver();
-      slogs_[i]->AddOutputChannel(kSchedulerChannel);
+      slogs_[i]->AddOutputSocket(kSchedulerChannel);
       senders_[i] = slogs_[i]->NewSender();
       slogs_[i]->StartInNewThreads();
     }
@@ -144,7 +144,7 @@ class InterleaverTest : public ::testing::Test {
   }
 
   Transaction* ReceiveTxn(int i) {
-    auto req_env = slogs_[i]->ReceiveFromOutputChannel(kSchedulerChannel);
+    auto req_env = slogs_[i]->ReceiveFromOutputSocket(kSchedulerChannel);
     if (req_env == nullptr) {
       return nullptr;
     }

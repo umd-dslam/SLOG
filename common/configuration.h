@@ -28,6 +28,8 @@ class Configuration {
   uint32_t broker_ports(int i) const;
   uint32_t broker_ports_size() const;
   uint32_t server_port() const;
+  uint32_t forwarder_port() const;
+  uint32_t sequencer_port() const;
   uint32_t num_replicas() const;
   uint32_t num_partitions() const;
   uint32_t num_workers() const;

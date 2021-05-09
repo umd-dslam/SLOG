@@ -13,10 +13,16 @@ namespace slog {
 using EnvelopePtr = std::unique_ptr<internal::Envelope>;
 
 inline std::string MakeInProcChannelAddress(Channel chan) { return "inproc://channel_" + std::to_string(chan); }
-
-inline std::string MakeRemoteAddress(const std::string& protocol, const std::string& addr, uint32_t port) {
+inline std::string MakeRemoteAddress(const std::string& protocol, const std::string& addr, uint32_t port,
+                                     bool binding = false) {
   std::stringstream endpoint;
-  endpoint << protocol << "://" << addr << ":" << port;
+  endpoint << protocol << "://";
+  if (binding && protocol == "tcp") {
+    endpoint << "*";
+  } else {
+    endpoint << addr;
+  }
+  endpoint << ":" << port;
   return endpoint.str();
 }
 
@@ -132,6 +138,17 @@ inline bool RecvDeserializedProtoWithEmptyDelim(zmq::socket_t& socket, T& out, b
     return false;
   }
   return RecvDeserializedProto(socket, out, dont_wait);
+}
+
+inline EnvelopePtr DeserializeEnvelope(const zmq::message_t& msg) {
+  auto env = std::make_unique<internal::Envelope>();
+  if (!DeserializeProto(*env, msg)) {
+    return nullptr;
+  }
+  MachineId machine_id = -1;
+  ParseMachineId(machine_id, msg);
+  env->set_from(machine_id);
+  return env;
 }
 
 }  // namespace slog

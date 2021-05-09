@@ -28,8 +28,8 @@ class ForwarderTest : public ::testing::Test {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
       test_slogs[i]->AddServerAndClient();
       test_slogs[i]->AddForwarder();
-      test_slogs[i]->AddOutputChannel(kSequencerChannel);
-      test_slogs[i]->AddOutputChannel(kMultiHomeOrdererChannel);
+      test_slogs[i]->AddOutputSocket(kSequencerChannel);
+      test_slogs[i]->AddOutputSocket(kMultiHomeOrdererChannel);
     }
     // Replica 0
     test_slogs[0]->Data("A", {"xxxxx", 0, 0});
@@ -47,18 +47,23 @@ class ForwarderTest : public ::testing::Test {
     }
   }
 
-  Transaction* ReceiveOnSequencerChannel(vector<size_t> indices) {
-    CHECK(!indices.empty());
-    vector<zmq::pollitem_t> poll_items;
-    for (auto i : indices) {
-      poll_items.push_back(test_slogs[i]->GetPollItemForChannel(kSequencerChannel));
+  Transaction* ReceiveOnSequencerChannel(vector<size_t> machines) {
+    CHECK(!machines.empty());
+    // machine, inproc, pollitem
+    std::vector<std::pair<size_t, bool>> info;
+    std::vector<zmq::pollitem_t> poll_items;
+    for (auto m : machines) {
+      info.emplace_back(m, true);
+      poll_items.push_back(test_slogs[m]->GetPollItemForOutputSocket(kSequencerChannel, true));
+      info.emplace_back(m, false);
+      poll_items.push_back(test_slogs[m]->GetPollItemForOutputSocket(kSequencerChannel, false));
     }
     auto rc = zmq::poll(poll_items);
     if (rc <= 0) return nullptr;
-
     for (size_t i = 0; i < poll_items.size(); i++) {
       if (poll_items[i].revents & ZMQ_POLLIN) {
-        auto req_env = test_slogs[indices[i]]->ReceiveFromOutputChannel(kSequencerChannel);
+        auto [m, inproc] = info[i];
+        auto req_env = test_slogs[m]->ReceiveFromOutputSocket(kSequencerChannel, inproc);
         if (req_env == nullptr) {
           return nullptr;
         }
@@ -69,8 +74,8 @@ class ForwarderTest : public ::testing::Test {
     return nullptr;
   }
 
-  Transaction* ReceiveOnOrdererChannel(size_t index) {
-    auto req_env = test_slogs[index]->ReceiveFromOutputChannel(kMultiHomeOrdererChannel);
+  Transaction* ReceiveOnOrdererChannel(size_t machine) {
+    auto req_env = test_slogs[machine]->ReceiveFromOutputSocket(kMultiHomeOrdererChannel);
     if (req_env == nullptr) {
       return nullptr;
     }

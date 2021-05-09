@@ -17,13 +17,14 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
-Sequencer::Sequencer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
-                     milliseconds poll_timeout)
-    : NetworkedModule("Sequencer", broker, kSequencerChannel, metrics_manager, poll_timeout),
+Sequencer::Sequencer(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
+                     const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
+    : NetworkedModule("Sequencer", context, config, config->sequencer_port(), kSequencerChannel, metrics_manager,
+                      poll_timeout),
       batch_id_counter_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {
-  partitioned_batch_.resize(config()->num_partitions());
+  partitioned_batch_.resize(config->num_partitions());
   NewBatch();
 }
 

@@ -21,7 +21,7 @@ class SchedulerTest : public ::testing::Test {
       test_slogs[i] = make_unique<TestSlog>(configs[i]);
       test_slogs[i]->AddScheduler();
       sender[i] = test_slogs[i]->NewSender();
-      test_slogs[i]->AddOutputChannel(kServerChannel);
+      test_slogs[i]->AddOutputSocket(kServerChannel);
     }
     // Relica 0
     test_slogs[0]->Data("A", {"valueA", 0, 1});
@@ -72,7 +72,7 @@ class SchedulerTest : public ::testing::Test {
     Transaction txn;
     bool first_time = true;
     for (uint32_t i = 0; i < num_partitions; i++) {
-      auto req_env = test_slogs[receiver]->ReceiveFromOutputChannel(kServerChannel);
+      auto req_env = test_slogs[receiver]->ReceiveFromOutputSocket(kServerChannel);
       CHECK(req_env != nullptr);
       CHECK_EQ(req_env->request().type_case(), internal::Request::kCompletedSubtxn);
       auto completed_subtxn = req_env->request().completed_subtxn();

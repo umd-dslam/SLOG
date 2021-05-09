@@ -25,8 +25,8 @@ namespace slog {
  */
 class Sequencer : public NetworkedModule {
  public:
-  Sequencer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
-            milliseconds poll_timeout = kModuleTimeout);
+  Sequencer(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
+            const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;

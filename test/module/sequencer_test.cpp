@@ -28,8 +28,8 @@ class SequencerTest : public ::testing::TestWithParam<bool> {
     for (int i = 0; i < 4; i++) {
       slog_[i] = make_unique<TestSlog>(configs_[i]);
       slog_[i]->AddSequencer();
-      slog_[i]->AddOutputChannel(kInterleaverChannel);
-      slog_[i]->AddOutputChannel(kLocalLogChannel);
+      slog_[i]->AddOutputSocket(kInterleaverChannel);
+      slog_[i]->AddOutputSocket(kLocalLogChannel);
     }
     sender_ = slog_[0]->NewSender();
     for (auto& slog : slog_) {
@@ -41,7 +41,7 @@ class SequencerTest : public ::testing::TestWithParam<bool> {
 
   internal::Batch* ReceiveBatch(int i) {
     // Iff i is the id of the sender (0), check the local log channel instead
-    auto req_env = slog_[i]->ReceiveFromOutputChannel(i == 0 ? kLocalLogChannel : kInterleaverChannel);
+    auto req_env = slog_[i]->ReceiveFromOutputSocket(i == 0 ? kLocalLogChannel : kInterleaverChannel);
     if (req_env == nullptr) {
       return nullptr;
     }

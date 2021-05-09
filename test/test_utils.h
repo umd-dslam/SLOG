@@ -53,13 +53,9 @@ class TestSlog {
   void AddGlobalPaxos();
   void AddMultiHomeOrderer();
 
-  void AddOutputChannel(Channel channel);
-  zmq::pollitem_t GetPollItemForChannel(Channel channel);
-
-  EnvelopePtr ReceiveFromOutputChannel(Channel channel) {
-    CHECK(channels_.count(channel) > 0) << "Channel " << channel << " does not exist";
-    return RecvEnvelope(channels_[channel]);
-  }
+  void AddOutputSocket(Channel channel);
+  zmq::pollitem_t GetPollItemForOutputSocket(Channel channel, bool inproc = true);
+  EnvelopePtr ReceiveFromOutputSocket(Channel channel, bool inproc = true);
 
   unique_ptr<Sender> NewSender();
 
@@ -82,7 +78,8 @@ class TestSlog {
   ModuleRunnerPtr global_paxos_;
   ModuleRunnerPtr multi_home_orderer_;
 
-  std::unordered_map<Channel, zmq::socket_t> channels_;
+  std::unordered_map<Channel, zmq::socket_t> inproc_sockets_;
+  std::unordered_map<Channel, zmq::socket_t> outproc_sockets_;
 
   zmq::context_t client_context_;
   zmq::socket_t client_socket_;

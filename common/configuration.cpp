@@ -54,6 +54,10 @@ Configuration::Configuration(const internal::Configuration& config, const string
       << "Replication factor must not exceed number of replicas";
   CHECK_LE(config_.broker_ports_size(), kMaxChannel - kBrokerChannel)
       << "Maximum number of broker threads is " << kMaxChannel - kBrokerChannel;
+  CHECK_GT(config_.broker_ports_size(), 0) << "There must be at least one broker";
+  CHECK_NE(config_.server_port(), 0) << "Server port must be set";
+  CHECK_NE(config_.sequencer_port(), 0) << "Sequencer port must be set";
+  CHECK_NE(config_.forwarder_port(), 0) << "Forwarder port must be set";
 
   bool local_address_is_valid = local_address_.empty();
   for (int r = 0; r < config_.replicas_size(); r++) {
@@ -106,6 +110,10 @@ uint32_t Configuration::broker_ports(int i) const { return config_.broker_ports(
 uint32_t Configuration::broker_ports_size() const { return config_.broker_ports_size(); }
 
 uint32_t Configuration::server_port() const { return config_.server_port(); }
+
+uint32_t Configuration::forwarder_port() const { return config_.forwarder_port(); }
+
+uint32_t Configuration::sequencer_port() const { return config_.sequencer_port(); }
 
 milliseconds Configuration::forwarder_batch_duration() const {
   return milliseconds(config_.forwarder_batch_duration());

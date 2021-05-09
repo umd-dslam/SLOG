@@ -195,11 +195,11 @@ void Broker::StartInNewThreads() {
   }
   running_ = true;
 
-  auto binding_addr = config_->protocol() == "tcp" ? "*" : config_->local_address();
   auto cpus = config_->cpu_pinnings(ModuleId::BROKER);
   for (size_t i = 0; i < config_->broker_ports_size(); i++) {
     auto internal_endpoint = MakeInProcChannelAddress(MakeChannel(i));
-    auto external_endpoint = MakeRemoteAddress(config_->protocol(), binding_addr, config_->broker_ports(i));
+    auto external_endpoint =
+        MakeRemoteAddress(config_->protocol(), config_->local_address(), config_->broker_ports(i), true /* binding */);
 
     auto& t = threads_.emplace_back(MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint,
                                                                 channels_, config_->recv_retries(), poll_timeout_ms_));

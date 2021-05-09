@@ -27,7 +27,16 @@ struct ChannelOption {
  */
 class NetworkedModule : public Module {
  public:
+  NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
+                  const ConfigurationPtr& config, Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
+                  std::optional<std::chrono::milliseconds> poll_timeout);
+
   NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+                  const MetricsRepositoryManagerPtr& metrics_manager,
+                  std::optional<std::chrono::milliseconds> poll_timeout);
+
+  NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
+                  const ConfigurationPtr& config, uint32_t port, Channel channel,
                   const MetricsRepositoryManagerPtr& metrics_manager,
                   std::optional<std::chrono::milliseconds> poll_timeout);
 
@@ -65,11 +74,15 @@ class NetworkedModule : public Module {
   void SetUp() final;
   bool Loop() final;
 
+  bool OnEnvelopeReceived(EnvelopePtr&& wrapped_env);
+
   std::shared_ptr<zmq::context_t> context_;
   ConfigurationPtr config_;
-  MetricsRepositoryManagerPtr metrics_manager_;
   Channel channel_;
-  zmq::socket_t pull_socket_;
+  std::optional<uint32_t> port_;
+  MetricsRepositoryManagerPtr metrics_manager_;
+  zmq::socket_t inproc_socket_;
+  zmq::socket_t outproc_socket_;
   std::vector<zmq::socket_t> custom_sockets_;
   Sender sender_;
   Poller poller_;

@@ -37,8 +37,8 @@ EnvelopePtr MakePong(int64_t time) {
 }
 
 TEST(BrokerAndSenderTest, PingPong) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
+  const Channel PING = 8;
+  const Channel PONG = 9;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
   auto ping = thread([&]() {
@@ -86,8 +86,8 @@ TEST(BrokerAndSenderTest, PingPong) {
 }
 
 TEST(BrokerTest, LocalPingPong) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
+  const Channel PING = 8;
+  const Channel PONG = 9;
   ConfigVec configs = MakeTestConfigurations("local_ping_pong", 1, 1);
   auto broker = Broker::New(configs[0], kTestModuleTimeout);
   broker->AddChannel(PING);
@@ -126,8 +126,8 @@ TEST(BrokerTest, LocalPingPong) {
 }
 
 TEST(BrokerTest, MultiSend) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
+  const Channel PING = 8;
+  const Channel PONG = 9;
   const int NUM_PONGS = 3;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, NUM_PONGS + 1);
 
@@ -188,8 +188,8 @@ TEST(BrokerTest, MultiSend) {
 }
 
 TEST(BrokerTest, CreateRedirection) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
+  const Channel PING = 8;
+  const Channel PONG = 9;
   const Channel TAG = 11111;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 
@@ -263,8 +263,8 @@ TEST(BrokerTest, CreateRedirection) {
 }
 
 TEST(BrokerTest, RemoveRedirection) {
-  const Channel PING = 1;
-  const Channel PONG = 2;
+  const Channel PING = 8;
+  const Channel PONG = 9;
   const Channel TAG = 11111;
   ConfigVec configs = MakeTestConfigurations("pingpong", 1, 2);
 

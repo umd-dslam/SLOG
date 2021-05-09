@@ -32,7 +32,7 @@ namespace slog {
  */
 class Forwarder : public NetworkedModule {
  public:
-  Forwarder(const std::shared_ptr<Broker>& broker,
+  Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
             const std::shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
             const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout_ms = kModuleTimeout);
 
