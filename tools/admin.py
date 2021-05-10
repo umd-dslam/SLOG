@@ -1006,7 +1006,7 @@ class CollectClientCommand(AdminCommand):
         machines = [
             {
                 'address': c.decode(),
-                'name': f"{i}-{c.decode()}"
+                'name': str(i)
             }
             for i, r in enumerate(self.config.replicas)
             for c in r.client_addresses
@@ -1077,7 +1077,7 @@ class CollectServerCommand(AdminCommand):
         machines = [
             {
                 'address': a.decode(),
-                'name': f"{r}-{p}-{a.decode()}"
+                'name': f"{r}-{p}"
             }
             for r, rep in enumerate(self.config.replicas)
             for p, a in enumerate(rep.addresses)
