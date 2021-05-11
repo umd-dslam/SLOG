@@ -836,6 +836,10 @@ class BenchmarkCommand(AdminCommand):
             help="Percent of sampled transactions to be written to result files"
         )
         parser.add_argument(
+            "--txn-profiles", action="store_true",
+            help="Output the profile of the sampled txns"
+        )
+        parser.add_argument(
             "-e",
             nargs="*",
             help="Environment variables to pass to the container. For example, "
@@ -933,7 +937,7 @@ class BenchmarkCommand(AdminCommand):
                 f"--workers {args.workers} "
                 f"--sample {args.sample} "
                 f"--seed {args.seed} "
-                f"--txn_profiles 0 "
+                f"--txn_profiles={args.txn_profiles} "
             )
             shell_cmd += (
                 f"--rate {args.rate} " 

@@ -29,7 +29,7 @@ DEFINE_double(sample, 10, "Percent of sampled transactions to be written to resu
 DEFINE_int32(
     seed, -1,
     "Seed for any randomization in the benchmark. If set to negative, seed will be picked from std::random_device()");
-DEFINE_bool(txn_profiles, true, "Output transaction profiles");
+DEFINE_bool(txn_profiles, false, "Output transaction profiles");
 
 using namespace slog;
 
