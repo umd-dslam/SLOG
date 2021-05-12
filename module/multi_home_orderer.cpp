@@ -127,7 +127,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
       NewBatch();
     });
 
-    batch_starting_time_ = steady_clock::now();
+    batch_starting_time_ = std::chrono::steady_clock::now();
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
@@ -144,7 +144,7 @@ void MultiHomeOrderer::SendBatch() {
 
   if (collecting_stats_) {
     stat_batch_sizes_.push_back(batch_size_);
-    stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+    stat_batch_durations_ms_.push_back((std::chrono::steady_clock::now() - batch_starting_time_).count() / 1000000.0);
   }
 
   auto paxos_env = NewEnvelope();

@@ -14,6 +14,7 @@ using std::pair;
 using std::shared_ptr;
 using std::string;
 using std::unordered_map;
+using std::vector;
 
 namespace slog {
 

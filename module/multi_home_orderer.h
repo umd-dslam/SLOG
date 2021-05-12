@@ -25,7 +25,7 @@ namespace slog {
 class MultiHomeOrderer : public NetworkedModule {
  public:
   MultiHomeOrderer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
-                   milliseconds poll_timeout = kModuleTimeout);
+                   std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
@@ -46,7 +46,7 @@ class MultiHomeOrderer : public NetworkedModule {
   BatchLog multi_home_batch_log_;
 
   bool collecting_stats_;
-  steady_clock::time_point batch_starting_time_;
+  std::chrono::steady_clock::time_point batch_starting_time_;
   std::vector<int> stat_batch_sizes_;
   std::vector<float> stat_batch_durations_ms_;
 };

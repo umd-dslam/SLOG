@@ -63,8 +63,8 @@ void InitializeRecording(const ConfigurationPtr& config);
 
 template <typename TxnOrBatchPtr>
 inline void RecordTxnEvent(TxnOrBatchPtr txn, TransactionEvent event) {
-  using Clock = std::chrono::system_clock;
-  auto now = duration_cast<microseconds>(Clock::now().time_since_epoch()).count();
+  auto now = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch())
+                 .count();
   if ((gDisabledEvents >> event) & 1) {
     return;
   }

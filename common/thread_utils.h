@@ -19,18 +19,4 @@ inline void PinToCpu(pthread_t thread, int cpu) {
   }
 }
 
-template <class Rep, class Period>
-void Sleep(const std::chrono::duration<Rep, Period>& dur) {
-  auto remaining = dur;
-  if (remaining > 1ms) {
-    auto start = high_resolution_clock::now();
-    std::this_thread::sleep_for(remaining - 1ms);
-    auto end = high_resolution_clock::now();
-    remaining -= end - start;
-  }
-  auto start = high_resolution_clock::now();
-  while (high_resolution_clock::now() - start < remaining)
-    ;
-}
-
 }  // namespace slog

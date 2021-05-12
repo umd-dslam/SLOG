@@ -10,7 +10,12 @@
 
 using std::shared_ptr;
 using std::unique_ptr;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::steady_clock;
 using std::chrono::system_clock;
+using std::chrono::operator""ms;
+using std::chrono::operator""us;
 
 namespace slog {
 namespace {

@@ -1,11 +1,8 @@
 #pragma once
 
-#include <chrono>
 #include <string>
 
 #include "proto/transaction.pb.h"
-
-using namespace std::chrono;
 
 namespace slog {
 

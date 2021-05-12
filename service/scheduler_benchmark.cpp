@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "common/configuration.h"
 #include "common/csv_writer.h"
 #include "connection/broker.h"
@@ -16,6 +18,7 @@ DEFINE_string(out_dir, ".", "Directory containing output data");
 DEFINE_string(commands, "key_value", "Commands type. Choose from (noop, dummy, and key_value)");
 
 using namespace slog;
+using namespace std::chrono;
 
 using std::make_shared;
 using std::string;

@@ -30,7 +30,10 @@ uint32_t FNVHash(It begin, It end) {
 
 using google::protobuf::io::FileInputStream;
 using google::protobuf::io::ZeroCopyInputStream;
+using std::chrono::milliseconds;
+using std::chrono::operator""ms;
 using std::string;
+using std::vector;
 
 ConfigurationPtr Configuration::FromFile(const string& file_path, const string& local_address) {
   int fd = open(file_path.c_str(), O_RDONLY);

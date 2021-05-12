@@ -1,12 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 
 #include "common/types.h"
 
 namespace slog {
 
-const auto kModuleTimeout = 1000ms;
+const auto kModuleTimeout = std::chrono::milliseconds(1000);
 
 const Channel kServerChannel = 1;
 const Channel kForwarderChannel = 2;

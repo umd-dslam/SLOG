@@ -102,6 +102,6 @@ bool operator==(google::protobuf::Map<K, V> map1, google::protobuf::Map<K, V> ma
 /**
  * Extract txns from a batch
  */
-vector<Transaction*> Unbatch(internal::Batch* batch);
+std::vector<Transaction*> Unbatch(internal::Batch* batch);
 
 }  // namespace slog

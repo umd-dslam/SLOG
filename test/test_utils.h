@@ -21,7 +21,7 @@ using std::string;
 using std::unique_ptr;
 namespace slog {
 
-const auto kTestModuleTimeout = 5ms;
+const auto kTestModuleTimeout = std::chrono::milliseconds(5);
 
 using ConfigVec = std::vector<ConfigurationPtr>;
 

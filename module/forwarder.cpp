@@ -30,7 +30,7 @@ uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
 
 Forwarder::Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
-                     const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
+                     const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Forwarder", context, config, config->forwarder_port(), kForwarderChannel, metrics_manager,
                       poll_timeout),
       lookup_master_index_(lookup_master_index),
@@ -114,7 +114,7 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   if (batch_size_ == 1) {
     NewTimedCallback(config()->forwarder_batch_duration(), [this]() { SendLookupMasterRequestBatch(); });
 
-    batch_starting_time_ = steady_clock::now();
+    batch_starting_time_ = std::chrono::steady_clock::now();
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
@@ -128,7 +128,7 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 void Forwarder::SendLookupMasterRequestBatch() {
   if (collecting_stats_) {
     stat_batch_sizes_.push_back(batch_size_);
-    stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+    stat_batch_durations_ms_.push_back((std::chrono::steady_clock::now() - batch_starting_time_).count() / 1000000.0);
   }
 
   auto local_rep = config()->local_replica();
@@ -240,7 +240,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
       VLOG(3) << "Txn " << txn_id << " is a multi-home txn. Sending to the sequencer.";
       auto part = ChooseRandomPartition(*txn, rg_);
       // Send the txn directly to sequencers of involved replicas to generate lock-only txns
-      vector<MachineId> destinations;
+      std::vector<MachineId> destinations;
       destinations.reserve(txn_internal->involved_replicas_size());
       for (auto rep : txn_internal->involved_replicas()) {
         destinations.push_back(config()->MakeMachineId(rep, part));

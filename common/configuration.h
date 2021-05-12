@@ -1,13 +1,12 @@
 #pragma once
 
+#include <chrono>
 #include <string>
+#include <vector>
 
 #include "common/types.h"
 #include "proto/configuration.pb.h"
 #include "proto/internal.pb.h"
-
-using std::string;
-using std::vector;
 
 namespace slog {
 
@@ -17,14 +16,14 @@ using ConfigurationPtr = std::shared_ptr<const Configuration>;
 
 class Configuration {
  public:
-  static ConfigurationPtr FromFile(const string& file_path, const string& local_address = "");
+  static ConfigurationPtr FromFile(const std::string& file_path, const std::string& local_address = "");
 
-  Configuration(const internal::Configuration& config, const string& local_address);
+  Configuration(const internal::Configuration& config, const std::string& local_address);
 
-  const string& protocol() const;
-  const vector<string>& all_addresses() const;
-  const string& address(uint32_t replica, uint32_t partition) const;
-  const string& address(MachineId machine_id) const;
+  const std::string& protocol() const;
+  const std::vector<std::string>& all_addresses() const;
+  const std::string& address(uint32_t replica, uint32_t partition) const;
+  const std::string& address(MachineId machine_id) const;
   uint32_t broker_ports(int i) const;
   uint32_t broker_ports_size() const;
   uint32_t server_port() const;
@@ -33,14 +32,14 @@ class Configuration {
   uint32_t num_replicas() const;
   uint32_t num_partitions() const;
   uint32_t num_workers() const;
-  vector<MachineId> all_machine_ids() const;
-  milliseconds forwarder_batch_duration() const;
+  std::vector<MachineId> all_machine_ids() const;
+  std::chrono::milliseconds forwarder_batch_duration() const;
   int forwarder_max_batch_size() const;
-  milliseconds sequencer_batch_duration() const;
+  std::chrono::milliseconds sequencer_batch_duration() const;
   int sequencer_max_batch_size() const;
   uint32_t replication_factor() const;
 
-  const string& local_address() const;
+  const std::string& local_address() const;
   uint32_t local_replica() const;
   uint32_t local_partition() const;
   MachineId local_machine_id() const;
@@ -60,25 +59,25 @@ class Configuration {
   uint32_t replication_delay_pct() const;
   uint32_t replication_delay_amount_ms() const;
 
-  vector<TransactionEvent> disabled_events() const;
+  std::vector<TransactionEvent> disabled_events() const;
   bool bypass_mh_orderer() const;
-  vector<int> cpu_pinnings(ModuleId module) const;
+  std::vector<int> cpu_pinnings(ModuleId module) const;
   bool return_dummy_txn() const;
   int recv_retries() const;
   internal::Commands commands() const;
-  const vector<uint32_t> replication_order() const;
+  const std::vector<uint32_t> replication_order() const;
   bool synchronized_batching() const;
   uint32_t sample_rate() const;
   std::array<int, 2> interleaver_remote_to_local_ratio() const;
 
  private:
   internal::Configuration config_;
-  string local_address_;
+  std::string local_address_;
   int local_replica_;
   int local_partition_;
 
-  vector<string> all_addresses_;
-  vector<uint32_t> replication_order_;
+  std::vector<std::string> all_addresses_;
+  std::vector<uint32_t> replication_order_;
 };
 
 }  // namespace slog

@@ -205,7 +205,7 @@ void Interleaver::AdvanceLogs() {
       std::uniform_int_distribution<> rnd(0, config()->num_partitions() - 1);
       auto part = rnd(rg_);
 
-      vector<MachineId> destinations, ack_destinations;
+      std::vector<MachineId> destinations, ack_destinations;
       destinations.reserve(config()->num_replicas());
       ack_destinations.reserve(config()->replication_factor());
       for (uint32_t rep = 0; rep < config()->num_replicas(); rep++) {

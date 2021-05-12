@@ -22,7 +22,7 @@ class TestSimulatedMultiPaxos : public SimulatedMultiPaxos {
   Pair Poll() {
     unique_lock<mutex> lock(m_);
     // Wait until committed_ is not null
-    bool ok = cv_.wait_for(lock, milliseconds(2000), [this] { return committed_ != nullptr; });
+    bool ok = cv_.wait_for(lock, std::chrono::milliseconds(2000), [this] { return committed_ != nullptr; });
     if (!ok) {
       CHECK(false) << "Poll timed out";
     }

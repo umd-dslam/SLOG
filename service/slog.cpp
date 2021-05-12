@@ -105,7 +105,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
     threads.emplace_back(GenerateFn, i * range, (i + 1) * range);
   }
   while (num_done < FLAGS_data_threads) {
-    std::this_thread::sleep_for(5s);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     LOG(INFO) << "Generated " << counter.load() << " records";
   }
   for (auto& t : threads) {

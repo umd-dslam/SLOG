@@ -10,6 +10,8 @@
 
 using std::get_if;
 using std::string;
+using std::vector;
+
 namespace slog {
 
 Transaction* MakeTransaction(const std::vector<KeyEntry>& keys, const std::variant<string, int>& proc,

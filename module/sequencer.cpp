@@ -16,6 +16,8 @@ using internal::Batch;
 using internal::Request;
 using internal::Response;
 
+using std::chrono::milliseconds;
+
 Sequencer::Sequencer(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                      const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
     : NetworkedModule("Sequencer", context, config, config->sequencer_port(), kSequencerChannel, metrics_manager,
@@ -46,7 +48,7 @@ void Sequencer::OnInternalRequestReceived(EnvelopePtr&& env) {
     case Request::kForwardTxn: {
       auto txn = request->mutable_forward_txn()->release_txn();
       if (txn->internal().sequencer_delay_ms() > 0) {
-        auto delay = std::chrono::milliseconds(txn->internal().sequencer_delay_ms());
+        auto delay = milliseconds(txn->internal().sequencer_delay_ms());
         NewTimedCallback(delay, [this, txn]() { BatchTxn(txn); });
       } else {
         BatchTxn(txn);
@@ -88,7 +90,7 @@ void Sequencer::BatchTxn(Transaction* txn) {
       NewBatch();
     });
 
-    batch_starting_time_ = steady_clock::now();
+    batch_starting_time_ = std::chrono::steady_clock::now();
   }
 
   // Batch size is larger than the maximum size, send the batch immediately
@@ -106,7 +108,7 @@ void Sequencer::SendBatch() {
 
   if (collecting_stats_) {
     stat_batch_sizes_.push_back(batch_size_);
-    stat_batch_durations_ms_.push_back((steady_clock::now() - batch_starting_time_).count() / 1000000.0);
+    stat_batch_durations_ms_.push_back((std::chrono::steady_clock::now() - batch_starting_time_).count() / 1000000.0);
   }
 
   auto local_replica = config()->local_replica();

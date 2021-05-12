@@ -26,7 +26,8 @@ namespace slog {
 class Sequencer : public NetworkedModule {
  public:
   Sequencer(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
-            const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout = kModuleTimeout);
+            const MetricsRepositoryManagerPtr& metrics_manager,
+            std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
@@ -48,7 +49,7 @@ class Sequencer : public NetworkedModule {
   std::mt19937 rg_;
 
   bool collecting_stats_;
-  steady_clock::time_point batch_starting_time_;
+  std::chrono::steady_clock::time_point batch_starting_time_;
   std::vector<int> stat_batch_sizes_;
   std::vector<float> stat_batch_durations_ms_;
 };
