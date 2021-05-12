@@ -16,7 +16,6 @@
 #include "module/scheduler.h"
 #include "module/sequencer.h"
 #include "module/server.h"
-#include "module/ticker.h"
 #include "proto/internal.pb.h"
 #include "proto/offline_data.pb.h"
 #include "service/service_utils.h"

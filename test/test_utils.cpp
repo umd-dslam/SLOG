@@ -14,7 +14,6 @@
 #include "module/scheduler.h"
 #include "module/sequencer.h"
 #include "module/server.h"
-#include "module/ticker.h"
 #include "proto/api.pb.h"
 
 using std::make_shared;

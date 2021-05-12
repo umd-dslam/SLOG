@@ -32,7 +32,5 @@ target_sources(slog-core
     sequencer.h
     server.cpp
     server.h
-    ticker.cpp
-    ticker.h
     txn_generator.cpp
     txn_generator.h)

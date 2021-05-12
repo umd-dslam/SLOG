@@ -5,7 +5,6 @@
 #include "common/constants.h"
 #include "common/json_utils.h"
 #include "common/proto_utils.h"
-#include "module/ticker.h"
 #include "paxos/simulated_multi_paxos.h"
 
 using std::shared_ptr;
