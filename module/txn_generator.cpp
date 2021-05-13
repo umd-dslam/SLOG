@@ -101,6 +101,7 @@ void SynchronizedTxnGenerator::SetUp() {
     poller_.PushSocket(socket_);
     for (int i = 0; i < num_clients_; i++) {
       SendNextTxn();
+      std::this_thread::sleep_for(100us);
     }
   }
 
