@@ -29,7 +29,7 @@ macro(add_slog_test TESTFILE)
   gtest_discover_tests(${TESTNAME}
     PROPERTIES 
       RUN_SERIAL TRUE
-      TIMEOUT    10)
+      TIMEOUT    5)
 endmacro()
 
 add_slog_test(common/string_utils_test.cpp)
