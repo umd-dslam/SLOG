@@ -42,7 +42,8 @@ struct ResultWriters {
                                          "time",  // microseconds since epoch
                                          "machine"};
   const vector<string> kEventNamesColumns = {"id", "event"};
-  const vector<string> kSummaryColumns = {"avg_tps", "aborted", "committed", "single_home", "multi_home", "remaster"};
+  const vector<string> kSummaryColumns = {"avg_tps",    "aborted",  "committed",   "single_home",
+                                          "multi_home", "remaster", "elapsed_time"};
 
   ResultWriters()
       : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
@@ -192,39 +193,50 @@ int main(int argc, char* argv[]) {
   float avg_tps = 0;
   int aborted = 0, committed = 0, not_started = 0, single_home = 0, multi_home = 0, remaster = 0;
   for (auto& w : workers) {
-    auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
-    auto& txns = gen->txns();
+    auto worker = dynamic_cast<const TxnGenerator*>(w->module().get());
+    const auto& txns = worker->txns();
     auto worker_committed = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->status() == TransactionStatus::COMMITTED;
     });
-    avg_tps += 1000.0 * worker_committed / gen->elapsed_time().count();
-    committed += worker_committed;
-    aborted += count_if(txns.begin(), txns.end(),
-                        [](TxnGenerator::TxnInfo info) { return info.txn->status() == TransactionStatus::ABORTED; });
-    not_started += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+    auto worker_aborted = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+      return info.txn->status() == TransactionStatus::ABORTED;
+    });
+    auto worker_not_started = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->status() == TransactionStatus::NOT_STARTED;
     });
-    single_home += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+    auto worker_single_home = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->internal().type() == TransactionType::SINGLE_HOME;
     });
-    multi_home += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+    auto worker_multi_home = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
     });
-    remaster += count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
+    auto worker_remaster = count_if(txns.begin(), txns.end(), [](TxnGenerator::TxnInfo info) {
       return info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
     });
+    auto worker_avg_tps =
+        worker_committed / std::chrono::duration_cast<std::chrono::seconds>(worker->elapsed_time()).count();
+
+    if (writers) {
+      writers->summary << worker_avg_tps << worker_aborted << worker_committed << worker_single_home
+                       << worker_multi_home << worker_remaster << worker->elapsed_time().count() << csvendl;
+    }
+
+    avg_tps += worker_avg_tps;
+    committed += worker_committed;
+    aborted += worker_aborted;
+    not_started += worker_not_started;
+    single_home += worker_single_home;
+    multi_home += worker_multi_home;
+    remaster += worker_remaster;
   }
-  avg_tps = std::floor(avg_tps);
 
   LOG(INFO) << "Summary:\n"
-            << "Avg. TPS: " << avg_tps << "\nAborted: " << aborted << "\nCommitted: " << committed
+            << "Avg. TPS: " << std::floor(avg_tps) << "\nAborted: " << aborted << "\nCommitted: " << committed
             << "\nNot started: " << not_started << "\nSingle-home: " << single_home << "\nMulti-home: " << multi_home
             << "\nRemaster: " << remaster;
 
   // Dump benchmark data to files
   if (writers) {
-    writers->summary << avg_tps << aborted << committed << single_home << multi_home << remaster << csvendl;
-
     vector<TxnGenerator::TxnInfo> txn_infos;
     for (auto& w : workers) {
       auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());

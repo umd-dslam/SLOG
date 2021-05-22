@@ -128,7 +128,7 @@ bool SynchronizedTxnGenerator::Loop() {
   }
 
   if (duration_reached && num_recv_txns_ == txns_.size()) {
-    elapsed_time_ = duration_cast<milliseconds>(steady_clock::now() - start_time_);
+    elapsed_time_ = steady_clock::now() - start_time_;
     return true;
   }
   return false;
@@ -253,7 +253,7 @@ bool ConstantRateTxnGenerator::Loop() {
     stop = num_sent_txns_ >= generated_txns_.size() && (dry_run_ || num_recv_txns_ >= txns_.size());
   }
   if (stop) {
-    elapsed_time_ = duration_cast<milliseconds>(steady_clock::now() - start_time_);
+    elapsed_time_ = steady_clock::now() - start_time_;
     return true;
   }
   return false;

@@ -109,7 +109,8 @@ void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
     }
 
     for (const auto& data : txn_events_data) {
-      txn_events_csv << ENUM_NAME(data.event, TransactionEvent) << data.time << data.partition << data.replica << csvendl;
+      txn_events_csv << ENUM_NAME(data.event, TransactionEvent) << data.time << data.partition << data.replica
+                     << csvendl;
     }
     LOG(INFO) << "Metrics written to: \"" << dir << "/\"";
   } catch (std::runtime_error& e) {

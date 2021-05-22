@@ -23,7 +23,7 @@ class TxnGenerator {
   virtual const std::vector<TxnInfo>& txns() const = 0;
   virtual size_t num_sent_txns() const = 0;
   virtual size_t num_recv_txns() const = 0;
-  virtual std::chrono::milliseconds elapsed_time() const = 0;
+  virtual std::chrono::nanoseconds elapsed_time() const = 0;
 };
 
 // This generators simulates synchronized clients, each of which sends a new
@@ -39,7 +39,7 @@ class SynchronizedTxnGenerator : public Module, public TxnGenerator {
 
   size_t num_sent_txns() const final { return num_sent_txns_; }
   size_t num_recv_txns() const final { return num_recv_txns_; }
-  std::chrono::milliseconds elapsed_time() const final {
+  std::chrono::nanoseconds elapsed_time() const final {
     if (elapsed_time_.load() == std::chrono::milliseconds(0)) {
       return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_);
     }
@@ -65,7 +65,7 @@ class SynchronizedTxnGenerator : public Module, public TxnGenerator {
   std::vector<TxnInfo> txns_;
   std::atomic<size_t> num_sent_txns_;
   std::atomic<size_t> num_recv_txns_;
-  std::atomic<std::chrono::milliseconds> elapsed_time_;
+  std::atomic<std::chrono::nanoseconds> elapsed_time_;
 };
 
 // This generator sends txn at a constant rate
@@ -81,9 +81,9 @@ class ConstantRateTxnGenerator : public Module, public TxnGenerator {
 
   size_t num_sent_txns() const final { return num_sent_txns_; }
   size_t num_recv_txns() const final { return num_recv_txns_; }
-  std::chrono::milliseconds elapsed_time() const final {
-    if (elapsed_time_.load() == std::chrono::milliseconds(0)) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_);
+  std::chrono::nanoseconds elapsed_time() const final {
+    if (elapsed_time_.load() == std::chrono::nanoseconds(0)) {
+      return std::chrono::steady_clock::now() - start_time_;
     }
     return elapsed_time_;
   }
@@ -108,7 +108,7 @@ class ConstantRateTxnGenerator : public Module, public TxnGenerator {
   std::vector<TxnInfo> txns_;
   std::atomic<size_t> num_sent_txns_;
   std::atomic<size_t> num_recv_txns_;
-  std::atomic<std::chrono::milliseconds> elapsed_time_;
+  std::atomic<std::chrono::nanoseconds> elapsed_time_;
 };
 
 }  // namespace slog
