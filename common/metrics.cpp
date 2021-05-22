@@ -100,7 +100,6 @@ void MetricsRepositoryManager::RegisterCurrentThread() {
 void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
   try {
     CSVWriter txn_events_csv(dir + "/txn_events.csv", {"event_id", "time", "partition", "replica"});
-    CSVWriter event_names_csv(dir + "/event_names.csv", {"id", "event"});
 
     std::list<TransactionEventMetrics::Data> txn_events_data;
     std::lock_guard<std::mutex> guard(mut_);
@@ -109,13 +108,8 @@ void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
       txn_events_data.splice(txn_events_data.end(), metrics->data());
     }
 
-    std::unordered_map<int, string> event_names;
     for (const auto& data : txn_events_data) {
-      txn_events_csv << static_cast<int>(data.event) << data.time << data.partition << data.replica << csvendl;
-      event_names[data.event] = ENUM_NAME(data.event, TransactionEvent);
-    }
-    for (auto e : event_names) {
-      event_names_csv << e.first << e.second << csvendl;
+      txn_events_csv << ENUM_NAME(data.event, TransactionEvent) << data.time << data.partition << data.replica << csvendl;
     }
     LOG(INFO) << "Metrics written to: \"" << dir << "/\"";
   } catch (std::runtime_error& e) {

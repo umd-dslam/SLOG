@@ -47,12 +47,10 @@ struct ResultWriters {
   ResultWriters()
       : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
         events(FLAGS_out_dir + "/txn_events.csv", kEventsColumns),
-        event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns),
         summary(FLAGS_out_dir + "/summary.csv", kSummaryColumns) {}
 
   CSVWriter txns;
   CSVWriter events;
-  CSVWriter event_names;
   CSVWriter summary;
 };
 
@@ -239,7 +237,6 @@ int main(int argc, char* argv[]) {
     auto sample_size = static_cast<size_t>(txn_infos.size() * FLAGS_sample / 100);
     txn_infos.resize(sample_size);
 
-    std::unordered_map<int, string> event_names;
     for (const auto& info : txn_infos) {
       CHECK(info.txn != nullptr);
       auto& txn_internal = info.txn->internal();
@@ -249,14 +246,9 @@ int main(int argc, char* argv[]) {
 
       for (int i = 0; i < txn_internal.events_size(); i++) {
         auto event = txn_internal.events(i);
-        event_names[event] = ENUM_NAME(event, TransactionEvent);
-        writers->events << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
+        writers->events << txn_internal.id() << ENUM_NAME(event, TransactionEvent) << txn_internal.event_times(i)
                         << txn_internal.event_machines(i) << csvendl;
       }
-    }
-
-    for (auto e : event_names) {
-      writers->event_names << e.first << e.second << csvendl;
     }
 
     if (FLAGS_txn_profiles) {
