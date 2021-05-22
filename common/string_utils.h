@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -13,5 +14,35 @@ size_t NextNTokens(std::vector<std::string>& tokens, const std::string& str, con
 std::string Trim(std::string str);
 
 std::vector<std::string> Split(const std::string& str, const std::string& delims);
+
+template <template <typename, typename...> class Container, typename T, typename R>
+std::string Join(const Container<std::pair<T, R>>& parts, char delim = ';') {
+  std::ostringstream ss;
+  bool first = true;
+  for (const auto& p : parts) {
+    if (!first) {
+      ss << delim;
+    } else {
+      first = false;
+    }
+    ss << p.first << ":" << p.second;
+  }
+  return ss.str();
+}
+
+template <typename Container>
+std::string Join(const Container& parts, char delim = ';') {
+  std::ostringstream ss;
+  bool first = true;
+  for (const auto& p : parts) {
+    if (!first) {
+      ss << delim;
+    } else {
+      first = false;
+    }
+    ss << p;
+  }
+  return ss.str();
+}
 
 }  // namespace slog

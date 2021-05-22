@@ -8,6 +8,7 @@
 #include "common/configuration.h"
 #include "common/csv_writer.h"
 #include "common/proto_utils.h"
+#include "common/string_utils.h"
 #include "module/txn_generator.h"
 #include "service/service_utils.h"
 #include "workload/basic_workload.h"
@@ -34,14 +35,8 @@ DEFINE_bool(txn_profiles, false, "Output transaction profiles");
 using namespace slog;
 
 struct ResultWriters {
-  const vector<string> kTxnColumns = {"client_txn_id", "txn_id", "is_mh", "is_mp",
-                                      "sent_at",       // microseconds since epoch
-                                      "received_at"};  // microseconds since epoch
-
-  const vector<string> kEventsColumns = {"txn_id", "event_id",
-                                         "time",  // microseconds since epoch
-                                         "machine"};
-  const vector<string> kEventNamesColumns = {"id", "event"};
+  const vector<string> kTxnColumns = {"txn_id", "coordinator", "replicas", "partitions", "sent_at", "received_at"};
+  const vector<string> kEventsColumns = {"txn_id", "event_id", "time", "machine"};
   const vector<string> kSummaryColumns = {"avg_tps",    "aborted",  "committed",   "single_home",
                                           "multi_home", "remaster", "elapsed_time"};
 
@@ -54,6 +49,11 @@ struct ResultWriters {
   CSVWriter events;
   CSVWriter summary;
 };
+
+template <typename Container>
+std::string ToJsonArrayStr(const Container& c) {
+  return "[" + Join(c, ',') + "]";
+}
 
 using std::count_if;
 using std::make_unique;
@@ -252,8 +252,9 @@ int main(int argc, char* argv[]) {
     for (const auto& info : txn_infos) {
       CHECK(info.txn != nullptr);
       auto& txn_internal = info.txn->internal();
-      writers->txns << info.profile.client_txn_id << txn_internal.id() << info.profile.is_multi_home
-                    << info.profile.is_multi_partition << info.sent_at.time_since_epoch().count()
+      writers->txns << txn_internal.id() << txn_internal.coordinating_server()
+                    << ToJsonArrayStr(txn_internal.involved_replicas())
+                    << ToJsonArrayStr(txn_internal.involved_partitions()) << info.sent_at.time_since_epoch().count()
                     << info.recv_at.time_since_epoch().count() << csvendl;
 
       for (int i = 0; i < txn_internal.events_size(); i++) {
