@@ -39,6 +39,9 @@ int main(int argc, char* argv[]) {
   internal::Configuration config_proto;
   config_proto.set_protocol("ipc");
   config_proto.add_broker_ports(0);
+  config_proto.set_server_port(5000);
+  config_proto.set_sequencer_port(5001);
+  config_proto.set_forwarder_port(5002);
   config_proto.set_num_partitions(1);
   config_proto.mutable_simple_partitioning()->set_num_records(FLAGS_records);
   config_proto.mutable_simple_partitioning()->set_record_size_bytes(FLAGS_record_size);
@@ -121,15 +124,10 @@ int main(int argc, char* argv[]) {
 
   // Output the results
   const vector<string> kTxnColumns = {"txn_id", "sent_at", "reads", "writes"};
-  const vector<string> kEventsColumns = {"txn_id", "event_id",
-                                         "time",  // microseconds since epoch
-                                         "machine"};
-  const vector<string> kEventNamesColumns = {"id", "event"};
+  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine"};
   CSVWriter profiles(FLAGS_out_dir + "/transactions.csv", kTxnColumns);
   CSVWriter events(FLAGS_out_dir + "/events.csv", kEventsColumns);
-  CSVWriter event_names(FLAGS_out_dir + "/event_names.csv", kEventNamesColumns);
 
-  std::unordered_map<int, string> enames;
   for (const auto& info : results) {
     auto txn = info.txn;
     auto& txn_internal = txn->internal();
@@ -141,16 +139,11 @@ int main(int argc, char* argv[]) {
         writes.push_back(k);
       }
     }
-    profiles << txn_internal.id() << duration_cast<microseconds>(info.sent_at.time_since_epoch()).count() << Join(reads)
-             << Join(writes) << csvendl;
+    profiles << txn_internal.id() << info.sent_at.time_since_epoch().count() << Join(reads) << Join(writes) << csvendl;
     for (int i = 0; i < txn_internal.events_size(); i++) {
       auto event = txn_internal.events(i);
-      enames[event] = ENUM_NAME(event, TransactionEvent);
-      events << txn_internal.id() << static_cast<int>(event) << txn_internal.event_times(i)
+      events << txn_internal.id() << ENUM_NAME(event, TransactionEvent) << txn_internal.event_times(i)
              << txn_internal.event_machines(i) << csvendl;
     }
-  }
-  for (auto e : enames) {
-    event_names << e.first << e.second << csvendl;
   }
 }

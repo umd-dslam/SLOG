@@ -36,7 +36,7 @@ using namespace slog;
 
 struct ResultWriters {
   const vector<string> kTxnColumns = {"txn_id", "coordinator", "replicas", "partitions", "sent_at", "received_at"};
-  const vector<string> kEventsColumns = {"txn_id", "event_id", "time", "machine"};
+  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine"};
   const vector<string> kSummaryColumns = {"avg_tps",    "aborted",  "committed",   "single_home",
                                           "multi_home", "remaster", "elapsed_time"};
 
@@ -49,11 +49,6 @@ struct ResultWriters {
   CSVWriter events;
   CSVWriter summary;
 };
-
-template <typename Container>
-std::string ToJsonArrayStr(const Container& c) {
-  return "[" + Join(c, ',') + "]";
-}
 
 using std::count_if;
 using std::make_unique;
@@ -164,8 +159,8 @@ int main(int argc, char* argv[]) {
     }
     auto now = std::chrono::steady_clock::now();
     auto t = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_print_time);
-    auto send_tps = num_sent_txns - last_num_sent_txns * 1000 / t.count();
-    auto recv_tps = num_recv_txns - last_num_recv_txns * 1000 / t.count();
+    auto send_tps = (num_sent_txns - last_num_sent_txns) * 1000 / t.count();
+    auto recv_tps = (num_recv_txns - last_num_recv_txns) * 1000 / t.count();
 
     // Effectively skip the first log since it is usually inaccurate.
     if (last_num_sent_txns > 0) {
@@ -214,7 +209,7 @@ int main(int argc, char* argv[]) {
       return info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
     });
     auto worker_avg_tps =
-        worker_committed / std::chrono::duration_cast<std::chrono::seconds>(worker->elapsed_time()).count();
+        worker_committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
 
     if (writers) {
       writers->summary << worker_avg_tps << worker_aborted << worker_committed << worker_single_home
@@ -253,8 +248,8 @@ int main(int argc, char* argv[]) {
       CHECK(info.txn != nullptr);
       auto& txn_internal = info.txn->internal();
       writers->txns << txn_internal.id() << txn_internal.coordinating_server()
-                    << ToJsonArrayStr(txn_internal.involved_replicas())
-                    << ToJsonArrayStr(txn_internal.involved_partitions()) << info.sent_at.time_since_epoch().count()
+                    << Join(txn_internal.involved_replicas())
+                    << Join(txn_internal.involved_partitions()) << info.sent_at.time_since_epoch().count()
                     << info.recv_at.time_since_epoch().count() << csvendl;
 
       for (int i = 0; i < txn_internal.events_size(); i++) {

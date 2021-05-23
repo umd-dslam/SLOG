@@ -85,7 +85,6 @@ class BrokerThread : public Module {
       }
       auto& entry = redirect_[tag];
       entry.to = channel;
-      LOG(INFO) << "Create redirection for " << tag << ". Pending msgs: " << entry.pending_msgs.size();
       for (auto& msg : entry.pending_msgs) {
         ForwardMessage(chan_it->second.socket, chan_it->second.send_raw, move(msg));
       }
@@ -115,11 +114,9 @@ class BrokerThread : public Module {
     if (tag_or_chan_id >= kMaxChannel) {
       auto& entry = redirect_[tag_or_chan_id];
       if (!entry.to.has_value()) {
-        LOG(INFO) << "Redirect to " << tag_or_chan_id << " [Pending]";
         entry.pending_msgs.push_back(move(msg));
         return;
       }
-      LOG(INFO) << "Redirect to " << tag_or_chan_id;
       chan_id = entry.to.value();
     }
 

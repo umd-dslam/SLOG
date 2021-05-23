@@ -955,7 +955,6 @@ class BenchmarkCommand(AdminCommand):
                 mounts=[SLOG_DATA_MOUNT],
                 # Expose all ports from container to host
                 network_mode="host",
-                # Avoid hanging this tool after starting the server
                 detach=True,
                 environment=parse_envs(args.e),
             )
@@ -1055,7 +1054,7 @@ class CollectServerCommand(AdminCommand):
                 out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
                 mkdir_cmd = f"mkdir -p {out_dir}"
                 cp_config_cmd = f"cp {CONTAINER_SLOG_CONFIG_FILE_PATH} {out_dir}"
-                metrics_cmd = f"client metrics {out_dir}"
+                metrics_cmd = f"client metrics {out_dir} --port {self.config.server_port}"
                 client.containers.run(
                     args.image,
                     name=SLOG_CLIENT_CONTAINER_NAME,
@@ -1067,8 +1066,6 @@ class CollectServerCommand(AdminCommand):
                     mounts=[SLOG_DATA_MOUNT],
                     # Expose all ports from container to host
                     network_mode="host",
-                    # Avoid hanging this tool after starting the server
-                    detach=True,
                 )
                 LOG.info("%s: Triggered flushing metrics to disk", addr)
 
