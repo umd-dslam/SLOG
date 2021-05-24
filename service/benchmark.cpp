@@ -316,7 +316,8 @@ int main(int argc, char* argv[]) {
       multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
       remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
     }
-    avg_tps += worker_committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
+    avg_tps +=
+        worker_committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
     committed += worker_committed;
   }
 
