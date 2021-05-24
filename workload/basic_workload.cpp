@@ -51,7 +51,7 @@ constexpr char NEAREST[] = "nearest";
 constexpr char SP_PARTITION[] = "sp_partition";
 
 const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"}, {MP_PCT, "0"},       {MP_PARTS, "2"},
-                                    {HOT, "10000"},      {RECORDS, "10"}, {HOT_RECORDS, "2"},  {WRITES, "10"},
+                                    {HOT, "0"},          {RECORDS, "10"}, {HOT_RECORDS, "0"},  {WRITES, "10"},
                                     {VALUE_SIZE, "100"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
 
 }  // namespace
@@ -64,6 +64,7 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr config, uint32_t region, con
       partition_to_key_lists_(config->num_partitions()),
       rg_(seed),
       client_txn_id_counter_(0) {
+  name_ = "basic";
   auto num_replicas = config->num_replicas();
   auto num_partitions = config->num_partitions();
   auto hot_keys_per_list = std::max(1U, params_.GetUInt32(HOT) / num_replicas);

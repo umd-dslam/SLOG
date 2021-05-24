@@ -99,7 +99,7 @@ void MetricsRepositoryManager::RegisterCurrentThread() {
 
 void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
   try {
-    CSVWriter txn_events_csv(dir + "/txn_events.csv", {"event", "time", "partition", "replica"});
+    CSVWriter txn_events_csv(dir + "/events.csv", {"event", "time", "partition", "replica"});
 
     std::list<TransactionEventMetrics::Data> txn_events_data;
     std::lock_guard<std::mutex> guard(mut_);

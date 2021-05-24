@@ -17,7 +17,9 @@ const RawParamMap DEFAULT_PARAMS = {{REMASTER_GAP, "50"}};
 
 RemasteringWorkload::RemasteringWorkload(const ConfigurationPtr config, uint32_t region, const string& data_dir,
                                          const string& params_str, const uint32_t seed)
-    : BasicWorkload(config, region, data_dir, params_str, seed, DEFAULT_PARAMS) {}
+    : BasicWorkload(config, region, data_dir, params_str, seed, DEFAULT_PARAMS) {
+  name_ = "remastering";
+}
 
 std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextTransaction() {
   if (client_txn_id_counter_ % params_.GetUInt32(REMASTER_GAP) == 0) {

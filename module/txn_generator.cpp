@@ -1,7 +1,5 @@
 #include "module/txn_generator.h"
 
-#include <glog/logging.h>
-
 #include <sstream>
 
 #include "common/constants.h"
@@ -59,26 +57,23 @@ bool RecordFinishedTxn(TxnGenerator::TxnInfo& info, Transaction* txn, bool is_du
 
 }  // namespace
 
-SynchronizedTxnGenerator::SynchronizedTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
-                                                   std::unique_ptr<Workload>&& workload, uint32_t region,
-                                                   uint32_t num_txns, int num_clients, int duration_s, bool dry_run)
-    : Module("Synchronized-Txn-Generator"),
+SynchronousTxnGenerator::SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
+                                                 std::unique_ptr<Workload>&& workload, uint32_t region,
+                                                 uint32_t num_txns, int num_clients, int duration_s, bool dry_run)
+    : Module("Synchronous-Txn-Generator"),
+      TxnGenerator(std::move(workload)),
       config_(config),
       socket_(context, ZMQ_DEALER),
-      workload_(std::move(workload)),
       poller_(kModuleTimeout),
       region_(region),
       num_txns_(num_txns),
       num_clients_(num_clients),
       duration_(duration_s * 1000),
-      dry_run_(dry_run),
-      num_sent_txns_(0),
-      num_recv_txns_(0) {
-  CHECK(workload_ != nullptr) << "Must provide a valid workload";
-  CHECK_GT(duration_s, 0) << "Duration must be set for synchronized txn generator";
+      dry_run_(dry_run) {
+  CHECK_GT(duration_s, 0) << "Duration must be set for synchronous txn generator";
 }
 
-SynchronizedTxnGenerator::~SynchronizedTxnGenerator() {
+SynchronousTxnGenerator::~SynchronousTxnGenerator() {
   for (auto& txn : generated_txns_) {
     delete txn.first;
     txn.first = nullptr;
@@ -89,7 +84,7 @@ SynchronizedTxnGenerator::~SynchronizedTxnGenerator() {
   }
 }
 
-void SynchronizedTxnGenerator::SetUp() {
+void SynchronousTxnGenerator::SetUp() {
   CHECK_GT(num_txns_, 0) << "There must be at least one transaction";
   LOG(INFO) << "Generating " << num_txns_ << " transactions";
   for (size_t i = 0; i < num_txns_; i++) {
@@ -106,15 +101,16 @@ void SynchronizedTxnGenerator::SetUp() {
   }
 
   LOG(INFO) << "Start sending transactions with " << num_clients_ << " concurrent clients";
-  start_time_ = steady_clock::now();
+
+  StartTimer();
 }
 
-bool SynchronizedTxnGenerator::Loop() {
+bool SynchronousTxnGenerator::Loop() {
   if (dry_run_) {
     return true;
   }
 
-  bool duration_reached = steady_clock::now() - start_time_ >= duration_;
+  bool duration_reached = elapsed_time() >= duration_;
   if (poller_.NextEvent()) {
     if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       auto& info = txns_[res.stream_id()];
@@ -128,18 +124,18 @@ bool SynchronizedTxnGenerator::Loop() {
   }
 
   if (duration_reached && num_recv_txns_ == txns_.size()) {
-    elapsed_time_ = steady_clock::now() - start_time_;
+    StopTimer();
     return true;
   }
   return false;
 }
 
-void SynchronizedTxnGenerator::SendNextTxn() {
-  const auto& selected_txn = generated_txns_[num_sent_txns_ % generated_txns_.size()];
+void SynchronousTxnGenerator::SendNextTxn() {
+  const auto& selected_txn = generated_txns_[num_sent_txns() % generated_txns_.size()];
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(new Transaction(*selected_txn.first));
-  req.set_stream_id(num_sent_txns_);
+  req.set_stream_id(num_sent_txns());
   SendSerializedProtoWithEmptyDelim(socket_, req);
 
   TxnInfo info;
@@ -155,18 +151,14 @@ ConstantRateTxnGenerator::ConstantRateTxnGenerator(const ConfigurationPtr& confi
                                                    unique_ptr<Workload>&& workload, uint32_t region, uint32_t num_txns,
                                                    int tps, int duration_s, bool dry_run)
     : Module("Txn-Generator"),
+      TxnGenerator(std::move(workload)),
       config_(config),
       socket_(context, ZMQ_DEALER),
-      workload_(std::move(workload)),
       poller_(kModuleTimeout),
       region_(region),
       num_txns_(num_txns),
       duration_(duration_s * 1000),
-      dry_run_(dry_run),
-      num_sent_txns_(0),
-      num_recv_txns_(0) {
-  CHECK(workload_ != nullptr) << "Must provide a valid workload";
-
+      dry_run_(dry_run) {
   CHECK_LT(tps, 1000000) << "Transaction/sec is too high (max. 1000000)";
   int overhead_estimate = !dry_run_ * 10;
   if (1000000 / tps > overhead_estimate) {
@@ -202,24 +194,25 @@ void ConstantRateTxnGenerator::SetUp() {
   // Schedule sending new txns
   poller_.AddTimedCallback(interval_, [this]() { SendNextTxn(); });
   LOG(INFO) << "Start sending transactions";
-  start_time_ = steady_clock::now();
+
+  StartTimer();
 }
 
 void ConstantRateTxnGenerator::SendNextTxn() {
   // If duration is set, keep sending txn until duration is reached, otherwise send until all generated txns are sent
   if (duration_ > 0ms) {
-    if (steady_clock::now() - start_time_ >= duration_) {
+    if (elapsed_time() >= duration_) {
       return;
     }
-  } else if (num_sent_txns_ >= generated_txns_.size()) {
+  } else if (num_sent_txns() >= generated_txns_.size()) {
     return;
   }
 
-  const auto& selected_txn = generated_txns_[num_sent_txns_ % generated_txns_.size()];
+  const auto& selected_txn = generated_txns_[num_sent_txns() % generated_txns_.size()];
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(new Transaction(*selected_txn.first));
-  req.set_stream_id(num_sent_txns_);
+  req.set_stream_id(num_sent_txns());
   if (!dry_run_) {
     SendSerializedProtoWithEmptyDelim(socket_, req);
   }
@@ -247,13 +240,13 @@ bool ConstantRateTxnGenerator::Loop() {
   bool stop = false;
   // If duration is set, keep sending txn until duration is reached, otherwise send until all generated txns are sent
   if (duration_ > 0ms) {
-    bool duration_reached = steady_clock::now() - start_time_ >= duration_;
+    bool duration_reached = elapsed_time() >= duration_;
     stop = duration_reached && (dry_run_ || num_recv_txns_ == num_sent_txns_);
   } else {
     stop = num_sent_txns_ >= generated_txns_.size() && (dry_run_ || num_recv_txns_ >= txns_.size());
   }
   if (stop) {
-    elapsed_time_ = steady_clock::now() - start_time_;
+    StopTimer();
     return true;
   }
   return false;

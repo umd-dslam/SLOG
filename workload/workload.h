@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "common/configuration.h"
+#include "common/json_utils.h"
 #include "common/string_utils.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
@@ -65,6 +66,16 @@ class WorkloadParams {
     return ss.str();
   }
 
+  rapidjson::Value as_json(rapidjson::Document::AllocatorType& allocator) const {
+    rapidjson::Value params(rapidjson::kObjectType);
+    for (const auto& [k, v] : raw_params_) {
+      rapidjson::Value k_json(k.c_str(), allocator);
+      rapidjson::Value v_json(v.c_str(), allocator);
+      params.AddMember(k_json, v_json, allocator);
+    }
+    return params;
+  }
+
  private:
   RawParamMap Parse(const std::string& params_str) {
     RawParamMap map;
@@ -110,7 +121,8 @@ struct TransactionProfile {
  */
 class Workload {
  public:
-  Workload(const RawParamMap& default_params, const std::string& params_str) : params_(default_params) {
+  Workload(const RawParamMap& default_params, const std::string& params_str)
+      : name_("unnamed"), params_(default_params) {
     params_.Update(params_str);
   }
 
@@ -119,7 +131,8 @@ class Workload {
    */
   virtual std::pair<Transaction*, TransactionProfile> NextTransaction() = 0;
 
-  std::string GetParamsStr() { return params_.ToString(); }
+  std::string name() const { return name_; }
+  WorkloadParams params() const { return params_; }
 
   static const RawParamMap MergeParams(const RawParamMap& p1, const RawParamMap& p2) {
     RawParamMap params;
@@ -129,6 +142,7 @@ class Workload {
   }
 
  protected:
+  std::string name_;
   WorkloadParams params_;
 };
 
