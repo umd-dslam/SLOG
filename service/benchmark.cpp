@@ -307,15 +307,17 @@ int main(int argc, char* argv[]) {
   for (auto& w : workers) {
     auto worker = dynamic_cast<const TxnGenerator*>(w->module().get());
     const auto& txn_infos = worker->txn_infos();
+    int worker_committed = 0;
     for (auto info : txn_infos) {
-      committed += info.txn->status() == TransactionStatus::COMMITTED;
+      worker_committed += info.txn->status() == TransactionStatus::COMMITTED;
       aborted += info.txn->status() == TransactionStatus::ABORTED;
       not_started += info.txn->status() == TransactionStatus::NOT_STARTED;
       single_home += info.txn->internal().type() == TransactionType::SINGLE_HOME;
       multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
       remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
     }
-    avg_tps += committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
+    avg_tps += worker_committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
+    committed += worker_committed;
   }
 
   LOG(INFO) << "Summary:\n"
