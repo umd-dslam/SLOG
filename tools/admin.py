@@ -45,12 +45,6 @@ SLOG_DATA_MOUNT = docker.types.Mount(
     source=HOST_DATA_DIR,
     type="bind",
 )
-SLOG_CONFIG_FILE_NAME = "slog.conf"
-CONTAINER_SLOG_CONFIG_FILE_PATH = os.path.join(
-    CONTAINER_DATA_DIR,
-    SLOG_CONFIG_FILE_NAME
-)
-
 BENCHMARK_CONTAINER_NAME = "benchmark"
 
 RemoteProcess = collections.namedtuple(
@@ -191,6 +185,7 @@ class AdminCommand(Command):
 
     def __init__(self):
         self.config = None
+        self.config_name = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -226,11 +221,7 @@ class AdminCommand(Command):
         self.do_command(args)
 
     def load_config(self, args):
-        if not os.path.isfile(args.config):
-            if self.CONFIG_FILE_REQUIRED:
-                raise FileNotFoundError(f'Config file does not exist: "{args.config}"')
-            else:
-                return
+        self.config_name = os.path.basename(args.config)
         with open(args.config, "r") as f:
             self.config = Configuration()
             text_format.Parse(f.read(), self.config)
@@ -363,9 +354,8 @@ class StartCommand(AdminCommand):
 
         # Prepare a command to update the config file
         config_text = text_format.MessageToString(self.config)
-        sync_config_cmd = (
-            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
-        )
+        config_path = os.path.join(CONTAINER_DATA_DIR, self.config_name)
+        sync_config_cmd = f"echo '{config_text}' > {config_path}"
 
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
@@ -380,7 +370,7 @@ class StartCommand(AdminCommand):
             client, addr, *_ = remote_proc
             shell_cmd = (
                 f"slog "
-                f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                f"--config {config_path} "
                 f"--address {addr} "
                 f"--data-dir {CONTAINER_DATA_DIR} "
             )
@@ -687,9 +677,8 @@ class LocalCommand(AdminCommand):
         # Spin up local Docker containers and connect them to the network
         #
         config_text = text_format.MessageToString(self.config)
-        sync_config_cmd = (
-            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
-        )
+        config_path = os.path.join(CONTAINER_DATA_DIR, self.config_name)
+        sync_config_cmd = f"echo '{config_text}' > {config_path}"
 
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
@@ -703,7 +692,7 @@ class LocalCommand(AdminCommand):
                 addr = addr_b.decode()
                 shell_cmd = (
                     f"slog "
-                    f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                    f"--config {config_path} "
                     f"--address {addr} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
@@ -889,9 +878,8 @@ class BenchmarkCommand(AdminCommand):
     def do_command(self, args):
         # Prepare a command to update the config file
         config_text = text_format.MessageToString(self.config)
-        sync_config_cmd = (
-            f"echo '{config_text}' > {CONTAINER_SLOG_CONFIG_FILE_PATH}"
-        )
+        config_path = os.path.join(CONTAINER_DATA_DIR, self.config_name)
+        sync_config_cmd = f"echo '{config_text}' > {config_path}"
 
         if args.tag:
             tag = args.tag
@@ -926,7 +914,7 @@ class BenchmarkCommand(AdminCommand):
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
-                f"--config {CONTAINER_SLOG_CONFIG_FILE_PATH} "
+                f"--config {config_path} "
                 f"--r {rep} "
                 f"--data-dir {CONTAINER_DATA_DIR} "
                 f"--out-dir {out_dir} "
@@ -1024,15 +1012,8 @@ class CollectServerCommand(AdminCommand):
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
-        parser.add_argument(
-            "tag",
-            help="Tag of the metrics data"
-        )
-        parser.add_argument(
-            "--out-dir",
-            default='',
-            help="Directory to put the collected data"
-        )
+        parser.add_argument("--tag", default="test", help="Tag of the metrics data")
+        parser.add_argument("--out-dir", default='', help="Directory to put the collected data")
         group = parser.add_mutually_exclusive_group()
         group.add_argument("--flush-only", action="store_true", help="Only trigger flushing metrics to disk")
         group.add_argument("--download-only", action="store_true", help="Only download the data files")
@@ -1049,11 +1030,12 @@ class CollectServerCommand(AdminCommand):
             with Pool(processes=len(self.remote_procs)) as pool:
                 pool.map(clean_up, self.remote_procs)
 
+            config_path = os.path.join(CONTAINER_DATA_DIR, self.config_name)
             def trigger_flushing_metrics(remote_proc):
                 client, addr, *_ = remote_proc
                 out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
                 mkdir_cmd = f"mkdir -p {out_dir}"
-                cp_config_cmd = f"cp {CONTAINER_SLOG_CONFIG_FILE_PATH} {out_dir}"
+                cp_config_cmd = f"cp {config_path} {out_dir}"
                 metrics_cmd = f"client metrics {out_dir} --port {self.config.server_port}"
                 client.containers.run(
                     args.image,

@@ -8,6 +8,7 @@
 #include "common/proto_utils.h"
 #include "glog/logging.h"
 #include "proto/internal.pb.h"
+#include "version.h"
 
 namespace slog {
 
@@ -80,7 +81,8 @@ thread_local std::shared_ptr<MetricsRepository> per_thread_metrics_repo;
  *  MetricsRepositoryManager
  */
 
-MetricsRepositoryManager::MetricsRepositoryManager(const ConfigurationPtr& config) : config_(config) {
+MetricsRepositoryManager::MetricsRepositoryManager(const std::string& config_name, const ConfigurationPtr& config)
+    : config_name_(config_name), config_(config) {
   sample_mask_.fill(false);
   for (uint32_t i = 0; i < config_->sample_rate() * kSampleMaskSize / 100; i++) {
     sample_mask_[i] = true;
@@ -99,6 +101,9 @@ void MetricsRepositoryManager::RegisterCurrentThread() {
 
 void MetricsRepositoryManager::AggregateAndFlushToDisk(const std::string& dir) {
   try {
+    CSVWriter metadata_csv(dir + "/metadata.csv", {"version", "config_name"});
+    metadata_csv << SLOG_VERSION << config_name_;
+
     CSVWriter txn_events_csv(dir + "/events.csv", {"event", "time", "partition", "replica"});
 
     std::list<TransactionEventMetrics::Data> txn_events_data;

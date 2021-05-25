@@ -1,5 +1,4 @@
 import argparse
-import time
 
 class Command:
     """Base class for a command"""
@@ -7,9 +6,6 @@ class Command:
     NAME = "<not_implemented>"
     HELP = ""
     DESCRIPTION = ""
-
-    def __init__(self):
-        self.config = None
 
     def create_subparser(self, subparsers):
         parser = subparsers.add_parser(

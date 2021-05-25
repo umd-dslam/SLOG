@@ -161,7 +161,11 @@ int main(int argc, char* argv[]) {
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
-  auto metrics_manager = make_shared<slog::MetricsRepositoryManager>(config);
+  auto config_name = FLAGS_config;
+  if (auto pos = config_name.rfind('/'); pos != std::string::npos) {
+    config_name = config_name.substr(pos + 1);
+  }
+  auto metrics_manager = make_shared<slog::MetricsRepositoryManager>(config_name, config);
 
   vector<pair<unique_ptr<slog::ModuleRunner>, slog::ModuleId>> modules;
   modules.emplace_back(MakeRunnerFor<slog::Server>(broker, metrics_manager), slog::ModuleId::SERVER);
