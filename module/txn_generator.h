@@ -20,37 +20,23 @@ class TxnGenerator {
     std::chrono::system_clock::time_point sent_at;
     std::chrono::system_clock::time_point recv_at;
     bool finished = false;
+    int generator_id;
   };
 
-  TxnGenerator(std::unique_ptr<Workload>&& workload)
-      : workload_(std::move(workload)),
-        num_sent_txns_(0),
-        num_recv_txns_(0),
-        elapsed_time_(std::chrono::nanoseconds(0)) {
-    CHECK(workload_ != nullptr) << "Must provide a valid workload";
-  }
-  const Workload& workload() const { return *workload_; }
-  size_t num_sent_txns() const { return num_sent_txns_; }
-  size_t num_recv_txns() const { return num_recv_txns_; }
-  std::chrono::nanoseconds elapsed_time() const {
-    if (timer_running_) {
-      return std::chrono::steady_clock::now() - start_time_;
-    }
-    return elapsed_time_.load();
-  }
+  TxnGenerator(std::unique_ptr<Workload>&& workload);
+  const Workload& workload() const;
+  size_t num_sent_txns() const;
+  size_t num_recv_txns() const;
+  std::chrono::nanoseconds elapsed_time() const;
 
   virtual const std::vector<TxnInfo>& txn_infos() const = 0;
 
  protected:
-  void StartTimer() {
-    timer_running_ = true;
-    start_time_ = std::chrono::steady_clock::now();
-  }
-  void StopTimer() {
-    timer_running_ = false;
-    elapsed_time_ = std::chrono::steady_clock::now() - start_time_;
-  }
+  void StartTimer();
+  void StopTimer();
+  bool timer_running() const;
 
+  int id_;
   std::unique_ptr<Workload> workload_;
   std::atomic<size_t> num_sent_txns_;
   std::atomic<size_t> num_recv_txns_;

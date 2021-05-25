@@ -16,7 +16,7 @@
 #include "workload/remastering_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
-DEFINE_int32(workers, 1, "Number of worker threads");
+DEFINE_int32(generators, 1, "Number of generator threads");
 DEFINE_uint32(r, 0, "The region where the current machine is located");
 DEFINE_string(data_dir, "", "Directory containing intial data");
 DEFINE_string(out_dir, "", "Directory containing output data");
@@ -43,19 +43,19 @@ using std::unique_ptr;
 uint32_t seed = std::random_device{}();
 zmq::context_t context;
 
-vector<unique_ptr<ModuleRunner>> InitializeWorkers() {
+vector<unique_ptr<ModuleRunner>> InitializeGenerators() {
   // Load the config
   auto config = Configuration::FromFile(FLAGS_config, "");
 
   // Setup zmq context
   context.set(zmq::ctxopt::blocky, false);
 
-  // Initialize the workers
-  FLAGS_workers = std::max(FLAGS_workers, 1);
+  // Initialize the generators
+  FLAGS_generators = std::max(FLAGS_generators, 1);
   auto remaining_txns = FLAGS_txns;
-  auto num_txns_per_worker = FLAGS_txns / FLAGS_workers;
-  vector<std::unique_ptr<ModuleRunner>> workers;
-  for (int i = 0; i < FLAGS_workers; i++) {
+  auto num_txns_per_generator = FLAGS_txns / FLAGS_generators;
+  vector<std::unique_ptr<ModuleRunner>> generators;
+  for (int i = 0; i < FLAGS_generators; i++) {
     // Select the workload
     unique_ptr<Workload> workload;
     if (FLAGS_wl == "basic") {
@@ -65,47 +65,47 @@ vector<unique_ptr<ModuleRunner>> InitializeWorkers() {
     } else {
       LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
     }
-    if (i < FLAGS_workers - 1) {
-      remaining_txns -= num_txns_per_worker;
+    if (i < FLAGS_generators - 1) {
+      remaining_txns -= num_txns_per_generator;
     } else {
-      num_txns_per_worker = remaining_txns;
+      num_txns_per_generator = remaining_txns;
     }
     if (FLAGS_rate > 0) {
-      auto tps_per_worker = FLAGS_rate / FLAGS_workers + (i < (FLAGS_rate % FLAGS_workers));
-      workers.push_back(MakeRunnerFor<ConstantRateTxnGenerator>(config, context, std::move(workload), FLAGS_r,
-                                                                num_txns_per_worker, tps_per_worker, FLAGS_duration,
-                                                                FLAGS_dry_run));
+      auto tps_per_generator = FLAGS_rate / FLAGS_generators + (i < (FLAGS_rate % FLAGS_generators));
+      generators.push_back(MakeRunnerFor<ConstantRateTxnGenerator>(config, context, std::move(workload), FLAGS_r,
+                                                                   num_txns_per_generator, tps_per_generator,
+                                                                   FLAGS_duration, FLAGS_dry_run));
     } else {
-      int num_clients = FLAGS_clients / FLAGS_workers + (i < (FLAGS_clients % FLAGS_workers));
-      workers.push_back(MakeRunnerFor<SynchronousTxnGenerator>(config, context, std::move(workload), FLAGS_r,
-                                                               num_txns_per_worker, num_clients, FLAGS_duration,
-                                                               FLAGS_dry_run));
+      int num_clients = FLAGS_clients / FLAGS_generators + (i < (FLAGS_clients % FLAGS_generators));
+      generators.push_back(MakeRunnerFor<SynchronousTxnGenerator>(config, context, std::move(workload), FLAGS_r,
+                                                                  num_txns_per_generator, num_clients, FLAGS_duration,
+                                                                  FLAGS_dry_run));
     }
   }
-  return workers;
+  return generators;
 }
 
-void RunBenchmark(vector<unique_ptr<ModuleRunner>>& workers) {
+void RunBenchmark(vector<unique_ptr<ModuleRunner>>& generators) {
   // Block SIGINT from here so that the new threads inherit the block mask
   sigset_t signal_set;
   sigemptyset(&signal_set);
   sigaddset(&signal_set, SIGINT);
   pthread_sigmask(SIG_BLOCK, &signal_set, nullptr);
 
-  // Run the workers
-  for (auto& w : workers) {
+  // Run the generators
+  for (auto& w : generators) {
     w->StartInNewThread();
   }
 
-  // Wait until all workers finish the setting up phase
+  // Wait until all generators finish the setting up phase
   for (;;) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     bool setup = true;
-    for (const auto& w : workers) setup &= w->set_up();
+    for (const auto& w : generators) setup &= w->set_up();
     if (setup) break;
   }
 
-  // Status report until all workers finish running
+  // Status report until all generators finish running
   size_t last_num_sent_txns = 0;
   size_t last_num_recv_txns = 0;
   auto last_print_time = std::chrono::steady_clock::now();
@@ -116,7 +116,7 @@ void RunBenchmark(vector<unique_ptr<ModuleRunner>>& workers) {
     bool running = false;
     size_t num_sent_txns = 0;
     size_t num_recv_txns = 0;
-    for (auto& w : workers) {
+    for (auto& w : generators) {
       running |= w->is_running();
       auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
       num_sent_txns += gen->num_sent_txns();
@@ -149,10 +149,12 @@ void RunBenchmark(vector<unique_ptr<ModuleRunner>>& workers) {
 }
 
 struct ResultWriters {
-  const vector<string> kTxnColumns = {"txn_id", "coordinator", "replicas", "partitions", "sent_at", "received_at"};
+  const vector<string> kTxnColumns = {"txn_id",    "coordinator", "replicas",   "partitions",
+                                      "generator", "sent_at",     "received_at"};
   const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine"};
-  const vector<string> kSummaryColumns = {"avg_tps",    "aborted",  "committed",   "single_home",
-                                          "multi_home", "remaster", "elapsed_time"};
+  const vector<string> kSummaryColumns = {"committed",       "aborted",    "not_started",
+                                          "single_home",     "multi_home", "single_partition",
+                                          "multi_partition", "remaster",   "elapsed_time"};
 
   ResultWriters()
       : txns(FLAGS_out_dir + "/transactions.csv", kTxnColumns),
@@ -165,7 +167,53 @@ struct ResultWriters {
 };
 std::optional<ResultWriters> writers;
 
-void WriteResults(const vector<unique_ptr<ModuleRunner>>& workers) {
+struct GeneratorSummary {
+  int committed = 0;
+  int aborted = 0;
+  int not_started = 0;
+  int single_home = 0;
+  int multi_home = 0;
+  int single_partition = 0;
+  int multi_partition = 0;
+  int remaster = 0;
+
+  GeneratorSummary& operator+(const GeneratorSummary& other) {
+    committed += other.committed;
+    aborted += other.aborted;
+    not_started += other.not_started;
+    single_home += other.single_home;
+    multi_home += other.multi_home;
+    single_partition += other.single_partition;
+    multi_partition += other.multi_partition;
+    remaster += other.remaster;
+    return *this;
+  }
+
+  GeneratorSummary& operator+(const TxnGenerator::TxnInfo& info) {
+    committed += info.txn->status() == TransactionStatus::COMMITTED;
+    aborted += info.txn->status() == TransactionStatus::ABORTED;
+    not_started += info.txn->status() == TransactionStatus::NOT_STARTED;
+    single_home += info.txn->internal().type() == TransactionType::SINGLE_HOME;
+    multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
+    single_partition += info.txn->internal().involved_partitions_size() == 1;
+    multi_partition += info.txn->internal().involved_partitions_size() > 1;
+    remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
+    return *this;
+  }
+
+  template <typename T>
+  GeneratorSummary& operator+=(const T& other) {
+    return *this + other;
+  }
+};
+
+CSVWriter& operator<<(CSVWriter& csv, const GeneratorSummary& s) {
+  csv << s.committed << s.aborted << s.not_started << s.single_home << s.multi_home << s.single_partition
+      << s.multi_partition << s.remaster;
+  return csv;
+}
+
+void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   if (!writers.has_value()) {
     return;
   }
@@ -182,10 +230,10 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& workers) {
   } else {
     metadata.AddMember("clients", FLAGS_clients, alloc);
   }
-  CHECK(!workers.empty());
-  auto worker = dynamic_cast<const TxnGenerator*>(workers.front()->module().get());
-  auto workload = worker->workload().params().as_json(alloc);
-  workload.AddMember("name", rapidjson::Value(worker->workload().name().c_str(), alloc), alloc);
+  CHECK(!generators.empty());
+  auto generator = dynamic_cast<const TxnGenerator*>(generators.front()->module().get());
+  auto workload = generator->workload().params().as_json(alloc);
+  workload.AddMember("name", rapidjson::Value(generator->workload().name().c_str(), alloc), alloc);
   metadata.AddMember("workload", workload, alloc);
 
   rapidjson::StringBuffer metadata_buf;
@@ -199,27 +247,19 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& workers) {
   metadata_file << metadata_buf.GetString();
 
   // Aggregate complete data and output summary
-  for (auto& w : workers) {
-    float avg_tps = 0;
-    int aborted = 0, committed = 0, not_started = 0, single_home = 0, multi_home = 0, remaster = 0;
-    auto worker = dynamic_cast<const TxnGenerator*>(w->module().get());
-    const auto& txn_infos = worker->txn_infos();
+  for (auto& w : generators) {
+    GeneratorSummary summary;
+    auto generator = dynamic_cast<const TxnGenerator*>(w->module().get());
+    const auto& txn_infos = generator->txn_infos();
     for (auto info : txn_infos) {
-      committed += info.txn->status() == TransactionStatus::COMMITTED;
-      aborted += info.txn->status() == TransactionStatus::ABORTED;
-      not_started += info.txn->status() == TransactionStatus::NOT_STARTED;
-      single_home += info.txn->internal().type() == TransactionType::SINGLE_HOME;
-      multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
-      remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
+      summary += info;
     }
-    avg_tps += committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
-    writers->summary << avg_tps << aborted << committed << single_home << multi_home << remaster
-                     << worker->elapsed_time().count() << csvendl;
+    writers->summary << summary << generator->elapsed_time().count() << csvendl;
   }
 
   // Sample a subset of the result
   vector<TxnGenerator::TxnInfo> txn_infos;
-  for (auto& w : workers) {
+  for (auto& w : generators) {
     auto gen = dynamic_cast<const TxnGenerator*>(w->module().get());
     txn_infos.insert(txn_infos.end(), gen->txn_infos().begin(), gen->txn_infos().end());
   }
@@ -232,8 +272,8 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& workers) {
     CHECK(info.txn != nullptr);
     auto& txn_internal = info.txn->internal();
     writers->txns << txn_internal.id() << txn_internal.coordinating_server() << Join(txn_internal.involved_replicas())
-                  << Join(txn_internal.involved_partitions()) << info.sent_at.time_since_epoch().count()
-                  << info.recv_at.time_since_epoch().count() << csvendl;
+                  << Join(txn_internal.involved_partitions()) << info.generator_id
+                  << info.sent_at.time_since_epoch().count() << info.recv_at.time_since_epoch().count() << csvendl;
 
     for (int i = 0; i < txn_internal.events_size(); i++) {
       auto event = txn_internal.events(i);
@@ -296,35 +336,31 @@ int main(int argc, char* argv[]) {
     writers.emplace();
   }
 
-  auto workers = InitializeWorkers();
+  auto generators = InitializeGenerators();
 
-  RunBenchmark(workers);
+  RunBenchmark(generators);
 
-  WriteResults(workers);
+  WriteResults(generators);
 
   float avg_tps = 0;
-  int aborted = 0, committed = 0, not_started = 0, single_home = 0, multi_home = 0, remaster = 0;
-  for (auto& w : workers) {
-    auto worker = dynamic_cast<const TxnGenerator*>(w->module().get());
-    const auto& txn_infos = worker->txn_infos();
-    int worker_committed = 0;
+  GeneratorSummary summary;
+  for (auto& w : generators) {
+    auto generator = dynamic_cast<const TxnGenerator*>(w->module().get());
+    const auto& txn_infos = generator->txn_infos();
+    int prev_committed = summary.committed;
     for (auto info : txn_infos) {
-      worker_committed += info.txn->status() == TransactionStatus::COMMITTED;
-      aborted += info.txn->status() == TransactionStatus::ABORTED;
-      not_started += info.txn->status() == TransactionStatus::NOT_STARTED;
-      single_home += info.txn->internal().type() == TransactionType::SINGLE_HOME;
-      multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
-      remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
+      summary += info;
     }
-    avg_tps +=
-        worker_committed * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(worker->elapsed_time()).count();
-    committed += worker_committed;
+    avg_tps += (summary.committed - prev_committed) * 1000 /
+               std::chrono::duration_cast<std::chrono::milliseconds>(generator->elapsed_time()).count();
   }
 
   LOG(INFO) << "Summary:\n"
-            << "Avg. TPS: " << std::floor(avg_tps) << "\nAborted: " << aborted << "\nCommitted: " << committed
-            << "\nNot started: " << not_started << "\nSingle-home: " << single_home << "\nMulti-home: " << multi_home
-            << "\nRemaster: " << remaster;
+            << "Avg. TPS: " << std::floor(avg_tps) << "\nAborted: " << summary.aborted
+            << "\nCommitted: " << summary.committed << "\nNot started: " << summary.not_started
+            << "\nSingle-home: " << summary.single_home << "\nMulti-home: " << summary.multi_home
+            << "\nSingle-partition: " << summary.single_partition << "\nMulti-partition: " << summary.multi_partition
+            << "\nRemaster: " << summary.remaster;
 
   return 0;
 }

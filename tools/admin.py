@@ -826,7 +826,7 @@ class BenchmarkCommand(AdminCommand):
             help="Number of clients sending synchronized txns"
         )
         parser.add_argument(
-            "--workers", type=int,
+            "--generators", type=int,
             default=1,
             help="Number of threads for each benchmark machine"
         )
@@ -934,7 +934,7 @@ class BenchmarkCommand(AdminCommand):
                 f"--wl {args.workload} "
                 f'--params "{args.params}" '
                 f"--txns {args.txns} "
-                f"--workers {args.workers} "
+                f"--generators {args.generators} "
                 f"--sample {args.sample} "
                 f"--seed {args.seed} "
                 f"--txn_profiles={args.txn_profiles} "

@@ -33,12 +33,13 @@ void ConnectToServer(const ConfigurationPtr& config, zmq::socket_t& socket, uint
   }
 }
 
-bool RecordFinishedTxn(TxnGenerator::TxnInfo& info, Transaction* txn, bool is_dummy) {
+bool RecordFinishedTxn(TxnGenerator::TxnInfo& info, int generator_id, Transaction* txn, bool is_dummy) {
   if (info.finished) {
     LOG(ERROR) << "Received response for finished txn";
     return false;
   }
   info.recv_at = system_clock::now();
+  info.generator_id = generator_id;
   if (is_dummy) {
     if (info.txn == nullptr) {
       LOG(ERROR) << "No transaction in the txn info";
@@ -55,7 +56,39 @@ bool RecordFinishedTxn(TxnGenerator::TxnInfo& info, Transaction* txn, bool is_du
   return true;
 }
 
+static int generator_id = 0;
+
 }  // namespace
+
+TxnGenerator::TxnGenerator(std::unique_ptr<Workload>&& workload)
+    : id_(generator_id++),
+      workload_(std::move(workload)),
+      num_sent_txns_(0),
+      num_recv_txns_(0),
+      elapsed_time_(std::chrono::nanoseconds(0)) {
+  CHECK(workload_ != nullptr) << "Must provide a valid workload";
+}
+const Workload& TxnGenerator::workload() const { return *workload_; }
+size_t TxnGenerator::num_sent_txns() const { return num_sent_txns_; }
+size_t TxnGenerator::num_recv_txns() const { return num_recv_txns_; }
+std::chrono::nanoseconds TxnGenerator::elapsed_time() const {
+  if (timer_running_) {
+    return std::chrono::steady_clock::now() - start_time_;
+  }
+  return elapsed_time_.load();
+}
+
+void TxnGenerator::StartTimer() {
+  timer_running_ = true;
+  start_time_ = std::chrono::steady_clock::now();
+}
+
+void TxnGenerator::StopTimer() {
+  timer_running_ = false;
+  elapsed_time_ = std::chrono::steady_clock::now() - start_time_;
+}
+
+bool TxnGenerator::timer_running() const { return timer_running_; }
 
 SynchronousTxnGenerator::SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
                                                  std::unique_ptr<Workload>&& workload, uint32_t region,
@@ -96,7 +129,7 @@ void SynchronousTxnGenerator::SetUp() {
     poller_.PushSocket(socket_);
     for (int i = 0; i < num_clients_; i++) {
       SendNextTxn();
-      std::this_thread::sleep_for(100us);
+      std::this_thread::sleep_for(500us);
     }
   }
 
@@ -114,7 +147,7 @@ bool SynchronousTxnGenerator::Loop() {
   if (poller_.NextEvent()) {
     if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       auto& info = txns_[res.stream_id()];
-      if (RecordFinishedTxn(info, res.mutable_txn()->release_txn(), config_->return_dummy_txn())) {
+      if (RecordFinishedTxn(info, id_, res.mutable_txn()->release_txn(), config_->return_dummy_txn())) {
         num_recv_txns_++;
         if (!duration_reached) {
           SendNextTxn();
@@ -194,8 +227,6 @@ void ConstantRateTxnGenerator::SetUp() {
   // Schedule sending new txns
   poller_.AddTimedCallback(interval_, [this]() { SendNextTxn(); });
   LOG(INFO) << "Start sending transactions";
-
-  StartTimer();
 }
 
 void ConstantRateTxnGenerator::SendNextTxn() {
@@ -232,8 +263,13 @@ bool ConstantRateTxnGenerator::Loop() {
   if (poller_.NextEvent()) {
     if (api::Response res; RecvDeserializedProtoWithEmptyDelim(socket_, res)) {
       CHECK_LT(res.stream_id(), txns_.size());
+
+      if (!timer_running()) {
+        StartTimer();
+      }
+
       auto& info = txns_[res.stream_id()];
-      num_recv_txns_ += RecordFinishedTxn(info, res.mutable_txn()->release_txn(), config_->return_dummy_txn());
+      num_recv_txns_ += RecordFinishedTxn(info, id_, res.mutable_txn()->release_txn(), config_->return_dummy_txn());
     }
   }
 
