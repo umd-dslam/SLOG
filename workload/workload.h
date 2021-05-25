@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include "common/configuration.h"
-#include "common/json_utils.h"
 #include "common/string_utils.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
@@ -66,14 +65,13 @@ class WorkloadParams {
     return ss.str();
   }
 
-  rapidjson::Value as_json(rapidjson::Document::AllocatorType& allocator) const {
-    rapidjson::Value params(rapidjson::kObjectType);
-    for (const auto& [k, v] : raw_params_) {
-      rapidjson::Value k_json(k.c_str(), allocator);
-      rapidjson::Value v_json(v.c_str(), allocator);
-      params.AddMember(k_json, v_json, allocator);
+  std::vector<std::string> param_keys() const {
+    std::vector<std::string> keys;
+    keys.reserve(raw_params_.size());
+    for (auto kv : raw_params_) {
+      keys.push_back(kv.first);
     }
-    return params;
+    return keys;
   }
 
  private:

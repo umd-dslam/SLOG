@@ -7,7 +7,6 @@
 
 #include "common/configuration.h"
 #include "common/csv_writer.h"
-#include "common/json_utils.h"
 #include "common/proto_utils.h"
 #include "common/string_utils.h"
 #include "module/txn_generator.h"
@@ -213,39 +212,31 @@ CSVWriter& operator<<(CSVWriter& csv, const GeneratorSummary& s) {
   return csv;
 }
 
+void WriteMetadata(const Workload& workload) {
+  vector<string> columns{"duration", "txns", "clients", "rate", "sample", "wl:name"};
+  const auto& param_keys = workload.params().param_keys();
+  for (const auto& k : param_keys) {
+    columns.push_back("wl:" + k);
+  }
+
+  CSVWriter metadata_json(FLAGS_out_dir + "/metadata.csv", columns);
+  metadata_json << FLAGS_duration << FLAGS_txns << FLAGS_rate << FLAGS_clients << FLAGS_sample << workload.name();
+  for (const auto& k : param_keys) {
+    metadata_json << workload.params().GetString(k);
+  }
+  metadata_json << csvendl;
+}
+
 void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   if (!writers.has_value()) {
     return;
   }
 
   // Write metadata
-  rapidjson::Document metadata(rapidjson::kObjectType);
-  auto& alloc = metadata.GetAllocator();
-
-  metadata.AddMember("duration", FLAGS_duration, alloc);
-  metadata.AddMember("txns", FLAGS_txns, alloc);
-  metadata.AddMember("sample", FLAGS_sample, alloc);
-  if (FLAGS_rate > 0) {
-    metadata.AddMember("rate", FLAGS_rate, alloc);
-  } else {
-    metadata.AddMember("clients", FLAGS_clients, alloc);
-  }
   CHECK(!generators.empty());
   auto generator = dynamic_cast<const TxnGenerator*>(generators.front()->module().get());
-  auto workload = generator->workload().params().as_json(alloc);
-  workload.AddMember("name", rapidjson::Value(generator->workload().name().c_str(), alloc), alloc);
-  metadata.AddMember("workload", workload, alloc);
-
-  rapidjson::StringBuffer metadata_buf;
-  rapidjson::PrettyWriter<rapidjson::StringBuffer> metadata_writer(metadata_buf);
-  metadata.Accept(metadata_writer);
-  auto metadata_filename = FLAGS_out_dir + "/metadata.json";
-  std::ofstream metadata_file(metadata_filename, std::ios::out);
-  if (!metadata_file) {
-    throw std::runtime_error(std::string("Cannot open file: ") + metadata_filename);
-  }
-  metadata_file << metadata_buf.GetString();
-
+  WriteMetadata(generator->workload()); 
+  
   // Aggregate complete data and output summary
   for (auto& w : generators) {
     GeneratorSummary summary;
