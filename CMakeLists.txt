@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(slog)
+
+file(READ "VERSION" VERSION)
+project(slog VERSION ${VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -7,6 +9,9 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
+configure_file("version.h.in" "version.h")
+
+message(STATUS "Version: ${CMAKE_PROJECT_VERSION}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 #========================================

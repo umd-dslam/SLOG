@@ -20,6 +20,7 @@
 #include "proto/offline_data.pb.h"
 #include "service/service_utils.h"
 #include "storage/mem_only_storage.h"
+#include "version.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_string(address, "", "Address of the local machine");
@@ -116,6 +117,7 @@ void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& c
 int main(int argc, char* argv[]) {
   slog::InitializeService(&argc, &argv);
 
+  LOG(INFO) << "SLOG version: " << SLOG_VERSION;
   auto zmq_version = zmq::version();
   LOG(INFO) << "ZMQ version " << std::get<0>(zmq_version) << "." << std::get<1>(zmq_version) << "."
             << std::get<2>(zmq_version);
