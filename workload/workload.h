@@ -37,9 +37,14 @@ class WorkloadParams {
     return std::stod(raw_params_.at(key));
   }
 
-  int GetInt(const std::string& key) const {
+  int32_t GetInt32(const std::string& key) const {
     CheckKeyExists(key);
     return std::stoi(raw_params_.at(key));
+  }
+
+  int64_t GetInt64(const std::string& key) const {
+    CheckKeyExists(key);
+    return std::stoll(raw_params_.at(key));
   }
 
   uint32_t GetUInt32(const std::string& key) const {

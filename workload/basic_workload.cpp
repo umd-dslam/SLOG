@@ -23,11 +23,11 @@ namespace {
 
 // Percentage of multi-home transactions
 constexpr char MH_PCT[] = "mh";
-// Number of regions selected as homes in a multi-home transaction
+// Max number of regions selected as homes in a multi-home transaction
 constexpr char MH_HOMES[] = "mh_homes";
 // Percentage of multi-partition transactions
 constexpr char MP_PCT[] = "mp";
-// Number of partitions selected as parts of a multi-partition transaction
+// Max number of partitions selected as parts of a multi-partition transaction
 constexpr char MP_PARTS[] = "mp_parts";
 // Number of hot keys per partition. The actual number of
 // hot keys won't match exactly the specified number but will be close.
@@ -118,13 +118,16 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   // Select a number of partitions to choose from for each record
   vector<uint32_t> candidate_partitions;
   if (pro.is_multi_partition) {
+    CHECK_GE(num_partitions, 2) << "There must be at least 2 partitions for MP txns";
     candidate_partitions.resize(num_partitions);
     iota(candidate_partitions.begin(), candidate_partitions.end(), 0);
     shuffle(candidate_partitions.begin(), candidate_partitions.end(), rg_);
-    auto mp_num_partitions = params_.GetUInt32(MP_PARTS);
-    candidate_partitions.resize(mp_num_partitions);
+    auto max_num_partitions = std::min(num_partitions, params_.GetUInt32(MP_PARTS));
+    CHECK_GE(max_num_partitions, 2) << "At least 2 partitions must be selected for MP txns";
+    std::uniform_int_distribution num_partitions(2U, max_num_partitions);
+    candidate_partitions.resize(num_partitions(rg_));
   } else {
-    auto sp_partition = params_.GetInt(SP_PARTITION);
+    auto sp_partition = params_.GetInt32(SP_PARTITION);
     if (sp_partition < 0) {
       std::uniform_int_distribution<uint32_t> dis(0, num_partitions - 1);
       candidate_partitions.push_back(dis(rg_));
@@ -147,18 +150,19 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     CHECK_GE(num_replicas, 2) << "There must be at least 2 regions for MH txns";
     candidate_homes.resize(num_replicas);
     iota(candidate_homes.begin(), candidate_homes.end(), 0);
-    if (params_.GetInt(NEAREST)) {
+    if (params_.GetInt32(NEAREST)) {
       std::swap(candidate_homes[0], candidate_homes[local_region_]);
       shuffle(candidate_homes.begin() + 1, candidate_homes.end(), rg_);
     } else {
       shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
     }
 
-    auto mp_num_homes = params_.GetUInt32(MH_HOMES);
-    CHECK_GE(mp_num_homes, 2) << "At least 2 regions must be selected for MH txns";
-    candidate_homes.resize(mp_num_homes);
+    auto max_num_homes = std::min(params_.GetUInt32(MH_HOMES), num_replicas);
+    CHECK_GE(max_num_homes, 2) << "At least 2 regions must be selected for MH txns";
+    std::uniform_int_distribution num_homes(2U, max_num_homes);
+    candidate_homes.resize(num_homes(rg_));
   } else {
-    if (params_.GetInt(NEAREST)) {
+    if (params_.GetInt32(NEAREST)) {
       candidate_homes.push_back(local_region_);
     } else {
       std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
