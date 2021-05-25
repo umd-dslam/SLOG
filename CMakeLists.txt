@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3)
 
-file(READ "VERSION" VERSION)
+file(READ "VERSION" _VERSION)
+string(STRIP ${_VERSION} VERSION)
 project(slog VERSION ${VERSION})
 
 set(CMAKE_CXX_STANDARD 17)
