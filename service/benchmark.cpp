@@ -235,8 +235,8 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   // Write metadata
   CHECK(!generators.empty());
   auto generator = dynamic_cast<const TxnGenerator*>(generators.front()->module().get());
-  WriteMetadata(generator->workload()); 
-  
+  WriteMetadata(generator->workload());
+
   // Aggregate complete data and output summary
   for (auto& w : generators) {
     GeneratorSummary summary;

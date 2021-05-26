@@ -200,10 +200,10 @@ uint32_t Configuration::replication_delay_pct() const { return config_.replicati
 
 uint32_t Configuration::replication_delay_amount_ms() const { return config_.replication_delay().delay_amount_ms(); }
 
-vector<TransactionEvent> Configuration::disabled_events() const {
+vector<TransactionEvent> Configuration::enabled_events() const {
   vector<TransactionEvent> res;
-  res.reserve(config_.disabled_events_size());
-  for (auto e : config_.disabled_events()) {
+  res.reserve(config_.enabled_events_size());
+  for (auto e : config_.enabled_events()) {
     res.push_back(TransactionEvent(e));
   }
   return res;
