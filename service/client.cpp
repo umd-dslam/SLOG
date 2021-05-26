@@ -90,11 +90,11 @@ void ExecuteTxn(const char* txn_file) {
         const auto& txn = res.txn().txn();
         cout << txn;
         if (!txn.internal().events().empty()) {
-          cout << left << setw(33) << "Tracing event";
+          cout << left << setw(40) << "Tracing event";
           cout << right << setw(8) << "Machine" << setw(20) << "Time"
                << "\n";
           for (int i = 0; i < txn.internal().events_size(); ++i) {
-            cout << left << setw(33) << ENUM_NAME(txn.internal().events(i), TransactionEvent);
+            cout << left << setw(40) << ENUM_NAME(txn.internal().events(i), TransactionEvent);
             cout << right << setw(8) << txn.internal().event_machines(i) << setw(20) << txn.internal().event_times(i)
                  << "\n";
           }

@@ -105,27 +105,29 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
   auto txn = env->mutable_request()->mutable_forward_txn()->release_txn();
   auto txn_id = txn->internal().id();
   auto ins = active_txns_.try_emplace(txn_id, config(), txn);
+  auto holder_it = ins.first;
+  auto& holder = holder_it->second;
 
   if (ins.second) {
-    RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
+    RECORD(holder.txn().mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
 
     VLOG(2) << "Accepted " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
             << txn->internal().home() << ")";
   } else {
-    if (!ins.first->second.AddLockOnlyTxn(txn)) {
+    if (!holder.AddLockOnlyTxn(txn)) {
       LOG(ERROR) << "Already received txn: (" << txn_id << ", " << txn->internal().home() << ")";
       return;
     }
 
-    RECORD(txn->mutable_internal(), TransactionEvent::ENTER_SCHEDULER_LO);
+    RECORD(holder.txn().mutable_internal(), TransactionEvent::ENTER_SCHEDULER_LO);
 
     VLOG(2) << "Added " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
             << txn->internal().home() << ")";
   }
 
-  if (ins.first->second.is_aborting()) {
-    if (ins.first->second.is_ready_for_gc()) {
-      active_txns_.erase(ins.first);
+  if (holder.is_aborting()) {
+    if (holder.is_ready_for_gc()) {
+      active_txns_.erase(holder_it);
     }
     return;
   }

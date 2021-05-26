@@ -34,6 +34,7 @@ DEFINE_bool(txn_profiles, false, "Output transaction profiles");
 
 using namespace slog;
 
+using std::chrono::duration_cast;
 using std::count_if;
 using std::make_unique;
 using std::setw;
@@ -122,7 +123,7 @@ void RunBenchmark(vector<unique_ptr<ModuleRunner>>& generators) {
       num_recv_txns += gen->num_recv_txns();
     }
     auto now = std::chrono::steady_clock::now();
-    auto t = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_print_time);
+    auto t = duration_cast<std::chrono::milliseconds>(now - last_print_time);
     auto send_tps = (num_sent_txns - last_num_sent_txns) * 1000 / t.count();
     auto recv_tps = (num_recv_txns - last_num_recv_txns) * 1000 / t.count();
 
@@ -342,8 +343,8 @@ int main(int argc, char* argv[]) {
     for (auto info : txn_infos) {
       summary += info;
     }
-    avg_tps += (summary.committed - prev_committed) * 1000 /
-               std::chrono::duration_cast<std::chrono::milliseconds>(generator->elapsed_time()).count();
+    auto elapsed_time = static_cast<float>(generator->elapsed_time().count()) / 1000000000;
+    avg_tps += (summary.committed - prev_committed) / elapsed_time;
   }
 
   LOG(INFO) << "Summary:\n"
