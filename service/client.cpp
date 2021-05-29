@@ -75,6 +75,7 @@ void ExecuteTxn(const char* txn_file) {
   api::Request req;
   req.mutable_txn()->set_allocated_txn(txn);
 
+  LOG(INFO) << "Request size in bytes: " << req.ByteSizeLong();
   // 3. Send to the server
   for (uint32_t i = 0; i < FLAGS_repeat; i++) {
     SendSerializedProtoWithEmptyDelim(server_socket, req);
@@ -87,6 +88,7 @@ void ExecuteTxn(const char* txn_file) {
       if (!RecvDeserializedProtoWithEmptyDelim(server_socket, res)) {
         LOG(FATAL) << "Malformed response";
       } else {
+        LOG(INFO) << "Response size in bytes: " << res.ByteSizeLong();
         const auto& txn = res.txn().txn();
         cout << txn;
         if (!txn.internal().events().empty()) {
