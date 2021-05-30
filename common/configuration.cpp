@@ -122,16 +122,12 @@ milliseconds Configuration::forwarder_batch_duration() const {
   return milliseconds(config_.forwarder_batch_duration());
 }
 
-int Configuration::forwarder_max_batch_size() const { return config_.forwarder_max_batch_size(); }
-
 milliseconds Configuration::sequencer_batch_duration() const {
   if (config_.sequencer_batch_duration() == 0) {
     return 1ms;
   }
   return milliseconds(config_.sequencer_batch_duration());
 }
-
-int Configuration::sequencer_max_batch_size() const { return config_.sequencer_max_batch_size(); }
 
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 

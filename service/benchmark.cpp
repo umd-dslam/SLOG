@@ -34,11 +34,11 @@ DEFINE_bool(txn_profiles, false, "Output transaction profiles");
 
 using namespace slog;
 
-using std::chrono::duration_cast;
 using std::count_if;
 using std::make_unique;
 using std::setw;
 using std::unique_ptr;
+using std::chrono::duration_cast;
 
 uint32_t seed = std::random_device{}();
 zmq::context_t context;
