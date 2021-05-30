@@ -65,7 +65,8 @@ TxnGenerator::TxnGenerator(std::unique_ptr<Workload>&& workload)
       workload_(std::move(workload)),
       num_sent_txns_(0),
       num_recv_txns_(0),
-      elapsed_time_(std::chrono::nanoseconds(0)) {
+      elapsed_time_(std::chrono::nanoseconds(0)),
+      timer_running_(false) {
   CHECK(workload_ != nullptr) << "Must provide a valid workload";
 }
 const Workload& TxnGenerator::workload() const { return *workload_; }
