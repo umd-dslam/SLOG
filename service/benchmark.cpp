@@ -221,7 +221,7 @@ void WriteMetadata(const Workload& workload) {
   }
 
   CSVWriter metadata_json(FLAGS_out_dir + "/metadata.csv", columns);
-  metadata_json << FLAGS_duration << FLAGS_txns << FLAGS_rate << FLAGS_clients << FLAGS_sample << workload.name();
+  metadata_json << FLAGS_duration << FLAGS_txns << FLAGS_clients << FLAGS_rate << FLAGS_sample << workload.name();
   for (const auto& k : param_keys) {
     metadata_json << workload.params().GetString(k);
   }
