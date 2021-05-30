@@ -17,7 +17,7 @@ void Poller::PushSocket(zmq::socket_t& socket) {
 }
 
 bool Poller::NextEvent(bool dont_wait) {
-  auto may_has_msg = true;
+  auto may_have_msg = true;
   if (!dont_wait) {
     // Compute the time that we need to wait until the next event
     auto shortest_timeout = poll_timeout_;
@@ -42,7 +42,7 @@ bool Poller::NextEvent(bool dont_wait) {
       // No timed event to wait, wait until there is a new message
       rc = zmq::poll(poll_items_, -1);
     }
-    may_has_msg = rc > 0;
+    may_have_msg = rc > 0;
   }
 
   // Process and clean up triggered callbacks
@@ -58,7 +58,7 @@ bool Poller::NextEvent(bool dont_wait) {
     }
   }
 
-  return may_has_msg;
+  return may_have_msg;
 }
 
 bool Poller::is_socket_ready(size_t i) const { return poll_items_[i].revents & ZMQ_POLLIN; }
