@@ -22,8 +22,6 @@ class Poller {
 
   void AddTimedCallback(std::chrono::microseconds timeout, std::function<void()>&& cb);
 
-  void ClearTimedCallbacks();
-
  private:
   using Clock = std::chrono::steady_clock;
   using TimePoint = Clock::time_point;

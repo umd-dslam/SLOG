@@ -62,7 +62,6 @@ class NetworkedModule : public Module {
   void Send(EnvelopePtr&& env, const std::vector<MachineId>& to_machine_ids, Channel to_channel);
 
   void NewTimedCallback(std::chrono::microseconds timeout, std::function<void()>&& cb);
-  void ClearTimedCallbacks();
 
   const std::shared_ptr<zmq::context_t> context() const { return context_; }
   const ConfigurationPtr& config() const { return config_; }

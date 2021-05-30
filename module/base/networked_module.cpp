@@ -189,6 +189,4 @@ void NetworkedModule::NewTimedCallback(std::chrono::microseconds timeout, std::f
   poller_.AddTimedCallback(timeout, std::move(cb));
 }
 
-void NetworkedModule::ClearTimedCallbacks() { poller_.ClearTimedCallbacks(); }
-
 }  // namespace slog
