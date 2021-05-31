@@ -233,6 +233,34 @@ class CreateSpotClusterCommand(AWSCommand):
         print_slog_config_fragment(instance_ips, args.clients)
 
 
+class DestroySpotClusterCommand(AWSCommand):
+
+    NAME = "stop"
+    HELP = "Destroy a spot clusters from given configurations"
+
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Run the command without actually destroying the clusters"
+        )
+
+    def initialize_and_do_command(self, args):
+        for region in args.regions:
+            ec2 = boto3.client('ec2', region_name=region)
+            response = ec2.describe_spot_fleet_requests()
+            spot_fleet_requests_ids = [
+                config['SpotFleetRequestId'] for config in
+                response['SpotFleetRequestConfigs']
+                if config['SpotFleetRequestState'] in ['submitted', 'active', 'modifying']
+            ]
+            LOG.info("%s: Cancelling request IDs: %s", region, spot_fleet_requests_ids)
+            if not args.dry_run:
+                if len(spot_fleet_requests_ids) > 0:
+                    ec2.cancel_spot_fleet_requests(
+                        SpotFleetRequestIds=spot_fleet_requests_ids, TerminateInstances=True
+                    )
+
+
 class InstallDockerCommand(AWSCommand):
     NAME = "docker"
     HELP = "Install docker on all running instances"
@@ -343,6 +371,7 @@ class ListInstancesCommand(AWSCommand):
 if __name__ == "__main__":
     initialize_and_run_commands("AWS utilities", [
         CreateSpotClusterCommand,
+        DestroySpotClusterCommand,
         InstallDockerCommand,
         ListInstancesCommand,
     ])
