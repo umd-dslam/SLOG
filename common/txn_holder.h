@@ -24,7 +24,8 @@ class TxnHolder {
         aborting_(false),
         done_(false),
         num_lo_txns_(0),
-        expected_num_lo_txns_(txn->internal().involved_replicas_size()) {
+        expected_num_lo_txns_(txn->internal().involved_replicas_size()),
+        num_dispatches_(0) {
     lo_txns_[main_txn_].reset(txn);
     ++num_lo_txns_;
   }
@@ -58,6 +59,9 @@ class TxnHolder {
   void SetAborting() { aborting_ = true; }
   bool is_aborting() const { return aborting_; }
 
+  void IncNumDispatches() { num_dispatches_++; }
+  int num_dispatches() const { return num_dispatches_; }
+
   bool is_ready_for_gc() const { return done_ && num_lo_txns_ == expected_num_lo_txns_; }
   int num_lock_only_txns() const { return num_lo_txns_; }
   int expected_num_lock_only_txns() const { return expected_num_lo_txns_; }
@@ -71,6 +75,7 @@ class TxnHolder {
   bool done_;
   int num_lo_txns_;
   int expected_num_lo_txns_;
+  int num_dispatches_;
 };
 
 }  // namespace slog

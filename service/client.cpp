@@ -235,7 +235,8 @@ void PrintSchedulerStats(const rapidjson::Document& stats, uint32_t level) {
       cout << TXN_DONE << ": " << txn[TXN_DONE].GetBool() << ", ";
       cout << TXN_ABORTING << ": " << txn[TXN_ABORTING].GetBool() << ", ";
       cout << TXN_NUM_LO << ": " << txn[TXN_NUM_LO].GetInt() << ", ";
-      cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << "\n";
+      cout << TXN_EXPECTED_NUM_LO << ": " << txn[TXN_EXPECTED_NUM_LO].GetInt() << ", ";
+      cout << TXN_NUM_DISPATCHES << ": " << txn[TXN_NUM_DISPATCHES].GetInt() << "\n";
     }
   }
 
