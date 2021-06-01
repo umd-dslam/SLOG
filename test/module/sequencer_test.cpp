@@ -39,21 +39,25 @@ class SequencerTest : public ::testing::TestWithParam<bool> {
 
   void SendToSequencer(EnvelopePtr&& req) { sender_->Send(std::move(req), kSequencerChannel); }
 
-  internal::Batch* ReceiveBatch(int i) {
-    // Iff i is the id of the sender (0), check the local log channel instead
-    auto req_env = slog_[i]->ReceiveFromOutputSocket(i == 0 ? kLocalLogChannel : kInterleaverChannel);
+  vector<internal::Batch> ReceiveBatches(int i) {
+    // If i is in the same replica as the sender (machine 0), check the local log channel instead
+    auto channel = configs_[0]->UnpackMachineId(i).first == 0 ? kLocalLogChannel : kInterleaverChannel;
+    auto req_env = slog_[i]->ReceiveFromOutputSocket(channel);
     if (req_env == nullptr) {
-      return nullptr;
+      return {};
     }
-    if (req_env->request().type_case() != Request::kForwardBatch) {
-      return nullptr;
+    if (req_env->request().type_case() != Request::kForwardBatchData) {
+      return {};
     }
-    auto forward_batch = req_env->mutable_request()->mutable_forward_batch();
-    if (forward_batch->part_case() != internal::ForwardBatch::kBatchData) {
-      return nullptr;
+    auto forward_batch = req_env->mutable_request()->mutable_forward_batch_data();
+    vector<internal::Batch> batches;
+    for (int i = 0; i < forward_batch->batch_data_size(); i++) {
+      batches.push_back(forward_batch->batch_data(i));
     }
-    auto batch = req_env->mutable_request()->mutable_forward_batch()->release_batch_data();
-    return batch;
+    while (!forward_batch->batch_data().empty()) {
+      forward_batch->mutable_batch_data()->ReleaseLast();
+    }
+    return batches;
   }
 
   unique_ptr<Sender> sender_;
@@ -70,30 +74,50 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
   SendToSequencer(move(env));
 
-  for (int rep = 0; rep < 2; rep++) {
+  // Batch partitions are distributed to corresponding local partitions
+  {
+    auto batches = ReceiveBatches(0);
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
+    ASSERT_EQ(batches[0].transaction_type(), TransactionType::SINGLE_HOME);
+    auto& batched_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(batched_txn.internal().id(), 1000);
+    ASSERT_EQ(batched_txn.keys_size(), 2);
+    ASSERT_EQ(batched_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(batched_txn.keys().at("C"), txn->keys().at("C"));
+  }
+
+  {
+    auto batches = ReceiveBatches(1);
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
+    ASSERT_EQ(batches[0].transaction_type(), TransactionType::SINGLE_HOME);
+    auto& batched_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(batched_txn.internal().id(), 1000);
+    ASSERT_EQ(batched_txn.keys_size(), 1);
+    ASSERT_EQ(batched_txn.keys().at("B"), txn->keys().at("B"));
+  }
+
+  // All batch partitions are sent to a machine in the remote replica
+  {
+    auto batches = ReceiveBatches(3);
+    ASSERT_EQ(batches.size(), 2);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
+    ASSERT_EQ(batches[0].transaction_type(), TransactionType::SINGLE_HOME);
     {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
-      ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
-      auto& batched_txn = batch->transactions().at(0);
+      auto& batched_txn = batches[0].transactions().at(0);
       ASSERT_EQ(batched_txn.internal().id(), 1000);
       ASSERT_EQ(batched_txn.keys_size(), 2);
       ASSERT_EQ(batched_txn.keys().at("A"), txn->keys().at("A"));
       ASSERT_EQ(batched_txn.keys().at("C"), txn->keys().at("C"));
-      delete batch;
     }
-
+    ASSERT_EQ(batches[1].transactions_size(), 1);
+    ASSERT_EQ(batches[1].transaction_type(), TransactionType::SINGLE_HOME);
     {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
-      ASSERT_EQ(batch->transaction_type(), TransactionType::SINGLE_HOME);
-      auto& batched_txn = batch->transactions().at(0);
+      auto& batched_txn = batches[1].transactions().at(0);
       ASSERT_EQ(batched_txn.internal().id(), 1000);
       ASSERT_EQ(batched_txn.keys_size(), 1);
       ASSERT_EQ(batched_txn.keys().at("B"), txn->keys().at("B"));
-      delete batch;
     }
   }
 }
@@ -111,39 +135,51 @@ TEST_P(SequencerTest, MultiHomeTransaction1) {
 
   // The txn was sent to region 0, which generates two subtxns, each for each partitions. These subtxns are
   // also replicated to region 1.
-  for (int rep = 0; rep < 2; rep++) {
+  {
+    auto batches = ReceiveBatches(0);
+    ASSERT_EQ(batches.size(), 1);
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 2);
+    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
+  }
+
+  {
+    auto batches = ReceiveBatches(1);
+    ASSERT_EQ(batches.size(), 1);
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 2);
+    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+  }
+
+  {
+    auto batches = ReceiveBatches(3);
+    ASSERT_FALSE(batches.empty());
+    ASSERT_EQ(batches.size(), 2);
     {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
-
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
-
-      auto lo_txn = batch->transactions().at(0);
+      auto lo_txn = batches[0].transactions().at(0);
       ASSERT_EQ(lo_txn.internal().id(), 1000);
       ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
       ASSERT_EQ(lo_txn.internal().home(), 0);
       ASSERT_EQ(lo_txn.keys_size(), 2);
       ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
       ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
-
-      delete batch;
     }
-
     {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
-
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
-
-      auto lo_txn = batch->transactions().at(0);
+      auto lo_txn = batches[1].transactions().at(0);
       ASSERT_EQ(lo_txn.internal().id(), 1000);
       ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
       ASSERT_EQ(lo_txn.internal().home(), 0);
       ASSERT_EQ(lo_txn.keys_size(), 2);
       ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
       ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
-
-      delete batch;
     }
   }
 }
@@ -161,32 +197,40 @@ TEST_P(SequencerTest, MultiHomeTransaction2) {
 
   // The txn was sent to region 0, which only generates one subtxn for partition 1 because the subtxn for partition
   // 0 is redundant (both A and C are homed at region 1)
-  for (int rep = 0; rep < 2; rep++) {
-    {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
+  {
+    auto batches = ReceiveBatches(0);
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 0);
+  }
 
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 0);
+  {
+    auto batches = ReceiveBatches(1);
 
-      delete batch;
-    }
+    ASSERT_EQ(batches.size(), 1);
 
-    {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 2);
+    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+  }
 
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
+  {
+    auto batches = ReceiveBatches(3);
+    ASSERT_FALSE(batches.empty());
+    ASSERT_EQ(batches.size(), 2);
 
-      auto lo_txn = batch->transactions().at(0);
-      ASSERT_EQ(lo_txn.internal().id(), 1000);
-      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn.internal().home(), 0);
-      ASSERT_EQ(lo_txn.keys_size(), 2);
-      ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
-      ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+    ASSERT_EQ(batches[0].transactions_size(), 0);
 
-      delete batch;
-    }
+    auto lo_txn = batches[1].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 2);
+    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
+    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
   }
 }
 
@@ -198,13 +242,35 @@ TEST_P(SequencerTest, RemasterTransaction) {
 
   SendToSequencer(move(env));
 
-  for (int rep = 0; rep < 2; rep++) {
-    auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
+  {
+    auto batches = ReceiveBatches(0);
 
-    ASSERT_NE(batch, nullptr);
-    ASSERT_EQ(batch->transactions_size(), 1);
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
 
-    auto lo_txn = batch->transactions().at(0);
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 1);
+    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_TRUE(lo_txn.remaster().is_new_master_lock_only());
+  }
+
+  {
+    auto batches = ReceiveBatches(1);
+
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 0);
+  }
+
+  {
+    auto batches = ReceiveBatches(3);
+
+    ASSERT_EQ(batches.size(), 2);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
+
+    auto lo_txn = batches[0].transactions().at(0);
     ASSERT_EQ(lo_txn.internal().id(), 1000);
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
@@ -212,7 +278,7 @@ TEST_P(SequencerTest, RemasterTransaction) {
     ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
     ASSERT_TRUE(lo_txn.remaster().is_new_master_lock_only());
 
-    delete batch;
+    ASSERT_EQ(batches[1].transactions_size(), 0);
   }
 }
 #endif
@@ -228,31 +294,41 @@ TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
 
   // The txn was sent to region 0, which only generates one subtxns for partition 0 because B of partition 1
   // does not have any key homed at 0.
-  for (int rep = 0; rep < 2; rep++) {
-    {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 0));
+  {
+    auto batches = ReceiveBatches(0);
 
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 1);
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
 
-      auto lo_txn = batch->transactions().at(0);
-      ASSERT_EQ(lo_txn.internal().id(), 1000);
-      ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
-      ASSERT_EQ(lo_txn.internal().home(), 0);
-      ASSERT_EQ(lo_txn.keys_size(), 1);
-      ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 1);
+    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+  }
 
-      delete batch;
-    }
+  {
+    auto batches = ReceiveBatches(1);
 
-    {
-      auto batch = ReceiveBatch(configs_[0]->MakeMachineId(rep, 1));
+    ASSERT_EQ(batches.size(), 1);
+    ASSERT_EQ(batches[0].transactions_size(), 0);
+  }
 
-      ASSERT_NE(batch, nullptr);
-      ASSERT_EQ(batch->transactions_size(), 0);
+  {
+    auto batches = ReceiveBatches(3);
 
-      delete batch;
-    }
+    ASSERT_EQ(batches.size(), 2);
+    ASSERT_EQ(batches[0].transactions_size(), 1);
+
+    auto lo_txn = batches[0].transactions().at(0);
+    ASSERT_EQ(lo_txn.internal().id(), 1000);
+    ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
+    ASSERT_EQ(lo_txn.internal().home(), 0);
+    ASSERT_EQ(lo_txn.keys_size(), 1);
+    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+
+    ASSERT_EQ(batches[1].transactions_size(), 0);
   }
 }
 

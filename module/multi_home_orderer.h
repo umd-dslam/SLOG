@@ -31,8 +31,10 @@ class MultiHomeOrderer : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
-  void ProcessForwardBatch(EnvelopePtr&& env);
+  void ProcessForwardBatchData(EnvelopePtr&& env);
+  void ProcessForwardBatchOrder(EnvelopePtr&& env);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
+  void AdvanceLog();
 
   void NewBatch();
   BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config()->local_machine_id(); }

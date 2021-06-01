@@ -105,87 +105,72 @@ void Sequencer::SendBatch() {
 
   auto local_replica = config()->local_replica();
   auto local_partition = config()->local_partition();
+
+  // Propose a new batch
   auto paxos_env = NewEnvelope();
   auto paxos_propose = paxos_env->mutable_request()->mutable_paxos_propose();
   paxos_propose->set_value(local_partition);
   Send(move(paxos_env), kLocalPaxos);
 
-  if (!SendBatchDelayed()) {
-    auto num_partitions = config()->num_partitions();
-    auto num_replicas = config()->num_replicas();
-    for (uint32_t part = 0; part < num_partitions; part++) {
-      auto env = NewBatchRequest(partitioned_batch_[part].release());
+  // Distribute the batch data to other partitions in the same replica
+  auto num_replicas = config()->num_replicas();
+  auto num_partitions = config()->num_partitions();
+  vector<internal::Batch*> batch_partitions;
+  for (uint32_t p = 0; p < num_partitions; p++) {
+    auto batch_partition = partitioned_batch_[p].release();
 
-      RECORD(env->mutable_request()->mutable_forward_batch()->mutable_batch_data(),
-             TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
+    RECORD(batch_partition, TransactionEvent::EXIT_SEQUENCER_IN_BATCH);
 
-      bool send_local = false;
-      vector<MachineId> destinations;
-      destinations.reserve(num_replicas);
-      for (uint32_t rep = 0; rep < num_replicas; rep++) {
-        if (part == local_partition && rep == local_replica) {
-          send_local = true;
-        } else {
-          destinations.push_back(config()->MakeMachineId(rep, part));
-        }
-      }
-      Send(*env, destinations, kInterleaverChannel);
-      if (send_local) {
-        Send(move(env), kLocalLogChannel);
-      }
+    auto env = NewBatchForwardingMessage({batch_partition});
+    Send(*env, config()->MakeMachineId(local_replica, p), kLocalLogChannel);
+    // Collect back the batch partition to send to other replicas
+    batch_partitions.push_back(
+        env->mutable_request()->mutable_forward_batch_data()->mutable_batch_data()->ReleaseLast());
+  }
+
+  // Distribute the batch data to other replicas. All partitions of current batch are contained in a single message
+  auto env = NewBatchForwardingMessage(move(batch_partitions));
+  // Send to any partition
+  auto remote_partition = batch_id_counter_ % num_partitions;
+  vector<MachineId> destinations;
+  destinations.reserve(num_replicas);
+  for (uint32_t rep = 0; rep < num_replicas; rep++) {
+    if (rep != local_replica) {
+      destinations.push_back(config()->MakeMachineId(rep, remote_partition));
     }
   }
-}
 
-bool Sequencer::SendBatchDelayed() {
-  if (!config()->replication_delay_pct()) {
-    return false;
-  }
+  // Deliberately delay the batch as specified in the config
+  if (config()->replication_delay_pct()) {
+    std::bernoulli_distribution is_delayed(config()->replication_delay_pct() / 100.0);
+    if (is_delayed(rg_)) {
+      auto delay_ms = config()->replication_delay_amount_ms();
 
-  std::bernoulli_distribution is_delayed(config()->replication_delay_pct() / 100.0);
-  if (!is_delayed(rg_)) {
-    return false;
-  }
+      VLOG(3) << "Delay batch " << batch_id() << " for " << delay_ms << " ms";
 
-  auto delay_ms = config()->replication_delay_amount_ms();
+      NewTimedCallback(milliseconds(delay_ms),
+                       [this, destinations, batch_id = batch_id(), delayed_env = env.release()]() {
+                         VLOG(3) << "Sending delayed batch " << batch_id;
+                         Send(*delayed_env, destinations, kInterleaverChannel);
+                         delete delayed_env;
+                       });
 
-  VLOG(3) << "Delay batch " << batch_id() << " for " << delay_ms << " ms";
-
-  for (uint32_t part = 0; part < config()->num_partitions(); part++) {
-    auto env = NewBatchRequest(partitioned_batch_[part].release());
-
-    // Send to the partition in the local replica immediately
-    if (part == config()->local_partition()) {
-      auto copied_env = std::make_unique<internal::Envelope>(*env);
-      Send(move(copied_env), kLocalLogChannel);
-    } else {
-      Send(*env, config()->MakeMachineId(config()->local_replica(), part), kInterleaverChannel);
+      return;
     }
-
-    NewTimedCallback(milliseconds(delay_ms), [this, part, delayed_env = env.release()]() {
-      VLOG(3) << "Sending delayed batch " << delayed_env->request().forward_batch().batch_data().id();
-      // Replicate batch to all replicas EXCEPT local replica
-      vector<MachineId> destinations;
-      destinations.reserve(config()->num_replicas());
-      for (uint32_t rep = 0; rep < config()->num_replicas(); rep++) {
-        if (rep != config()->local_replica()) {
-          destinations.push_back(config()->MakeMachineId(rep, part));
-        }
-      }
-      Send(*delayed_env, destinations, kInterleaverChannel);
-      delete delayed_env;
-    });
   }
 
-  return true;
+  Send(*env, destinations, kInterleaverChannel);
 }
 
-EnvelopePtr Sequencer::NewBatchRequest(internal::Batch* batch) {
+EnvelopePtr Sequencer::NewBatchForwardingMessage(std::vector<internal::Batch*>&& batch) {
   auto env = NewEnvelope();
-  auto forward_batch = env->mutable_request()->mutable_forward_batch();
+  auto forward_batch = env->mutable_request()->mutable_forward_batch_data();
+  forward_batch->set_home(config()->local_replica());
   // Minus 1 so that batch id counter starts from 0
-  forward_batch->set_same_origin_position(batch_id_counter_ - 1);
-  forward_batch->set_allocated_batch_data(batch);
+  forward_batch->set_home_position(batch_id_counter_ - 1);
+  for (auto b : batch) {
+    forward_batch->mutable_batch_data()->AddAllocated(b);
+  }
   return env;
 }
 

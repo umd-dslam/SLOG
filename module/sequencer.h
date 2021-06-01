@@ -39,8 +39,7 @@ class Sequencer : public NetworkedModule {
   void NewBatch();
   BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config()->local_machine_id(); }
   void SendBatch();
-  EnvelopePtr NewBatchRequest(internal::Batch* batch);
-  bool SendBatchDelayed();
+  EnvelopePtr NewBatchForwardingMessage(std::vector<internal::Batch*>&& batch);
 
   std::vector<std::unique_ptr<internal::Batch>> partitioned_batch_;
   BatchId batch_id_counter_;

@@ -49,9 +49,12 @@ void MultiHomeOrderer::OnInternalRequestReceived(EnvelopePtr&& env) {
       AddToBatch(txn);
       break;
     }
-    case Request::kForwardBatch:
+    case Request::kForwardBatchData:
       // Received a batch of multi-home txn replicated from another region
-      ProcessForwardBatch(move(env));
+      ProcessForwardBatchData(move(env));
+      break;
+    case Request::kForwardBatchOrder:
+      ProcessForwardBatchOrder(move(env));
       break;
     case Request::kStats:
       ProcessStatsRequest(env->request().stats());
@@ -62,33 +65,31 @@ void MultiHomeOrderer::OnInternalRequestReceived(EnvelopePtr&& env) {
   }
 }
 
-void MultiHomeOrderer::ProcessForwardBatch(EnvelopePtr&& env) {
-  auto forward_batch = env->mutable_request()->mutable_forward_batch();
-  switch (forward_batch->part_case()) {
-    case internal::ForwardBatch::kBatchData: {
-      auto batch = BatchPtr(forward_batch->release_batch_data());
+void MultiHomeOrderer::ProcessForwardBatchData(EnvelopePtr&& env) {
+  auto batch = BatchPtr(env->mutable_request()->mutable_forward_batch_data()->mutable_batch_data()->ReleaseLast());
 
-      RECORD(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
+  RECORD(batch.get(), TransactionEvent::ENTER_MULTI_HOME_ORDERER_IN_BATCH);
 
-      VLOG(1) << "Received data for MULTI-HOME batch " << batch->id() << " from [" << env->from()
-              << "]. Number of txns: " << batch->transactions_size();
+  VLOG(1) << "Received data for MULTI-HOME batch " << batch->id() << " from [" << env->from()
+          << "]. Number of txns: " << batch->transactions_size();
 
-      multi_home_batch_log_.AddBatch(std::move(batch));
-      break;
-    }
-    case internal::ForwardBatch::kRemoteBatchOrder: {
-      auto& batch_order = forward_batch->remote_batch_order();
+  multi_home_batch_log_.AddBatch(std::move(batch));
 
-      VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
-              << "]. Slot: " << batch_order.slot();
+  AdvanceLog();
+}
 
-      multi_home_batch_log_.AddSlot(batch_order.slot(), batch_order.batch_id());
-      break;
-    }
-    default:
-      break;
-  }
+void MultiHomeOrderer::ProcessForwardBatchOrder(EnvelopePtr&& env) {
+  auto& batch_order = env->request().forward_batch_order().remote_batch_order();
 
+  VLOG(1) << "Received order for batch " << batch_order.batch_id() << " from [" << env->from()
+          << "]. Slot: " << batch_order.slot();
+
+  multi_home_batch_log_.AddSlot(batch_order.slot(), batch_order.batch_id());
+
+  AdvanceLog();
+}
+
+void MultiHomeOrderer::AdvanceLog() {
   while (multi_home_batch_log_.HasNextBatch()) {
     auto batch_and_slot = multi_home_batch_log_.NextBatch();
     auto& batch = batch_and_slot.second;
@@ -148,8 +149,8 @@ void MultiHomeOrderer::SendBatch() {
   auto part = config()->leader_partition_for_multi_home_ordering();
   for (uint32_t rep = 0; rep < config()->num_replicas(); rep++) {
     auto env = NewEnvelope();
-    auto forward_batch = env->mutable_request()->mutable_forward_batch();
-    forward_batch->set_allocated_batch_data(batch_per_rep_[rep].release());
+    auto forward_batch = env->mutable_request()->mutable_forward_batch_data();
+    forward_batch->mutable_batch_data()->AddAllocated(batch_per_rep_[rep].release());
     Send(move(env), config()->MakeMachineId(rep, part), kMultiHomeOrdererChannel);
   }
 }
