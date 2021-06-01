@@ -307,7 +307,10 @@ void Scheduler::ProcessStatsRequest(const internal::StatsRequest& stats_request)
           .AddMember(StringRef(TXN_ABORTING), txn_holder.is_aborting(), alloc)
           .AddMember(StringRef(TXN_NUM_LO), txn_holder.num_lock_only_txns(), alloc)
           .AddMember(StringRef(TXN_EXPECTED_NUM_LO), txn_holder.expected_num_lock_only_txns(), alloc)
-          .AddMember(StringRef(TXN_NUM_DISPATCHES), txn_holder.num_dispatches(), alloc);
+          .AddMember(StringRef(TXN_NUM_DISPATCHES), txn_holder.num_dispatches(), alloc)
+          .AddMember(StringRef(TXN_MULTI_HOME),
+                     txn_holder.txn().internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY, alloc)
+          .AddMember(StringRef(TXN_MULTI_PARTITION), txn_holder.txn().internal().involved_partitions_size() > 1, alloc);
       txns.PushBack(txn_obj, alloc);
     }
     stats.AddMember(StringRef(ALL_TXNS), txns, alloc);

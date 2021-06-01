@@ -67,5 +67,7 @@ const char TXN_ABORTING[] = "aborting";
 const char TXN_NUM_LO[] = "num_lo";
 const char TXN_NUM_DISPATCHES[] = "num_dispatches";
 const char TXN_EXPECTED_NUM_LO[] = "expected_num_lo";
+const char TXN_MULTI_HOME[] = "multi_home";
+const char TXN_MULTI_PARTITION[] = "multi_partition";
 
 }  // namespace slog
