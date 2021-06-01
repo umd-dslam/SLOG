@@ -24,7 +24,7 @@ from paramiko.ssh_exception import PasswordRequiredException
 
 from common import Command, initialize_and_run_commands
 from gen_data import add_exported_gen_data_arguments
-from proto.configuration_pb2 import Configuration
+from proto.configuration_pb2 import Configuration, Replica
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,11 +51,22 @@ RemoteProcess = collections.namedtuple(
     'RemoteProcess',
     [
         'docker_client',
-        'address',
+        'public_address',
+        'private_address',
         'replica',
         'partition',
     ]
 )
+
+
+def public_addresses(rep: Replica):
+    if rep.public_addresses:
+        return rep.public_addresses
+    return rep.addresses
+
+
+def private_addresses(rep: Replica):
+    return rep.addresses
 
 
 def cleanup_container(
@@ -227,17 +238,22 @@ class AdminCommand(Command):
             text_format.Parse(f.read(), self.config)
 
     def init_remote_processes(self, args):
-        procs = []
         # Create a docker client for each node
+        self.remote_procs = []
         for rep, rep_info in enumerate(self.config.replicas):
-            for part, addr in enumerate(rep_info.addresses):
+            for part, (pub_addr, priv_addr) in enumerate(
+                zip(public_addresses(rep_info), private_addresses(rep_info))
+            ):
                 # Use None as a placeholder for the first value
-                procs.append([None, addr.decode(), rep, part])
+                self.remote_procs.append(RemoteProcess(
+                    None, pub_addr.decode(), priv_addr.decode(), rep, part
+                ))
         
         def init_docker_client(remote_proc):
-            addr = remote_proc[1]
+            addr = remote_proc.public_address
+            client = None
             try:
-                remote_proc[0] = self.new_docker_client(args.user, addr)
+                client = self.new_docker_client(args.user, addr)
                 LOG.info("Connected to %s", addr)
             except PasswordRequiredException as e:
                 LOG.error(
@@ -247,11 +263,12 @@ class AdminCommand(Command):
                 )
             except Exception as e:
                 LOG.error("Failed to connect to %s", addr)
+            
+            return remote_proc._replace(docker_client=client)
 
-        with Pool(processes=len(procs)) as pool:
-            pool.map(init_docker_client, procs)
+        with Pool(processes=len(self.remote_procs)) as pool:
+            self.remote_procs = pool.map(init_docker_client, self.remote_procs)
 
-        self.remote_procs = [RemoteProcess(*m) for m in procs if m[0] is not None]
 
     def pull_slog_image(self, args):
         if len(self.remote_procs) == 0 or args.no_pull:
@@ -367,11 +384,11 @@ class StartCommand(AdminCommand):
             pool.map(clean_up, self.remote_procs)
 
         def start_container(remote_proc):
-            client, addr, *_ = remote_proc
+            client, pub_address, priv_address, *_ = remote_proc
             shell_cmd = (
                 f"slog "
                 f"--config {config_path} "
-                f"--address {addr} "
+                f"--address {priv_address} "
                 f"--data-dir {CONTAINER_DATA_DIR} "
             )
             client.containers.run(
@@ -391,7 +408,7 @@ class StartCommand(AdminCommand):
             )
             LOG.info(
                 "%s: Synced config and ran command: %s",
-                addr,
+                pub_address,
                 shell_cmd
             )
 
@@ -415,10 +432,9 @@ class StopCommand(AdminCommand):
             return
 
         def stop_container(remote_proc):
-            client, addr, *_  = remote_proc
             try:
-                LOG.info("Stopping SLOG on %s...", addr)
-                c = client.containers.get(SLOG_CONTAINER_NAME)
+                LOG.info("Stopping SLOG on %s...", remote_proc.public_address)
+                c = remote_proc.docker_client.containers.get(SLOG_CONTAINER_NAME)
                 # Set timeout to 0 to kill the container immediately
                 c.stop(timeout=0)
             except docker.errors.NotFound:
@@ -444,7 +460,7 @@ class StatusCommand(AdminCommand):
         remote_procs = sorted(self.remote_procs, key=key_func)
         for rep, g in itertools.groupby(remote_procs, key_func):
             print(f"Replica {rep}:")
-            for client, addr, _, part, *_ in g:
+            for client, addr, _, _, part, *_ in g:
                 status = get_container_status(client, SLOG_CONTAINER_NAME)
                 print(f"\tPartition {part} ({addr}): {status}")
 
@@ -505,7 +521,7 @@ class LogsCommand(AdminCommand):
                         )
                     else:
                         addr_is_in_replica = (
-                            args.a.encode() in rep.addresses
+                            args.a.encode() in public_addresses(rep)
                             for rep in self.config.replicas
                         )
                     if any(addr_is_in_replica):
@@ -522,7 +538,8 @@ class LogsCommand(AdminCommand):
                 if args.client:
                     self.addr = self.config.replicas[r].client_addresses[p].decode()
                 else:
-                    self.addr = self.config.replicas[r].addresses[p].decode()
+                    addresses = public_addresses(self.config.replicas[r])
+                    self.addr = addresses[p].decode()
 
             self.client = self.new_docker_client(args.user, self.addr)
             LOG.info("Connected to %s", self.addr)
@@ -683,17 +700,18 @@ class LocalCommand(AdminCommand):
         # Clean up everything first so that the old running session does not
         # mess up with broker synchronization of the new session
         for r, rep in enumerate(self.config.replicas):
-            for p, _ in enumerate(rep.addresses):
+            for p, _ in enumerate(public_addresses(rep)):
                 container_name = f"slog_{r}_{p}"
                 cleanup_container(self.client, container_name)
 
         for r, rep in enumerate(self.config.replicas):
-            for p, addr_b in enumerate(rep.addresses):
-                addr = addr_b.decode()
+            for p, (pub_addr, priv_addr) in enumerate(
+                zip(public_addresses(rep), private_addresses(rep))
+            ):
                 shell_cmd = (
                     f"slog "
                     f"--config {config_path} "
-                    f"--address {addr} "
+                    f"--address {priv_addr.decode()} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
                 container_name = f"slog_{r}_{p}"
@@ -711,20 +729,20 @@ class LocalCommand(AdminCommand):
 
                 # Connect the container to the custom network.
                 # This has to happen before we start the container.
-                slog_nw.connect(container, ipv4_address=addr)
+                slog_nw.connect(container, ipv4_address=priv_addr.decode())
 
                 # Actually start the container
                 container.start()
 
                 LOG.info(
                     "%s: Synced config and ran command: %s",
-                    addr,
+                    pub_addr.decode(),
                     shell_cmd,
                 )
     
     def __stop(self):
         for r in range(len(self.config.replicas)):
-            for p in range (self.config.num_partitions):
+            for p in range(self.config.num_partitions):
                 try:
                     container_name = f"slog_{r}_{p}"
                     LOG.info("Stopping \"%s\"", container_name)
@@ -742,7 +760,7 @@ class LocalCommand(AdminCommand):
     def __status(self):
         for r, rep in enumerate(self.config.replicas):
             print(f"Replica {r}:")
-            for p, addr in enumerate(rep.addresses):
+            for p, addr in enumerate(public_addresses(rep)):
                 container_name = f"slog_{r}_{p}"
                 status = get_container_status(self.client, container_name)
                 print(f"\tPartition {p} ({addr.decode()}): {status}")
@@ -849,31 +867,30 @@ class BenchmarkCommand(AdminCommand):
         Override this method because the clients of this command are created from
         the addresses specified in a json file instead of from the configuration file
         """
-        procs = []
+        self.remote_procs = []
         # Create a docker client for each node
         for rep, rep_info in enumerate(self.config.replicas):
             for i, addr in enumerate(rep_info.client_addresses):
                 # Use None as a placeholder for the first value
-                procs.append([None, addr.decode(), rep, i])
+                self.remote_procs.append(RemoteProcess(None, addr.decode(), None, rep, i))
 
         def init_docker_client(proc):
-            addr = proc[1]
+            client = None
             try:
-                proc[0] = self.new_docker_client(args.user, addr)         
-                LOG.info("Connected to %s", addr)
+                client = self.new_docker_client(args.user, proc.public_address)
+                LOG.info("Connected to %s", proc.public_address)
             except PasswordRequiredException as e:
                 LOG.error(
                     "Failed to authenticate when trying to connect to %s. "
                     "Check username or key files",
-                    f"{args.user}@{addr}",
+                    f"{args.user}@{proc.public_address}",
                 )
             except Exception as e:
                 LOG.exception(e)
+            return proc._replace(docker_client=client)
         
-        with Pool(processes=len(procs)) as pool:
-            pool.map(init_docker_client, procs)
-
-        self.remote_procs = [RemoteProcess(*p) for p in procs]
+        with Pool(processes=len(self.remote_procs)) as pool:
+            self.remote_procs = pool.map(init_docker_client, self.remote_procs)
 
     def do_command(self, args):
         # Prepare a command to update the config file
@@ -910,7 +927,7 @@ class BenchmarkCommand(AdminCommand):
             return
 
         def benchmark_runner(proc):
-            client, addr, rep, *_ = proc
+            client, addr, _, rep, *_ = proc
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
@@ -1063,7 +1080,7 @@ class CollectServerCommand(AdminCommand):
                 'name': f"{r}-{p}"
             }
             for r, rep in enumerate(self.config.replicas)
-            for p, a in enumerate(rep.addresses)
+            for p, a in enumerate(public_addresses(rep))
         ]
         fetch_data(machines, args.user, args.tag, server_out_dir)
 

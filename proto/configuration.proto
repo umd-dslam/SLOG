@@ -6,13 +6,16 @@ import "proto/transaction.proto";
 package slog.internal;
 
 message Replica {
-    // List of all machine addresses in the system.
+    // List of all server addresses in the system.
     // This list must have the size equal to number of partitions
     // If protocol is "tcp", these are IP addresses.
     // If protocol is "icp", these are filesystem paths.
     repeated bytes addresses = 1;
+    // AWS public addresses for the servers. This field is only used by the admin tool.
+    // If not specified, the addresses field is used instead.
+    repeated bytes public_addresses = 2;
     // List of machines used for benchmarking. This field is only used by the admin tool
-    repeated bytes client_addresses = 2;
+    repeated bytes client_addresses = 3;
 }
 
 message ReplicationDelayExperiment {
