@@ -254,7 +254,7 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
 TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
-  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 2000, {{"A", KeyType::WRITE, {{0, 1}}}},
+  auto remaster_txn = MakeTestTransaction(test_slogs[0]->config(), 2000, {{"A", KeyType::WRITE, {{0, 1}}}}, {},
                                           1 /* remaster */, MakeMachineId(0, 1));
   auto txn = MakeTestTransaction(test_slogs[0]->config(), 1000, {{"A", KeyType::READ, {{1, 2}}}}, {{"GET", "A"}}, {},
                                  MakeMachineId(0, 0));
