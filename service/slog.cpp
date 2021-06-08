@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
     os << r << " ";
   }
   LOG(INFO) << "Replication order: " << os.str();
-
+  LOG(INFO) << "Execution type: " << ENUM_NAME(config->execution_type(), slog::internal::ExecutionType);
   if (config->return_dummy_txn()) {
     LOG(WARNING) << "Dummy transactions will be returned";
   }

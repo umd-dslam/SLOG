@@ -23,15 +23,12 @@ Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const sha
                const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, metrics_manager, poll_timeout),
       storage_(storage) {
-  switch (config()->commands()) {
-    case internal::Commands::DUMMY:
-      commands_ = make_unique<DummyCommands<Key, Record>>(config(), storage);
-      break;
-    case internal::Commands::NOOP:
-      commands_ = make_unique<NoopCommands<Key, Record>>();
+  switch (config()->execution_type()) {
+    case internal::ExecutionType::KEY_VALUE:
+      execution_ = make_unique<KeyValueExecution<Key, Record>>(config(), storage);
       break;
     default:
-      commands_ = make_unique<KeyValueCommands<Key, Record>>(config(), storage);
+      execution_ = make_unique<NoopExecution>();
       break;
   }
 }
@@ -189,7 +186,7 @@ void Worker::ReadLocalStorage(TxnId txn_id) {
           break;
         }
         value.set_value(record->to_string());
-      } else if (txn.procedure_case() == Transaction::kRemaster) {
+      } else if (txn.program_case() == Transaction::kRemaster) {
         txn.set_status(TransactionStatus::ABORTED);
         txn.set_abort_reason("Remaster non-existent key " + key);
         break;
@@ -226,10 +223,10 @@ void Worker::Execute(TxnId txn_id) {
   auto& state = TxnState(txn_id);
   auto& txn = state.txn_holder->txn();
 
-  switch (txn.procedure_case()) {
+  switch (txn.program_case()) {
     case Transaction::kCode: {
       if (txn.status() != TransactionStatus::ABORTED) {
-        commands_->Execute(txn);
+        execution_->Execute(txn);
       }
 
       if (txn.status() == TransactionStatus::ABORTED) {
@@ -272,7 +269,7 @@ void Worker::Finish(TxnId txn_id) {
   if (config()->UnpackMachineId(coordinator).first == config()->local_replica()) {
     if (config()->return_dummy_txn()) {
       txn->mutable_keys()->clear();
-      txn->mutable_code()->clear();
+      txn->mutable_code()->Clear();
       txn->mutable_remaster()->Clear();
     }
     Envelope env;

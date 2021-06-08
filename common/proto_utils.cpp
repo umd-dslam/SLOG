@@ -8,14 +8,13 @@
 #include <optional>
 #include <sstream>
 
-using std::get_if;
 using std::string;
 using std::vector;
 
 namespace slog {
 
-Transaction* MakeTransaction(const std::vector<KeyEntry>& keys, const std::variant<string, int>& proc,
-                             MachineId coordinating_server) {
+Transaction* MakeTransaction(const vector<KeyEntry>& keys, const std::vector<std::vector<std::string>>& code,
+                             std::optional<int> remaster, MachineId coordinating_server) {
   Transaction* txn = new Transaction();
   for (const auto& key : keys) {
     ValueEntry val;
@@ -26,10 +25,15 @@ Transaction* MakeTransaction(const std::vector<KeyEntry>& keys, const std::varia
     }
     txn->mutable_keys()->insert({key.key, std::move(val)});
   }
-  if (auto code = get_if<string>(&proc); code) {
-    txn->set_code(*code);
+  if (remaster.has_value()) {
+    txn->mutable_remaster()->set_new_master(remaster.value());
   } else {
-    txn->mutable_remaster()->set_new_master(std::get<int>(proc));
+    for (const auto& proc : code) {
+      auto proc_proto = txn->mutable_code()->add_procedures();
+      for (const auto& args : proc) {
+        proc_proto->add_args(args);
+      }
+    }
   }
   txn->set_status(TransactionStatus::NOT_STARTED);
   txn->mutable_internal()->set_id(1000);
@@ -69,7 +73,7 @@ TransactionType SetTransactionType(Transaction& txn) {
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
   // Remaster txn will become multi-home
-  if (txn.procedure_case() == Transaction::kRemaster) {
+  if (txn.program_case() == Transaction::kRemaster) {
     is_single_home = false;
   }
 #endif /* REMASTER_PROTOCOL_COUNTERLESS */
@@ -92,8 +96,7 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
   lock_only_txn->mutable_internal()->set_home(lo_master);
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
-  if (lock_only_txn->procedure_case() == Transaction::kRemaster &&
-      lock_only_txn->remaster().new_master() == lo_master) {
+  if (lock_only_txn->program_case() == Transaction::kRemaster && lock_only_txn->remaster().new_master() == lo_master) {
     lock_only_txn->mutable_remaster()->set_is_new_master_lock_only(true);
     // For remaster txn, there is only one key in the metadata, and we want to keep that key there
     // in this case, so we return here.
@@ -168,7 +171,7 @@ void PopulateInvolvedReplicas(Transaction& txn) {
   }
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
-  if (txn.procedure_case() == Transaction::kRemaster) {
+  if (txn.program_case() == Transaction::kRemaster) {
     involved_replicas.push_back(txn.remaster().new_master());
   }
 #endif
@@ -233,6 +236,16 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
   involved_replicas->erase(std::unique(involved_replicas->begin(), involved_replicas->end()), involved_replicas->end());
 }
 
+std::ostream& operator<<(std::ostream& os, const Procedures& code) {
+  for (const auto& p : code.procedures()) {
+    for (const auto& arg : p.args()) {
+      os << arg << " ";
+    }
+    os << "\n";
+  }
+  return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   os << "Transaction ID: " << txn.internal().id() << "\n";
   os << "Status: " << ENUM_NAME(txn.status(), TransactionStatus) << "\n";
@@ -256,8 +269,8 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
     }
   }
   os << "Type: " << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";
-  if (txn.procedure_case() == Transaction::ProcedureCase::kCode) {
-    os << "Code: " << txn.code() << "\n";
+  if (txn.program_case() == Transaction::ProgramCase::kCode) {
+    os << "Code:\n" << txn.code();
   } else {
     os << "New master: " << txn.remaster().new_master() << "\n";
   }
@@ -281,9 +294,9 @@ std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
 }
 
 bool operator==(const Transaction& txn1, const Transaction txn2) {
-  return txn1.status() == txn2.status() && txn1.keys() == txn2.keys() &&
-         txn1.procedure_case() == txn2.procedure_case() && txn1.abort_reason() == txn2.abort_reason() &&
-         txn1.internal().id() == txn2.internal().id() && txn1.internal().type() == txn2.internal().type();
+  return txn1.status() == txn2.status() && txn1.keys() == txn2.keys() && txn1.program_case() == txn2.program_case() &&
+         txn1.abort_reason() == txn2.abort_reason() && txn1.internal().id() == txn2.internal().id() &&
+         txn1.internal().type() == txn2.internal().type();
 }
 
 bool operator==(const MasterMetadata& metadata1, const MasterMetadata& metadata2) {

@@ -14,9 +14,9 @@ target_sources(slog-core
     multi_home_orderer.h
     scheduler.cpp
     scheduler.h
-    scheduler_components/commands.h
     scheduler_components/ddr_lock_manager.cpp
     scheduler_components/ddr_lock_manager.h
+    scheduler_components/execution.h
     scheduler_components/old_lock_manager.cpp
     scheduler_components/old_lock_manager.h
     scheduler_components/per_key_remaster_manager.cpp

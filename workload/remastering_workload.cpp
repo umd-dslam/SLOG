@@ -55,7 +55,7 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
 
   pro.records.insert({key, record});
 
-  auto txn = MakeTransaction(keys, new_master);
+  auto txn = MakeTransaction(keys, {}, new_master);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 
   client_txn_id_counter_++;

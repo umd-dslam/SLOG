@@ -103,7 +103,7 @@ vector<TxnId> LockState::Release(TxnId txn_id) {
 AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
   auto home = txn.internal().home();
-  auto is_remaster = txn.procedure_case() == Transaction::kRemaster;
+  auto is_remaster = txn.program_case() == Transaction::kRemaster;
 
   // A remaster txn only has one key K but it acquires locks on (K, RO) and (K, RN)
   // where RO and RN are the old and new region respectively.

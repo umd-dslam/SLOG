@@ -236,7 +236,7 @@ TEST_P(SequencerTest, MultiHomeTransaction2) {
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
 TEST_P(SequencerTest, RemasterTransaction) {
-  auto txn = MakeTestTransaction(configs_[0], 1000, {{"A", KeyType::WRITE, 1}}, 0);
+  auto txn = MakeTestTransaction(configs_[0], 1000, {{"A", KeyType::WRITE, 1}}, {}, 0);
   auto env = make_unique<Envelope>();
   env->mutable_request()->mutable_forward_txn()->mutable_txn()->CopyFrom(*txn);
 

@@ -2,7 +2,6 @@
 
 #include <optional>
 #include <unordered_map>
-#include <variant>
 #include <vector>
 
 #include "common/configuration.h"
@@ -31,13 +30,15 @@ struct KeyEntry {
 /**
  * Creates a new transaction
  * @param keys                Keys of the transaction
- * @param proc                Code or new master
+ * @param code                Code
+ * @param remaster            If specify, `code` is ignored and the txn becomes a remaster txn
  * @param coordinating_server MachineId of the server in charge of responding the
  *                            transaction result to the client.
  * @return                    A new transaction having given properties
  */
-Transaction* MakeTransaction(const std::vector<KeyEntry>& keys, const std::variant<string, int>& proc = "",
-                             MachineId coordinating_server = 0);
+Transaction* MakeTransaction(const std::vector<KeyEntry>& keys,
+                             const std::vector<std::vector<std::string>>& code = {{}},
+                             std::optional<int> remaster = std::nullopt, MachineId coordinating_server = 0);
 
 /**
  * Inspects the internal metadata of a transaction then determines whether

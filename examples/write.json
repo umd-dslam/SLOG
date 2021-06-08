@@ -1,5 +1,9 @@
 {
   "read_set": [],
   "write_set": ["0", "1", "2"],
-  "code": "SET 0 Hello SET 1 World SET 2 !!!!!"
+  "code": [
+    ["SET", "0", "Hello"],
+    ["SET", "1", "World"],
+    ["SET", "2", "!!!!!"]
+  ]
 }

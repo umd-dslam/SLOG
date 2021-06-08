@@ -11,7 +11,7 @@
 #include "common/txn_holder.h"
 #include "common/types.h"
 #include "module/base/networked_module.h"
-#include "module/scheduler_components/commands.h"
+#include "module/scheduler_components/execution.h"
 #include "proto/internal.pb.h"
 #include "proto/transaction.pb.h"
 #include "storage/storage.h"
@@ -83,7 +83,7 @@ class Worker : public NetworkedModule {
   TransactionState& TxnState(TxnId txn_id);
 
   std::shared_ptr<Storage<Key, Record>> storage_;
-  std::unique_ptr<Commands<Key, Record>> commands_;
+  std::unique_ptr<Execution> execution_;
 
   std::unordered_map<TxnId, TransactionState> txn_states_;
 };

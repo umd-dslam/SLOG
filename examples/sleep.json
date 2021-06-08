@@ -1,5 +1,5 @@
 {
   "read_set": ["0"],
   "write_set": ["0"],
-  "code": "SLEEP 3"
+  "code": [["SLEEP", "3"]]
 }

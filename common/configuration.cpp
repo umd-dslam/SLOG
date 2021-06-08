@@ -221,7 +221,7 @@ bool Configuration::return_dummy_txn() const { return config_.return_dummy_txn()
 
 int Configuration::recv_retries() const { return config_.recv_retries() == 0 ? 1000 : config_.recv_retries(); }
 
-internal::Commands Configuration::commands() const { return config_.commands(); }
+internal::ExecutionType Configuration::execution_type() const { return config_.execution_type(); }
 
 const vector<uint32_t> Configuration::replication_order() const { return replication_order_; }
 

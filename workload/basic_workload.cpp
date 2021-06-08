@@ -171,7 +171,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   }
 
   vector<KeyEntry> keys;
-  std::ostringstream code;
+  vector<vector<string>> code;
 
   auto writes = params_.GetUInt32(WRITES);
   auto hot_records = params_.GetUInt32(HOT_RECORDS);
@@ -200,11 +200,11 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
       record.is_hot = is_hot;
       // Decide whether this is a read or a write record
       if (i < writes) {
-        code << "SET " << key << " " << RandomString(value_size, rg_) << " ";
+        code.push_back({"SET", key, RandomString(value_size, rg_)});
         keys.emplace_back(key, KeyType::WRITE);
         record.is_write = true;
       } else {
-        code << "GET " << key << " ";
+        code.push_back({"GET", key});
         keys.emplace_back(key, KeyType::READ);
         record.is_write = false;
       }
@@ -214,7 +214,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   }
 
   // Construct a new transaction
-  auto txn = MakeTransaction(keys, code.str());
+  auto txn = MakeTransaction(keys, code);
   txn->mutable_internal()->set_id(client_txn_id_counter_);
 
   client_txn_id_counter_++;

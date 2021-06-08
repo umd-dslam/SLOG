@@ -52,7 +52,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   common_config.mutable_hash_partitioning()->set_partition_key_num_bytes(1);
   common_config.set_sequencer_batch_duration(1);
   common_config.set_forwarder_batch_duration(1);
-  common_config.set_commands(internal::Commands::KEY_VALUE);
+  common_config.set_execution_type(internal::ExecutionType::KEY_VALUE);
   for (int r = 0; r < num_replicas; r++) {
     auto replica = common_config.add_replicas();
     for (int p = 0; p < num_partitions; p++) {
@@ -78,8 +78,9 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
 }
 
 Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
-                                 const std::variant<string, int>& proc, MachineId coordinator) {
-  auto txn = MakeTransaction(keys, proc, coordinator);
+                                 const std::vector<std::vector<std::string>> code, std::optional<int> remaster,
+                                 MachineId coordinator) {
+  auto txn = MakeTransaction(keys, code, remaster, coordinator);
   txn->mutable_internal()->set_id(id);
 
   PopulateInvolvedPartitions(config, *txn);
@@ -88,8 +89,8 @@ Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const
 }
 
 TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
-                            const std::variant<string, int>& proc) {
-  auto txn = MakeTestTransaction(config, id, keys, proc);
+                            const std::vector<std::vector<std::string>> code, std::optional<int> remaster) {
+  auto txn = MakeTestTransaction(config, id, keys, code, remaster);
 
   vector<Transaction*> lo_txns;
   for (int i = 0; i < txn->internal().involved_replicas_size(); ++i) {

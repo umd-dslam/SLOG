@@ -67,9 +67,18 @@ void ExecuteTxn(const char* txn_file) {
 
   Transaction* txn;
   if (d.HasMember("new_master")) {
-    txn = MakeTransaction(keys, d["new_master"].GetInt());
+    txn = MakeTransaction(keys, {}, d["new_master"].GetInt());
   } else {
-    txn = MakeTransaction(keys, d["code"].GetString());
+    vector<vector<string>> code;
+    const auto& code_json = d["code"].GetArray();
+    for (const auto& proc_json : code_json) {
+      vector<string> args;
+      for (const auto& arg_json : proc_json.GetArray()) {
+        args.push_back(arg_json.GetString());
+      }
+      code.emplace_back(std::move(args));
+    }
+    txn = MakeTransaction(keys, code);
   }
 
   api::Request req;

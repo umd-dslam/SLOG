@@ -69,8 +69,8 @@ class E2ETest : public ::testing::Test {
 // This test submits multiple transactions to the system serially and checks the
 // read values for correctness.
 TEST_F(E2ETest, BasicSingleHomeSingleParition) {
-  auto txn1 = MakeTransaction({{"A", KeyType::WRITE}}, "SET A newA");
-  auto txn2 = MakeTransaction({{"A", KeyType::READ}}, "GET A");
+  auto txn1 = MakeTransaction({{"A", KeyType::WRITE}}, {{"SET", "A", "newA"}});
+  auto txn2 = MakeTransaction({{"A", KeyType::READ}}, {{"GET", "A"}});
 
   test_slogs[0]->SendTxn(txn1);
   auto txn1_resp = test_slogs[0]->RecvTxnResult();
@@ -90,7 +90,7 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
 
 TEST_F(E2ETest, MultiPartitionTxn) {
   for (size_t i = 0; i < NUM_MACHINES; i++) {
-    auto txn = MakeTransaction({{"A", KeyType::READ}, {"B", KeyType::WRITE}}, "GET A SET B newB");
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"B", KeyType::WRITE}}, {{"GET", "A"}, {"SET", "B", "newB"}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
@@ -104,7 +104,7 @@ TEST_F(E2ETest, MultiPartitionTxn) {
 
 TEST_F(E2ETest, MultiHomeTxn) {
   for (size_t i = 2; i < 3; i++) {
-    auto txn = MakeTransaction({{"A", KeyType::READ}, {"C", KeyType::WRITE}}, "GET A SET C newC");
+    auto txn = MakeTransaction({{"A", KeyType::READ}, {"C", KeyType::WRITE}}, {{"GET", "A"}, {"SET", "C", "newC"}});
 
     test_slogs[i]->SendTxn(txn);
     auto txn_resp = test_slogs[i]->RecvTxnResult();
@@ -133,7 +133,7 @@ TEST_F(E2ETest, MultiHomeMultiPartitionTxn) {
 
 #ifdef ENABLE_REMASTER
 TEST_F(E2ETest, RemasterTxn) {
-  auto remaster_txn = MakeTransaction({{"A", KeyType::WRITE}}, 1);
+  auto remaster_txn = MakeTransaction({{"A", KeyType::WRITE}}, {}, 1);
 
   test_slogs[1]->SendTxn(remaster_txn);
   auto remaster_txn_resp = test_slogs[1]->RecvTxnResult();
@@ -161,14 +161,14 @@ TEST_F(E2ETest, RemasterTxn) {
 
 TEST_F(E2ETest, AbortTxnBadCommand) {
   // Multi-partition transaction where one of the partition will abort
-  auto aborted_txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}}, "SET B notB EQ A notA");
+  auto aborted_txn = MakeTransaction({{"A"}, {"B", KeyType::WRITE}}, {{"SET", "B", "notB"}, {"EQ", "A", "notA"}});
 
   test_slogs[1]->SendTxn(aborted_txn);
   auto aborted_txn_resp = test_slogs[1]->RecvTxnResult();
   ASSERT_EQ(TransactionStatus::ABORTED, aborted_txn_resp.status());
   ASSERT_EQ(TransactionType::SINGLE_HOME, aborted_txn_resp.internal().type());
 
-  auto txn = MakeTransaction({{"B"}}, "GET B");
+  auto txn = MakeTransaction({{"B"}}, {{"GET", "B"}});
 
   test_slogs[1]->SendTxn(txn);
   auto txn_resp = test_slogs[1]->RecvTxnResult();

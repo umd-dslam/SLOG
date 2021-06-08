@@ -2,8 +2,8 @@
 
 #include <glog/logging.h>
 
+#include <optional>
 #include <unordered_set>
-#include <variant>
 #include <vector>
 
 #include "common/configuration.h"
@@ -29,10 +29,12 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
                                  internal::Configuration common_config = {});
 
 Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
-                                 const std::variant<string, int>& proc = "", MachineId coordinator = 0);
+                                 const std::vector<std::vector<std::string>> code = {{}},
+                                 std::optional<int> remaster = std::nullopt, MachineId coordinator = 0);
 
 TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
-                            const std::variant<string, int>& proc = "");
+                            const std::vector<std::vector<std::string>> code = {{}},
+                            std::optional<int> remaster = std::nullopt);
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 

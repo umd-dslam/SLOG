@@ -149,7 +149,7 @@ TEST_F(DDRLockManagerTest, KeyReplicaLocks) {
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
 TEST_F(DDRLockManagerTest, RemasterTxn) {
   auto configs = MakeTestConfigurations("locking", 3, 1);
-  auto holder = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::WRITE, 2}}, 1 /* new_master */);
+  auto holder = MakeTestTxnHolder(configs[0], 100, {{"A", KeyType::WRITE, 2}}, {}, 1 /* new_master */);
 
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(1)), AcquireLocksResult::WAITING);
   ASSERT_EQ(lock_manager.AcquireLocks(holder.lock_only_txn(2)), AcquireLocksResult::ACQUIRED);

@@ -197,7 +197,7 @@ struct GeneratorSummary {
     multi_home += info.txn->internal().type() == TransactionType::MULTI_HOME_OR_LOCK_ONLY;
     single_partition += info.txn->internal().involved_partitions_size() == 1;
     multi_partition += info.txn->internal().involved_partitions_size() > 1;
-    remaster += info.txn->procedure_case() == Transaction::ProcedureCase::kRemaster;
+    remaster += info.txn->program_case() == Transaction::ProgramCase::kRemaster;
     return *this;
   }
 

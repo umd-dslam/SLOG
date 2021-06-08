@@ -16,7 +16,7 @@ DEFINE_uint32(record_size, 100, "Size of a record in bytes");
 DEFINE_string(params, "hot=0,hot_records=0", "Basic workload params");
 DEFINE_double(sample, 10, "Percent of sampled transactions to be written to result files");
 DEFINE_string(out_dir, ".", "Directory containing output data");
-DEFINE_string(commands, "key_value", "Commands type. Choose from (noop, dummy, and key_value)");
+DEFINE_string(execution, "key_value", "Execution type. Choose from (noop and key_value)");
 
 using namespace slog;
 using namespace std::chrono;
@@ -47,14 +47,12 @@ int main(int argc, char* argv[]) {
   config_proto.mutable_simple_partitioning()->set_record_size_bytes(FLAGS_record_size);
   config_proto.add_replicas()->add_addresses(address);
   config_proto.set_num_workers(FLAGS_workers);
-  if (FLAGS_commands == "noop") {
-    config_proto.set_commands(internal::Commands::NOOP);
-  } else if (FLAGS_commands == "dummy") {
-    config_proto.set_commands(internal::Commands::DUMMY);
-  } else if (FLAGS_commands == "key_value") {
-    config_proto.set_commands(internal::Commands::KEY_VALUE);
+  if (FLAGS_execution == "noop") {
+    config_proto.set_execution_type(internal::ExecutionType::NOOP);
+  } else if (FLAGS_execution == "key_value") {
+    config_proto.set_execution_type(internal::ExecutionType::KEY_VALUE);
   } else {
-    LOG(FATAL) << "Unknown commands type: " << FLAGS_commands;
+    LOG(FATAL) << "Unknown commands type: " << FLAGS_execution;
   }
 
   auto config = make_shared<Configuration>(config_proto, address);

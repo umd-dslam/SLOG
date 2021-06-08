@@ -64,10 +64,9 @@ message CpuPinning {
     uint32 cpu = 2;
 }
 
-enum Commands {
-    NOOP = 0;
-    DUMMY = 1;
-    KEY_VALUE = 2;
+enum ExecutionType {
+    KEY_VALUE = 0;
+    NOOP = 1;
 }
 
 /**
@@ -122,8 +121,8 @@ message Configuration {
     bool return_dummy_txn = 19;
     // Number of retries after calling zmq::recv something
     int32 recv_retries = 20;
-    // Type of commands to run while executing a txn 
-    Commands commands = 21;
+    // Way of executing code of a txn
+    ExecutionType execution_type = 21;
     // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
     // txns are put into the batches at approximately the same time
     bool synchronized_batching = 22;
