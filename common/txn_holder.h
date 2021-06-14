@@ -32,17 +32,25 @@ class TxnHolder {
 
   bool AddLockOnlyTxn(Transaction* txn) {
     auto home = txn->internal().home();
-    if (home >= static_cast<int>(lo_txns_.size()) || lo_txns_[home] != nullptr) {
+    CHECK_LT(home, static_cast<int>(lo_txns_.size()));
+
+    if (lo_txns_[home] != nullptr) {
       return false;
     }
+
     lo_txns_[home].reset(txn);
+
     ++num_lo_txns_;
+
     return true;
   }
 
   Transaction* Release() {
     auto txn = lo_txns_[main_txn_].release();
-    lo_txns_.clear();
+    // Do not use clear() here because lo_txns_ must never change in size
+    for (auto& lo_txn : lo_txns_) {
+      lo_txn.reset();
+    }
     return txn;
   }
 
