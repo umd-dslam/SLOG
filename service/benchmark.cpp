@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iomanip>
+#include <iostream>
 #include <optional>
 #include <random>
 #include <unordered_map>
@@ -263,9 +264,17 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   for (const auto& info : txn_infos) {
     CHECK(info.txn != nullptr);
     auto& txn_internal = info.txn->internal();
-    writers->txns << txn_internal.id() << txn_internal.coordinating_server() << Join(txn_internal.involved_replicas())
-                  << Join(txn_internal.involved_partitions()) << info.generator_id
-                  << info.sent_at.time_since_epoch().count() << info.recv_at.time_since_epoch().count() << csvendl;
+    string involved_replicas, involved_partitions;
+    if (FLAGS_dry_run) {
+      involved_replicas = Join(info.profile.involved_replicas());
+      involved_partitions = Join(info.profile.involved_partitions());
+    } else {
+      involved_replicas = Join(txn_internal.involved_replicas());
+      involved_partitions = Join(txn_internal.involved_partitions());
+    }
+    writers->txns << txn_internal.id() << txn_internal.coordinating_server() << involved_replicas << involved_partitions
+                  << info.generator_id << info.sent_at.time_since_epoch().count()
+                  << info.recv_at.time_since_epoch().count() << csvendl;
 
     for (int i = 0; i < txn_internal.events_size(); i++) {
       auto event = txn_internal.events(i);

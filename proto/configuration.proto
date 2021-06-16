@@ -16,6 +16,9 @@ message Replica {
     repeated bytes public_addresses = 2;
     // List of machines used for benchmarking. This field is only used by the admin tool
     repeated bytes client_addresses = 3;
+    // Comma-separated string of replica id (e.g "1,3,2") ordered from closest replica to
+    // furthest replica, not including this replica. This field is only used by the admin tool.
+    string distance_ranking = 4;
 }
 
 message ReplicationDelayExperiment {

@@ -239,4 +239,13 @@ std::array<int, 2> Configuration::interleaver_remote_to_local_ratio() const {
   return {std::stoi(ratio[0]), std::stoi(ratio[1])};
 }
 
+std::vector<int> Configuration::distance_ranking_from(int replica_id) const {
+  auto ranking_str = Split(config_.replicas(replica_id).distance_ranking(), ",");
+  std::vector<int> ranking;
+  for (auto s : ranking_str) {
+    ranking.push_back(std::stoi(s));
+  }
+  return ranking;
+}
+
 }  // namespace slog

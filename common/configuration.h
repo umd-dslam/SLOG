@@ -67,6 +67,7 @@ class Configuration {
   bool synchronized_batching() const;
   uint32_t sample_rate() const;
   std::array<int, 2> interleaver_remote_to_local_ratio() const;
+  std::vector<int> distance_ranking_from(int replica_id) const;
 
  private:
   internal::Configuration config_;

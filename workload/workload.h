@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 
@@ -117,6 +118,22 @@ struct TransactionProfile {
   };
 
   std::map<Key, Record> records;
+
+  std::set<uint32_t> involved_replicas() const {
+    std::set<uint32_t> r;
+    for (const auto& entry : records) {
+      r.insert(entry.second.home);
+    }
+    return r;
+  }
+
+  std::set<uint32_t> involved_partitions() const {
+    std::set<uint32_t> p;
+    for (const auto& entry : records) {
+      p.insert(entry.second.partition);
+    }
+    return p;
+  }
 };
 
 /**

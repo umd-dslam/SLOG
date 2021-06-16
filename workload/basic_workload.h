@@ -22,6 +22,7 @@ class BasicWorkload : public Workload {
  protected:
   ConfigurationPtr config_;
   uint32_t local_region_;
+  std::vector<int> distance_ranking_;
 
   // This is an index of keys by their partition and home.
   // Each partition holds a vector of homes, each of which

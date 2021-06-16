@@ -25,6 +25,9 @@ namespace {
 constexpr char MH_PCT[] = "mh";
 // Max number of regions selected as homes in a multi-home transaction
 constexpr char MH_HOMES[] = "mh_homes";
+// Zipf coefficient for selecting regions to access in a txn. Must be non-negative.
+// The lower this is, the more uniform the regions are selected
+constexpr char MH_ZIPF[] = "mh_zipf";
 // Percentage of multi-partition transactions
 constexpr char MP_PCT[] = "mp";
 // Max number of partitions selected as parts of a multi-partition transaction
@@ -50,9 +53,21 @@ constexpr char NEAREST[] = "nearest";
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";
 
-const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},       {MH_HOMES, "2"}, {MP_PCT, "0"},       {MP_PARTS, "2"},
-                                    {HOT, "0"},          {RECORDS, "10"}, {HOT_RECORDS, "0"},  {WRITES, "10"},
-                                    {VALUE_SIZE, "100"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
+const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},   {MH_HOMES, "2"},     {MH_ZIPF, "0"},  {MP_PCT, "0"},
+                                    {MP_PARTS, "2"}, {HOT, "0"},          {RECORDS, "10"}, {HOT_RECORDS, "0"},
+                                    {WRITES, "10"},  {VALUE_SIZE, "100"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
+
+std::discrete_distribution<> zipf_distribution(double a, size_t n) {
+  std::vector<double> weights(n);
+  double s = 0;
+  for (size_t i = 1; i <= n; i++) {
+    s += 1 / std::pow(i, a);
+  }
+  for (size_t i = 0; i < n; i++) {
+    weights[i] = 1 / (std::pow(i + 1, a) * s);
+  }
+  return std::discrete_distribution<>(weights.begin(), weights.end());
+}
 
 }  // namespace
 
@@ -61,6 +76,7 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr config, uint32_t region, con
     : Workload(MergeParams(extra_default_params, DEFAULT_PARAMS), params_str),
       config_(config),
       local_region_(region),
+      distance_ranking_(config->distance_ranking_from(region)),
       partition_to_key_lists_(config->num_partitions()),
       rg_(seed),
       client_txn_id_counter_(0) {
@@ -80,6 +96,11 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr config, uint32_t region, con
         partition_to_key_lists_[part].emplace_back(hot_keys_per_list);
       }
     }
+  }
+
+  CHECK_EQ(distance_ranking_.size(), num_replicas - 1) << "Distance ranking size must match the number of regions";
+  if (!params_.GetInt32(NEAREST)) {
+    distance_ranking_.insert(distance_ranking_.begin(), local_region_);
   }
 
   if (!simple_partitioning) {
@@ -148,19 +169,23 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   vector<uint32_t> candidate_homes;
   if (pro.is_multi_home) {
     CHECK_GE(num_replicas, 2) << "There must be at least 2 regions for MH txns";
-    candidate_homes.resize(num_replicas);
-    iota(candidate_homes.begin(), candidate_homes.end(), 0);
-    if (params_.GetInt32(NEAREST)) {
-      std::swap(candidate_homes[0], candidate_homes[local_region_]);
-      shuffle(candidate_homes.begin() + 1, candidate_homes.end(), rg_);
-    } else {
-      shuffle(candidate_homes.begin(), candidate_homes.end(), rg_);
-    }
-
     auto max_num_homes = std::min(params_.GetUInt32(MH_HOMES), num_replicas);
     CHECK_GE(max_num_homes, 2) << "At least 2 regions must be selected for MH txns";
-    std::uniform_int_distribution num_homes(2U, max_num_homes);
-    candidate_homes.resize(num_homes(rg_));
+    auto num_homes = std::uniform_int_distribution{2U, max_num_homes}(rg_);
+    if (params_.GetInt32(NEAREST)) {
+      candidate_homes.push_back(local_region_);
+      num_homes--;
+    }
+
+    auto zipf_coef = params_.GetDouble(MH_ZIPF);
+    auto dis = zipf_distribution(zipf_coef, distance_ranking_.size());
+    for (size_t i = 0; i < num_homes; i++) {
+      auto next_home = distance_ranking_[dis(rg_)];
+      while (std::find(candidate_homes.begin(), candidate_homes.end(), next_home) != candidate_homes.end()) {
+        next_home = distance_ranking_[dis(rg_)];
+      }
+      candidate_homes.push_back(next_home);
+    }
   } else {
     if (params_.GetInt32(NEAREST)) {
       candidate_homes.push_back(local_region_);
