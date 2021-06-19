@@ -488,9 +488,11 @@ class LogsCommand(AdminCommand):
                  "partition of the machine to stream log from."
         )
         parser.add_argument(
-            "-f", "--follow", 
-            action="store_true",
-            help="Follow log output"
+            "-f", "--follow", action="store_true", help="Follow log output"
+        )
+        parser.add_argument(
+            "-n", "--tail", type=int,
+            help="Number of lines at the end of the log to output"
         )
         parser.add_argument(
             "--container",
@@ -573,12 +575,13 @@ class LogsCommand(AdminCommand):
 
         if args.follow:
             try:
-                for log in c.logs(stream=True, follow=True):
+                log_stream = c.logs(stream=True, follow=True, tail=args.tail)
+                for log in log_stream:
                     print(log.decode(), end="")
             except KeyboardInterrupt:
                 print()
         else:
-            print(c.logs().decode(), end="")
+            print(c.logs(tail=args.tail).decode(), end="")
 
 
 class LocalCommand(AdminCommand):
