@@ -7,6 +7,7 @@
 #include "common/constants.h"
 #include "common/metrics.h"
 #include "common/offline_data_reader.h"
+#include "common/sharder.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/consensus.h"
@@ -54,6 +55,8 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
   slog::OfflineDataReader reader(fd);
   LOG(INFO) << "Loading " << reader.GetNumDatums() << " datums...";
 
+  auto sharder = slog::Sharder::MakeSharder(config);
+
   VLOG(1) << "First 10 datums are: ";
   int c = 10;
   while (reader.HasNextDatum()) {
@@ -63,7 +66,7 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
       c--;
     }
 
-    CHECK(config->key_is_in_local_partition(datum.key()))
+    CHECK(sharder->is_local_key(datum.key()))
         << "Key " << datum.key() << " does not belong to partition " << config->local_partition();
 
     CHECK_LT(datum.master(), config->num_replicas()) << "Master number exceeds number of replicas";

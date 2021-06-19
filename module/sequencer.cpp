@@ -22,6 +22,7 @@ Sequencer::Sequencer(const std::shared_ptr<zmq::context_t>& context, const Confi
                      const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
     : NetworkedModule("Sequencer", context, config, config->sequencer_port(), kSequencerChannel, metrics_manager,
                       poll_timeout),
+      sharder_(Sharder::MakeSharder(config)),
       batch_id_counter_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {
@@ -75,7 +76,7 @@ void Sequencer::BatchTxn(Transaction* txn) {
   for (int i = 0; i < num_involved_partitions; ++i) {
     bool in_place = i == (num_involved_partitions - 1);
     auto p = txn->internal().involved_partitions(i);
-    auto new_txn = GeneratePartitionedTxn(config(), txn, p, in_place);
+    auto new_txn = GeneratePartitionedTxn(sharder_, txn, p, in_place);
     if (new_txn != nullptr) {
       partitioned_batch_[p]->mutable_transactions()->AddAllocated(new_txn);
     }

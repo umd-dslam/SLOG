@@ -83,7 +83,7 @@ Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const
   auto txn = MakeTransaction(keys, code, remaster, coordinator);
   txn->mutable_internal()->set_id(id);
 
-  PopulateInvolvedPartitions(config, *txn);
+  PopulateInvolvedPartitions(Sharder::MakeSharder(config), *txn);
 
   return txn;
 }
@@ -92,10 +92,11 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
                             const std::vector<std::vector<std::string>> code, std::optional<int> remaster) {
   auto txn = MakeTestTransaction(config, id, keys, code, remaster);
 
+  auto sharder = Sharder::MakeSharder(config);
   vector<Transaction*> lo_txns;
   for (int i = 0; i < txn->internal().involved_replicas_size(); ++i) {
     auto lo = GenerateLockOnlyTxn(txn, txn->internal().involved_replicas(i));
-    auto partitioned_lo = GeneratePartitionedTxn(config, lo, config->local_partition(), true);
+    auto partitioned_lo = GeneratePartitionedTxn(sharder, lo, sharder->local_partition(), true);
     if (partitioned_lo != nullptr) {
       lo_txns.push_back(partitioned_lo);
     }
@@ -113,6 +114,7 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
 
 TestSlog::TestSlog(const ConfigurationPtr& config)
     : config_(config),
+      sharder_(Sharder::MakeSharder(config)),
       storage_(new MemOnlyStorage<Key, Record, Metadata>()),
       broker_(Broker::New(config, kTestModuleTimeout)),
       client_context_(1) {
@@ -121,8 +123,8 @@ TestSlog::TestSlog(const ConfigurationPtr& config)
 }
 
 void TestSlog::Data(Key&& key, Record&& record) {
-  CHECK(config_->key_is_in_local_partition(key))
-      << "Key \"" << key << "\" belongs to partition " << config_->partition_of_key(key);
+  CHECK(sharder_->is_local_key(key)) << "Key \"" << key << "\" belongs to partition "
+                                     << sharder_->compute_partition(key);
   storage_->Write(key, record);
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/configuration.h"
+#include "common/sharder.h"
 #include "proto/transaction.pb.h"
 #include "storage/storage.h"
 
@@ -13,12 +13,12 @@ class Execution {
 
 template <typename K, typename R>
 class KeyValueExecution : public Execution {
-  ConfigurationPtr config_;
+  SharderPtr sharder_;
   std::shared_ptr<Storage<K, R>> storage_;
 
  public:
-  KeyValueExecution(const ConfigurationPtr& config, const std::shared_ptr<Storage<K, R>>& storage)
-      : config_(config), storage_(storage) {}
+  KeyValueExecution(const SharderPtr& sharder, const std::shared_ptr<Storage<K, R>>& storage)
+      : sharder_(sharder), storage_(storage) {}
 
   void Execute(Transaction& txn) final {
     auto& keys = *txn.mutable_keys();
@@ -72,7 +72,7 @@ class KeyValueExecution : public Execution {
       txn.set_status(TransactionStatus::COMMITTED);
 
       for (const auto& [key, value] : txn.keys()) {
-        if (!config_->key_is_in_local_partition(key) || value.type() == KeyType::READ) {
+        if (!sharder_->is_local_key(key) || value.type() == KeyType::READ) {
           continue;
         }
         if (auto record = storage_->Read(key); record != nullptr) {

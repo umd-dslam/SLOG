@@ -56,8 +56,9 @@ class SchedulerTest : public ::testing::Test {
 
   void SendTransaction(Transaction* txn) {
     CHECK(txn != nullptr);
+    auto sharder = Sharder::MakeSharder(test_slogs[0]->config());
     for (auto p : txn->internal().involved_partitions()) {
-      auto new_txn = GeneratePartitionedTxn(test_slogs[0]->config(), txn, p);
+      auto new_txn = GeneratePartitionedTxn(sharder, txn, p);
       if (new_txn != nullptr) {
         internal::Envelope env;
         env.mutable_request()->mutable_forward_txn()->set_allocated_txn(new_txn);

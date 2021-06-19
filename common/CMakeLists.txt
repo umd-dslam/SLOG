@@ -12,6 +12,8 @@ target_sources(slog-core
     offline_data_reader.h
     proto_utils.cpp
     proto_utils.h
+    sharder.cpp
+    sharder.h
     spin_latch.h
     string_utils.cpp
     string_utils.h

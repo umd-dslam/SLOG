@@ -5,6 +5,7 @@
 
 #include "common/configuration.h"
 #include "common/metrics.h"
+#include "common/sharder.h"
 #include "common/types.h"
 #include "connection/broker.h"
 #include "module/base/networked_module.h"
@@ -41,6 +42,7 @@ class Sequencer : public NetworkedModule {
   void SendBatch();
   EnvelopePtr NewBatchForwardingMessage(std::vector<internal::Batch*>&& batch);
 
+  const SharderPtr sharder_;
   std::vector<std::unique_ptr<internal::Batch>> partitioned_batch_;
   BatchId batch_id_counter_;
   int batch_size_;

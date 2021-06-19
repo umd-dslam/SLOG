@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/configuration.h"
+#include "common/sharder.h"
 #include "common/types.h"
 
 #define ENUM_NAME(enum, enum_type) enum_type##_descriptor()->FindValueByNumber(enum)->name()
@@ -60,7 +61,7 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
 /**
  * Returns nullptr if the generated txn contains no relevant key
  */
-Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition,
+Transaction* GeneratePartitionedTxn(const SharderPtr& sharder, Transaction* txn, uint32_t partition,
                                     bool in_place = false);
 
 /**
@@ -71,7 +72,7 @@ void PopulateInvolvedReplicas(Transaction& txn);
 /**
  * Populate the involved_partitions field in the transaction
  */
-void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn);
+void PopulateInvolvedPartitions(const SharderPtr& sharder, Transaction& txn);
 
 /**
  * Merges the results of two transactions

@@ -33,6 +33,7 @@ Forwarder::Forwarder(const std::shared_ptr<zmq::context_t>& context, const Confi
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
     : NetworkedModule("Forwarder", context, config, config->forwarder_port(), kForwarderChannel, metrics_manager,
                       poll_timeout),
+      sharder_(Sharder::MakeSharder(config)),
       lookup_master_index_(lookup_master_index),
       batch_size_(0),
       rg_(std::random_device()()),
@@ -62,7 +63,7 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   RECORD(txn->mutable_internal(), TransactionEvent::ENTER_FORWARDER);
 
   try {
-    PopulateInvolvedPartitions(config(), *txn);
+    PopulateInvolvedPartitions(sharder_, *txn);
   } catch (std::invalid_argument& e) {
     LOG(ERROR) << "Only numeric keys are allowed while running in Simple Partitioning mode";
     return;
@@ -70,7 +71,7 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
 
   bool need_remote_lookup = false;
   for (auto& [key, value] : *txn->mutable_keys()) {
-    auto partition = config()->partition_of_key(key);
+    auto partition = sharder_->compute_partition(key);
 
     // If this is a local partition, lookup the master info from the local storage
     if (partition == config()->local_partition()) {
@@ -145,7 +146,7 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
   for (int i = 0; i < lookup_master.keys_size(); i++) {
     const auto& key = lookup_master.keys(i);
 
-    if (config()->key_is_in_local_partition(key)) {
+    if (sharder_->is_local_key(key)) {
       Metadata metadata;
       if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
         // If key exists, add the metadata of current key to the response

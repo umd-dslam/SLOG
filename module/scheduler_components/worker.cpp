@@ -25,7 +25,7 @@ Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const sha
       storage_(storage) {
   switch (config()->execution_type()) {
     case internal::ExecutionType::KEY_VALUE:
-      execution_ = make_unique<KeyValueExecution<Key, Record>>(config(), storage);
+      execution_ = make_unique<KeyValueExecution<Key, Record>>(Sharder::MakeSharder(config()), storage);
       break;
     default:
       execution_ = make_unique<NoopExecution>();

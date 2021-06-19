@@ -20,6 +20,7 @@ class Configuration {
 
   Configuration(const internal::Configuration& config, const std::string& local_address);
 
+  const internal::Configuration& proto_config() const;
   const std::string& protocol() const;
   const std::vector<std::string>& all_addresses() const;
   const std::string& address(uint32_t replica, uint32_t partition) const;
@@ -47,10 +48,6 @@ class Configuration {
   uint32_t leader_replica_for_multi_home_ordering() const;
   uint32_t leader_partition_for_multi_home_ordering() const;
 
-  uint32_t partition_of_key(const Key& key) const;
-  bool key_is_in_local_partition(const Key& key) const;
-  // Only work with simple partitioning
-  int partition_of_key(uint32_t key) const;
   uint32_t master_of_key(uint32_t key) const;
   const internal::SimplePartitioning* simple_partitioning() const;
 

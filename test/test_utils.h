@@ -66,9 +66,11 @@ class TestSlog {
   Transaction RecvTxnResult();
 
   const ConfigurationPtr& config() const { return config_; }
+  const SharderPtr& sharder() const { return sharder_; }
 
  private:
   ConfigurationPtr config_;
+  SharderPtr sharder_;
   shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
   shared_ptr<Broker> broker_;
   ModuleRunnerPtr server_;

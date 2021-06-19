@@ -14,20 +14,6 @@
 
 namespace slog {
 
-namespace {
-
-template <class It>
-uint32_t FNVHash(It begin, It end) {
-  uint64_t hash = 0x811c9dc5;
-  for (auto it = begin; it != end; it++) {
-    hash = (hash * 0x01000193) % (1LL << 32);
-    hash ^= *it;
-  }
-  return hash;
-}
-
-}  // namespace
-
 using google::protobuf::io::FileInputStream;
 using google::protobuf::io::ZeroCopyInputStream;
 using std::chrono::milliseconds;
@@ -92,6 +78,8 @@ Configuration::Configuration(const internal::Configuration& config, const string
     }
   }
 }
+
+const internal::Configuration& Configuration::proto_config() const { return config_; }
 
 const string& Configuration::protocol() const { return config_.protocol(); }
 
@@ -168,23 +156,6 @@ uint32_t Configuration::leader_partition_for_multi_home_ordering() const {
   // leader of the local paxos process
   return num_partitions() - 1;
 }
-
-uint32_t Configuration::partition_of_key(const Key& key) const {
-  if (config_.has_hash_partitioning()) {
-    auto end = config_.hash_partitioning().partition_key_num_bytes() >= key.length()
-                   ? key.end()
-                   : key.begin() + config_.hash_partitioning().partition_key_num_bytes();
-    return FNVHash(key.begin(), end) % num_partitions();
-  } else {
-    return partition_of_key(std::stoll(key));
-  }
-}
-
-bool Configuration::key_is_in_local_partition(const Key& key) const {
-  return partition_of_key(key) == static_cast<uint32_t>(local_partition_);
-}
-
-int Configuration::partition_of_key(uint32_t key) const { return key % num_partitions(); }
 
 uint32_t Configuration::master_of_key(uint32_t key) const { return (key / num_partitions()) % num_replicas(); }
 

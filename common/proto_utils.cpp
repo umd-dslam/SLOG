@@ -107,14 +107,13 @@ Transaction* GenerateLockOnlyTxn(Transaction* txn, uint32_t lo_master, bool in_p
   return lock_only_txn;
 }
 
-Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction* txn, uint32_t partition,
-                                    bool in_place) {
+Transaction* GeneratePartitionedTxn(const SharderPtr& sharder, Transaction* txn, uint32_t partition, bool in_place) {
   Transaction* new_txn = txn;
   if (!in_place) {
     new_txn = new Transaction(*txn);
   }
 
-  vector<bool> involved_replicas(config->num_replicas(), false);
+  vector<bool> involved_replicas(8, false);
 
   // Check if the generated subtxn does not intend to lock any key in its home region
   // If this is a remaster txn, it is never redundant
@@ -122,10 +121,13 @@ Transaction* GeneratePartitionedTxn(const ConfigurationPtr& config, Transaction*
 
   // Remove keys that are not in the target partition
   for (auto it = new_txn->mutable_keys()->begin(); it != new_txn->mutable_keys()->end();) {
-    if (config->partition_of_key(it->first) != partition) {
+    if (sharder->compute_partition(it->first) != partition) {
       it = new_txn->mutable_keys()->erase(it);
     } else {
       auto master = it->second.metadata().master();
+      if (master >= involved_replicas.size()) {
+        involved_replicas.resize(master + 1);
+      }
       involved_replicas[master] = true;
       is_redundant &= static_cast<int>(master) != new_txn->internal().home();
 
@@ -181,11 +183,11 @@ void PopulateInvolvedReplicas(Transaction& txn) {
   txn.mutable_internal()->mutable_involved_replicas()->Add(involved_replicas.begin(), last);
 }
 
-void PopulateInvolvedPartitions(const ConfigurationPtr& config, Transaction& txn) {
-  vector<bool> involved_partitions(config->num_partitions(), false);
-  vector<bool> active_partitions(config->num_partitions(), false);
+void PopulateInvolvedPartitions(const SharderPtr& sharder, Transaction& txn) {
+  vector<bool> involved_partitions(sharder->num_partitions(), false);
+  vector<bool> active_partitions(sharder->num_partitions(), false);
   for (const auto& [key, value] : txn.keys()) {
-    auto partition = config->partition_of_key(key);
+    auto partition = sharder->compute_partition(key);
     involved_partitions[partition] = true;
     if (value.type() == KeyType::WRITE) {
       active_partitions[partition] = true;
