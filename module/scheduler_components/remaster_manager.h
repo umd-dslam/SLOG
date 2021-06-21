@@ -77,7 +77,7 @@ class RemasterManager {
       Record record;
       bool found = storage->Read(key, record);
       if (found) {
-        storage_counter = record.metadata.counter;
+        storage_counter = record.metadata().counter;
       }
 
       if (value.metadata().counter() < storage_counter) {
@@ -85,9 +85,9 @@ class RemasterManager {
       } else if (value.metadata().counter() > storage_counter) {
         waiting = true;
       } else {
-        CHECK(value.metadata().master() == record.metadata.master)
+        CHECK(value.metadata().master() == record.metadata().master)
             << "Masters don't match for same key \"" << key << "\". In txn: " << value.metadata().master()
-            << ". In storage: " << record.metadata.master;
+            << ". In storage: " << record.metadata().master;
       }
     }
 

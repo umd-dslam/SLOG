@@ -125,9 +125,9 @@ class SegmentT {
       new_node->value = value;
       new_node->next = buckets_->bucket_roots[idx];
       buckets_->bucket_roots[idx] = new_node;
+      size_++;
     }
 
-    size_++;
     if (size_ >= load_factor_max_size_) {
       Rehash();
     }

@@ -16,10 +16,6 @@ public:
     return table_.Get(result, key);
   }
 
-  R* Read(const K& key) final {
-    return table_.GetUnsafe(key);
-  }
-
   void Write(const K& key, const R& record) final {
     table_.InsertOrUpdate(key, record);
   }
@@ -33,7 +29,7 @@ public:
     if (!table_.Get(rec, key)) {
       return false;
     }
-    metadata = rec.metadata;
+    metadata = rec.metadata();
     return true;
   }
 

@@ -19,6 +19,7 @@ const uint32_t DEFAULT_MASTER_REGION_OF_NEW_KEY = 0;
 
 struct Metadata {
   Metadata() = default;
+  Metadata(const MasterMetadata& metadata) : master(metadata.master()), counter(metadata.counter()) {}
   Metadata(uint32_t m, uint32_t c = 0) : master(m), counter(c) {}
   void operator=(const MasterMetadata& metadata) {
     master = metadata.master();
@@ -30,20 +31,22 @@ struct Metadata {
 };
 
 struct Record {
-  Record(const std::string& v, uint32_t m, uint32_t c = 0) : metadata(m, c) { SetValue(v); }
+  Record(const std::string& v, uint32_t m, uint32_t c = 0) : metadata_(m, c) { SetValue(v); }
 
   Record(const Record& other) {
     SetValue(other.data_.get(), other.size_);
-    metadata = other.metadata;
+    SetMetadata(other.metadata_);
   }
 
   Record& operator=(const Record& other) {
     Record tmp(other);
     data_.swap(tmp.data_);
     std::swap(size_, tmp.size_);
-    std::swap(metadata, tmp.metadata);
+    std::swap(metadata_, tmp.metadata_);
     return *this;
   }
+
+  void SetMetadata(const Metadata& metadata) { metadata_ = metadata; }
 
   void SetValue(const std::string& v) { SetValue(v.data(), v.size()); }
 
@@ -62,12 +65,12 @@ struct Record {
 
   Record() = default;
 
+  const Metadata& metadata() const { return metadata_; }
   char* data() { return data_.get(); }
   size_t size() { return size_; }
 
-  Metadata metadata;
-
  private:
+  Metadata metadata_;
   std::unique_ptr<char[]> data_;
   size_t size_ = 0;
 };

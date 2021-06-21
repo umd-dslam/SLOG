@@ -75,15 +75,10 @@ class KeyValueExecution : public Execution {
         if (!sharder_->is_local_key(key) || value.type() == KeyType::READ) {
           continue;
         }
-        if (auto record = storage_->Read(key); record != nullptr) {
-          record->metadata = value.metadata();
-          record->SetValue(value.new_value());
-        } else {
-          R new_record;
-          new_record.metadata = value.metadata();
-          new_record.SetValue(value.new_value());
-          storage_->Write(key, new_record);
-        }
+        R new_record;
+        new_record.SetMetadata(value.metadata());
+        new_record.SetValue(value.new_value());
+        storage_->Write(key, new_record);
       }
       for (const auto& key : txn.deleted_keys()) {
         storage_->Delete(key);

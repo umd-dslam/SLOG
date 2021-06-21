@@ -55,7 +55,10 @@ class TxnHolder {
   }
 
   TxnId txn_id() const { return txn_id_; }
-  Transaction& txn() const { return *lo_txns_[main_txn_]; }
+  Transaction& txn() const {
+    CHECK(lo_txns_[main_txn_] != nullptr);
+    return *lo_txns_[main_txn_];
+  }
   Transaction& lock_only_txn(size_t i) const { return *lo_txns_[i]; }
 
   void SetRemasterResult(const Key& key, uint32_t counter) { remaster_result_.emplace(key, counter); }
