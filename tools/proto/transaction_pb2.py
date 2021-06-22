@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x17proto/transaction.proto\x12\x04slog\"1\n\x0eMasterMetadata\x12\x0e\n\x06master\x18\x01 \x01(\r\x12\x0f\n\x07\x63ounter\x18\x02 \x01(\r\"\x81\x01\n\nValueEntry\x12\r\n\x05value\x18\x01 \x01(\t\x12\x11\n\tnew_value\x18\x02 \x01(\t\x12\x1b\n\x04type\x18\x03 \x01(\x0e\x32\r.slog.KeyType\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x14.slog.MasterMetadataH\x00\x42\n\n\x08optional\"\xb5\x02\n\x13TransactionInternal\x12\n\n\x02id\x18\x01 \x01(\x04\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.slog.TransactionType\x12\x0c\n\x04home\x18\x03 \x01(\x05\x12\x1b\n\x13\x63oordinating_server\x18\x04 \x01(\r\x12\x1a\n\x12sequencer_delay_ms\x18\x05 \x01(\x05\x12\x1b\n\x13involved_partitions\x18\x06 \x03(\r\x12\x19\n\x11\x61\x63tive_partitions\x18\x07 \x03(\r\x12\x19\n\x11involved_replicas\x18\x08 \x03(\r\x12&\n\x06\x65vents\x18\t \x03(\x0e\x32\x16.slog.TransactionEvent\x12\x13\n\x0b\x65vent_times\x18\n \x03(\x03\x12\x16\n\x0e\x65vent_machines\x18\x0b \x03(\r\"H\n\x11RemasterProcedure\x12\x12\n\nnew_master\x18\x01 \x01(\r\x12\x1f\n\x17is_new_master_lock_only\x18\x02 \x01(\x08\"\x19\n\tProcedure\x12\x0c\n\x04\x61rgs\x18\x01 \x03(\x0c\"1\n\nProcedures\x12#\n\nprocedures\x18\x01 \x03(\x0b\x32\x0f.slog.Procedure\"\xd3\x02\n\x0bTransaction\x12+\n\x08internal\x18\x01 \x01(\x0b\x32\x19.slog.TransactionInternal\x12 \n\x04\x63ode\x18\x02 \x01(\x0b\x32\x10.slog.ProceduresH\x00\x12+\n\x08remaster\x18\x03 \x01(\x0b\x32\x17.slog.RemasterProcedureH\x00\x12)\n\x04keys\x18\x04 \x03(\x0b\x32\x1b.slog.Transaction.KeysEntry\x12\x14\n\x0c\x64\x65leted_keys\x18\x05 \x03(\t\x12\'\n\x06status\x18\x06 \x01(\x0e\x32\x17.slog.TransactionStatus\x12\x14\n\x0c\x61\x62ort_reason\x18\x07 \x01(\t\x1a=\n\tKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.slog.ValueEntry:\x02\x38\x01\x42\t\n\x07program*L\n\x0fTransactionType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0f\n\x0bSINGLE_HOME\x10\x01\x12\x1b\n\x17MULTI_HOME_OR_LOCK_ONLY\x10\x02*@\n\x11TransactionStatus\x12\x0f\n\x0bNOT_STARTED\x10\x00\x12\r\n\tCOMMITTED\x10\x01\x12\x0b\n\x07\x41\x42ORTED\x10\x02*\x1e\n\x07KeyType\x12\x08\n\x04READ\x10\x00\x12\t\n\x05WRITE\x10\x01*\x8c\x05\n\x10TransactionEvent\x12\x07\n\x03\x41LL\x10\x00\x12\x10\n\x0c\x45NTER_SERVER\x10\x01\x12\x1c\n\x18\x45XIT_SERVER_TO_FORWARDER\x10\x02\x12\x13\n\x0f\x45NTER_FORWARDER\x10\x03\x12\x1f\n\x1b\x45XIT_FORWARDER_TO_SEQUENCER\x10\x04\x12(\n$EXIT_FORWARDER_TO_MULTI_HOME_ORDERER\x10\x05\x12\x1c\n\x18\x45NTER_MULTI_HOME_ORDERER\x10\x06\x12%\n!ENTER_MULTI_HOME_ORDERER_IN_BATCH\x10\x07\x12$\n EXIT_MULTI_HOME_ORDERER_IN_BATCH\x10\x08\x12\x1b\n\x17\x45XIT_MULTI_HOME_ORDERER\x10\t\x12\x13\n\x0f\x45NTER_SEQUENCER\x10\n\x12\x1c\n\x18\x45NTER_SEQUENCER_IN_BATCH\x10\x0b\x12\x1b\n\x17\x45XIT_SEQUENCER_IN_BATCH\x10\x0c\x12\x1e\n\x1a\x45NTER_INTERLEAVER_IN_BATCH\x10\r\x12\x14\n\x10\x45XIT_INTERLEAVER\x10\x0e\x12\x13\n\x0f\x45NTER_SCHEDULER\x10\x0f\x12\x16\n\x12\x45NTER_SCHEDULER_LO\x10\x10\x12\x16\n\x12\x45NTER_LOCK_MANAGER\x10\x11\x12\x0e\n\nDISPATCHED\x10\x12\x12\x13\n\x0f\x44ISPATCHED_FAST\x10\x13\x12\x13\n\x0f\x44ISPATCHED_SLOW\x10\x14\x12\x10\n\x0c\x45NTER_WORKER\x10\x15\x12\x0f\n\x0b\x45XIT_WORKER\x10\x16\x12\x14\n\x10RETURN_TO_SERVER\x10\x17\x12\x19\n\x15\x45XIT_SERVER_TO_CLIENT\x10\x18\x62\x06proto3'
+  serialized_pb=b'\n\x17proto/transaction.proto\x12\x04slog\"1\n\x0eMasterMetadata\x12\x0e\n\x06master\x18\x01 \x01(\r\x12\x0f\n\x07\x63ounter\x18\x02 \x01(\r\"\x81\x01\n\nValueEntry\x12\r\n\x05value\x18\x01 \x01(\x0c\x12\x11\n\tnew_value\x18\x02 \x01(\x0c\x12\x1b\n\x04type\x18\x03 \x01(\x0e\x32\r.slog.KeyType\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x14.slog.MasterMetadataH\x00\x42\n\n\x08optional\"C\n\rKeyValueEntry\x12\x0b\n\x03key\x18\x01 \x01(\x0c\x12%\n\x0bvalue_entry\x18\x02 \x01(\x0b\x32\x10.slog.ValueEntry\"\xb5\x02\n\x13TransactionInternal\x12\n\n\x02id\x18\x01 \x01(\x04\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.slog.TransactionType\x12\x0c\n\x04home\x18\x03 \x01(\x05\x12\x1b\n\x13\x63oordinating_server\x18\x04 \x01(\r\x12\x1a\n\x12sequencer_delay_ms\x18\x05 \x01(\x05\x12\x1b\n\x13involved_partitions\x18\x06 \x03(\r\x12\x19\n\x11\x61\x63tive_partitions\x18\x07 \x03(\r\x12\x19\n\x11involved_replicas\x18\x08 \x03(\r\x12&\n\x06\x65vents\x18\t \x03(\x0e\x32\x16.slog.TransactionEvent\x12\x13\n\x0b\x65vent_times\x18\n \x03(\x03\x12\x16\n\x0e\x65vent_machines\x18\x0b \x03(\r\"H\n\x11RemasterProcedure\x12\x12\n\nnew_master\x18\x01 \x01(\r\x12\x1f\n\x17is_new_master_lock_only\x18\x02 \x01(\x08\"\x19\n\tProcedure\x12\x0c\n\x04\x61rgs\x18\x01 \x03(\x0c\"1\n\nProcedures\x12#\n\nprocedures\x18\x01 \x03(\x0b\x32\x0f.slog.Procedure\"\x8c\x02\n\x0bTransaction\x12+\n\x08internal\x18\x01 \x01(\x0b\x32\x19.slog.TransactionInternal\x12 \n\x04\x63ode\x18\x02 \x01(\x0b\x32\x10.slog.ProceduresH\x00\x12+\n\x08remaster\x18\x03 \x01(\x0b\x32\x17.slog.RemasterProcedureH\x00\x12!\n\x04keys\x18\x04 \x03(\x0b\x32\x13.slog.KeyValueEntry\x12\x14\n\x0c\x64\x65leted_keys\x18\x05 \x03(\x0c\x12\'\n\x06status\x18\x06 \x01(\x0e\x32\x17.slog.TransactionStatus\x12\x14\n\x0c\x61\x62ort_reason\x18\x07 \x01(\tB\t\n\x07program*L\n\x0fTransactionType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0f\n\x0bSINGLE_HOME\x10\x01\x12\x1b\n\x17MULTI_HOME_OR_LOCK_ONLY\x10\x02*@\n\x11TransactionStatus\x12\x0f\n\x0bNOT_STARTED\x10\x00\x12\r\n\tCOMMITTED\x10\x01\x12\x0b\n\x07\x41\x42ORTED\x10\x02*\x1e\n\x07KeyType\x12\x08\n\x04READ\x10\x00\x12\t\n\x05WRITE\x10\x01*\x8c\x05\n\x10TransactionEvent\x12\x07\n\x03\x41LL\x10\x00\x12\x10\n\x0c\x45NTER_SERVER\x10\x01\x12\x1c\n\x18\x45XIT_SERVER_TO_FORWARDER\x10\x02\x12\x13\n\x0f\x45NTER_FORWARDER\x10\x03\x12\x1f\n\x1b\x45XIT_FORWARDER_TO_SEQUENCER\x10\x04\x12(\n$EXIT_FORWARDER_TO_MULTI_HOME_ORDERER\x10\x05\x12\x1c\n\x18\x45NTER_MULTI_HOME_ORDERER\x10\x06\x12%\n!ENTER_MULTI_HOME_ORDERER_IN_BATCH\x10\x07\x12$\n EXIT_MULTI_HOME_ORDERER_IN_BATCH\x10\x08\x12\x1b\n\x17\x45XIT_MULTI_HOME_ORDERER\x10\t\x12\x13\n\x0f\x45NTER_SEQUENCER\x10\n\x12\x1c\n\x18\x45NTER_SEQUENCER_IN_BATCH\x10\x0b\x12\x1b\n\x17\x45XIT_SEQUENCER_IN_BATCH\x10\x0c\x12\x1e\n\x1a\x45NTER_INTERLEAVER_IN_BATCH\x10\r\x12\x14\n\x10\x45XIT_INTERLEAVER\x10\x0e\x12\x13\n\x0f\x45NTER_SCHEDULER\x10\x0f\x12\x16\n\x12\x45NTER_SCHEDULER_LO\x10\x10\x12\x16\n\x12\x45NTER_LOCK_MANAGER\x10\x11\x12\x0e\n\nDISPATCHED\x10\x12\x12\x13\n\x0f\x44ISPATCHED_FAST\x10\x13\x12\x13\n\x0f\x44ISPATCHED_SLOW\x10\x14\x12\x10\n\x0c\x45NTER_WORKER\x10\x15\x12\x0f\n\x0b\x45XIT_WORKER\x10\x16\x12\x14\n\x10RETURN_TO_SERVER\x10\x17\x12\x19\n\x15\x45XIT_SERVER_TO_CLIENT\x10\x18\x62\x06proto3'
 )
 
 _TRANSACTIONTYPE = _descriptor.EnumDescriptor(
@@ -48,8 +48,8 @@ _TRANSACTIONTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1022,
-  serialized_end=1098,
+  serialized_start=1020,
+  serialized_end=1096,
 )
 _sym_db.RegisterEnumDescriptor(_TRANSACTIONTYPE)
 
@@ -79,8 +79,8 @@ _TRANSACTIONSTATUS = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1100,
-  serialized_end=1164,
+  serialized_start=1098,
+  serialized_end=1162,
 )
 _sym_db.RegisterEnumDescriptor(_TRANSACTIONSTATUS)
 
@@ -105,8 +105,8 @@ _KEYTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1166,
-  serialized_end=1196,
+  serialized_start=1164,
+  serialized_end=1194,
 )
 _sym_db.RegisterEnumDescriptor(_KEYTYPE)
 
@@ -246,8 +246,8 @@ _TRANSACTIONEVENT = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1199,
-  serialized_end=1851,
+  serialized_start=1197,
+  serialized_end=1849,
 )
 _sym_db.RegisterEnumDescriptor(_TRANSACTIONEVENT)
 
@@ -337,15 +337,15 @@ _VALUEENTRY = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='value', full_name='slog.ValueEntry.value', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='new_value', full_name='slog.ValueEntry.new_value', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -382,6 +382,45 @@ _VALUEENTRY = _descriptor.Descriptor(
   ],
   serialized_start=85,
   serialized_end=214,
+)
+
+
+_KEYVALUEENTRY = _descriptor.Descriptor(
+  name='KeyValueEntry',
+  full_name='slog.KeyValueEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='slog.KeyValueEntry.key', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='value_entry', full_name='slog.KeyValueEntry.value_entry', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=216,
+  serialized_end=283,
 )
 
 
@@ -482,8 +521,8 @@ _TRANSACTIONINTERNAL = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=217,
-  serialized_end=526,
+  serialized_start=286,
+  serialized_end=595,
 )
 
 
@@ -521,8 +560,8 @@ _REMASTERPROCEDURE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=528,
-  serialized_end=600,
+  serialized_start=597,
+  serialized_end=669,
 )
 
 
@@ -553,8 +592,8 @@ _PROCEDURE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=602,
-  serialized_end=627,
+  serialized_start=671,
+  serialized_end=696,
 )
 
 
@@ -585,48 +624,10 @@ _PROCEDURES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=629,
-  serialized_end=678,
+  serialized_start=698,
+  serialized_end=747,
 )
 
-
-_TRANSACTION_KEYSENTRY = _descriptor.Descriptor(
-  name='KeysEntry',
-  full_name='slog.Transaction.KeysEntry',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='key', full_name='slog.Transaction.KeysEntry.key', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='value', full_name='slog.Transaction.KeysEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=b'8\001',
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=948,
-  serialized_end=1009,
-)
 
 _TRANSACTION = _descriptor.Descriptor(
   name='Transaction',
@@ -666,7 +667,7 @@ _TRANSACTION = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='deleted_keys', full_name='slog.Transaction.deleted_keys', index=4,
-      number=5, type=9, cpp_type=9, label=3,
+      number=5, type=12, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -688,7 +689,7 @@ _TRANSACTION = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_TRANSACTION_KEYSENTRY, ],
+  nested_types=[],
   enum_types=[
   ],
   serialized_options=None,
@@ -702,8 +703,8 @@ _TRANSACTION = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=681,
-  serialized_end=1020,
+  serialized_start=750,
+  serialized_end=1018,
 )
 
 _VALUEENTRY.fields_by_name['type'].enum_type = _KEYTYPE
@@ -711,15 +712,14 @@ _VALUEENTRY.fields_by_name['metadata'].message_type = _MASTERMETADATA
 _VALUEENTRY.oneofs_by_name['optional'].fields.append(
   _VALUEENTRY.fields_by_name['metadata'])
 _VALUEENTRY.fields_by_name['metadata'].containing_oneof = _VALUEENTRY.oneofs_by_name['optional']
+_KEYVALUEENTRY.fields_by_name['value_entry'].message_type = _VALUEENTRY
 _TRANSACTIONINTERNAL.fields_by_name['type'].enum_type = _TRANSACTIONTYPE
 _TRANSACTIONINTERNAL.fields_by_name['events'].enum_type = _TRANSACTIONEVENT
 _PROCEDURES.fields_by_name['procedures'].message_type = _PROCEDURE
-_TRANSACTION_KEYSENTRY.fields_by_name['value'].message_type = _VALUEENTRY
-_TRANSACTION_KEYSENTRY.containing_type = _TRANSACTION
 _TRANSACTION.fields_by_name['internal'].message_type = _TRANSACTIONINTERNAL
 _TRANSACTION.fields_by_name['code'].message_type = _PROCEDURES
 _TRANSACTION.fields_by_name['remaster'].message_type = _REMASTERPROCEDURE
-_TRANSACTION.fields_by_name['keys'].message_type = _TRANSACTION_KEYSENTRY
+_TRANSACTION.fields_by_name['keys'].message_type = _KEYVALUEENTRY
 _TRANSACTION.fields_by_name['status'].enum_type = _TRANSACTIONSTATUS
 _TRANSACTION.oneofs_by_name['program'].fields.append(
   _TRANSACTION.fields_by_name['code'])
@@ -729,6 +729,7 @@ _TRANSACTION.oneofs_by_name['program'].fields.append(
 _TRANSACTION.fields_by_name['remaster'].containing_oneof = _TRANSACTION.oneofs_by_name['program']
 DESCRIPTOR.message_types_by_name['MasterMetadata'] = _MASTERMETADATA
 DESCRIPTOR.message_types_by_name['ValueEntry'] = _VALUEENTRY
+DESCRIPTOR.message_types_by_name['KeyValueEntry'] = _KEYVALUEENTRY
 DESCRIPTOR.message_types_by_name['TransactionInternal'] = _TRANSACTIONINTERNAL
 DESCRIPTOR.message_types_by_name['RemasterProcedure'] = _REMASTERPROCEDURE
 DESCRIPTOR.message_types_by_name['Procedure'] = _PROCEDURE
@@ -753,6 +754,13 @@ ValueEntry = _reflection.GeneratedProtocolMessageType('ValueEntry', (_message.Me
   # @@protoc_insertion_point(class_scope:slog.ValueEntry)
   })
 _sym_db.RegisterMessage(ValueEntry)
+
+KeyValueEntry = _reflection.GeneratedProtocolMessageType('KeyValueEntry', (_message.Message,), {
+  'DESCRIPTOR' : _KEYVALUEENTRY,
+  '__module__' : 'proto.transaction_pb2'
+  # @@protoc_insertion_point(class_scope:slog.KeyValueEntry)
+  })
+_sym_db.RegisterMessage(KeyValueEntry)
 
 TransactionInternal = _reflection.GeneratedProtocolMessageType('TransactionInternal', (_message.Message,), {
   'DESCRIPTOR' : _TRANSACTIONINTERNAL,
@@ -783,20 +791,11 @@ Procedures = _reflection.GeneratedProtocolMessageType('Procedures', (_message.Me
 _sym_db.RegisterMessage(Procedures)
 
 Transaction = _reflection.GeneratedProtocolMessageType('Transaction', (_message.Message,), {
-
-  'KeysEntry' : _reflection.GeneratedProtocolMessageType('KeysEntry', (_message.Message,), {
-    'DESCRIPTOR' : _TRANSACTION_KEYSENTRY,
-    '__module__' : 'proto.transaction_pb2'
-    # @@protoc_insertion_point(class_scope:slog.Transaction.KeysEntry)
-    })
-  ,
   'DESCRIPTOR' : _TRANSACTION,
   '__module__' : 'proto.transaction_pb2'
   # @@protoc_insertion_point(class_scope:slog.Transaction)
   })
 _sym_db.RegisterMessage(Transaction)
-_sym_db.RegisterMessage(Transaction.KeysEntry)
 
 
-_TRANSACTION_KEYSENTRY._options = None
 # @@protoc_insertion_point(module_scope)

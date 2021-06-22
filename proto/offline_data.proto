@@ -3,7 +3,7 @@ syntax = "proto3";
 package slog;
 
 message Datum {
-    string key = 1;
-    string record = 2;
+    bytes key = 1;
+    bytes record = 2;
     uint32 master = 3;
 }

@@ -10,12 +10,12 @@ message Replica {
     // This list must have the size equal to number of partitions
     // If protocol is "tcp", these are IP addresses.
     // If protocol is "icp", these are filesystem paths.
-    repeated bytes addresses = 1;
+    repeated string addresses = 1;
     // AWS public addresses for the servers. This field is only used by the admin tool.
     // If not specified, the addresses field is used instead.
-    repeated bytes public_addresses = 2;
+    repeated string public_addresses = 2;
     // List of machines used for benchmarking. This field is only used by the admin tool
-    repeated bytes client_addresses = 3;
+    repeated string client_addresses = 3;
     // Comma-separated string of replica id (e.g "1,3,2") ordered from closest replica to
     // furthest replica, not including this replica. This field is only used by the admin tool.
     string distance_ranking = 4;
@@ -78,7 +78,7 @@ enum ExecutionType {
 message Configuration {
     // Protocol for the zmq sockets in the broker. Use "tcp" for
     // normal running and "icp" for unit and integration tests
-    bytes protocol = 1;
+    string protocol = 1;
     // Replica groups. Each group has a list of machine addresses
     // with the size equal to number of partitions
     repeated Replica replicas = 2;
@@ -111,7 +111,7 @@ message Configuration {
     // in the list. For example, ['1,2', '2,1,0', ''] means that, with a replication factor of 3, replica 0 will
     // synchronously replicate to 1 and 2, replica 1 will replicate to 2 and 0, and replica 2 will not synchronously
     // replicate to anywhere.
-    repeated bytes replication_order = 14;
+    repeated string replication_order = 14;
     // Replication of txn batches will be delayed to simulate uneven network latency
     ReplicationDelayExperiment replication_delay = 15;
     // Enable recording for the specified events
@@ -134,5 +134,5 @@ message Configuration {
     // The ratio between fetching rate for remote logs message vs fetching rate for local log messages. Expressed
     // in the format "<remote>:<local>". For example "5:1" means the interleaver tries to fetch 5 messages for
     // remote logs before fetching 1 message for local log.
-    bytes interleaver_remote_to_local_ratio = 24;
+    string interleaver_remote_to_local_ratio = 24;
 }

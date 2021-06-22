@@ -130,7 +130,9 @@ int main(int argc, char* argv[]) {
     auto txn = info.txn;
     auto& txn_internal = txn->internal();
     vector<string> reads, writes;
-    for (const auto& [k, v] : txn->keys()) {
+    for (const auto& kv : txn->keys()) {
+      const auto& k = kv.key();
+      const auto& v = kv.value_entry();
       if (v.type() == KeyType::READ) {
         reads.push_back(k);
       } else {

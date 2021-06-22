@@ -105,10 +105,10 @@ TEST_F(ForwarderTest, ForwardToSameRegion) {
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
   ASSERT_EQ(0, forwarded_txn->internal().home());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("B").metadata().master());
-  ASSERT_EQ(1U, forwarded_txn->keys().at("B").metadata().counter());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().master());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().counter());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "B").metadata().master());
+  ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "B").metadata().counter());
 }
 
 TEST_F(ForwarderTest, ForwardToAnotherRegion) {
@@ -127,10 +127,10 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     ASSERT_EQ(1, forwarded_txn->internal().home());
-    ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().master());
-    ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().counter());
-    ASSERT_EQ(1U, forwarded_txn->keys().at("X").metadata().master());
-    ASSERT_EQ(0U, forwarded_txn->keys().at("X").metadata().counter());
+    ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "C").metadata().master());
+    ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "C").metadata().counter());
+    ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "X").metadata().master());
+    ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "X").metadata().counter());
   }
 
   {
@@ -140,8 +140,8 @@ TEST_F(ForwarderTest, ForwardToAnotherRegion) {
     ASSERT_TRUE(forwarded_txn != nullptr);
     ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
     ASSERT_EQ(0, forwarded_txn->internal().home());
-    ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
-    ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
+    ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().master());
+    ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().counter());
   }
 }
 
@@ -155,10 +155,10 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
   // The txn should be forwarded to the scheduler of the same machine
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, forwarded_txn->keys().at("NEW").metadata().master());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("NEW").metadata().counter());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, forwarded_txn->keys().at("KEY").metadata().master());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("KEY").metadata().counter());
+  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, TxnValueEntry(*forwarded_txn, "NEW").metadata().master());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "NEW").metadata().counter());
+  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, TxnValueEntry(*forwarded_txn, "KEY").metadata().master());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "KEY").metadata().counter());
 }
 
 TEST_F(ForwarderTest, ForwardMultiHome) {
@@ -171,8 +171,8 @@ TEST_F(ForwarderTest, ForwardMultiHome) {
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, forwarded_txn->internal().type());
   ASSERT_EQ(-1, forwarded_txn->internal().home());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().master());
-  ASSERT_EQ(0U, forwarded_txn->keys().at("A").metadata().counter());
-  ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().master());
-  ASSERT_EQ(1U, forwarded_txn->keys().at("C").metadata().counter());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().master());
+  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "A").metadata().counter());
+  ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "C").metadata().master());
+  ASSERT_EQ(1U, TxnValueEntry(*forwarded_txn, "C").metadata().counter());
 }

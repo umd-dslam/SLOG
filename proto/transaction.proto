@@ -24,12 +24,17 @@ message MasterMetadata {
 }
 
 message ValueEntry {
-    string value = 1;
-    string new_value = 2;
+    bytes value = 1;
+    bytes new_value = 2;
     KeyType type = 3;
     oneof optional {
         MasterMetadata metadata = 4;
     }
+}
+
+message KeyValueEntry {
+    bytes key = 1;
+    ValueEntry value_entry = 2;
 }
 
 enum TransactionEvent {
@@ -112,8 +117,8 @@ message Transaction {
         RemasterProcedure remaster = 3;
     } 
 
-    map<string, ValueEntry> keys = 4;
-    repeated string deleted_keys = 5;
+    repeated KeyValueEntry keys = 4;
+    repeated bytes deleted_keys = 5;
 
     TransactionStatus status = 6;
     string abort_reason = 7;

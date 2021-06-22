@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "common/sharder.h"
 #include "proto/transaction.pb.h"
 #include "storage/storage.h"
@@ -21,44 +23,55 @@ class KeyValueExecution : public Execution {
       : sharder_(sharder), storage_(storage) {}
 
   void Execute(Transaction& txn) final {
-    auto& keys = *txn.mutable_keys();
     bool aborted = false;
     std::ostringstream abort_reason;
+    std::unordered_map<std::string, int> key_index;
+    for (int i = 0; i < txn.keys_size(); i++) {
+      key_index.emplace(txn.keys(i).key(), i);
+    }
+
     for (auto& p : txn.code().procedures()) {
       const auto& args = p.args();
       if (args.empty()) {
         continue;
       }
       if (args[0] == "SET") {
-        auto it = keys.find(args[1]);
-        if (it == keys.end() || it->second.type() != KeyType::WRITE) {
+        auto it = key_index.find(args[1]);
+        if (it == key_index.end()) {
           continue;
         }
-        it->second.set_new_value(args[2]);
+        auto value = txn.mutable_keys(it->second)->mutable_value_entry();
+        if (value->type() != KeyType::WRITE) {
+          continue;
+        }
+        value->set_new_value(args[2]);
       } else if (args[0] == "DEL") {
-        if (!keys.contains(args[1]) || keys.at(args[1]).type() != KeyType::WRITE) {
+        auto it = key_index.find(args[1]);
+        if (it != key_index.end() || txn.keys(it->second).value_entry().type() != KeyType::WRITE) {
           continue;
         }
         txn.mutable_deleted_keys()->Add(std::string(args[1]));
       } else if (args[0] == "COPY") {
-        auto src_it = keys.find(args[1]);
-        auto dst_it = keys.find(args[2]);
-        if (src_it == keys.end()) {
+        auto src_it = key_index.find(args[1]);
+        auto dst_it = key_index.find(args[2]);
+        if (src_it == key_index.end() || dst_it == key_index.end()) {
           continue;
         }
-        if (dst_it == keys.end() || dst_it->second.type() != KeyType::WRITE) {
+        const auto& src_value = txn.keys(src_it->second).value_entry();
+        auto dst_value = txn.mutable_keys(dst_it->second)->mutable_value_entry();
+        if (dst_value->type() != KeyType::WRITE) {
           continue;
         }
-        dst_it->second.set_new_value(src_it->second.value());
+        dst_value->set_new_value(src_value.value());
       } else if (args[0] == "EQ") {
-        auto it = keys.find(args[1]);
-        if (it == keys.end()) {
+        auto it = key_index.find(args[1]);
+        if (it == key_index.end()) {
           continue;
         }
-        if (it->second.value() != args[2]) {
+        const auto& value = txn.keys(it->second).value_entry().value();
+        if (value != args[2]) {
           aborted = true;
-          abort_reason << "Key = " << args[1] << ". Expected value = " << args[2]
-                       << ". Actual value = " << it->second.value();
+          abort_reason << "Key = " << args[1] << ". Expected value = " << args[2] << ". Actual value = " << value;
         }
       } else if (args[0] == "SLEEP") {
         std::this_thread::sleep_for(std::chrono::milliseconds(std::stoi(args[1])));
@@ -71,7 +84,9 @@ class KeyValueExecution : public Execution {
     } else {
       txn.set_status(TransactionStatus::COMMITTED);
 
-      for (const auto& [key, value] : txn.keys()) {
+      for (const auto& kv : txn.keys()) {
+        const auto& key = kv.key();
+        const auto& value = kv.value_entry();
         if (!sharder_->is_local_key(key) || value.type() == KeyType::READ) {
           continue;
         }

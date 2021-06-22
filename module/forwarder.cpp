@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <unordered_map>
 
 #include "common/constants.h"
 #include "common/json_utils.h"
@@ -70,18 +71,20 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
   }
 
   bool need_remote_lookup = false;
-  for (auto& [key, value] : *txn->mutable_keys()) {
+  for (auto& kv : *txn->mutable_keys()) {
+    const auto& key = kv.key();
+    auto value = kv.mutable_value_entry();
     auto partition = sharder_->compute_partition(key);
 
     // If this is a local partition, lookup the master info from the local storage
     if (partition == config()->local_partition()) {
       Metadata metadata;
       if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
-        value.mutable_metadata()->set_master(metadata.master);
-        value.mutable_metadata()->set_counter(metadata.counter);
+        value->mutable_metadata()->set_master(metadata.master);
+        value->mutable_metadata()->set_counter(metadata.counter);
       } else {
-        value.mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-        value.mutable_metadata()->set_counter(0);
+        value->mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
+        value->mutable_metadata()->set_counter(0);
       }
     } else {
       // Otherwise, add the key to the appropriate remote lookup master request
@@ -140,7 +143,7 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
   const auto& lookup_master = env->request().lookup_master();
   Envelope lookup_env;
   auto lookup_response = lookup_env.mutable_response()->mutable_lookup_master();
-  auto metadata_map = lookup_response->mutable_master_metadata();
+  auto results = lookup_response->mutable_lookup_results();
 
   lookup_response->mutable_txn_ids()->CopyFrom(lookup_master.txn_ids());
   for (int i = 0; i < lookup_master.keys_size(); i++) {
@@ -150,14 +153,16 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
       Metadata metadata;
       if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
         // If key exists, add the metadata of current key to the response
-        auto& response_metadata = (*metadata_map)[key];
-        response_metadata.set_master(metadata.master);
-        response_metadata.set_counter(metadata.counter);
+        auto key_metadata = results->Add();
+        key_metadata->set_key(key);
+        key_metadata->mutable_metadata()->set_master(metadata.master);
+        key_metadata->mutable_metadata()->set_counter(metadata.counter);
       } else {
         // Otherwise, assign it to the default region for new key
-        auto& new_metadata = (*metadata_map)[key];
-        new_metadata.set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-        new_metadata.set_counter(0);
+        auto key_metadata = results->Add();
+        key_metadata->set_key(key);
+        key_metadata->mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
+        key_metadata->mutable_metadata()->set_counter(metadata.counter);
       }
     }
   }
@@ -171,6 +176,11 @@ void Forwarder::OnInternalResponseReceived(EnvelopePtr&& env) {
   }
 
   const auto& lookup_master = env->response().lookup_master();
+  std::unordered_map<std::string, int> index;
+  for (int i = 0; i < lookup_master.lookup_results_size(); i++) {
+    index[lookup_master.lookup_results(i).key()] = i;
+  }
+
   for (auto txn_id : lookup_master.txn_ids()) {
     auto pending_txn_it = pending_transactions_.find(txn_id);
     if (pending_txn_it == pending_transactions_.end()) {
@@ -180,11 +190,12 @@ void Forwarder::OnInternalResponseReceived(EnvelopePtr&& env) {
     // Transfer master info from the lookup response to its intended transaction
     auto& pending_env = pending_txn_it->second;
     auto txn = pending_env->mutable_request()->mutable_forward_txn()->mutable_txn();
-    for (auto& [key, value] : *txn->mutable_keys()) {
-      if (!value.has_metadata()) {
-        auto it = lookup_master.master_metadata().find(key);
-        if (it != lookup_master.master_metadata().end()) {
-          value.mutable_metadata()->CopyFrom(it->second);
+    for (auto& kv : *txn->mutable_keys()) {
+      if (!kv.value_entry().has_metadata()) {
+        auto it = index.find(kv.key());
+        if (it != index.end()) {
+          const auto& result = lookup_master.lookup_results(it->second).metadata();
+          kv.mutable_value_entry()->mutable_metadata()->CopyFrom(result);
         }
       }
     }
@@ -209,7 +220,7 @@ void Forwarder::Forward(EnvelopePtr&& env) {
   if (txn_type == TransactionType::SINGLE_HOME) {
     // If this current replica is its home, forward to the sequencer of the same machine
     // Otherwise, forward to the sequencer of a random machine in its home region
-    auto home_replica = txn->keys().begin()->second.metadata().master();
+    auto home_replica = txn->keys().begin()->value_entry().metadata().master();
     if (home_replica == config()->local_replica()) {
       VLOG(3) << "Current region is home of txn " << txn_id;
 

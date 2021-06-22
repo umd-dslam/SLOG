@@ -77,7 +77,7 @@ ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_part
   return configs;
 }
 
-Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyMetadata>& keys,
                                  const std::vector<std::vector<std::string>> code, std::optional<int> remaster,
                                  MachineId coordinator) {
   auto txn = MakeTransaction(keys, code, remaster, coordinator);
@@ -88,7 +88,7 @@ Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const
   return txn;
 }
 
-TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyMetadata>& keys,
                             const std::vector<std::vector<std::string>> code, std::optional<int> remaster) {
   auto txn = MakeTestTransaction(config, id, keys, code, remaster);
 
@@ -110,6 +110,12 @@ TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std:
     holder.AddLockOnlyTxn(lo_txns[i]);
   }
   return holder;
+}
+
+ValueEntry TxnValueEntry(const Transaction& txn, const std::string& key) {
+  auto it = std::find_if(txn.keys().begin(), txn.keys().end(),
+                         [&key](const KeyValueEntry& entry) { return entry.key() == key; });
+  return it->value_entry();
 }
 
 TestSlog::TestSlog(const ConfigurationPtr& config)

@@ -36,8 +36,9 @@ RemasterOccurredResult SimpleRemasterManager::RemasterOccured(const Key& remaste
   for (auto& queue_pair : blocked_queue_) {
     if (!queue_pair.second.empty()) {
       auto txn = queue_pair.second.front();
-      for (const auto& [key, value] : txn->keys()) {
-        if (static_cast<int>(value.metadata().master()) == txn->internal().home() && key == remaster_key) {
+      for (const auto& kv : txn->keys()) {
+        if (static_cast<int>(kv.value_entry().metadata().master()) == txn->internal().home() &&
+            kv.key() == remaster_key) {
           // TODO: check here if counters match, saves an iteration through all keys
           TryToUnblock(queue_pair.first, result);
           break;

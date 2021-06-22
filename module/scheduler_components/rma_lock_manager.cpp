@@ -111,14 +111,14 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
   auto ins = txn_info_.try_emplace(txn_id, num_required_locks);
   auto& txn_info = ins.first->second;
 
-  for (const auto& [key, value] : txn.keys()) {
+  for (const auto& kv : txn.keys()) {
     // Skip keys that does not belong to the assigned home. Remaster txn is an exception where
     // it is allowed that the metadata on the txn does not match its assigned home
-    if (!is_remaster && static_cast<int>(value.metadata().master()) != home) {
+    if (!is_remaster && static_cast<int>(kv.value_entry().metadata().master()) != home) {
       continue;
     }
 
-    auto key_replica = MakeKeyReplica(key, home);
+    auto key_replica = MakeKeyReplica(kv.key(), home);
     txn_info.keys.push_back(key_replica);
 
     auto& lock_state = lock_table_[key_replica];
@@ -126,7 +126,7 @@ AcquireLocksResult RMALockManager::AcquireLocks(const Transaction& txn) {
     DCHECK(!lock_state.Contains(txn_id)) << "Txn requested lock twice: " << txn_id << ", " << key_replica;
 
     auto before_mode = lock_state.mode;
-    switch (value.type()) {
+    switch (kv.value_entry().type()) {
       case KeyType::READ:
         if (lock_state.AcquireReadLock(txn_id)) {
           txn_info.num_waiting_for--;

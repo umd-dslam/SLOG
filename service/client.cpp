@@ -51,7 +51,7 @@ void ExecuteTxn(const char* txn_file) {
   d.Accept(writer);
   LOG(INFO) << "Parsed JSON: " << buffer.GetString();
 
-  vector<KeyEntry> keys;
+  vector<KeyMetadata> keys;
 
   // 2. Construct a request
   auto write_set_arr = d["write_set"].GetArray();

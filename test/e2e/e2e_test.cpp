@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <thread>
@@ -77,15 +78,15 @@ TEST_F(E2ETest, BasicSingleHomeSingleParition) {
   ASSERT_EQ(txn1_resp.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn1_resp.internal().type(), TransactionType::SINGLE_HOME);
   ASSERT_EQ(txn1_resp.keys_size(), 1);
-  ASSERT_EQ(txn1_resp.keys().at("A").value(), "valA");
-  ASSERT_EQ(txn1_resp.keys().at("A").new_value(), "newA");
+  ASSERT_EQ(TxnValueEntry(txn1_resp, "A").value(), "valA");
+  ASSERT_EQ(TxnValueEntry(txn1_resp, "A").new_value(), "newA");
 
   test_slogs[0]->SendTxn(txn2);
   auto txn2_resp = test_slogs[0]->RecvTxnResult();
   ASSERT_EQ(txn2_resp.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn2_resp.internal().type(), TransactionType::SINGLE_HOME);
   ASSERT_EQ(txn2_resp.keys_size(), 1);
-  ASSERT_EQ(txn2_resp.keys().at("A").value(), "newA");
+  ASSERT_EQ(TxnValueEntry(txn2_resp, "A").value(), "newA");
 }
 
 TEST_F(E2ETest, MultiPartitionTxn) {
@@ -97,8 +98,8 @@ TEST_F(E2ETest, MultiPartitionTxn) {
     ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
     ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);
     ASSERT_EQ(txn_resp.keys().size(), 2);
-    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
-    ASSERT_EQ(txn_resp.keys().at("B").new_value(), "newB");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "A").value(), "valA");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "B").new_value(), "newB");
   }
 }
 
@@ -111,8 +112,8 @@ TEST_F(E2ETest, MultiHomeTxn) {
     ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
     ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(txn_resp.keys().size(), 2);
-    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
-    ASSERT_EQ(txn_resp.keys().at("C").new_value(), "newC");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "A").value(), "valA");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "C").new_value(), "newC");
   }
 }
 
@@ -125,9 +126,9 @@ TEST_F(E2ETest, MultiHomeMultiPartitionTxn) {
     ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
     ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(txn_resp.keys().size(), 3);
-    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
-    ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
-    ASSERT_EQ(txn_resp.keys().at("C").value(), "valC");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "A").value(), "valA");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "X").value(), "valX");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "C").value(), "valC");
   }
 }
 
@@ -154,8 +155,8 @@ TEST_F(E2ETest, RemasterTxn) {
   ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);  // used to be MH
   ASSERT_EQ(txn_resp.keys().size(), 2);
-  ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
-  ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
+  ASSERT_EQ(TxnValueEntry(txn_resp, "A").value(), "valA");
+  ASSERT_EQ(TxnValueEntry(txn_resp, "X").value(), "valX");
 }
 #endif
 
@@ -175,7 +176,7 @@ TEST_F(E2ETest, AbortTxnBadCommand) {
   ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(txn_resp.internal().type(), TransactionType::SINGLE_HOME);
   // Value of B must not change because the previous txn was aborted
-  ASSERT_EQ(txn_resp.keys().at("B").value(), "valB");
+  ASSERT_EQ(TxnValueEntry(txn_resp, "B").value(), "valB");
 }
 
 TEST_F(E2ETest, AbortTxnEmptyKeySets) {
@@ -204,8 +205,8 @@ TEST_F(E2ETestBypassMHOrderer, MultiHomeSinglePartitionTxn) {
     auto txn_resp = test_slogs[i]->RecvTxnResult();
     ASSERT_EQ(TransactionStatus::COMMITTED, txn_resp.status());
     ASSERT_EQ(TransactionType::MULTI_HOME_OR_LOCK_ONLY, txn_resp.internal().type());
-    ASSERT_EQ("valA", txn_resp.keys().at("A").value());
-    ASSERT_EQ("valC", txn_resp.keys().at("C").value());
+    ASSERT_EQ("valA", TxnValueEntry(txn_resp, "A").value());
+    ASSERT_EQ("valC", TxnValueEntry(txn_resp, "C").value());
   }
 }
 
@@ -218,9 +219,9 @@ TEST_F(E2ETestBypassMHOrderer, MultiHomeMultiPartitionTxn) {
     ASSERT_EQ(txn_resp.status(), TransactionStatus::COMMITTED);
     ASSERT_EQ(txn_resp.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(txn_resp.keys().size(), 3);
-    ASSERT_EQ(txn_resp.keys().at("A").value(), "valA");
-    ASSERT_EQ(txn_resp.keys().at("X").value(), "valX");
-    ASSERT_EQ(txn_resp.keys().at("C").value(), "valC");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "A").value(), "valA");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "X").value(), "valX");
+    ASSERT_EQ(TxnValueEntry(txn_resp, "C").value(), "valC");
   }
 }
 

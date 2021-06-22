@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x18proto/offline_data.proto\x12\x04slog\"4\n\x05\x44\x61tum\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06record\x18\x02 \x01(\t\x12\x0e\n\x06master\x18\x03 \x01(\rb\x06proto3'
+  serialized_pb=b'\n\x18proto/offline_data.proto\x12\x04slog\"4\n\x05\x44\x61tum\x12\x0b\n\x03key\x18\x01 \x01(\x0c\x12\x0e\n\x06record\x18\x02 \x01(\x0c\x12\x0e\n\x06master\x18\x03 \x01(\rb\x06proto3'
 )
 
 
@@ -35,15 +35,15 @@ _DATUM = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='key', full_name='slog.Datum.key', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='record', full_name='slog.Datum.record', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),

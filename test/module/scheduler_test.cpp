@@ -108,11 +108,11 @@ TEST_F(SchedulerTest, SinglePartitionTransaction) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 2);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
-  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
-  ASSERT_EQ(output_txn.keys().at("D").new_value(), "newD");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").value(), "valueD");
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").new_value(), "newD");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
@@ -126,11 +126,11 @@ TEST_F(SchedulerTest, MultiPartitionTransaction1Active1Passive) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 2);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
-  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
-  ASSERT_EQ(output_txn.keys().at("C").new_value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").value(), "valueC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").new_value(), "valueA");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
@@ -144,12 +144,12 @@ TEST_F(SchedulerTest, MultiPartitionTransactionMutualWait2Partitions) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 2);
-  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
-  ASSERT_EQ(output_txn.keys().at("B").new_value(), "valueC");
-  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
-  ASSERT_EQ(output_txn.keys().at("C").new_value(), "valueB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").value(), "valueB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").new_value(), "valueC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").value(), "valueC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").new_value(), "valueB");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
@@ -164,15 +164,15 @@ TEST_F(SchedulerTest, MultiPartitionTransactionWriteOnly) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 3);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
-  ASSERT_EQ(output_txn.keys().at("A").new_value(), "newA");
-  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
-  ASSERT_EQ(output_txn.keys().at("B").new_value(), "newB");
-  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
-  ASSERT_EQ(output_txn.keys().at("C").new_value(), "newC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").new_value(), "newA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").value(), "valueB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").new_value(), "newB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").value(), "valueC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").new_value(), "newC");
 }
 
 TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
@@ -187,12 +187,12 @@ TEST_F(SchedulerTest, MultiPartitionTransactionReadOnly) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 3);
-  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
-  ASSERT_EQ(output_txn.keys().at("E").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("E").value(), "valueE");
-  ASSERT_EQ(output_txn.keys().at("F").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("F").value(), "valueF");
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").value(), "valueD");
+  ASSERT_EQ(TxnValueEntry(output_txn, "E").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "E").value(), "valueE");
+  ASSERT_EQ(TxnValueEntry(output_txn, "F").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "F").value(), "valueF");
 }
 
 TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
@@ -218,21 +218,21 @@ TEST_F(SchedulerTest, SimpleMultiHomeBatch) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 6);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
-  ASSERT_EQ(output_txn.keys().at("X").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("X").value(), "valueX");
-  ASSERT_EQ(output_txn.keys().at("C").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("C").value(), "valueC");
-  ASSERT_EQ(output_txn.keys().at("B").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("B").value(), "valueB");
-  ASSERT_EQ(output_txn.keys().at("B").new_value(), "newB");
-  ASSERT_EQ(output_txn.keys().at("Y").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("Y").value(), "valueY");
-  ASSERT_EQ(output_txn.keys().at("Y").new_value(), "newY");
-  ASSERT_EQ(output_txn.keys().at("Z").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("Z").value(), "valueZ");
-  ASSERT_EQ(output_txn.keys().at("Z").new_value(), "newZ");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "X").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "X").value(), "valueX");
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "C").value(), "valueC");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").value(), "valueB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "B").new_value(), "newB");
+  ASSERT_EQ(TxnValueEntry(output_txn, "Y").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "Y").value(), "valueY");
+  ASSERT_EQ(TxnValueEntry(output_txn, "Y").new_value(), "newY");
+  ASSERT_EQ(TxnValueEntry(output_txn, "Z").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "Z").value(), "valueZ");
+  ASSERT_EQ(TxnValueEntry(output_txn, "Z").new_value(), "newZ");
 }
 
 TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
@@ -246,11 +246,11 @@ TEST_F(SchedulerTest, SinglePartitionTransactionValidateMasters) {
   LOG(INFO) << output_txn;
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 2);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
-  ASSERT_EQ(output_txn.keys().at("D").type(), KeyType::WRITE);
-  ASSERT_EQ(output_txn.keys().at("D").value(), "valueD");
-  ASSERT_EQ(output_txn.keys().at("D").new_value(), "newD");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").type(), KeyType::WRITE);
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").value(), "valueD");
+  ASSERT_EQ(TxnValueEntry(output_txn, "D").new_value(), "newD");
 }
 
 #if defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY)
@@ -274,8 +274,8 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.internal().id(), 1000);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 1);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
 }
 #endif /* defined(REMASTER_PROTOCOL_SIMPLE) || defined(REMASTER_PROTOCOL_PER_KEY) */
 
@@ -307,8 +307,8 @@ TEST_F(SchedulerTest, SinglePartitionTransactionProcessRemaster) {
   ASSERT_EQ(output_txn.internal().id(), 2000U);
   ASSERT_EQ(output_txn.status(), TransactionStatus::COMMITTED);
   ASSERT_EQ(output_txn.keys_size(), 1);
-  ASSERT_EQ(output_txn.keys().at("A").type(), KeyType::READ);
-  ASSERT_EQ(output_txn.keys().at("A").value(), "valueA");
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").type(), KeyType::READ);
+  ASSERT_EQ(TxnValueEntry(output_txn, "A").value(), "valueA");
 }
 #endif /* REMASTERING_PROTOCOL_COUNTERLESS */
 

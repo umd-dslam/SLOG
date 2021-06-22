@@ -17,11 +17,11 @@ using std::unordered_map;
 
 namespace slog {
 
-struct KeyEntry {
-  KeyEntry(const Key& key, KeyType type = KeyType::READ, std::optional<Metadata> metadata = {})
+struct KeyMetadata {
+  KeyMetadata(const Key& key, KeyType type = KeyType::READ, std::optional<Metadata> metadata = {})
       : key(key), type(type), metadata(metadata) {}
 
-  KeyEntry(const Key& key, KeyType type, uint32_t master) : KeyEntry(key, type, {{master}}) {}
+  KeyMetadata(const Key& key, KeyType type, uint32_t master) : KeyMetadata(key, type, {{master}}) {}
 
   Key key;
   KeyType type;
@@ -30,14 +30,14 @@ struct KeyEntry {
 
 /**
  * Creates a new transaction
- * @param keys                Keys of the transaction
+ * @param key_metadatas       Keys and metadata
  * @param code                Code
  * @param remaster            If specify, `code` is ignored and the txn becomes a remaster txn
  * @param coordinating_server MachineId of the server in charge of responding the
  *                            transaction result to the client.
  * @return                    A new transaction having given properties
  */
-Transaction* MakeTransaction(const std::vector<KeyEntry>& keys,
+Transaction* MakeTransaction(const std::vector<KeyMetadata>& key_metadatas,
                              const std::vector<std::vector<std::string>>& code = {{}},
                              std::optional<int> remaster = std::nullopt, MachineId coordinating_server = 0);
 
@@ -85,21 +85,10 @@ void MergeTransaction(Transaction& txn, const Transaction& other);
 std::ostream& operator<<(std::ostream& os, const Transaction& txn);
 std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata);
 
-bool operator==(const Transaction& txn1, const Transaction txn2);
 bool operator==(const MasterMetadata& metadata1, const MasterMetadata& metadata2);
 bool operator==(const ValueEntry& val1, const ValueEntry& val2);
-template <typename K, typename V>
-bool operator==(google::protobuf::Map<K, V> map1, google::protobuf::Map<K, V> map2) {
-  if (map1.size() != map2.size()) {
-    return false;
-  }
-  for (const auto& [key, value] : map1) {
-    if (!map2.contains(key) || !(map2.at(key) == value)) {
-      return false;
-    }
-  }
-  return true;
-}
+bool operator==(const KeyValueEntry& kv1, const KeyValueEntry& kv2);
+bool operator==(const Transaction& txn1, const Transaction txn2);
 
 /**
  * Extract txns from a batch

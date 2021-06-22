@@ -37,7 +37,7 @@ std::pair<Transaction*, TransactionProfile> RemasteringWorkload::NextRemasterTra
   pro.is_multi_home = false;
   pro.is_multi_partition = false;
 
-  vector<KeyEntry> keys;
+  vector<KeyMetadata> keys;
 
   auto home = uniform_int_distribution<>(0, config_->num_replicas() - 1)(rg_);
   auto partition = uniform_int_distribution<>(0, config_->num_partitions() - 1)(rg_);

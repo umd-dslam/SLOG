@@ -83,8 +83,8 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
     auto& batched_txn = batches[0].transactions().at(0);
     ASSERT_EQ(batched_txn.internal().id(), 1000);
     ASSERT_EQ(batched_txn.keys_size(), 2);
-    ASSERT_EQ(batched_txn.keys().at("A"), txn->keys().at("A"));
-    ASSERT_EQ(batched_txn.keys().at("C"), txn->keys().at("C"));
+    ASSERT_EQ(TxnValueEntry(batched_txn, "A"), TxnValueEntry(*txn, "A"));
+    ASSERT_EQ(TxnValueEntry(batched_txn, "C"), TxnValueEntry(*txn, "C"));
   }
 
   {
@@ -95,7 +95,7 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
     auto& batched_txn = batches[0].transactions().at(0);
     ASSERT_EQ(batched_txn.internal().id(), 1000);
     ASSERT_EQ(batched_txn.keys_size(), 1);
-    ASSERT_EQ(batched_txn.keys().at("B"), txn->keys().at("B"));
+    ASSERT_EQ(TxnValueEntry(batched_txn, "B"), TxnValueEntry(*txn, "B"));
   }
 
   // All batch partitions are sent to a machine in the remote replica
@@ -108,8 +108,8 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
       auto& batched_txn = batches[0].transactions().at(0);
       ASSERT_EQ(batched_txn.internal().id(), 1000);
       ASSERT_EQ(batched_txn.keys_size(), 2);
-      ASSERT_EQ(batched_txn.keys().at("A"), txn->keys().at("A"));
-      ASSERT_EQ(batched_txn.keys().at("C"), txn->keys().at("C"));
+      ASSERT_EQ(TxnValueEntry(batched_txn, "A"), TxnValueEntry(*txn, "A"));
+      ASSERT_EQ(TxnValueEntry(batched_txn, "C"), TxnValueEntry(*txn, "C"));
     }
     ASSERT_EQ(batches[1].transactions_size(), 1);
     ASSERT_EQ(batches[1].transaction_type(), TransactionType::SINGLE_HOME);
@@ -117,7 +117,7 @@ TEST_P(SequencerTest, SingleHomeTransaction) {
       auto& batched_txn = batches[1].transactions().at(0);
       ASSERT_EQ(batched_txn.internal().id(), 1000);
       ASSERT_EQ(batched_txn.keys_size(), 1);
-      ASSERT_EQ(batched_txn.keys().at("B"), txn->keys().at("B"));
+      ASSERT_EQ(TxnValueEntry(batched_txn, "B"), TxnValueEntry(*txn, "B"));
     }
   }
 }
@@ -143,8 +143,8 @@ TEST_P(SequencerTest, MultiHomeTransaction1) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 2);
-    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
-    ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "C"), TxnValueEntry(*txn, "C"));
   }
 
   {
@@ -155,8 +155,8 @@ TEST_P(SequencerTest, MultiHomeTransaction1) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 2);
-    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
-    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "B"), TxnValueEntry(*txn, "B"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "D"), TxnValueEntry(*txn, "D"));
   }
 
   {
@@ -169,8 +169,8 @@ TEST_P(SequencerTest, MultiHomeTransaction1) {
       ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
       ASSERT_EQ(lo_txn.internal().home(), 0);
       ASSERT_EQ(lo_txn.keys_size(), 2);
-      ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
-      ASSERT_EQ(lo_txn.keys().at("C"), txn->keys().at("C"));
+      ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
+      ASSERT_EQ(TxnValueEntry(lo_txn, "C"), TxnValueEntry(*txn, "C"));
     }
     {
       auto lo_txn = batches[1].transactions().at(0);
@@ -178,8 +178,8 @@ TEST_P(SequencerTest, MultiHomeTransaction1) {
       ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
       ASSERT_EQ(lo_txn.internal().home(), 0);
       ASSERT_EQ(lo_txn.keys_size(), 2);
-      ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
-      ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+      ASSERT_EQ(TxnValueEntry(lo_txn, "B"), TxnValueEntry(*txn, "B"));
+      ASSERT_EQ(TxnValueEntry(lo_txn, "D"), TxnValueEntry(*txn, "D"));
     }
   }
 }
@@ -213,8 +213,8 @@ TEST_P(SequencerTest, MultiHomeTransaction2) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 2);
-    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
-    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "B"), TxnValueEntry(*txn, "B"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "D"), TxnValueEntry(*txn, "D"));
   }
 
   {
@@ -229,8 +229,8 @@ TEST_P(SequencerTest, MultiHomeTransaction2) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 2);
-    ASSERT_EQ(lo_txn.keys().at("B"), txn->keys().at("B"));
-    ASSERT_EQ(lo_txn.keys().at("D"), txn->keys().at("D"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "B"), TxnValueEntry(*txn, "B"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "D"), TxnValueEntry(*txn, "D"));
   }
 }
 
@@ -253,7 +253,7 @@ TEST_P(SequencerTest, RemasterTransaction) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 1);
-    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
     ASSERT_TRUE(lo_txn.remaster().is_new_master_lock_only());
   }
 
@@ -275,7 +275,7 @@ TEST_P(SequencerTest, RemasterTransaction) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 1);
-    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
     ASSERT_TRUE(lo_txn.remaster().is_new_master_lock_only());
 
     ASSERT_EQ(batches[1].transactions_size(), 0);
@@ -305,7 +305,7 @@ TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 1);
-    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
   }
 
   {
@@ -326,7 +326,7 @@ TEST_P(SequencerTest, MultiHomeTransactionBypassedOrderer) {
     ASSERT_EQ(lo_txn.internal().type(), TransactionType::MULTI_HOME_OR_LOCK_ONLY);
     ASSERT_EQ(lo_txn.internal().home(), 0);
     ASSERT_EQ(lo_txn.keys_size(), 1);
-    ASSERT_EQ(lo_txn.keys().at("A"), txn->keys().at("A"));
+    ASSERT_EQ(TxnValueEntry(lo_txn, "A"), TxnValueEntry(*txn, "A"));
 
     ASSERT_EQ(batches[1].transactions_size(), 0);
   }

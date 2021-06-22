@@ -107,7 +107,9 @@ AcquireLocksResult OldLockManager::AcquireLocks(const Transaction& txn) {
   auto ins = txn_info_.try_emplace(txn_id, txn.keys_size());
   auto& txn_info = ins.first->second;
 
-  for (const auto& [key, value] : txn.keys()) {
+  for (const auto& kv : txn.keys()) {
+    const auto& key = kv.key();
+    const auto& value = kv.value_entry();
     // Skip keys that does not belong to the assigned home
     if (static_cast<int>(value.metadata().master()) != txn.internal().home()) {
       continue;

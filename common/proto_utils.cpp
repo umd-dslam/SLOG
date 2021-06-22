@@ -7,23 +7,26 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <unordered_set>
 
 using std::string;
 using std::vector;
 
 namespace slog {
 
-Transaction* MakeTransaction(const vector<KeyEntry>& keys, const std::vector<std::vector<std::string>>& code,
-                             std::optional<int> remaster, MachineId coordinating_server) {
+Transaction* MakeTransaction(const vector<KeyMetadata>& key_metadatas,
+                             const std::vector<std::vector<std::string>>& code, std::optional<int> remaster,
+                             MachineId coordinating_server) {
   Transaction* txn = new Transaction();
-  for (const auto& key : keys) {
-    ValueEntry val;
-    val.set_type(key.type);
-    if (key.metadata.has_value()) {
-      val.mutable_metadata()->set_master(key.metadata->master);
-      val.mutable_metadata()->set_counter(key.metadata->counter);
+  for (const auto& key_metadata : key_metadatas) {
+    auto new_entry = txn->mutable_keys()->Add();
+    new_entry->set_key(key_metadata.key);
+    auto new_value_entry = new_entry->mutable_value_entry();
+    new_value_entry->set_type(key_metadata.type);
+    if (key_metadata.metadata.has_value()) {
+      new_value_entry->mutable_metadata()->set_master(key_metadata.metadata->master);
+      new_value_entry->mutable_metadata()->set_counter(key_metadata.metadata->counter);
     }
-    txn->mutable_keys()->insert({key.key, std::move(val)});
   }
   if (remaster.has_value()) {
     txn->mutable_remaster()->set_new_master(remaster.value());
@@ -51,7 +54,7 @@ TransactionType SetTransactionType(Transaction& txn) {
 
   bool master_metadata_is_complete = !txn.keys().empty();
   for (const auto& kv : txn.keys()) {
-    if (!kv.second.has_metadata()) {
+    if (!kv.value_entry().has_metadata()) {
       master_metadata_is_complete = false;
       break;
     }
@@ -63,9 +66,9 @@ TransactionType SetTransactionType(Transaction& txn) {
   }
 
   bool is_single_home = true;
-  auto home = txn.keys().begin()->second.metadata().master();
+  auto home = txn.keys().begin()->value_entry().metadata().master();
   for (const auto& kv : txn.keys()) {
-    if (kv.second.metadata().master() != home) {
+    if (kv.value_entry().metadata().master() != home) {
       is_single_home = false;
       break;
     }
@@ -121,10 +124,10 @@ Transaction* GeneratePartitionedTxn(const SharderPtr& sharder, Transaction* txn,
 
   // Remove keys that are not in the target partition
   for (auto it = new_txn->mutable_keys()->begin(); it != new_txn->mutable_keys()->end();) {
-    if (sharder->compute_partition(it->first) != partition) {
+    if (sharder->compute_partition(it->key()) != partition) {
       it = new_txn->mutable_keys()->erase(it);
     } else {
-      auto master = it->second.metadata().master();
+      auto master = it->value_entry().metadata().master();
       if (master >= involved_replicas.size()) {
         involved_replicas.resize(master + 1);
       }
@@ -161,15 +164,15 @@ void PopulateInvolvedReplicas(Transaction& txn) {
 
   if (txn.internal().type() == TransactionType::SINGLE_HOME) {
     txn.mutable_internal()->mutable_involved_replicas()->Clear();
-    CHECK(txn.keys().begin()->second.has_metadata());
-    txn.mutable_internal()->add_involved_replicas(txn.keys().begin()->second.metadata().master());
+    CHECK(txn.keys().begin()->value_entry().has_metadata());
+    txn.mutable_internal()->add_involved_replicas(txn.keys().begin()->value_entry().metadata().master());
     return;
   }
 
   vector<uint32_t> involved_replicas;
   for (const auto& kv : txn.keys()) {
-    CHECK(kv.second.has_metadata());
-    involved_replicas.push_back(kv.second.metadata().master());
+    CHECK(kv.value_entry().has_metadata());
+    involved_replicas.push_back(kv.value_entry().metadata().master());
   }
 
 #ifdef REMASTER_PROTOCOL_COUNTERLESS
@@ -186,10 +189,10 @@ void PopulateInvolvedReplicas(Transaction& txn) {
 void PopulateInvolvedPartitions(const SharderPtr& sharder, Transaction& txn) {
   vector<bool> involved_partitions(sharder->num_partitions(), false);
   vector<bool> active_partitions(sharder->num_partitions(), false);
-  for (const auto& [key, value] : txn.keys()) {
-    auto partition = sharder->compute_partition(key);
+  for (const auto& kv : txn.keys()) {
+    auto partition = sharder->compute_partition(kv.key());
     involved_partitions[partition] = true;
-    if (value.type() == KeyType::WRITE) {
+    if (kv.value_entry().type() == KeyType::WRITE) {
       active_partitions[partition] = true;
     }
   }
@@ -224,8 +227,14 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
     txn.set_status(TransactionStatus::ABORTED);
     txn.set_abort_reason(other.abort_reason());
   } else if (txn.status() != TransactionStatus::ABORTED) {
+    std::unordered_set<std::string> existing_keys;
+    for (const auto& kv : txn.keys()) {
+      existing_keys.insert(kv.key());
+    }
     for (const auto& kv : other.keys()) {
-      txn.mutable_keys()->insert(kv);
+      if (existing_keys.find(kv.key()) == existing_keys.end()) {
+        txn.mutable_keys()->Add()->CopyFrom(kv);
+      }
     }
   }
   txn.mutable_internal()->mutable_events()->MergeFrom(other.internal().events());
@@ -256,7 +265,9 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   }
   os << "Key set:\n";
   os << std::setfill(' ');
-  for (const auto& [k, v] : txn.keys()) {
+  for (const auto& kv : txn.keys()) {
+    const auto& k = kv.key();
+    const auto& v = kv.value_entry();
     os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << k << "\n";
     os << "\tValue: " << v.value() << "\n";
     if (v.type() == KeyType::WRITE) {
@@ -295,12 +306,6 @@ std::ostream& operator<<(std::ostream& os, const MasterMetadata& metadata) {
   return os;
 }
 
-bool operator==(const Transaction& txn1, const Transaction txn2) {
-  return txn1.status() == txn2.status() && txn1.keys() == txn2.keys() && txn1.program_case() == txn2.program_case() &&
-         txn1.abort_reason() == txn2.abort_reason() && txn1.internal().id() == txn2.internal().id() &&
-         txn1.internal().type() == txn2.internal().type();
-}
-
 bool operator==(const MasterMetadata& metadata1, const MasterMetadata& metadata2) {
   return metadata1.master() == metadata2.master() && metadata1.counter() == metadata2.counter();
 }
@@ -308,6 +313,25 @@ bool operator==(const MasterMetadata& metadata1, const MasterMetadata& metadata2
 bool operator==(const ValueEntry& val1, const ValueEntry& val2) {
   return val1.value() == val2.value() && val1.new_value() == val2.new_value() && val1.type() == val2.type() &&
          val1.metadata() == val2.metadata();
+}
+
+bool operator==(const KeyValueEntry& kv1, const KeyValueEntry& kv2) {
+  return kv1.key() == kv2.key() && kv1.value_entry() == kv2.value_entry();
+}
+
+bool operator==(const Transaction& txn1, const Transaction txn2) {
+  bool ok = txn1.status() == txn2.status() && txn1.keys_size() == txn2.keys_size() &&
+            txn1.program_case() == txn2.program_case() && txn1.abort_reason() == txn2.abort_reason() &&
+            txn1.internal().id() == txn2.internal().id() && txn1.internal().type() == txn2.internal().type();
+  if (!ok) {
+    return false;
+  }
+  for (int i = 0; i < txn1.keys_size(); i++) {
+    if (!(txn1.keys(i) == txn2.keys(i))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 vector<Transaction*> Unbatch(internal::Batch* batch) {

@@ -195,7 +195,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     }
   }
 
-  vector<KeyEntry> keys;
+  vector<KeyMetadata> keys;
   vector<vector<string>> code;
 
   auto writes = params_.GetUInt32(WRITES);

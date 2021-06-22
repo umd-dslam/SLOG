@@ -28,13 +28,15 @@ using ConfigVec = std::vector<ConfigurationPtr>;
 ConfigVec MakeTestConfigurations(string&& prefix, int num_replicas, int num_partitions,
                                  internal::Configuration common_config = {});
 
-Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+Transaction* MakeTestTransaction(const ConfigurationPtr& config, TxnId id, const std::vector<KeyMetadata>& keys,
                                  const std::vector<std::vector<std::string>> code = {{}},
                                  std::optional<int> remaster = std::nullopt, MachineId coordinator = 0);
 
-TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyEntry>& keys,
+TxnHolder MakeTestTxnHolder(const ConfigurationPtr& config, TxnId id, const std::vector<KeyMetadata>& keys,
                             const std::vector<std::vector<std::string>> code = {{}},
                             std::optional<int> remaster = std::nullopt);
+
+ValueEntry TxnValueEntry(const Transaction& txn, const std::string& key);
 
 using ModuleRunnerPtr = unique_ptr<ModuleRunner>;
 

@@ -38,16 +38,16 @@ AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
 
   int num_relevant_locks = 0;
   vector<TxnId> blocking_txns;
-  for (const auto& [key, value] : txn.keys()) {
-    if (!is_remaster && static_cast<int>(value.metadata().master()) != home) {
+  for (const auto& kv : txn.keys()) {
+    if (!is_remaster && static_cast<int>(kv.value_entry().metadata().master()) != home) {
       continue;
     }
     ++num_relevant_locks;
 
-    auto key_replica = MakeKeyReplica(key, home);
+    auto key_replica = MakeKeyReplica(kv.key(), home);
     auto& lock_queue_tail = lock_table_[key_replica];
 
-    switch (value.type()) {
+    switch (kv.value_entry().type()) {
       case KeyType::READ: {
         auto b_txn = lock_queue_tail.AcquireReadLock(txn_id);
         if (b_txn.has_value()) {

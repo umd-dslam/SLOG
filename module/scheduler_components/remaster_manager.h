@@ -68,7 +68,9 @@ class RemasterManager {
   static VerifyMasterResult CheckCounters(const Transaction& txn, bool filter_by_home,
                                           const shared_ptr<const Storage<Key, Record>>& storage) {
     auto waiting = false;
-    for (const auto& [key, value] : txn.keys()) {
+    for (const auto& kv : txn.keys()) {
+      const auto& key = kv.key();
+      const auto& value = kv.value_entry();
       if (filter_by_home && static_cast<int>(value.metadata().master()) != txn.internal().home()) {
         continue;
       }
