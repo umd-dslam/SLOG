@@ -21,8 +21,7 @@ using internal::Response;
 
 Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const shared_ptr<Storage<Key, Record>>& storage,
                const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Worker-" + std::to_string(channel), broker, channel, metrics_manager, poll_timeout),
-      storage_(storage) {
+    : NetworkedModule(broker, channel, metrics_manager, poll_timeout), storage_(storage) {
   switch (config()->execution_type()) {
     case internal::ExecutionType::KEY_VALUE:
       execution_ = make_unique<KeyValueExecution<Key, Record>>(Sharder::MakeSharder(config()), storage);

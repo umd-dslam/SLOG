@@ -26,8 +26,7 @@ class BrokerThread : public Module {
   BrokerThread(const shared_ptr<zmq::context_t>& context, const string& internal_endpoint,
                const string& external_endpoint, const vector<pair<Channel, bool>>& channels, int recv_retries_start_,
                std::chrono::milliseconds poll_timeout_ms)
-      : Module("Broker"),
-        external_socket_(*context, ZMQ_PULL),
+      : external_socket_(*context, ZMQ_PULL),
         internal_socket_(*context, ZMQ_PULL),
         internal_endpoint_(internal_endpoint),
         external_endpoint_(external_endpoint),
@@ -45,6 +44,8 @@ class BrokerThread : public Module {
       channels_.try_emplace(chan, move(new_channel), send_raw);
     }
   }
+
+  std::string name() const override { return "Broker"; };
 
   void SetUp() final {
     LOG(INFO) << "Binding a broker thread to \"" << external_endpoint_ << "\"";

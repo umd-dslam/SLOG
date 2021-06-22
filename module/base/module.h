@@ -14,7 +14,7 @@ namespace slog {
  */
 class Module {
  public:
-  Module(const std::string& name) : name_(name){};
+  Module() = default;
   Module(const Module&) = delete;
   const Module& operator=(const Module&) = delete;
   virtual ~Module() {}
@@ -31,10 +31,10 @@ class Module {
    */
   virtual bool Loop() = 0;
 
-  const std::string& name() const { return name_; }
-
- private:
-  std::string name_;
+  /**
+   * Module name
+   */
+  virtual std::string name() const = 0;
 };
 
 /**

@@ -46,7 +46,7 @@ Transaction* Server::CompletedTransaction::ReleaseTxn() {
 
 Server::Server(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Server", broker, kServerChannel, metrics_manager, poll_timeout), txn_id_counter_(0) {}
+    : NetworkedModule(broker, kServerChannel, metrics_manager, poll_timeout), txn_id_counter_(0) {}
 
 /***********************************************
                 Initialization

@@ -18,7 +18,7 @@ using internal::Response;
 
 Scheduler::Scheduler(const shared_ptr<Broker>& broker, const shared_ptr<Storage<Key, Record>>& storage,
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Scheduler", broker, {kSchedulerChannel, false /* recv_raw */}, metrics_manager, poll_timeout) {
+    : NetworkedModule(broker, {kSchedulerChannel, false /* recv_raw */}, metrics_manager, poll_timeout) {
   for (size_t i = 0; i < config()->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(broker, Worker::MakeChannel(i), storage, metrics_manager, poll_timeout));
   }

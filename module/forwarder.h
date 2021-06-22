@@ -38,6 +38,8 @@ class Forwarder : public NetworkedModule {
             const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
+  std::string name() const override { return "Forwarder"; }
+
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
   void OnInternalResponseReceived(EnvelopePtr&& env) final;

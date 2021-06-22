@@ -11,9 +11,11 @@ using namespace std;
 class TestModule : public NetworkedModule {
  public:
   TestModule(const std::shared_ptr<Broker>& broker, int socket_number, array<int, 2> weights)
-      : NetworkedModule("test_module", broker, socket_number, nullptr, kModuleTimeout),
+      : NetworkedModule(broker, socket_number, nullptr, kModuleTimeout),
         socket_number_(socket_number),
         weights_(weights) {}
+
+  std::string name() const override { return "Test-Module"; }
 
   const std::string& result() const { return result_; }
 

@@ -42,6 +42,8 @@ class Worker : public NetworkedModule {
 
   static Channel MakeChannel(int worker_num) { return kMaxChannel + worker_num; }
 
+  std::string name() const override { return "Worker-" + std::to_string(channel()); }
+
  protected:
   void Initialize() final;
   /**

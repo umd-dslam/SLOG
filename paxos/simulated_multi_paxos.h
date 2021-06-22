@@ -22,6 +22,8 @@ class SimulatedMultiPaxos : public NetworkedModule {
   SimulatedMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker, const vector<MachineId>& group_members,
                       MachineId me, std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
+  std::string name() const override { return "Paxos-" + std::to_string(channel()); }
+
   bool IsMember() const;
 
  protected:

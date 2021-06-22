@@ -57,6 +57,7 @@ class SynchronousTxnGenerator : public Module, public TxnGenerator {
   void SetUp() final;
   bool Loop() final;
   const std::vector<TxnInfo>& txn_infos() const final { return txns_; }
+  std::string name() const final { return "Synchronous-Txn-Generator"; }
 
  private:
   void SendNextTxn();
@@ -83,6 +84,7 @@ class ConstantRateTxnGenerator : public Module, public TxnGenerator {
   void SetUp() final;
   bool Loop() final;
   const std::vector<TxnInfo>& txn_infos() const final { return txns_; }
+  std::string name() const final { return "Constant-Txn-Generator"; }
 
  private:
   void SendNextTxn();

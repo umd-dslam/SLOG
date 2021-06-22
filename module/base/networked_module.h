@@ -27,17 +27,16 @@ struct ChannelOption {
  */
 class NetworkedModule : public Module {
  public:
-  NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
-                  const ConfigurationPtr& config, Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
-                  std::optional<std::chrono::milliseconds> poll_timeout);
-
-  NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+  NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config, Channel channel,
                   const MetricsRepositoryManagerPtr& metrics_manager,
                   std::optional<std::chrono::milliseconds> poll_timeout);
 
-  NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
-                  const ConfigurationPtr& config, uint32_t port, Channel channel,
+  NetworkedModule(const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                   const MetricsRepositoryManagerPtr& metrics_manager,
+                  std::optional<std::chrono::milliseconds> poll_timeout);
+
+  NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config, uint32_t port,
+                  Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
                   std::optional<std::chrono::milliseconds> poll_timeout);
 
  protected:

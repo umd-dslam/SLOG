@@ -27,6 +27,8 @@ class MultiHomeOrderer : public NetworkedModule {
   MultiHomeOrderer(const std::shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                    std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
+  std::string name() const override { return "MultiHomeOrderer"; }
+
  protected:
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 

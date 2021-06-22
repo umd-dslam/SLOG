@@ -18,12 +18,10 @@ namespace slog {
 
 using internal::Envelope;
 
-NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
-                                 const ConfigurationPtr& config, Channel channel,
-                                 const MetricsRepositoryManagerPtr& metrics_manager,
+NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
+                                 Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
                                  std::optional<std::chrono::milliseconds> poll_timeout)
-    : Module(name),
-      context_(context),
+    : context_(context),
       config_(config),
       channel_(channel),
       port_(std::nullopt),
@@ -37,23 +35,22 @@ NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<
       counters_({0, 0}),
       current_(0) {
   std::ostringstream os;
-  os << "module = " << name << ", rep = " << config->local_replica() << ", part = " << config->local_partition()
+  os << "rep = " << config->local_replica() << ", part = " << config->local_partition()
      << ", machine_id = " << config->local_machine_id();
   debug_info_ = os.str();
 }
 
-NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<Broker>& broker, ChannelOption chopt,
+NetworkedModule::NetworkedModule(const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                                  const MetricsRepositoryManagerPtr& metrics_manager,
                                  optional<std::chrono::milliseconds> poll_timeout)
-    : NetworkedModule(name, broker->context(), broker->config(), chopt.channel, metrics_manager, poll_timeout) {
+    : NetworkedModule(broker->context(), broker->config(), chopt.channel, metrics_manager, poll_timeout) {
   broker->AddChannel(channel_, chopt.recv_raw);
 }
 
-NetworkedModule::NetworkedModule(const std::string& name, const std::shared_ptr<zmq::context_t>& context,
-                                 const ConfigurationPtr& config, uint32_t port, Channel channel,
-                                 const MetricsRepositoryManagerPtr& metrics_manager,
+NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
+                                 uint32_t port, Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
                                  std::optional<std::chrono::milliseconds> poll_timeout)
-    : NetworkedModule(name, context, config, channel, metrics_manager, poll_timeout) {
+    : NetworkedModule(context, config, channel, metrics_manager, poll_timeout) {
   port_ = port;
 }
 
@@ -65,7 +62,7 @@ void NetworkedModule::AddCustomSocket(zmq::socket_t&& new_socket) {
 zmq::socket_t& NetworkedModule::GetCustomSocket(size_t i) { return custom_sockets_.at(i); }
 
 void NetworkedModule::SetUp() {
-  VLOG(1) << "Thread info: " << debug_info_;
+  VLOG(1) << "Thread info (" << name() << "): " << debug_info_;
 
   inproc_socket_.bind(MakeInProcChannelAddress(channel_));
   inproc_socket_.set(zmq::sockopt::rcvhwm, 0);

@@ -54,8 +54,7 @@ void LocalLog::UpdateReadyBatches() {
 
 Interleaver::Interleaver(const shared_ptr<Broker>& broker, const MetricsRepositoryManagerPtr& metrics_manager,
                          std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Interleaver", broker, kInterleaverChannel, metrics_manager, poll_timeout),
-      rg_(std::random_device()()) {
+    : NetworkedModule(broker, kInterleaverChannel, metrics_manager, poll_timeout), rg_(std::random_device()()) {
   broker->AddChannel(kLocalLogChannel);
 
   for (uint32_t p = 0; p < config()->num_partitions(); p++) {

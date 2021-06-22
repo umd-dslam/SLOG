@@ -32,8 +32,7 @@ uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
 Forwarder::Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                      const shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Forwarder", context, config, config->forwarder_port(), kForwarderChannel, metrics_manager,
-                      poll_timeout),
+    : NetworkedModule(context, config, config->forwarder_port(), kForwarderChannel, metrics_manager, poll_timeout),
       sharder_(Sharder::MakeSharder(config)),
       lookup_master_index_(lookup_master_index),
       batch_size_(0),

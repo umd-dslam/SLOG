@@ -11,9 +11,7 @@ using internal::Response;
 SimulatedMultiPaxos::SimulatedMultiPaxos(Channel group_number, const shared_ptr<Broker>& broker,
                                          const vector<MachineId>& members, MachineId me,
                                          std::chrono::milliseconds poll_timeout)
-    : NetworkedModule("Paxos-" + std::to_string(group_number), broker, group_number, nullptr, poll_timeout),
-      leader_(*this, members, me),
-      acceptor_(*this) {}
+    : NetworkedModule(broker, group_number, nullptr, poll_timeout), leader_(*this, members, me), acceptor_(*this) {}
 
 void SimulatedMultiPaxos::OnInternalRequestReceived(EnvelopePtr&& req) {
   // A non-leader machine can still need to do some work to maintain its state should it becomes a leader later

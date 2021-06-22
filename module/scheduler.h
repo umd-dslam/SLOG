@@ -46,6 +46,8 @@ class Scheduler : public NetworkedModule {
             const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout = kModuleTimeout);
 
+  std::string name() const override { return "Scheduler"; }
+
  protected:
   void Initialize() final;
 

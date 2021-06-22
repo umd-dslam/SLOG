@@ -94,8 +94,7 @@ bool TxnGenerator::timer_running() const { return timer_running_; }
 SynchronousTxnGenerator::SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
                                                  std::unique_ptr<Workload>&& workload, uint32_t region,
                                                  uint32_t num_txns, int num_clients, int duration_s, bool dry_run)
-    : Module("Synchronous-Txn-Generator"),
-      TxnGenerator(std::move(workload)),
+    : TxnGenerator(std::move(workload)),
       config_(config),
       socket_(context, ZMQ_DEALER),
       poller_(kModuleTimeout),
@@ -184,8 +183,7 @@ void SynchronousTxnGenerator::SendNextTxn() {
 ConstantRateTxnGenerator::ConstantRateTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
                                                    unique_ptr<Workload>&& workload, uint32_t region, uint32_t num_txns,
                                                    int tps, int duration_s, bool dry_run)
-    : Module("Txn-Generator"),
-      TxnGenerator(std::move(workload)),
+    : TxnGenerator(std::move(workload)),
       config_(config),
       socket_(context, ZMQ_DEALER),
       poller_(kModuleTimeout),
