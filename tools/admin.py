@@ -246,7 +246,7 @@ class AdminCommand(Command):
             ):
                 # Use None as a placeholder for the first value
                 self.remote_procs.append(RemoteProcess(
-                    None, pub_addr.decode(), priv_addr.decode(), rep, part
+                    None, pub_addr, priv_addr, rep, part
                 ))
         
         def init_docker_client(remote_proc):
@@ -538,10 +538,10 @@ class LogsCommand(AdminCommand):
                     raise Exception('The "-rp" flag requires a valid config file')
                 r, p = args.rp
                 if args.client:
-                    self.addr = self.config.replicas[r].client_addresses[p].decode()
+                    self.addr = self.config.replicas[r].client_addresses[p]
                 else:
                     addresses = public_addresses(self.config.replicas[r])
-                    self.addr = addresses[p].decode()
+                    self.addr = addresses[p]
 
             self.client = self.new_docker_client(args.user, self.addr)
             LOG.info("Connected to %s", self.addr)
@@ -714,7 +714,7 @@ class LocalCommand(AdminCommand):
                 shell_cmd = (
                     f"slog "
                     f"--config {config_path} "
-                    f"--address {priv_addr.decode()} "
+                    f"--address {priv_addr} "
                     f"--data-dir {CONTAINER_DATA_DIR} "
                 )
                 container_name = f"slog_{r}_{p}"
@@ -732,14 +732,14 @@ class LocalCommand(AdminCommand):
 
                 # Connect the container to the custom network.
                 # This has to happen before we start the container.
-                slog_nw.connect(container, ipv4_address=priv_addr.decode())
+                slog_nw.connect(container, ipv4_address=priv_addr)
 
                 # Actually start the container
                 container.start()
 
                 LOG.info(
                     "%s: Synced config and ran command: %s",
-                    pub_addr.decode(),
+                    pub_addr,
                     shell_cmd,
                 )
     
@@ -766,7 +766,7 @@ class LocalCommand(AdminCommand):
             for p, addr in enumerate(public_addresses(rep)):
                 container_name = f"slog_{r}_{p}"
                 status = get_container_status(self.client, container_name)
-                print(f"\tPartition {p} ({addr.decode()}): {status}")
+                print(f"\tPartition {p} ({addr}): {status}")
 
 
 class BenchmarkCommand(AdminCommand):
@@ -875,7 +875,7 @@ class BenchmarkCommand(AdminCommand):
         for rep, rep_info in enumerate(self.config.replicas):
             for i, addr in enumerate(rep_info.client_addresses):
                 # Use None as a placeholder for the first value
-                self.remote_procs.append(RemoteProcess(None, addr.decode(), None, rep, i))
+                self.remote_procs.append(RemoteProcess(None, addr, None, rep, i))
 
         def init_docker_client(proc):
             client = None
@@ -1016,7 +1016,7 @@ class CollectClientCommand(AdminCommand):
         client_out_dir = os.path.join(args.out_dir, args.tag, "client")
         machines = [
             {
-                'address': c.decode(),
+                'address': c,
                 'name': str(i)
             }
             for i, r in enumerate(self.config.replicas)
@@ -1079,7 +1079,7 @@ class CollectServerCommand(AdminCommand):
         server_out_dir = os.path.join(args.out_dir, args.tag, "server")
         machines = [
             {
-                'address': a.decode(),
+                'address': a,
                 'name': f"{r}-{p}"
             }
             for r, rep in enumerate(self.config.replicas)
