@@ -121,7 +121,7 @@ ValueEntry TxnValueEntry(const Transaction& txn, const std::string& key) {
 TestSlog::TestSlog(const ConfigurationPtr& config)
     : config_(config),
       sharder_(Sharder::MakeSharder(config)),
-      storage_(new MemOnlyStorage<Key, Record, Metadata>()),
+      storage_(new MemOnlyStorage()),
       broker_(Broker::New(config, kTestModuleTimeout)),
       client_context_(1) {
   client_context_.set(zmq::ctxopt::blocky, false);

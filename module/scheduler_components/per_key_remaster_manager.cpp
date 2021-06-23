@@ -6,8 +6,7 @@ using std::make_pair;
 
 namespace slog {
 
-PerKeyRemasterManager::PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
-    : storage_(storage) {}
+PerKeyRemasterManager::PerKeyRemasterManager(const shared_ptr<const Storage>& storage) : storage_(storage) {}
 
 VerifyMasterResult PerKeyRemasterManager::VerifyMaster(Transaction& txn) {
   if (txn.keys().empty()) {

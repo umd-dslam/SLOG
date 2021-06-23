@@ -13,13 +13,12 @@ class Execution {
   virtual void Execute(Transaction& txn) = 0;
 };
 
-template <typename K, typename R>
 class KeyValueExecution : public Execution {
   SharderPtr sharder_;
-  std::shared_ptr<Storage<K, R>> storage_;
+  std::shared_ptr<Storage> storage_;
 
  public:
-  KeyValueExecution(const SharderPtr& sharder, const std::shared_ptr<Storage<K, R>>& storage)
+  KeyValueExecution(const SharderPtr& sharder, const std::shared_ptr<Storage>& storage)
       : sharder_(sharder), storage_(storage) {}
 
   void Execute(Transaction& txn) final {
@@ -90,7 +89,7 @@ class KeyValueExecution : public Execution {
         if (!sharder_->is_local_key(key) || value.type() == KeyType::READ) {
           continue;
         }
-        R new_record;
+        Record new_record;
         new_record.SetMetadata(value.metadata());
         new_record.SetValue(value.new_value());
         storage_->Write(key, new_record);

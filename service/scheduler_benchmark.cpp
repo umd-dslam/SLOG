@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto config = make_shared<Configuration>(config_proto, address);
-  auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
+  auto storage = make_shared<slog::MemOnlyStorage>();
 
   // Prepare the modules
   auto broker = Broker::New(config);

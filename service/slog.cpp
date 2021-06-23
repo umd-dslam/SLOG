@@ -37,7 +37,7 @@ using slog::Record;
 
 using std::make_shared;
 
-void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config, const string& data_dir) {
+void LoadData(slog::Storage& storage, const ConfigurationPtr& config, const string& data_dir) {
   if (data_dir.empty()) {
     LOG(INFO) << "No initial data directory specified. Starting with an empty storage.";
     return;
@@ -78,7 +78,7 @@ void LoadData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& confi
   close(fd);
 }
 
-void GenerateData(slog::Storage<Key, Record>& storage, const ConfigurationPtr& config) {
+void GenerateData(slog::Storage& storage, const ConfigurationPtr& config) {
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
   auto num_partitions = config->num_partitions();
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
   auto broker = Broker::New(config);
 
   // Create and initialize storage layer
-  auto storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
+  auto storage = make_shared<slog::MemOnlyStorage>();
   // If simple partitioning is used, generate the data;
   // otherwise, load data from an external file
   if (config->simple_partitioning()) {

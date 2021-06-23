@@ -4,8 +4,7 @@
 
 namespace slog {
 
-SimpleRemasterManager::SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage)
-    : storage_(storage) {}
+SimpleRemasterManager::SimpleRemasterManager(const shared_ptr<const Storage>& storage) : storage_(storage) {}
 
 VerifyMasterResult SimpleRemasterManager::VerifyMaster(Transaction& txn) {
   if (txn.keys().empty()) {

@@ -34,7 +34,7 @@ namespace slog {
 class Forwarder : public NetworkedModule {
  public:
   Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
-            const std::shared_ptr<LookupMasterIndex<Key, Metadata>>& lookup_master_index,
+            const std::shared_ptr<LookupMasterIndex>& lookup_master_index,
             const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
@@ -57,7 +57,7 @@ class Forwarder : public NetworkedModule {
   void Forward(EnvelopePtr&& env);
 
   const SharderPtr sharder_;
-  std::shared_ptr<LookupMasterIndex<Key, Metadata>> lookup_master_index_;
+  std::shared_ptr<LookupMasterIndex> lookup_master_index_;
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
   std::vector<internal::Envelope> partitioned_lookup_request_;
   int batch_size_;

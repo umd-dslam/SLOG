@@ -17,13 +17,13 @@ namespace slog {
 class SimpleRemasterManager : public RemasterManager {
  public:
   SimpleRemasterManager() = default;
-  SimpleRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
+  SimpleRemasterManager(const shared_ptr<const Storage>& storage);
 
   VerifyMasterResult VerifyMaster(Transaction& txn) final;
   RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) final;
   RemasterOccurredResult ReleaseTransaction(const Transaction& txn_holder) final;
 
-  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) { storage_ = storage; }
+  void SetStorage(const shared_ptr<const Storage>& storage) { storage_ = storage; }
 
  private:
   /**
@@ -32,7 +32,7 @@ class SimpleRemasterManager : public RemasterManager {
   void TryToUnblock(uint32_t local_log_machine_id, RemasterOccurredResult& result);
 
   // Needs access to storage to check counters
-  shared_ptr<const Storage<Key, Record>> storage_;
+  shared_ptr<const Storage> storage_;
 
   // One queue is kept per local log
   unordered_map<uint32_t, list<Transaction*>> blocked_queue_;

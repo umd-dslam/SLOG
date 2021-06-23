@@ -73,7 +73,7 @@ class TestSlog {
  private:
   ConfigurationPtr config_;
   SharderPtr sharder_;
-  shared_ptr<MemOnlyStorage<Key, Record, Metadata>> storage_;
+  shared_ptr<MemOnlyStorage> storage_;
   shared_ptr<Broker> broker_;
   ModuleRunnerPtr server_;
   ModuleRunnerPtr forwarder_;

@@ -36,7 +36,7 @@ struct TransactionState {
  */
 class Worker : public NetworkedModule {
  public:
-  Worker(const std::shared_ptr<Broker>& broker, Channel channel, const std::shared_ptr<Storage<Key, Record>>& storage,
+  Worker(const std::shared_ptr<Broker>& broker, Channel channel, const std::shared_ptr<Storage>& storage,
          const MetricsRepositoryManagerPtr& metrics_manager,
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
@@ -84,7 +84,7 @@ class Worker : public NetworkedModule {
   // Precondition: txn_id must exists in txn states table
   TransactionState& TxnState(TxnId txn_id);
 
-  std::shared_ptr<Storage<Key, Record>> storage_;
+  std::shared_ptr<Storage> storage_;
   std::unique_ptr<Execution> execution_;
 
   std::unordered_map<TxnId, TransactionState> txn_states_;

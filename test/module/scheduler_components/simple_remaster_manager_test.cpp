@@ -13,12 +13,12 @@ class SimpleRemasterManagerTest : public ::testing::Test {
  protected:
   void SetUp() {
     configs = MakeTestConfigurations("remaster", 2, 1);
-    storage = make_shared<slog::MemOnlyStorage<Key, Record, Metadata>>();
+    storage = make_shared<slog::MemOnlyStorage>();
     remaster_manager = make_unique<SimpleRemasterManager>(storage);
   }
 
   ConfigVec configs;
-  shared_ptr<Storage<Key, Record>> storage;
+  shared_ptr<Storage> storage;
   unique_ptr<SimpleRemasterManager> remaster_manager;
 };
 

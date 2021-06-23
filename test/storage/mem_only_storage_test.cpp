@@ -7,7 +7,7 @@
 using namespace slog;
 
 TEST(MemOnlyStorageTest, ReadWriteTest) {
-  MemOnlyStorage<Key, Record, Metadata> storage;
+  MemOnlyStorage storage;
   Key key = "key1";
   Value value = "value1";
   Record record(value, 0);

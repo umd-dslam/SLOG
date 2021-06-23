@@ -47,11 +47,11 @@ class TableTest : public ::testing::Test {
     warehouse_data = {{MakeInt32Scalar(10), MakeFixedTextScalar<10>("Maryland--"),
                        MakeFixedTextScalar<20>("Baltimore Blvd.-----"), MakeFixedTextScalar<20>("Paint Branch Drive--"),
                        MakeFixedTextScalar<20>("College Park--------"), MakeFixedTextScalar<2>("MA"),
-                       MakeFixedTextScalar<9>("20742----"), MakeInt32Scalar(1234), MakeInt32Scalar(1234567)},
+                       MakeFixedTextScalar<9>("20742----"), MakeInt32Scalar(1234), MakeInt64Scalar(1234567)},
                       {MakeInt32Scalar(20), MakeFixedTextScalar<10>("Goods Inc."),
                        MakeFixedTextScalar<20>("Main Street---------"), MakeFixedTextScalar<20>("Main Street 2-------"),
                        MakeFixedTextScalar<20>("Some City-----------"), MakeFixedTextScalar<2>("CA"),
-                       MakeFixedTextScalar<9>("12345----"), MakeInt32Scalar(4214), MakeInt32Scalar(521232)}};
+                       MakeFixedTextScalar<9>("12345----"), MakeInt32Scalar(4214), MakeInt64Scalar(521232)}};
 
     warehouse_table = std::make_unique<Table<WarehouseSchema>>(kv_table, deleted_keys);
     warehouse_table->Insert(warehouse_data[0]);

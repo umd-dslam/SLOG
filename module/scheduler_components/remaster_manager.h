@@ -66,7 +66,7 @@ class RemasterManager {
    * transaction to any queues
    */
   static VerifyMasterResult CheckCounters(const Transaction& txn, bool filter_by_home,
-                                          const shared_ptr<const Storage<Key, Record>>& storage) {
+                                          const shared_ptr<const Storage>& storage) {
     auto waiting = false;
     for (const auto& kv : txn.keys()) {
       const auto& key = kv.key();

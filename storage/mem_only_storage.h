@@ -7,25 +7,22 @@
 
 namespace slog {
 
-template<typename K, typename R, typename M>
-class MemOnlyStorage : 
-    public Storage<K, R>,
-    public LookupMasterIndex<K, M> {
+class MemOnlyStorage : public Storage, public LookupMasterIndex {
 public:
-  bool Read(const K& key, R& result) const final {
+  bool Read(const Key& key, Record& result) const final {
     return table_.Get(result, key);
   }
 
-  void Write(const K& key, const R& record) final {
+  void Write(const Key& key, const Record& record) final {
     table_.InsertOrUpdate(key, record);
   }
 
-  bool Delete(const K& key) final {
+  bool Delete(const Key& key) final {
     return table_.Erase(key);
   }
 
-  bool GetMasterMetadata(const K& key, M& metadata) const final {
-    R rec;
+  bool GetMasterMetadata(const Key& key, Metadata& metadata) const final {
+    Record rec;
     if (!table_.Get(rec, key)) {
       return false;
     }
@@ -34,7 +31,7 @@ public:
   }
 
 private:
-  ConcurrentHashMap<K, R> table_;
+  ConcurrentHashMap<Key, Record> table_;
 };
 
 } // namespace slog

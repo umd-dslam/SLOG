@@ -42,7 +42,7 @@ namespace slog {
 
 class Scheduler : public NetworkedModule {
  public:
-  Scheduler(const std::shared_ptr<Broker>& broker, const std::shared_ptr<Storage<Key, Record>>& storage,
+  Scheduler(const std::shared_ptr<Broker>& broker, const std::shared_ptr<Storage>& storage,
             const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout = kModuleTimeout);
 

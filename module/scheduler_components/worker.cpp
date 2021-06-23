@@ -19,12 +19,12 @@ using internal::Envelope;
 using internal::Request;
 using internal::Response;
 
-Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const shared_ptr<Storage<Key, Record>>& storage,
+Worker::Worker(const std::shared_ptr<Broker>& broker, Channel channel, const shared_ptr<Storage>& storage,
                const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
     : NetworkedModule(broker, channel, metrics_manager, poll_timeout), storage_(storage) {
   switch (config()->execution_type()) {
     case internal::ExecutionType::KEY_VALUE:
-      execution_ = make_unique<KeyValueExecution<Key, Record>>(Sharder::MakeSharder(config()), storage);
+      execution_ = make_unique<KeyValueExecution>(Sharder::MakeSharder(config()), storage);
       break;
     default:
       execution_ = make_unique<NoopExecution>();

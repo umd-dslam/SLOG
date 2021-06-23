@@ -19,13 +19,13 @@ namespace slog {
 class PerKeyRemasterManager : public RemasterManager {
  public:
   PerKeyRemasterManager() = default;
-  PerKeyRemasterManager(const shared_ptr<const Storage<Key, Record>>& storage);
+  PerKeyRemasterManager(const shared_ptr<const Storage>& storage);
 
   VerifyMasterResult VerifyMaster(Transaction& txn) final;
   RemasterOccurredResult RemasterOccured(const Key& key, uint32_t remaster_counter) final;
   RemasterOccurredResult ReleaseTransaction(const Transaction& txn) final;
 
-  void SetStorage(const shared_ptr<const Storage<Key, Record>>& storage) { storage_ = storage; }
+  void SetStorage(const shared_ptr<const Storage>& storage) { storage_ = storage; }
 
  private:
   /**
@@ -41,7 +41,7 @@ class PerKeyRemasterManager : public RemasterManager {
   void TryToUnblock(const Key& unblocked_key, RemasterOccurredResult& result);
 
   // Needs access to storage to check counters
-  shared_ptr<const Storage<Key, Record>> storage_;
+  shared_ptr<const Storage> storage_;
 
   // Priority queues for the transactions waiting for each key. Lowest counters first, earliest
   // arrivals break tie
