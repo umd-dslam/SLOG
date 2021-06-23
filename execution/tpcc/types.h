@@ -15,7 +15,7 @@ class DataType {
   virtual std::size_t size() const = 0;
 };
 
-template<typename BaseType>
+template <typename BaseType>
 class NumericDataType : public DataType {
  public:
   using CType = BaseType;
@@ -30,14 +30,14 @@ class NumericDataType : public DataType {
       static auto result = std::make_shared<KLASS>();                 \
       return result;                                                  \
     }                                                                 \
-  } 
+  }
 
 NUMERIC_TYPE(Int32Type, INT32, int32_t);
 NUMERIC_TYPE(Int64Type, INT64, int64_t);
 NUMERIC_TYPE(FloatType, FLOAT, float);
 NUMERIC_TYPE(DoubleType, DOUBLE, double);
 
-template<size_t Width>
+template <size_t Width>
 class FixedTextType : public DataType {
  public:
   DataTypeName name() const override { return DataTypeName::FIXED_TEXT; }
@@ -59,5 +59,5 @@ inline bool operator==(const DataType& dt1, const DataType& dt2) {
   return true;
 }
 
-} // namespace tpcc
-} // namespace slog
+}  // namespace tpcc
+}  // namespace slog

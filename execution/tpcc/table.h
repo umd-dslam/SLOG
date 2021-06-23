@@ -15,14 +15,15 @@ using KeyValueTablePtr = std::shared_ptr<KeyValueTable>;
 using KeyList = std::vector<std::string>;
 using KeyListPtr = std::shared_ptr<std::vector<std::string>>;
 
-template<typename Schema>
+template <typename Schema>
 class Table {
  public:
   using Column = typename Schema::Column;
   static constexpr size_t NumColumns = Schema::NumColumns;
   static constexpr size_t NumPKeys = Schema::NumPKeys;
 
-  Table(KeyValueTablePtr key_value_table, KeyListPtr deleted_keys) : key_value_table_(key_value_table), deleted_keys_(deleted_keys) {
+  Table(KeyValueTablePtr key_value_table, KeyListPtr deleted_keys)
+      : key_value_table_(key_value_table), deleted_keys_(deleted_keys) {
     InitializeColumnOffsets();
   }
 
@@ -36,8 +37,9 @@ class Table {
     auto storage_value = it->second.data();
     std::vector<ScalarPtr> result;
     result.reserve(columns.size());
-  
+
     if (columns.empty()) {
+      result.insert(result.end(), pkey.begin(), pkey.end());
       for (size_t i = NumPKeys; i < NumColumns; i++) {
         auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
         result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
@@ -45,15 +47,20 @@ class Table {
     } else {
       for (auto c : columns) {
         auto i = static_cast<size_t>(c);
-        auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
-        result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
+        if (i < NumPKeys) {
+          result.push_back(pkey[i]);
+        } else {
+          auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
+          result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
+        }
       }
     }
 
     return result;
   }
 
-  bool Update(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns, const std::vector<ScalarPtr>& values) {
+  bool Update(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns,
+              const std::vector<ScalarPtr>& values) {
     if (columns.size() != values.size()) {
       throw std::runtime_error("Number of values does not match number of columns");
     }
@@ -68,7 +75,8 @@ class Table {
     for (size_t i = 0; i < values.size(); i++) {
       auto c = columns[i];
       const auto& v = values[i];
-      storage_value.replace(column_offsets_[static_cast<size_t>(c)], v->type->size(), v->data());
+      auto offset = column_offsets_[static_cast<size_t>(c)];
+      storage_value.replace(offset, v->type->size(), reinterpret_cast<const char*>(v->data()));
     }
 
     return true;
@@ -136,7 +144,7 @@ class Table {
   // Column offsets within a storage value
   inline static std::array<size_t, NumColumns> column_offsets_;
   inline static bool column_offsets_initialized_ = false;
-  
+
   inline static void InitializeColumnOffsets() {
     if (column_offsets_initialized_) {
       return;
@@ -154,31 +162,15 @@ class Table {
 };
 
 struct WarehouseSchema {
-  enum class Column {
-    ID,
-    NAME,
-    STREET_1,
-    STREET_2,
-    CITY,
-    STATE,
-    ZIP,
-    TAX,
-    YTD
-  };
+  enum class Column { ID, NAME, STREET_1, STREET_2, CITY, STATE, ZIP, TAX, YTD };
   static constexpr size_t NumColumns = 9;
   static constexpr size_t NumPKeys = 1;
   inline static const std::array<std::shared_ptr<DataType>, NumColumns> ColumnTypes = {
-    Int32Type::Get(),
-    FixedTextType<10>::Get(),
-    FixedTextType<20>::Get(),
-    FixedTextType<20>::Get(),
-    FixedTextType<20>::Get(),
-    FixedTextType<2>::Get(),
-    FixedTextType<9>::Get(),
-    Int32Type::Get(),
-    Int32Type::Get(),
+      Int32Type::Get(),         FixedTextType<10>::Get(), FixedTextType<20>::Get(),
+      FixedTextType<20>::Get(), FixedTextType<20>::Get(), FixedTextType<2>::Get(),
+      FixedTextType<9>::Get(),  Int32Type::Get(),         Int32Type::Get(),
   };
 };
 
-} // namespace tpcc
-} // namespace slog
+}  // namespace tpcc
+}  // namespace slog
