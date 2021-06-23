@@ -5,7 +5,7 @@
 namespace slog {
 namespace tpcc {
 
-enum class DataTypeName { INT32, INT64, FLOAT, DOUBLE, FIXED_TEXT };
+enum class DataTypeName { INT8, INT16, INT32, INT64, FIXED_TEXT };
 
 class DataType {
  public:
@@ -32,10 +32,10 @@ class NumericDataType : public DataType {
     }                                                                 \
   }
 
+NUMERIC_TYPE(Int8Type, INT8, int8_t);
+NUMERIC_TYPE(Int16Type, INT16, int16_t);
 NUMERIC_TYPE(Int32Type, INT32, int32_t);
 NUMERIC_TYPE(Int64Type, INT64, int64_t);
-NUMERIC_TYPE(FloatType, FLOAT, float);
-NUMERIC_TYPE(DoubleType, DOUBLE, double);
 
 template <size_t Width>
 class FixedTextType : public DataType {

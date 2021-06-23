@@ -20,7 +20,7 @@ class Table {
  public:
   using Column = typename Schema::Column;
   static constexpr size_t NumColumns = Schema::NumColumns;
-  static constexpr size_t NumPKeys = Schema::NumPKeys;
+  static constexpr size_t PKeySize = Schema::PKeySize;
 
   Table(KeyValueTablePtr key_value_table, KeyListPtr deleted_keys)
       : key_value_table_(key_value_table), deleted_keys_(deleted_keys) {
@@ -38,16 +38,17 @@ class Table {
     std::vector<ScalarPtr> result;
     result.reserve(columns.size());
 
+    // If no column is provided, select ALL columns
     if (columns.empty()) {
       result.insert(result.end(), pkey.begin(), pkey.end());
-      for (size_t i = NumPKeys; i < NumColumns; i++) {
+      for (size_t i = PKeySize; i < NumColumns; i++) {
         auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
         result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
       }
     } else {
       for (auto c : columns) {
         auto i = static_cast<size_t>(c);
-        if (i < NumPKeys) {
+        if (i < PKeySize) {
           result.push_back(pkey[i]);
         } else {
           auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
@@ -88,14 +89,14 @@ class Table {
     }
 
     size_t storage_value_size = 0;
-    for (size_t i = NumPKeys; i < NumColumns; i++) {
+    for (size_t i = PKeySize; i < NumColumns; i++) {
       ValidateType(values[i], static_cast<Column>(i));
       storage_value_size += values[i]->type->size();
     }
 
     std::string storage_value;
     storage_value.reserve(storage_value_size);
-    for (size_t i = NumPKeys; i < NumColumns; i++) {
+    for (size_t i = PKeySize; i < NumColumns; i++) {
       storage_value.append(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
     }
 
@@ -110,21 +111,21 @@ class Table {
   }
 
   /**
-   * Creates storage key from the first NumPKeys values
+   * Creates storage key from the first PKeySize values
    */
   inline static std::string MakeStorageKey(const std::vector<ScalarPtr>& values) {
-    if (values.size() < NumPKeys) {
-      throw std::runtime_error("Number of values need to be equal or larger than primary key size");
+    if (values.size() < PKeySize) {
+      throw std::runtime_error("Number of values needs to be equal or larger than primary key size");
     }
     size_t storage_key_size = 0;
-    for (size_t i = 0; i < NumPKeys; i++) {
+    for (size_t i = 0; i < PKeySize; i++) {
       ValidateType(values[i], static_cast<Column>(i));
       storage_key_size += values[i]->type->size();
     }
 
     std::string storage_key;
     storage_key.reserve(storage_key_size);
-    for (size_t i = 0; i < NumPKeys; i++) {
+    for (size_t i = 0; i < PKeySize; i++) {
       storage_key.append(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
     }
 
@@ -150,27 +151,253 @@ class Table {
       return;
     }
     // First columns are primary keys so are not stored in the value portion
-    for (size_t i = 0; i < NumPKeys; i++) {
+    for (size_t i = 0; i < PKeySize; i++) {
       column_offsets_[i] = 0;
     }
     size_t offset = 0;
-    for (size_t i = NumPKeys; i < NumColumns; i++) {
+    for (size_t i = PKeySize; i < NumColumns; i++) {
       column_offsets_[i] = offset;
       offset += Schema::ColumnTypes[i]->size();
     }
   }
 };
 
-struct WarehouseSchema {
-  enum class Column { ID, NAME, STREET_1, STREET_2, CITY, STATE, ZIP, TAX, YTD };
-  static constexpr size_t NumColumns = 9;
-  static constexpr size_t NumPKeys = 1;
-  inline static const std::array<std::shared_ptr<DataType>, NumColumns> ColumnTypes = {
-      Int32Type::Get(),         FixedTextType<10>::Get(), FixedTextType<20>::Get(),
-      FixedTextType<20>::Get(), FixedTextType<20>::Get(), FixedTextType<2>::Get(),
-      FixedTextType<9>::Get(),  Int32Type::Get(),         Int32Type::Get(),
-  };
-};
+#define ARRAY(...) __VA_ARGS__
+#define SCHEMA(NAME, NUM_COLUMNS, PKEY_SIZE, COLUMNS, COLUMN_TYPES)                                     \
+  struct NAME {                                                                                         \
+    static constexpr size_t NumColumns = NUM_COLUMNS;                                                   \
+    static constexpr size_t PKeySize = PKEY_SIZE;                                                       \
+    enum class Column { COLUMNS };                                                                      \
+    inline static const std::array<std::shared_ptr<DataType>, NumColumns> ColumnTypes = {COLUMN_TYPES}; \
+  }
+
+// clang-format off
+
+SCHEMA(WarehouseSchema,
+       9, // NUM_COLUMNS
+       1, // PKEY_SIZE
+       ARRAY(ID,
+             NAME,
+             STREET_1,
+             STREET_2,
+             CITY,
+             STATE,
+             ZIP,
+             TAX,
+             YTD),
+       ARRAY(Int32Type::Get(), 
+             FixedTextType<10>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<2>::Get(),
+             FixedTextType<9>::Get(),
+             Int32Type::Get(),
+             Int64Type::Get()));
+
+SCHEMA(DistrictSchema,
+       11, // NUM_COLUMNS
+       2,  // PKEY_SIZE
+       ARRAY(W_ID,
+             ID,
+             NAME,
+             STREET_1,
+             STREET_2,
+             CITY,
+             STATE,
+             ZIP,
+             TAX,
+             YTD,
+             NEXT_O_ID), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+            //  FixedTextType<10>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<2>::Get(),
+             FixedTextType<9>::Get(),
+             Int32Type::Get(),
+             Int64Type::Get(),
+             Int32Type::Get()));
+
+SCHEMA(CustomerSchema,
+       21, // NUM_COLUMNS
+       3,  // PKEY_SIZE
+       ARRAY(W_ID,
+             D_ID,
+             ID,
+             FIRST,
+             MIDDLE,
+             LAST,
+             STREET_1,
+             STREET_2,
+             CITY,
+             STATE,
+             ZIP,
+             PHONE,
+             SINCE,
+             CREDIT,
+             CREDIT_LIM,
+             DISCOUNT,
+             BALANCE,
+             YTD_PAYMENT,
+             PAYMENT_CNT,
+             DELIVERY_CNT,
+             DATA), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             FixedTextType<16>::Get(),
+             FixedTextType<2>::Get(),
+             FixedTextType<16>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<20>::Get(),
+             FixedTextType<2>::Get(),
+             FixedTextType<9>::Get(),
+             FixedTextType<16>::Get(),
+             Int64Type::Get(),
+             FixedTextType<2>::Get(),
+             Int64Type::Get(),
+             Int32Type::Get(),
+             Int64Type::Get(),
+             Int64Type::Get(),
+             Int16Type::Get(),
+             Int16Type::Get(),
+             FixedTextType<250>::Get()));
+
+SCHEMA(HistorySchema,
+       9, // NUM_COLUMNS
+       4, // PKEY_SIZE
+       ARRAY(W_ID,
+             D_ID,
+             C_ID,
+             ID,
+             C_D_ID,
+             C_W_ID,
+             DATE,
+             AMOUNT,
+             DATA), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             Int64Type::Get(),
+             Int32Type::Get(),
+             FixedTextType<24>::Get()));
+
+SCHEMA(NewOrderSchema,
+       3, // NUM_COLUMNS
+       3, // PKEY_SIZE
+       ARRAY(W_ID,
+             D_ID,
+             O_ID), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get()));
+
+SCHEMA(OrderSchema,
+       8, // NUM_COLUMNS
+       3, // PKEY_SIZE
+       ARRAY(W_ID,
+             D_ID,
+             ID,
+             C_ID,
+             ENTRY_D,
+             CARRIER_ID,
+             OL_CNT,
+             ALL_LOCAL), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             Int32Type::Get(),
+             Int64Type::Get(),
+             Int8Type::Get(),
+             Int8Type::Get(),
+             Int8Type::Get()));
+
+SCHEMA(OrderLineSchema,
+       10, // NUM_COLUMNS
+       4,  // PKEY_SIZE
+       ARRAY(W_ID,
+             D_ID,
+             O_ID,
+             NUMBER,
+             I_ID,
+             SUPPLY_W_ID,
+             DELIVERY_D,
+             QUANTITY,
+             AMOUNT,
+             DIST_INFO), 
+       ARRAY(Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             Int32Type::Get(),
+             Int64Type::Get(),
+             Int8Type::Get(),
+             Int32Type::Get(),
+             FixedTextType<24>::Get()));
+
+SCHEMA(ItemSchema,
+       6, // NUM_COLUMNS
+       2, // PKEY_SIZE
+       ARRAY(W_ID,
+             ID,
+             IM_ID,
+             NAME,
+             PRICE,
+             DATA), 
+       ARRAY(Int32Type::Get(),
+             Int32Type::Get(),
+             Int32Type::Get(),
+             FixedTextType<24>::Get(),
+             Int32Type::Get(),
+             FixedTextType<50>::Get()));
+
+SCHEMA(StockSchema,
+       17, // NUM_COLUMNS
+       2,  // PKEY_SIZE
+       ARRAY(W_ID,
+             I_ID,
+             QUANTITY,
+             DIST_01,
+             DIST_02,
+             DIST_03,
+             DIST_04,
+             DIST_05,
+             DIST_06,
+             DIST_07,
+             DIST_08,
+             DIST_09,
+             DIST_10,
+             YTD,
+             ORDER_CNT,
+             REMOTE_CNT,
+             DATA), 
+       ARRAY(Int32Type::Get(),
+             Int32Type::Get(),
+             Int16Type::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             FixedTextType<24>::Get(),
+             Int32Type::Get(),
+             Int16Type::Get(),
+             Int16Type::Get(),
+             FixedTextType<50>::Get()));
+
+// clang-format on
 
 }  // namespace tpcc
 }  // namespace slog
