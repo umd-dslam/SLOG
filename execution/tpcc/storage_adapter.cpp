@@ -69,9 +69,13 @@ bool TxnStorageAdapter::Delete(std::string&& key) {
   if (it == key_index_.end()) {
     return false;
   }
-  txn_.mutable_keys()->erase(txn_.keys().begin() + it->second);
-  key_index_.erase(it);
+  for (int i = it->second; i < txn_.keys_size() - 1; i++) {
+    txn_.mutable_keys(i)->Swap(txn_.mutable_keys(i + 1));
+    key_index_[txn_.keys(i).key()] = i;
+  }
+  txn_.mutable_keys()->RemoveLast();
   txn_.mutable_deleted_keys()->Add(std::move(key));
+  key_index_.erase(it);
   return true;
 }
 

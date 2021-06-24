@@ -108,6 +108,9 @@ class TableTest : public ::testing::Test {
         storage->Write(key, record);
       }
     }
+    for (const auto& key : txn.deleted_keys()) {
+      storage->Delete(key);
+    }
     for (auto& kv : *(txn.mutable_keys())) {
       const auto& key = kv.key();
       Record record;
@@ -117,6 +120,7 @@ class TableTest : public ::testing::Test {
       value->set_value(record.to_string());
       value->clear_new_value();
     }
+    txn.clear_deleted_keys();
   }
 
   std::vector<std::vector<ScalarPtr>> data;
@@ -145,15 +149,29 @@ TEST_F(TableTest, UpdateAndSelect) {
   ASSERT_EQ(txn.keys_size(), data.size());
   ASSERT_EQ(txn.deleted_keys_size(), 0);
 
-  LOG(INFO) << txn;
   FlushAndRefreshTxn();
-  LOG(INFO) << txn;
 
   for (const auto& row : data) {
-    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + 2};
+    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + DistrictSchema::PKeySize};
 
     auto res = txn_table->Select(pkey, {DistrictSchema::Column::ID, DistrictSchema::Column::YTD,
                                         DistrictSchema::Column::NAME, DistrictSchema::Column::STREET_1});
     ASSERT_TRUE(ScalarListsEqual(res, {row[1], new_ytd, new_name, row[3]}));
   }
+}
+
+TEST_F(TableTest, Delete) {
+  ASSERT_TRUE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}));
+  ASSERT_FALSE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}));
+  ASSERT_EQ(txn.keys_size(), data.size() - 1);
+  ASSERT_EQ(txn.deleted_keys_size(), 1);
+
+  FlushAndRefreshTxn();
+
+  for (size_t i = 1; i < data.size(); i++) {
+    std::vector<ScalarPtr> pkey{data[i].begin(), data[i].begin() + DistrictSchema::PKeySize};
+    auto res = txn_table->Select(pkey);
+    ASSERT_TRUE(ScalarListsEqual(res, data[i]));
+  }
+  ASSERT_TRUE(txn_table->Select({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}).empty());  
 }
