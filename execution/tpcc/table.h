@@ -1,19 +1,17 @@
 #pragma once
 
+#include <glog/logging.h>
+
 #include <array>
 #include <exception>
 #include <unordered_map>
 #include <vector>
 
 #include "execution/tpcc/scalar.h"
+#include "execution/tpcc/storage_adapter.h"
 
 namespace slog {
 namespace tpcc {
-
-using KeyValueTable = std::unordered_map<std::string, std::string>;
-using KeyValueTablePtr = std::shared_ptr<KeyValueTable>;
-using KeyList = std::vector<std::string>;
-using KeyListPtr = std::shared_ptr<std::vector<std::string>>;
 
 template <typename Schema>
 class Table {
@@ -22,19 +20,18 @@ class Table {
   static constexpr size_t NumColumns = Schema::NumColumns;
   static constexpr size_t PKeySize = Schema::PKeySize;
 
-  Table(KeyValueTablePtr key_value_table, KeyListPtr deleted_keys)
-      : key_value_table_(key_value_table), deleted_keys_(deleted_keys) {
+  Table(const std::shared_ptr<StorageAdapter>& storage_adapter) : storage_adapter_(storage_adapter) {
     InitializeColumnOffsets();
   }
 
   std::vector<ScalarPtr> Select(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns = {}) {
     auto storage_key = MakeStorageKey(pkey);
-    auto it = key_value_table_->find(storage_key);
-    if (it == key_value_table_->end()) {
+    auto storage_value = storage_adapter_->Read(storage_key);
+    if (storage_value == nullptr) {
       return {};
     }
 
-    auto storage_value = it->second.data();
+    auto encoded_columns = storage_value->data();
     std::vector<ScalarPtr> result;
     result.reserve(columns.size());
 
@@ -42,7 +39,7 @@ class Table {
     if (columns.empty()) {
       result.insert(result.end(), pkey.begin(), pkey.end());
       for (size_t i = PKeySize; i < NumColumns; i++) {
-        auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
+        auto value = reinterpret_cast<const void*>(encoded_columns + column_offsets_[i]);
         result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
       }
     } else {
@@ -51,7 +48,7 @@ class Table {
         if (i < PKeySize) {
           result.push_back(pkey[i]);
         } else {
-          auto value = reinterpret_cast<void*>(storage_value + column_offsets_[i]);
+          auto value = reinterpret_cast<const void*>(encoded_columns + column_offsets_[i]);
           result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
         }
       }
@@ -62,31 +59,21 @@ class Table {
 
   bool Update(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns,
               const std::vector<ScalarPtr>& values) {
-    if (columns.size() != values.size()) {
-      throw std::runtime_error("Number of values does not match number of columns");
-    }
+    CHECK_EQ(columns.size(), values.size()) << "Number of values does not match number of columns";
 
-    auto storage_key = MakeStorageKey(pkey);
-    auto it = key_value_table_->find(storage_key);
-    if (it == key_value_table_->end()) {
-      return false;
-    }
-
-    auto& storage_value = it->second;
+    std::vector<StorageAdapter::UpdateEntry> updates;
     for (size_t i = 0; i < values.size(); i++) {
       auto c = columns[i];
       const auto& v = values[i];
       auto offset = column_offsets_[static_cast<size_t>(c)];
-      storage_value.replace(offset, v->type->size(), reinterpret_cast<const char*>(v->data()));
+      updates.emplace_back(StorageAdapter::UpdateEntry{.offset = offset, .size = v->type->size(), .data = v->data()});
     }
 
-    return true;
+    return storage_adapter_->Update(MakeStorageKey(pkey), updates);
   }
 
   bool Insert(const std::vector<ScalarPtr>& values) {
-    if (values.size() != NumColumns) {
-      throw std::runtime_error("Number of values does not match number of columns");
-    }
+    CHECK_EQ(values.size(), NumColumns) << "Number of values does not match number of columns";
 
     size_t storage_value_size = 0;
     for (size_t i = PKeySize; i < NumColumns; i++) {
@@ -100,23 +87,16 @@ class Table {
       storage_value.append(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
     }
 
-    auto res = key_value_table_->emplace(MakeStorageKey(values), std::move(storage_value));
-    return res.second;
+    return storage_adapter_->Insert(MakeStorageKey(values), std::move(storage_value));
   }
 
-  void Delete(const std::vector<ScalarPtr>& pkey) {
-    auto storage_key = MakeStorageKey(pkey);
-    key_value_table_->erase(storage_key);
-    deleted_keys_->push_back(storage_key);
-  }
+  bool Delete(const std::vector<ScalarPtr>& pkey) { return storage_adapter_->Delete(MakeStorageKey(pkey)); }
 
   /**
    * Creates storage key from the first PKeySize values
    */
   inline static std::string MakeStorageKey(const std::vector<ScalarPtr>& values) {
-    if (values.size() < PKeySize) {
-      throw std::runtime_error("Number of values needs to be equal or larger than primary key size");
-    }
+    CHECK_GE(values.size(), PKeySize) << "Number of values needs to be equal or larger than primary key size";
     size_t storage_key_size = 0;
     for (size_t i = 0; i < PKeySize; i++) {
       ValidateType(values[i], static_cast<Column>(i));
@@ -132,15 +112,15 @@ class Table {
     return storage_key;
   }
 
+ private:
   inline static void ValidateType(const ScalarPtr& val, Column col) {
-    if (val->type->name() != Schema::ColumnTypes[static_cast<size_t>(col)]->name()) {
-      throw std::runtime_error("Invalid column type");
-    }
+    const auto& value_type = val->type;
+    const auto& col_type = Schema::ColumnTypes[static_cast<size_t>(col)];
+    CHECK(value_type->name() == col_type->name())
+        << "Invalid column type. Value type: " << value_type->to_string() << ". Column type: " << col_type->to_string();
   }
 
- private:
-  KeyValueTablePtr key_value_table_;
-  KeyListPtr deleted_keys_;
+  std::shared_ptr<StorageAdapter> storage_adapter_;
 
   // Column offsets within a storage value
   inline static std::array<size_t, NumColumns> column_offsets_;
@@ -211,7 +191,7 @@ SCHEMA(DistrictSchema,
              NEXT_O_ID), 
        ARRAY(Int32Type::Get(),
              Int8Type::Get(),
-            //  FixedTextType<10>::Get(),
+             FixedTextType<10>::Get(),
              FixedTextType<20>::Get(),
              FixedTextType<20>::Get(),
              FixedTextType<20>::Get(),

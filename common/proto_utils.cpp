@@ -257,6 +257,18 @@ std::ostream& operator<<(std::ostream& os, const Procedures& code) {
   return os;
 }
 
+std::string ToReadable(const std::string& s) {
+  std::ostringstream ss;
+  for (auto c : s) {
+    if (std::isprint(c)) {
+      ss << c;
+    } else {
+      ss << '\\' << std::hex << (int(c) & 0xff);
+    }
+  }
+  return ss.str();
+}
+
 std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   os << "Transaction ID: " << txn.internal().id() << "\n";
   os << "Status: " << ENUM_NAME(txn.status(), TransactionStatus) << "\n";
@@ -268,17 +280,17 @@ std::ostream& operator<<(std::ostream& os, const Transaction& txn) {
   for (const auto& kv : txn.keys()) {
     const auto& k = kv.key();
     const auto& v = kv.value_entry();
-    os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << k << "\n";
-    os << "\tValue: " << v.value() << "\n";
+    os << "[" << ENUM_NAME(v.type(), KeyType) << "] " << ToReadable(k) << "\n";
+    os << "\tValue: " << ToReadable(v.value()) << "\n";
     if (v.type() == KeyType::WRITE) {
-      os << "\tNew value: " << v.new_value() << "\n";
+      os << "\tNew value: " << ToReadable(v.new_value()) << "\n";
     }
     os << "\tMetadata: " << v.metadata() << "\n";
   }
   if (!txn.deleted_keys().empty()) {
     os << "Deleted keys: ";
     for (const auto& k : txn.deleted_keys()) {
-      os << "\t" << k << "\n";
+      os << "\t" << ToReadable(k) << "\n";
     }
   }
   os << "Type: " << ENUM_NAME(txn.internal().type(), TransactionType) << "\n";

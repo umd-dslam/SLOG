@@ -4,7 +4,12 @@
 
 #include <iostream>
 
+#include "common/proto_utils.h"
+#include "execution/tpcc/metadata_initializer.h"
+#include "storage/mem_only_storage.h"
+
 using namespace std;
+using namespace slog;
 using namespace slog::tpcc;
 
 void PrintScalarList(const std::vector<ScalarPtr>& sl) {
@@ -44,40 +49,111 @@ bool ScalarListsEqual(const std::vector<ScalarPtr>& s1, const std::vector<Scalar
 class TableTest : public ::testing::Test {
  protected:
   void SetUp() {
-    warehouse_data = {{MakeInt32Scalar(10), MakeFixedTextScalar<10>("Maryland--"),
-                       MakeFixedTextScalar<20>("Baltimore Blvd.-----"), MakeFixedTextScalar<20>("Paint Branch Drive--"),
-                       MakeFixedTextScalar<20>("College Park--------"), MakeFixedTextScalar<2>("MA"),
-                       MakeFixedTextScalar<9>("20742----"), MakeInt32Scalar(1234), MakeInt64Scalar(1234567)},
-                      {MakeInt32Scalar(20), MakeFixedTextScalar<10>("Goods Inc."),
-                       MakeFixedTextScalar<20>("Main Street---------"), MakeFixedTextScalar<20>("Main Street 2-------"),
-                       MakeFixedTextScalar<20>("Some City-----------"), MakeFixedTextScalar<2>("CA"),
-                       MakeFixedTextScalar<9>("12345----"), MakeInt32Scalar(4214), MakeInt64Scalar(521232)}};
+    // clang-format off
+    data = {{MakeInt32Scalar(1000),
+             MakeInt8Scalar(2),
+             MakeFixedTextScalar<10>("UMD-------"),
+             MakeFixedTextScalar<20>("Baltimore Blvd.-----"),
+             MakeFixedTextScalar<20>("Paint Branch Drive--"),
+             MakeFixedTextScalar<20>("College Park--------"),
+             MakeFixedTextScalar<2>("MA"),
+             MakeFixedTextScalar<9>("20742----"),
+             MakeInt32Scalar(1234),
+             MakeInt64Scalar(1234567),
+             MakeInt32Scalar(4321)},
+            {MakeInt32Scalar(2001),
+             MakeInt8Scalar(3),
+             MakeFixedTextScalar<10>("Goods Inc."),
+             MakeFixedTextScalar<20>("Main Street---------"),
+             MakeFixedTextScalar<20>("Main Street 2-------"),
+             MakeFixedTextScalar<20>("Some City-----------"),
+             MakeFixedTextScalar<2>("CA"),
+             MakeFixedTextScalar<9>("12345----"),
+             MakeInt32Scalar(4214),
+             MakeInt64Scalar(521232),
+             MakeInt32Scalar(6476)}};
+    // clang-format on
 
-    warehouse_table = std::make_unique<Table<WarehouseSchema>>(kv_table, deleted_keys);
-    warehouse_table->Insert(warehouse_data[0]);
-    warehouse_table->Insert(warehouse_data[1]);
+    storage = std::make_shared<MemOnlyStorage>();
+    auto metadata_initializer = std::make_shared<TPCCMetadataInitializer>(2, 1);
+    auto storage_adapter = std::make_shared<StorageInitializingAdapter>(storage, metadata_initializer);
+    Table<DistrictSchema> storage_table(storage_adapter);
+    for (const auto& row : data) {
+      // Populate data to the storage
+      storage_table.Insert(row);
+      // Populate keys to the txn
+      auto new_entry = txn.mutable_keys()->Add();
+      new_entry->set_key(Table<DistrictSchema>::MakeStorageKey({row.begin(), row.begin() + 2}));
+      new_entry->mutable_value_entry()->set_type(KeyType::WRITE);
+      // This is to check if the metadata initializer is working correctly
+      auto home = std::static_pointer_cast<Int32Scalar>(row[0])->value % 2;
+      new_entry->mutable_value_entry()->mutable_metadata()->set_master(home);
+      new_entry->mutable_value_entry()->mutable_metadata()->set_counter(0);
+    }
+
+    auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
+    txn_table = std::make_unique<Table<DistrictSchema>>(txn_adapter);
+
+    // Populate initial values to the txn
+    FlushAndRefreshTxn();
   }
 
-  std::shared_ptr<KeyValueTable> kv_table = make_shared<KeyValueTable>();
-  std::shared_ptr<KeyList> deleted_keys = make_shared<KeyList>();
+  void FlushAndRefreshTxn() {
+    for (const auto& kv : txn.keys()) {
+      const auto& key = kv.key();
+      const auto& value = kv.value_entry();
+      if (!value.new_value().empty()) {
+        Record record(value.new_value());
+        record.SetMetadata(value.metadata());
+        storage->Write(key, record);
+      }
+    }
+    for (auto& kv : *(txn.mutable_keys())) {
+      const auto& key = kv.key();
+      Record record;
+      ASSERT_TRUE(storage->Read(key, record));
+      auto value = kv.mutable_value_entry();
+      ASSERT_EQ(value->metadata().master(), record.metadata().master);
+      value->set_value(record.to_string());
+      value->clear_new_value();
+    }
+  }
 
-  std::vector<std::vector<ScalarPtr>> warehouse_data;
-  std::unique_ptr<Table<WarehouseSchema>> warehouse_table;
+  std::vector<std::vector<ScalarPtr>> data;
+  std::shared_ptr<Storage> storage;
+  Transaction txn;
+  std::unique_ptr<Table<DistrictSchema>> txn_table;
 };
 
 TEST_F(TableTest, InsertAndSelect) {
-  ASSERT_TRUE(ScalarListsEqual(warehouse_table->Select({MakeInt32Scalar(10)}), warehouse_data[0]));
-  ASSERT_TRUE(ScalarListsEqual(warehouse_table->Select({MakeInt32Scalar(20)}), warehouse_data[1]));
-  ASSERT_EQ(kv_table->size(), 2);
-  ASSERT_TRUE(deleted_keys->empty());
+  for (const auto& row : data) {
+    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + 2};
+    ASSERT_TRUE(ScalarListsEqual(txn_table->Select(pkey), row));
+  }
+  ASSERT_EQ(txn.keys_size(), data.size());
+  ASSERT_EQ(txn.deleted_keys_size(), 0);
 }
 
 TEST_F(TableTest, UpdateAndSelect) {
-  std::vector<ScalarPtr> pkey = {MakeInt32Scalar(10)};
-  auto new_value = MakeFixedTextScalar<10>("Virginia--");
-  ASSERT_TRUE(warehouse_table->Update(pkey, {WarehouseSchema::Column::NAME}, {new_value}));
-  auto res = warehouse_table->Select(pkey, {WarehouseSchema::Column::ID, WarehouseSchema::Column::NAME});
-  ASSERT_TRUE(ScalarListsEqual(res, {MakeInt32Scalar(10), MakeFixedTextScalar<10>("Virginia--")}));
-  ASSERT_EQ(kv_table->size(), 2);
-  ASSERT_TRUE(deleted_keys->empty());
+  auto new_name = MakeFixedTextScalar<10>("AAAAAAAAAA");
+  auto new_ytd = MakeInt64Scalar(9876543210);
+  for (const auto& row : data) {
+    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + 2};
+    ASSERT_TRUE(
+        txn_table->Update(pkey, {DistrictSchema::Column::NAME, DistrictSchema::Column::YTD}, {new_name, new_ytd}));
+  }
+  ASSERT_EQ(txn.keys_size(), data.size());
+  ASSERT_EQ(txn.deleted_keys_size(), 0);
+
+  LOG(INFO) << txn;
+  FlushAndRefreshTxn();
+  LOG(INFO) << txn;
+
+  for (const auto& row : data) {
+    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + 2};
+
+    auto res = txn_table->Select(pkey, {DistrictSchema::Column::ID, DistrictSchema::Column::YTD,
+                                        DistrictSchema::Column::NAME, DistrictSchema::Column::STREET_1});
+    ASSERT_TRUE(ScalarListsEqual(res, {row[1], new_ytd, new_name, row[3]}));
+  }
 }

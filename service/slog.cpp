@@ -84,6 +84,7 @@ void GenerateData(slog::Storage& storage, std::shared_ptr<slog::MetadataInitiali
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
   auto num_partitions = config->num_partitions();
+  auto num_replicas = config->num_replicas();
   auto partition = config->local_partition();
 
   // Create a value of specified size by repeating the character 'a'

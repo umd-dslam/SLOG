@@ -13,6 +13,7 @@ class DataType {
   virtual ~DataType() = default;
   virtual DataTypeName name() const = 0;
   virtual std::size_t size() const = 0;
+  virtual std::string to_string() const = 0;
 };
 
 template <typename BaseType>
@@ -22,14 +23,16 @@ class NumericDataType : public DataType {
   std::size_t size() const override { return sizeof(BaseType); }
 };
 
-#define NUMERIC_TYPE(KLASS, NAME, CTYPE)                              \
-  class KLASS : public NumericDataType<CTYPE> {                       \
-   public:                                                            \
-    DataTypeName name() const override { return DataTypeName::NAME; } \
-    inline static std::shared_ptr<DataType> Get() {                   \
-      static auto result = std::make_shared<KLASS>();                 \
-      return result;                                                  \
-    }                                                                 \
+#define STRINGIFY(S) #S
+#define NUMERIC_TYPE(KLASS, NAME, CTYPE)                               \
+  class KLASS : public NumericDataType<CTYPE> {                        \
+   public:                                                             \
+    DataTypeName name() const override { return DataTypeName::NAME; }  \
+    std::string to_string() const override { return STRINGIFY(NAME); } \
+    inline static std::shared_ptr<DataType> Get() {                    \
+      static auto result = std::make_shared<KLASS>();                  \
+      return result;                                                   \
+    }                                                                  \
   }
 
 NUMERIC_TYPE(Int8Type, INT8, int8_t);
@@ -41,6 +44,7 @@ template <size_t Width>
 class FixedTextType : public DataType {
  public:
   DataTypeName name() const override { return DataTypeName::FIXED_TEXT; }
+  std::string to_string() const override { return "FIXED_TEXT<" + std::to_string(Width) + ">"; }
   size_t size() const override { return Width; }
 
   inline static std::shared_ptr<DataType> Get() {

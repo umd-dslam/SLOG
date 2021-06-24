@@ -1,6 +1,10 @@
 target_sources(slog-core
   PRIVATE
+    tpcc/metadata_initializer.cpp
+    tpcc/metadata_initializer.h
     tpcc/scalar.h
+    tpcc/storage_adapter.cpp
+    tpcc/storage_adapter.h
     tpcc/table.h
     tpcc/types.h
 )
