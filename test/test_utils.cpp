@@ -137,7 +137,9 @@ void TestSlog::Data(Key&& key, Record&& record) {
 void TestSlog::AddServerAndClient() { server_ = MakeRunnerFor<Server>(broker_, nullptr, kTestModuleTimeout); }
 
 void TestSlog::AddForwarder() {
-  forwarder_ = MakeRunnerFor<Forwarder>(broker_->context(), broker_->config(), storage_, nullptr, kTestModuleTimeout);
+  metadata_initializer_ = std::make_shared<ConstantMetadataInitializer>(0);
+  forwarder_ = MakeRunnerFor<Forwarder>(broker_->context(), broker_->config(), storage_, metadata_initializer_, nullptr,
+                                        kTestModuleTimeout);
 }
 
 void TestSlog::AddSequencer() {

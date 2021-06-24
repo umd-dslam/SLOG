@@ -31,10 +31,12 @@ uint32_t ChooseRandomPartition(const Transaction& txn, std::mt19937& rg) {
 
 Forwarder::Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                      const shared_ptr<LookupMasterIndex>& lookup_master_index,
+                     const std::shared_ptr<MetadataInitializer>& metadata_initializer,
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
     : NetworkedModule(context, config, config->forwarder_port(), kForwarderChannel, metrics_manager, poll_timeout),
       sharder_(Sharder::MakeSharder(config)),
       lookup_master_index_(lookup_master_index),
+      metadata_initializer_(metadata_initializer),
       batch_size_(0),
       rg_(std::random_device()()),
       collecting_stats_(false) {
@@ -82,8 +84,9 @@ void Forwarder::ProcessForwardTxn(EnvelopePtr&& env) {
         value->mutable_metadata()->set_master(metadata.master);
         value->mutable_metadata()->set_counter(metadata.counter);
       } else {
-        value->mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-        value->mutable_metadata()->set_counter(0);
+        auto metadata = metadata_initializer_->Compute(key);
+        value->mutable_metadata()->set_master(metadata.master);
+        value->mutable_metadata()->set_counter(metadata.counter);
       }
     } else {
       // Otherwise, add the key to the appropriate remote lookup master request
@@ -149,8 +152,7 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
     const auto& key = lookup_master.keys(i);
 
     if (sharder_->is_local_key(key)) {
-      Metadata metadata;
-      if (lookup_master_index_->GetMasterMetadata(key, metadata)) {
+      if (Metadata metadata; lookup_master_index_->GetMasterMetadata(key, metadata)) {
         // If key exists, add the metadata of current key to the response
         auto key_metadata = results->Add();
         key_metadata->set_key(key);
@@ -160,8 +162,9 @@ void Forwarder::ProcessLookUpMasterRequest(EnvelopePtr&& env) {
         // Otherwise, assign it to the default region for new key
         auto key_metadata = results->Add();
         key_metadata->set_key(key);
-        key_metadata->mutable_metadata()->set_master(DEFAULT_MASTER_REGION_OF_NEW_KEY);
-        key_metadata->mutable_metadata()->set_counter(metadata.counter);
+        auto new_metadata = metadata_initializer_->Compute(key);
+        key_metadata->mutable_metadata()->set_master(new_metadata.master);
+        key_metadata->mutable_metadata()->set_counter(new_metadata.counter);
       }
     }
   }

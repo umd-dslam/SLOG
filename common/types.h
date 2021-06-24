@@ -15,8 +15,6 @@ using SlotId = uint32_t;
 using Channel = uint64_t;
 using MachineId = int;
 
-const uint32_t DEFAULT_MASTER_REGION_OF_NEW_KEY = 0;
-
 struct Metadata {
   Metadata() = default;
   Metadata(const MasterMetadata& metadata) : master(metadata.master()), counter(metadata.counter()) {}
@@ -26,12 +24,12 @@ struct Metadata {
     counter = metadata.counter();
   }
 
-  uint32_t master = DEFAULT_MASTER_REGION_OF_NEW_KEY;
+  uint32_t master = 0;
   uint32_t counter = 0;
 };
 
 struct Record {
-  Record(const std::string& v, uint32_t m, uint32_t c = 0) : metadata_(m, c) { SetValue(v); }
+  Record(const std::string& v, uint32_t m = 0, uint32_t c = 0) : metadata_(m, c) { SetValue(v); }
 
   Record(const Record& other) {
     SetValue(other.data_.get(), other.size_);

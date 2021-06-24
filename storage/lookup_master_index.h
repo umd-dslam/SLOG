@@ -5,8 +5,8 @@
 namespace slog {
 
 class LookupMasterIndex {
-public:
+ public:
   virtual bool GetMasterMetadata(const Key& key, Metadata& metadata) const = 0;
 };
 
-} // namespace slog
+}  // namespace slog

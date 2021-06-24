@@ -153,12 +153,15 @@ TEST_F(ForwarderTest, TransactionHasNewKeys) {
 
   auto forwarded_txn = ReceiveOnSequencerChannel({0, 1, 2, 3});
   // The txn should be forwarded to the scheduler of the same machine
+  auto metadata_initializer = test_slogs[3]->metadata_initializer();
   ASSERT_TRUE(forwarded_txn != nullptr);
   ASSERT_EQ(TransactionType::SINGLE_HOME, forwarded_txn->internal().type());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, TxnValueEntry(*forwarded_txn, "NEW").metadata().master());
-  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "NEW").metadata().counter());
-  ASSERT_EQ(DEFAULT_MASTER_REGION_OF_NEW_KEY, TxnValueEntry(*forwarded_txn, "KEY").metadata().master());
-  ASSERT_EQ(0U, TxnValueEntry(*forwarded_txn, "KEY").metadata().counter());
+  auto metadata1 = metadata_initializer->Compute("NEW");
+  ASSERT_EQ(metadata1.master, TxnValueEntry(*forwarded_txn, "NEW").metadata().master());
+  ASSERT_EQ(metadata1.counter, TxnValueEntry(*forwarded_txn, "NEW").metadata().counter());
+  auto metadata2 = metadata_initializer->Compute("NEW");
+  ASSERT_EQ(metadata2.master, TxnValueEntry(*forwarded_txn, "KEY").metadata().master());
+  ASSERT_EQ(metadata2.counter, TxnValueEntry(*forwarded_txn, "KEY").metadata().counter());
 }
 
 TEST_F(ForwarderTest, ForwardMultiHome) {

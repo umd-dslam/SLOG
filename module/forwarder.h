@@ -11,6 +11,7 @@
 #include "module/base/networked_module.h"
 #include "proto/transaction.pb.h"
 #include "storage/lookup_master_index.h"
+#include "storage/metadata_initializer.h"
 
 namespace slog {
 
@@ -35,6 +36,7 @@ class Forwarder : public NetworkedModule {
  public:
   Forwarder(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
             const std::shared_ptr<LookupMasterIndex>& lookup_master_index,
+            const std::shared_ptr<MetadataInitializer>& metadata_initializer,
             const MetricsRepositoryManagerPtr& metrics_manager,
             std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
 
@@ -58,6 +60,7 @@ class Forwarder : public NetworkedModule {
 
   const SharderPtr sharder_;
   std::shared_ptr<LookupMasterIndex> lookup_master_index_;
+  std::shared_ptr<MetadataInitializer> metadata_initializer_;
   std::unordered_map<TxnId, EnvelopePtr> pending_transactions_;
   std::vector<internal::Envelope> partitioned_lookup_request_;
   int batch_size_;

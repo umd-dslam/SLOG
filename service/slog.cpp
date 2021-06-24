@@ -21,6 +21,7 @@
 #include "proto/offline_data.pb.h"
 #include "service/service_utils.h"
 #include "storage/mem_only_storage.h"
+#include "storage/metadata_initializer.h"
 #include "version.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
@@ -78,7 +79,8 @@ void LoadData(slog::Storage& storage, const ConfigurationPtr& config, const stri
   close(fd);
 }
 
-void GenerateData(slog::Storage& storage, const ConfigurationPtr& config) {
+void GenerateData(slog::Storage& storage, std::shared_ptr<slog::MetadataInitializer> metadata_initializer,
+                  const ConfigurationPtr& config) {
   auto simple_partitioning = config->simple_partitioning();
   auto num_records = simple_partitioning->num_records();
   auto num_partitions = config->num_partitions();
@@ -96,8 +98,8 @@ void GenerateData(slog::Storage& storage, const ConfigurationPtr& config) {
     uint64_t start_key = from_key + (partition + num_partitions - from_key % num_partitions) % num_partitions;
     uint64_t end_key = std::min(to_key, num_records);
     for (uint64_t key = start_key; key < end_key; key += num_partitions) {
-      int master = config->master_of_key(key);
-      Record record(value, master);
+      Record record(value);
+      record.SetMetadata(metadata_initializer->Compute(std::to_string(key)));
       storage.Write(std::to_string(key), record);
       counter++;
     }
@@ -156,11 +158,15 @@ int main(int argc, char* argv[]) {
 
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage>();
+  std::shared_ptr<slog::MetadataInitializer> metadata_initializer;
   // If simple partitioning is used, generate the data;
   // otherwise, load data from an external file
   if (config->simple_partitioning()) {
-    GenerateData(*storage, config);
+    metadata_initializer =
+        make_shared<slog::SimpleMetadataInitializer>(config->num_replicas(), config->num_partitions());
+    GenerateData(*storage, metadata_initializer, config);
   } else {
+    metadata_initializer = make_shared<slog::ConstantMetadataInitializer>(0);
     LoadData(*storage, config, FLAGS_data_dir);
   }
 
@@ -171,15 +177,23 @@ int main(int argc, char* argv[]) {
   auto metrics_manager = make_shared<slog::MetricsRepositoryManager>(config_name, config);
 
   vector<pair<unique_ptr<slog::ModuleRunner>, slog::ModuleId>> modules;
-  modules.emplace_back(MakeRunnerFor<slog::Server>(broker, metrics_manager), slog::ModuleId::SERVER);
-  modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(broker, metrics_manager), slog::ModuleId::MHORDERER);
-  modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(broker), slog::ModuleId::LOCALPAXOS);
-  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(broker->context(), broker->config(), storage, metrics_manager),
+  // clang-format off
+  modules.emplace_back(MakeRunnerFor<slog::Server>(broker, metrics_manager),
+                       slog::ModuleId::SERVER);
+  modules.emplace_back(MakeRunnerFor<slog::MultiHomeOrderer>(broker, metrics_manager),
+                       slog::ModuleId::MHORDERER);
+  modules.emplace_back(MakeRunnerFor<slog::LocalPaxos>(broker),
+                       slog::ModuleId::LOCALPAXOS);
+  modules.emplace_back(MakeRunnerFor<slog::Forwarder>(broker->context(), broker->config(), storage,
+                                                      metadata_initializer, metrics_manager),
                        slog::ModuleId::FORWARDER);
   modules.emplace_back(MakeRunnerFor<slog::Sequencer>(broker->context(), broker->config(), metrics_manager),
                        slog::ModuleId::SEQUENCER);
-  modules.emplace_back(MakeRunnerFor<slog::Interleaver>(broker, metrics_manager), slog::ModuleId::INTERLEAVER);
-  modules.emplace_back(MakeRunnerFor<slog::Scheduler>(broker, storage, metrics_manager), slog::ModuleId::SCHEDULER);
+  modules.emplace_back(MakeRunnerFor<slog::Interleaver>(broker, metrics_manager),
+                       slog::ModuleId::INTERLEAVER);
+  modules.emplace_back(MakeRunnerFor<slog::Scheduler>(broker, storage, metrics_manager),
+                       slog::ModuleId::SCHEDULER);
+  // clang-format on
 
   // One region is selected to globally order the multihome batches
   if (config->leader_replica_for_multi_home_ordering() == config->local_replica()) {
