@@ -5,11 +5,11 @@
 namespace slog {
 namespace tpcc {
 
-StorageInitializingAdapter::StorageInitializingAdapter(const std::shared_ptr<Storage>& storage,
+InitializingStorageAdapter::InitializingStorageAdapter(const std::shared_ptr<Storage>& storage,
                                                        const std::shared_ptr<MetadataInitializer>& metadata_initializer)
     : storage_(storage), metadata_initializer_(metadata_initializer) {}
 
-bool StorageInitializingAdapter::Insert(const std::string& key, std::string&& value) {
+bool InitializingStorageAdapter::Insert(const std::string& key, std::string&& value) {
   Record r(std::move(value));
   r.SetMetadata(metadata_initializer_->Compute(key));
   storage_->Write(key, std::move(r));

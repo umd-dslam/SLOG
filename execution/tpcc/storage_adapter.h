@@ -23,19 +23,19 @@ class StorageAdapter {
   virtual bool Delete(std::string&& key) = 0;
 };
 
-class StorageInitializingAdapter : public StorageAdapter {
+class InitializingStorageAdapter : public StorageAdapter {
  public:
-  StorageInitializingAdapter(const std::shared_ptr<Storage>& storage,
+  InitializingStorageAdapter(const std::shared_ptr<Storage>& storage,
                              const std::shared_ptr<MetadataInitializer>& metadata_initializer);
   const std::string* Read(const std::string&) override {
-    throw std::runtime_error("Read is unimplemented in StorageInitializingAdapter");
+    throw std::runtime_error("Read is unimplemented in InitializingStorageAdapter");
   }
   bool Insert(const std::string& key, std::string&& value) override;
   bool Update(const std::string&, const std::vector<UpdateEntry>&) override {
-    throw std::runtime_error("Update is unimplemented in StorageInitializingAdapter");
+    throw std::runtime_error("Update is unimplemented in InitializingStorageAdapter");
   }
   bool Delete(std::string&&) override {
-    throw std::runtime_error("Delete is unimplemented in StorageInitializingAdapter");
+    throw std::runtime_error("Delete is unimplemented in InitializingStorageAdapter");
   }
 
  private:

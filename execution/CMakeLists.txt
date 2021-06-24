@@ -1,5 +1,8 @@
 target_sources(slog-core
   PRIVATE
+    execution.h
+    key_value.cpp
+    tpcc.cpp
     tpcc/metadata_initializer.cpp
     tpcc/metadata_initializer.h
     tpcc/scalar.h
