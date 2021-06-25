@@ -4,6 +4,7 @@
 
 #include <array>
 #include <exception>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -20,9 +21,7 @@ class Table {
   static constexpr size_t NumColumns = Schema::NumColumns;
   static constexpr size_t PKeySize = Schema::PKeySize;
 
-  Table(const std::shared_ptr<StorageAdapter>& storage_adapter) : storage_adapter_(storage_adapter) {
-    InitializeColumnOffsets();
-  }
+  Table(const StorageAdapterPtr& storage_adapter) : storage_adapter_(storage_adapter) { InitializeColumnOffsets(); }
 
   std::vector<ScalarPtr> Select(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns = {}) {
     auto storage_key = MakeStorageKey(pkey);
@@ -112,6 +111,33 @@ class Table {
     return storage_key;
   }
 
+  inline static void PrintRows(const std::vector<std::vector<ScalarPtr>>& rows, const std::vector<Column>& cols = {}) {
+    if (rows.empty()) {
+      return;
+    }
+
+    auto columns = cols;
+    if (columns.empty()) {
+      for (size_t i = 0; i < Schema::NumColumns; i++) {
+        columns.push_back(static_cast<Column>(i));
+      }
+    }
+
+    for (const auto& row : rows) {
+      CHECK_EQ(row.size(), columns.size()) << "Number of values does not match number of columns";
+      bool first = true;
+      for (size_t i = 0; i < columns.size(); i++) {
+        ValidateType(row[i], columns[i]);
+        if (!first) {
+          std::cout << " | ";
+        }
+        std::cout << row[i]->to_string();
+        first = false;
+      }
+      std::cout << std::endl;
+    }
+  }
+
  private:
   inline static void ValidateType(const ScalarPtr& val, Column col) {
     const auto& value_type = val->type;
@@ -120,7 +146,7 @@ class Table {
         << "Invalid column type. Value type: " << value_type->to_string() << ". Column type: " << col_type->to_string();
   }
 
-  std::shared_ptr<StorageAdapter> storage_adapter_;
+  StorageAdapterPtr storage_adapter_;
 
   // Column offsets within a storage value
   inline static std::array<size_t, NumColumns> column_offsets_;

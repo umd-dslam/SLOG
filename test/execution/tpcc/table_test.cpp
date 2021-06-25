@@ -76,7 +76,7 @@ class TableTest : public ::testing::Test {
 
     storage = std::make_shared<MemOnlyStorage>();
     auto metadata_initializer = std::make_shared<TPCCMetadataInitializer>(2, 1);
-    auto storage_adapter = std::make_shared<InitializingStorageAdapter>(storage, metadata_initializer);
+    auto storage_adapter = std::make_shared<KVStorageAdapter>(storage, metadata_initializer);
     Table<DistrictSchema> storage_table(storage_adapter);
     for (const auto& row : data) {
       // Populate data to the storage

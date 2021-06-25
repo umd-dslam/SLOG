@@ -5,14 +5,26 @@
 namespace slog {
 namespace tpcc {
 
-InitializingStorageAdapter::InitializingStorageAdapter(const std::shared_ptr<Storage>& storage,
+KVStorageAdapter::KVStorageAdapter(const std::shared_ptr<Storage>& storage,
                                                        const std::shared_ptr<MetadataInitializer>& metadata_initializer)
     : storage_(storage), metadata_initializer_(metadata_initializer) {}
 
-bool InitializingStorageAdapter::Insert(const std::string& key, std::string&& value) {
+const std::string* KVStorageAdapter::Read(const std::string& key) {
+  Record r;
+  auto ok = storage_->Read(key, r);
+  if (!ok) {
+    return nullptr;
+  }
+  buffer_.push_back(r.to_string());
+  return &buffer_.back();
+};
+
+bool KVStorageAdapter::Insert(const std::string& key, std::string&& value) {
   Record r(std::move(value));
   r.SetMetadata(metadata_initializer_->Compute(key));
-  storage_->Write(key, std::move(r));
+  if (storage_->Write(key, std::move(r))) {
+    return false;
+  }
   return true;
 }
 

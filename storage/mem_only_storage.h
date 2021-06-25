@@ -10,7 +10,7 @@ class MemOnlyStorage : public Storage, public LookupMasterIndex {
  public:
   bool Read(const Key& key, Record& result) const final { return table_.Get(result, key); }
 
-  void Write(const Key& key, const Record& record) final { table_.InsertOrUpdate(key, record); }
+  bool Write(const Key& key, const Record& record) final { return table_.InsertOrUpdate(key, record); }
 
   bool Delete(const Key& key) final { return table_.Erase(key); }
 

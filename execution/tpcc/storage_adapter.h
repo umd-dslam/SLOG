@@ -23,24 +23,26 @@ class StorageAdapter {
   virtual bool Delete(std::string&& key) = 0;
 };
 
-class InitializingStorageAdapter : public StorageAdapter {
+using StorageAdapterPtr = std::shared_ptr<StorageAdapter>;
+
+class KVStorageAdapter : public StorageAdapter {
  public:
-  InitializingStorageAdapter(const std::shared_ptr<Storage>& storage,
+  KVStorageAdapter(const std::shared_ptr<Storage>& storage,
                              const std::shared_ptr<MetadataInitializer>& metadata_initializer);
-  const std::string* Read(const std::string&) override {
-    throw std::runtime_error("Read is unimplemented in InitializingStorageAdapter");
-  }
+  // This Read method is leaky. Only used for testing
+  const std::string* Read(const std::string&) override;
   bool Insert(const std::string& key, std::string&& value) override;
   bool Update(const std::string&, const std::vector<UpdateEntry>&) override {
-    throw std::runtime_error("Update is unimplemented in InitializingStorageAdapter");
+    throw std::runtime_error("Update is unimplemented in KVStorageAdapter");
   }
   bool Delete(std::string&&) override {
-    throw std::runtime_error("Delete is unimplemented in InitializingStorageAdapter");
+    throw std::runtime_error("Delete is unimplemented in KVStorageAdapter");
   }
 
  private:
   std::shared_ptr<Storage> storage_;
   std::shared_ptr<MetadataInitializer> metadata_initializer_;
+  std::vector<std::string> buffer_;
 };
 
 class TxnStorageAdapter : public StorageAdapter {

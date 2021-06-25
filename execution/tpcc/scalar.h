@@ -20,8 +20,9 @@ struct Scalar {
 
 using ScalarPtr = std::shared_ptr<Scalar>;
 
-template <typename DType>
+template <typename DType_>
 struct PrimitiveScalar : public Scalar {
+  using DType = DType_;
   using CType = typename DType::CType;
 
   PrimitiveScalar(CType value) : Scalar(DType::Get()), value(value) {}
@@ -32,21 +33,19 @@ struct PrimitiveScalar : public Scalar {
   CType value{};
 };
 
-struct Int8Scalar : public PrimitiveScalar<Int8Type> {
-  using PrimitiveScalar<Int8Type>::PrimitiveScalar;
-};
+#define NEW_PRIMITIVE_SCALAR(NAME)                                                    \
+  struct NAME##Scalar : public PrimitiveScalar<NAME##Type> {                          \
+    using PrimitiveScalar<NAME##Type>::PrimitiveScalar;                               \
+  };                                                                                  \
+  using NAME##ScalarPtr = std::shared_ptr<NAME##Scalar>;                              \
+  inline std::shared_ptr<NAME##Scalar> Make##NAME##Scalar(NAME##Scalar::CType data) { \
+    return std::make_shared<NAME##Scalar>(data);                                      \
+  }
 
-struct Int16Scalar : public PrimitiveScalar<Int16Type> {
-  using PrimitiveScalar<Int16Type>::PrimitiveScalar;
-};
-
-struct Int32Scalar : public PrimitiveScalar<Int32Type> {
-  using PrimitiveScalar<Int32Type>::PrimitiveScalar;
-};
-
-struct Int64Scalar : public PrimitiveScalar<Int64Type> {
-  using PrimitiveScalar<Int64Type>::PrimitiveScalar;
-};
+NEW_PRIMITIVE_SCALAR(Int8);
+NEW_PRIMITIVE_SCALAR(Int16);
+NEW_PRIMITIVE_SCALAR(Int32);
+NEW_PRIMITIVE_SCALAR(Int64);
 
 struct FixedTextScalar : public Scalar {
   FixedTextScalar(const std::shared_ptr<DataType>& type, const std::string& buffer) : Scalar(type), buffer(buffer) {}
@@ -59,27 +58,21 @@ struct FixedTextScalar : public Scalar {
 
   std::string buffer;
 };
+using FixedTextScalarPtr = std::shared_ptr<FixedTextScalar>;
 
-inline std::shared_ptr<Scalar> MakeInt8Scalar(int8_t data) { return std::make_shared<Int8Scalar>(data); }
-
-inline std::shared_ptr<Scalar> MakeInt16Scalar(int16_t data) { return std::make_shared<Int16Scalar>(data); }
-
-inline std::shared_ptr<Scalar> MakeInt32Scalar(int32_t data) { return std::make_shared<Int32Scalar>(data); }
-
-inline std::shared_ptr<Scalar> MakeInt64Scalar(int64_t data) { return std::make_shared<Int64Scalar>(data); }
-
-inline std::shared_ptr<Scalar> MakeFixedTextScalar(const std::shared_ptr<DataType>& type, const std::string& data) {
+inline std::shared_ptr<FixedTextScalar> MakeFixedTextScalar(const std::shared_ptr<DataType>& type,
+                                                            const std::string& data) {
   CHECK(type->name() == DataTypeName::FIXED_TEXT);
   CHECK_EQ(data.size(), type->size()) << "Size does not match: \"" << data << "\". Need size = " << type->size();
   return std::make_shared<FixedTextScalar>(type, data);
 }
 
 template <size_t Width>
-inline std::shared_ptr<Scalar> MakeFixedTextScalar(const std::string& data) {
+inline std::shared_ptr<FixedTextScalar> MakeFixedTextScalar(const std::string& data) {
   return MakeFixedTextScalar(FixedTextType<Width>::Get(), data);
 }
 
-inline std::shared_ptr<Scalar> MakeScalar(const std::shared_ptr<DataType>& type, const void* data) {
+inline ScalarPtr MakeScalar(const std::shared_ptr<DataType>& type, const void* data) {
   switch (type->name()) {
     case DataTypeName::INT8:
       return MakeInt8Scalar(*reinterpret_cast<const Int8Type::CType*>(data));
@@ -96,12 +89,17 @@ inline std::shared_ptr<Scalar> MakeScalar(const std::shared_ptr<DataType>& type,
 }
 
 template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
-std::shared_ptr<Scalar> MakeScalar(const std::shared_ptr<DataType>& type, T data) {
+ScalarPtr MakeScalar(const std::shared_ptr<DataType>& type, T data) {
   return MakeScalar(type, reinterpret_cast<const void*>(&data));
 }
 
-std::shared_ptr<Scalar> MakeScalar(const std::shared_ptr<DataType>& type, const char* data) {
+inline ScalarPtr MakeScalar(const std::shared_ptr<DataType>& type, const char* data) {
   return MakeFixedTextScalar(type, std::string{data});
+}
+
+template <typename T>
+inline std::shared_ptr<T> UncheckedCast(const ScalarPtr& from) {
+  return std::static_pointer_cast<T>(from);
 }
 
 template <typename DType>
@@ -109,9 +107,9 @@ bool operator==(const PrimitiveScalar<DType>& s1, const PrimitiveScalar<DType>& 
   return s1.value == s2.value;
 }
 
-bool operator==(const FixedTextScalar& s1, const FixedTextScalar& s2) { return s1.buffer == s2.buffer; }
+inline bool operator==(const FixedTextScalar& s1, const FixedTextScalar& s2) { return s1.buffer == s2.buffer; }
 
-bool operator==(const Scalar& s1, const Scalar& s2) {
+inline bool operator==(const Scalar& s1, const Scalar& s2) {
   if (s1.type != s2.type) {
     return false;
   }

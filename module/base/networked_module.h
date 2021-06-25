@@ -62,7 +62,7 @@ class NetworkedModule : public Module {
 
   void NewTimedCallback(std::chrono::microseconds timeout, std::function<void()>&& cb);
 
-  const std::shared_ptr<zmq::context_t> context() const { return context_; }
+  const std::shared_ptr<zmq::context_t>& context() const { return context_; }
   const ConfigurationPtr& config() const { return config_; }
 
   Channel channel() const { return channel_; }

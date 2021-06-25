@@ -8,8 +8,9 @@ class Storage {
  public:
   virtual ~Storage() = default;
   virtual bool Read(const Key& key, Record& result) const = 0;
-  virtual void Write(const Key& key, const Record& record) = 0;
-  virtual void Write(const Key& key, Record&& record) { Write(key, record); };
+  // Returns true if key exists
+  virtual bool Write(const Key& key, const Record& record) = 0;
+  virtual bool Write(const Key& key, Record&& record) { return Write(key, record); };
   virtual bool Delete(const Key& key) = 0;
 };
 

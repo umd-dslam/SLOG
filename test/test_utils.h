@@ -70,7 +70,7 @@ class TestSlog {
 
   const ConfigurationPtr& config() const { return config_; }
   const SharderPtr& sharder() const { return sharder_; }
-  const std::shared_ptr<MetadataInitializer> metadata_initializer() const { return metadata_initializer_; }
+  const std::shared_ptr<MetadataInitializer>& metadata_initializer() const { return metadata_initializer_; }
 
  private:
   ConfigurationPtr config_;
