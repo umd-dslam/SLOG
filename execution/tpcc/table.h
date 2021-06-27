@@ -249,14 +249,12 @@ SCHEMA(DistrictSchema,
 
 SCHEMA(CustomerSchema,
        TableId::CUSTOMER,
-       17, // NUM_COLUMNS
+       15, // NUM_COLUMNS
        3,  // PKEY_SIZE
        ARRAY(W_ID,
              D_ID,
              ID,
-             FIRST,
-             MIDDLE,
-             LAST,
+             FULL_NAME, // FIRST, MIDDLE, LAST
              ADDRESS, // STREET_1, STREET_2, CITY, STATE, ZIP
              PHONE,
              SINCE,
@@ -271,9 +269,7 @@ SCHEMA(CustomerSchema,
        ARRAY(Int32Type::Get(),
              Int8Type::Get(),
              Int32Type::Get(),
-             FixedTextType<16>::Get(),
-             FixedTextType<2>::Get(),
-             FixedTextType<16>::Get(),
+             FixedTextType<34>::Get(),
              FixedTextType<71>::Get(),
              FixedTextType<16>::Get(),
              Int64Type::Get(),
@@ -311,14 +307,16 @@ SCHEMA(HistorySchema,
 
 SCHEMA(NewOrderSchema,
        TableId::NEW_ORDER,
-       3, // NUM_COLUMNS
+       4, // NUM_COLUMNS
        3, // PKEY_SIZE
        ARRAY(W_ID,
              D_ID,
-             O_ID), 
+             O_ID,
+             DUMMY),
        ARRAY(Int32Type::Get(),
              Int8Type::Get(),
-             Int32Type::Get()));
+             Int32Type::Get(),
+             Int8Type::Get()));
 
 SCHEMA(OrderSchema,
        TableId::ORDER,
@@ -385,21 +383,12 @@ SCHEMA(ItemSchema,
 
 SCHEMA(StockSchema,
        TableId::STOCK,
-       17, // NUM_COLUMNS
-       2,  // PKEY_SIZE
+       8, // NUM_COLUMNS
+       2, // PKEY_SIZE
        ARRAY(W_ID,
              I_ID,
              QUANTITY,
-             DIST_01,
-             DIST_02,
-             DIST_03,
-             DIST_04,
-             DIST_05,
-             DIST_06,
-             DIST_07,
-             DIST_08,
-             DIST_09,
-             DIST_10,
+             ALL_DIST, // DIST_1, ..., DIST_10
              YTD,
              ORDER_CNT,
              REMOTE_CNT,
@@ -407,16 +396,7 @@ SCHEMA(StockSchema,
        ARRAY(Int32Type::Get(),
              Int32Type::Get(),
              Int16Type::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
-             FixedTextType<24>::Get(),
+             FixedTextType<240>::Get(),
              Int32Type::Get(),
              Int16Type::Get(),
              Int16Type::Get(),

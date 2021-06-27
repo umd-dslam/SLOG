@@ -51,5 +51,24 @@ class TxnStorageAdapter : public StorageAdapter {
   std::unordered_map<std::string, int> key_index_;
 };
 
+class TxnKeyGenStorageAdapter : public StorageAdapter {
+ public:
+  TxnKeyGenStorageAdapter(Transaction& txn);
+
+  const std::string* Read(const std::string& key) override;
+  bool Insert(const std::string& key, std::string&& value) override;
+  bool Update(const std::string& key, std::string&& updates) override;
+  bool Delete(std::string&& key) override;
+
+  void Finialize();
+
+ private:
+  void NewReadKey(const std::string& key);
+  void NewWriteKey(const std::string& key);
+  Transaction& txn_;
+  std::unordered_map<std::string, KeyType> key_index_;
+  bool finalized_;
+};
+
 }  // namespace tpcc
 }  // namespace slog

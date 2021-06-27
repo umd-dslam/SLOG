@@ -91,5 +91,51 @@ bool TxnStorageAdapter::Delete(std::string&& key) {
   return true;
 }
 
+TxnKeyGenStorageAdapter::TxnKeyGenStorageAdapter(Transaction& txn) : txn_(txn), finalized_(false) {}
+
+const std::string* TxnKeyGenStorageAdapter::Read(const std::string& key) {
+  NewReadKey(key);
+  return nullptr;
+}
+
+bool TxnKeyGenStorageAdapter::Insert(const std::string& key, std::string&&) {
+  NewWriteKey(key);
+  return false;
+}
+
+bool TxnKeyGenStorageAdapter::Update(const std::string& key, std::string&&) {
+  NewWriteKey(key);
+  return false;
+}
+
+bool TxnKeyGenStorageAdapter::Delete(std::string&& key) {
+  NewWriteKey(key);
+  return false;
+}
+
+void TxnKeyGenStorageAdapter::NewReadKey(const std::string& key) {
+  if (finalized_) {
+    return;
+  }
+  key_index_.insert({key, KeyType::READ});
+}
+
+void TxnKeyGenStorageAdapter::NewWriteKey(const std::string& key) {
+  if (finalized_) {
+    return;
+  }
+  key_index_.insert_or_assign(key, KeyType::WRITE);
+}
+
+void TxnKeyGenStorageAdapter::Finialize() {
+  txn_.clear_keys();
+  for (const auto& [k, v] : key_index_) {
+    auto new_key = txn_.mutable_keys()->Add();
+    new_key->set_key(k);
+    new_key->mutable_value_entry()->set_type(v);
+  }
+  finalized_ = true;
+}
+
 }  // namespace tpcc
 }  // namespace slog

@@ -27,7 +27,7 @@ std::string RandStr(size_t len) {
   return res;
 }
 
-void LoadItem(const StorageAdapterPtr& storage_adapter, int partition) {
+void LoadItem(const StorageAdapterPtr& storage_adapter, int w_partition) {
   Table<ItemSchema> item(storage_adapter);
 
   std::cout << "Loading " << kMaxItems << " items" << std::endl;
@@ -35,7 +35,7 @@ void LoadItem(const StorageAdapterPtr& storage_adapter, int partition) {
   std::uniform_int_distribution<> price_rnd(100, 10000);
   for (int id = 1; id <= kMaxItems; id++) {
     item.Insert({
-        MakeInt32Scalar(partition),
+        MakeInt32Scalar(w_partition),
         MakeInt32Scalar(id),
         MakeInt32Scalar(id),
         MakeFixedTextScalar<24>(RandStr(24)),
@@ -54,16 +54,7 @@ void LoadStock(const StorageAdapterPtr& storage_adapter, int w_id) {
         MakeInt32Scalar(w_id),
         MakeInt32Scalar(id),
         MakeInt16Scalar(quantity_rng(*rg)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
-        MakeFixedTextScalar<24>(RandStr(24)),
+        MakeFixedTextScalar<240>(RandStr(240)),
         MakeInt32Scalar(0),
         MakeInt16Scalar(0),
         MakeInt16Scalar(0),
@@ -81,11 +72,7 @@ void LoadDistrict(const StorageAdapterPtr& storage_adapter, int w_id) {
     district.Insert({MakeInt32Scalar(w_id),
                      MakeInt8Scalar(id),
                      MakeFixedTextScalar<10>(RandStr(10)),
-                     MakeFixedTextScalar<20>(RandStr(20)),
-                     MakeFixedTextScalar<20>(RandStr(20)),
-                     MakeFixedTextScalar<20>(RandStr(20)),
-                     MakeFixedTextScalar<2>(RandStr(2)),
-                     MakeFixedTextScalar<9>(RandStr(9)),
+                     MakeFixedTextScalar<71>(RandStr(71)),
                      MakeInt32Scalar(tax_rnd(*rg)),
                      MakeInt64Scalar(300000),
                      MakeInt32Scalar(3001)});
@@ -102,11 +89,7 @@ void LoadWarehouse(const StorageAdapterPtr& storage_adapter, int W) {
     // clang-format off
     warehouse.Insert({MakeInt32Scalar(id),
                       MakeFixedTextScalar<10>(RandStr(10)),
-                      MakeFixedTextScalar<20>(RandStr(20)),
-                      MakeFixedTextScalar<20>(RandStr(20)),
-                      MakeFixedTextScalar<20>(RandStr(20)),
-                      MakeFixedTextScalar<2>(RandStr(2)),
-                      MakeFixedTextScalar<9>(RandStr(9)),
+                      MakeFixedTextScalar<71>(RandStr(71)),
                       MakeInt32Scalar(tax_rnd(*rg)),
                       MakeInt64Scalar(300000000)});
     // clang-format on
@@ -125,27 +108,12 @@ void LoadCustomer(const StorageAdapterPtr& storage_adapter, int W) {
     std::cout << "Loading customers in warehouse: " << w_id << std::endl;
     for (int d_id = 1; d_id <= kDistPerWare; d_id++) {
       for (int id = 1; id <= kCustPerDist; id++) {
-        customer.Insert({MakeInt32Scalar(w_id),
-                         MakeInt8Scalar(d_id),
-                         MakeInt32Scalar(id),
-                         MakeFixedTextScalar<16>(RandStr(16)),
-                         MakeFixedTextScalar<2>("OE"),
-                         MakeFixedTextScalar<16>(RandStr(16)),
-                         MakeFixedTextScalar<20>(RandStr(20)),
-                         MakeFixedTextScalar<20>(RandStr(20)),
-                         MakeFixedTextScalar<20>(RandStr(20)),
-                         MakeFixedTextScalar<2>(RandStr(2)),
-                         MakeFixedTextScalar<9>(RandStr(9)),
-                         MakeFixedTextScalar<16>(RandStr(16)),
-                         MakeInt64Scalar(1234567890),
-                         MakeFixedTextScalar<2>(credit_rnd(*rg) ? "GC" : "BC"),
-                         MakeInt64Scalar(50000),
-                         MakeInt32Scalar(discount_rnd(*rg)),
-                         MakeInt64Scalar(-10),
-                         MakeInt64Scalar(100),
-                         MakeInt16Scalar(1),
-                         MakeInt16Scalar(0),
-                         MakeFixedTextScalar<250>(RandStr(250))});
+        customer.Insert({MakeInt32Scalar(w_id), MakeInt8Scalar(d_id), MakeInt32Scalar(id),
+                         MakeFixedTextScalar<34>(RandStr(34)), MakeFixedTextScalar<71>(RandStr(71)),
+                         MakeFixedTextScalar<16>(RandStr(16)), MakeInt64Scalar(1234567890),
+                         MakeFixedTextScalar<2>(credit_rnd(*rg) ? "GC" : "BC"), MakeInt64Scalar(50000),
+                         MakeInt32Scalar(discount_rnd(*rg)), MakeInt64Scalar(-10), MakeInt64Scalar(100),
+                         MakeInt16Scalar(1), MakeInt16Scalar(0), MakeFixedTextScalar<250>(RandStr(250))});
         // clang-format off
         history.Insert({MakeInt32Scalar(w_id),
                         MakeInt8Scalar(d_id),
@@ -186,7 +154,7 @@ void LoadOrder(const StorageAdapterPtr& storage_adapter, int W) {
                       MakeInt8Scalar(kLinePerOrder), MakeInt8Scalar(1)});
         // clang-format on
         if (id > 2100) {
-          new_order.Insert({MakeInt32Scalar(w_id), MakeInt8Scalar(d_id), MakeInt32Scalar(id)});
+          new_order.Insert({MakeInt32Scalar(w_id), MakeInt8Scalar(d_id), MakeInt32Scalar(id), MakeInt8Scalar(0)});
         }
         for (int ol_id = 1; ol_id <= kLinePerOrder; ol_id++) {
           // clang-format off
@@ -209,7 +177,7 @@ void LoadOrder(const StorageAdapterPtr& storage_adapter, int W) {
 
 }  // namespace
 
-void LoadTables(const StorageAdapterPtr& storage_adapter, int W, int partition) {
+void LoadTables(const StorageAdapterPtr& storage_adapter, int W, int w_partition) {
   rg = std::make_unique<std::mt19937>();
   rnd_str_pool.clear();
   rnd_str_pool.reserve(kRandStrPoolSize);
@@ -219,7 +187,7 @@ void LoadTables(const StorageAdapterPtr& storage_adapter, int W, int partition) 
     rnd_str_pool.push_back(kCharacters[char_rnd(*rg)]);
   }
 
-  LoadItem(storage_adapter, partition);
+  LoadItem(storage_adapter, w_partition);
   LoadWarehouse(storage_adapter, W);
   LoadCustomer(storage_adapter, W);
   LoadOrder(storage_adapter, W);

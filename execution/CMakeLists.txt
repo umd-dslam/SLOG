@@ -3,11 +3,16 @@ target_sources(slog-core
     execution.h
     key_value.cpp
     tpcc.cpp
+    tpcc/load_tables.cpp
+    tpcc/load_tables.h
     tpcc/metadata_initializer.cpp
     tpcc/metadata_initializer.h
+    tpcc/new_order.cpp
+    tpcc/new_order.h
     tpcc/scalar.h
     tpcc/storage_adapter.cpp
     tpcc/storage_adapter.h
     tpcc/table.h
+    tpcc/transaction.h
     tpcc/types.h
 )

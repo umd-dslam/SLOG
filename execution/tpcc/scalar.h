@@ -33,13 +33,13 @@ struct PrimitiveScalar : public Scalar {
   CType value{};
 };
 
-#define NEW_PRIMITIVE_SCALAR(NAME)                                                    \
-  struct NAME##Scalar : public PrimitiveScalar<NAME##Type> {                          \
-    using PrimitiveScalar<NAME##Type>::PrimitiveScalar;                               \
-  };                                                                                  \
-  using NAME##ScalarPtr = std::shared_ptr<NAME##Scalar>;                              \
-  inline std::shared_ptr<NAME##Scalar> Make##NAME##Scalar(NAME##Scalar::CType data) { \
-    return std::make_shared<NAME##Scalar>(data);                                      \
+#define NEW_PRIMITIVE_SCALAR(NAME)                                                                            \
+  struct NAME##Scalar : public PrimitiveScalar<NAME##Type> {                                                  \
+    using PrimitiveScalar<NAME##Type>::PrimitiveScalar;                                                       \
+  };                                                                                                          \
+  using NAME##ScalarPtr = std::shared_ptr<NAME##Scalar>;                                                      \
+  inline std::shared_ptr<NAME##Scalar> Make##NAME##Scalar(NAME##Scalar::CType data = NAME##Scalar::CType()) { \
+    return std::make_shared<NAME##Scalar>(data);                                                              \
   }
 
 NEW_PRIMITIVE_SCALAR(Int8);
@@ -70,6 +70,10 @@ inline std::shared_ptr<FixedTextScalar> MakeFixedTextScalar(const std::shared_pt
 template <size_t Width>
 inline std::shared_ptr<FixedTextScalar> MakeFixedTextScalar(const std::string& data) {
   return MakeFixedTextScalar(FixedTextType<Width>::Get(), data);
+}
+
+inline std::shared_ptr<FixedTextScalar> MakeFixedTextScalar() {
+  return MakeFixedTextScalar(FixedTextType<0>::Get(), "");
 }
 
 inline ScalarPtr MakeScalar(const std::shared_ptr<DataType>& type, const void* data) {
