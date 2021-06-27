@@ -7,8 +7,8 @@
 #include "common/proto_utils.h"
 #include "execution/tpcc/load_tables.h"
 #include "execution/tpcc/metadata_initializer.h"
-#include "execution/tpcc/new_order.h"
 #include "execution/tpcc/table.h"
+#include "execution/tpcc/transaction.h"
 #include "storage/mem_only_storage.h"
 
 using namespace std;
@@ -55,7 +55,7 @@ class TransactionTest : public ::testing::Test {
   std::shared_ptr<KVStorageAdapter> kv_storage_adapter;
 };
 
-TEST_F(TransactionTest, DISABLED_InspectStorage) {
+TEST_F(TransactionTest, InspectStorage) {
   {
     cout << "Warehouse\n";
     Table<WarehouseSchema> warehouse(kv_storage_adapter);
@@ -177,13 +177,19 @@ TEST_F(TransactionTest, DISABLED_InspectStorage) {
 }
 
 TEST_F(TransactionTest, NewOrder) {
+  int w_id = 1;
+  int d_id = 2;
+  int c_id = 5;
+  int o_id = 5000;
+  int64_t datetime = 1234567890;
+  int w_i_id = 100;
+  std::array<NewOrderTxn::OrderLine, 10> ol;
+  for (int i = 0; i < static_cast<int>(ol.size()); i++) {
+    ol[i] = NewOrderTxn::OrderLine{.id = i + 1, .supply_w_id = 1, .item_id = (i + 1) * 10, .quantity = 4};
+  }
   {
     auto key_gen_adapter = std::make_shared<TxnKeyGenStorageAdapter>(txn);
-    std::vector<NewOrderTxn::OrderLine> ol;
-    for (int i = 1; i <= kLinePerOrder; i++) {
-      ol.push_back(NewOrderTxn::OrderLine{.id = i, .supply_w_id = 1, .item_id = i * 10, .quantity = 4});
-    }
-    NewOrderTxn new_order_txn(key_gen_adapter, 1, 2, 5, 5000, 1234567890, ol, 100);
+    NewOrderTxn new_order_txn(key_gen_adapter, w_id, d_id, c_id, o_id, datetime, ol, w_i_id);
     new_order_txn.Read();
     new_order_txn.Write();
     key_gen_adapter->Finialize();
@@ -191,11 +197,96 @@ TEST_F(TransactionTest, NewOrder) {
   FlushAndRefreshTxn();
   {
     auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
-    std::vector<NewOrderTxn::OrderLine> ol;
-    for (int i = 1; i <= kLinePerOrder; i++) {
-      ol.push_back(NewOrderTxn::OrderLine{.id = i, .supply_w_id = 1, .item_id = i * 10, .quantity = 4});
-    }
-    NewOrderTxn new_order_txn(txn_adapter, 1, 2, 5, 5000, 1234567890, ol, 100);
+    NewOrderTxn new_order_txn(txn_adapter, w_id, d_id, c_id, o_id, datetime, ol, w_i_id);
     ASSERT_TRUE(new_order_txn.Execute());
+  }
+}
+
+TEST_F(TransactionTest, Payment) {
+  int w_id = 1;
+  int d_id = 2;
+  int c_w_id = 2;
+  int c_d_id = 3;
+  int c_id = 4;
+  int64_t amount = 10000;
+  int64_t datetime = 1234567890;
+  int h_id = 33333;
+  {
+    auto key_gen_adapter = std::make_shared<TxnKeyGenStorageAdapter>(txn);
+    PaymentTxn payment_txn(key_gen_adapter, w_id, d_id, c_w_id, c_d_id, c_id, amount, datetime, h_id);
+    payment_txn.Read();
+    payment_txn.Write();
+    key_gen_adapter->Finialize();
+  }
+  FlushAndRefreshTxn();
+  {
+    auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
+    PaymentTxn payment_txn(txn_adapter, w_id, d_id, c_w_id, c_d_id, c_id, amount, datetime, h_id);
+    ASSERT_TRUE(payment_txn.Execute());
+  }
+}
+
+TEST_F(TransactionTest, OrderStatus) {
+  int w_id = 1;
+  int d_id = 2;
+  int c_id = 2;
+  int o_id = 3;
+  {
+    auto key_gen_adapter = std::make_shared<TxnKeyGenStorageAdapter>(txn);
+    OrderStatusTxn order_status_txn(key_gen_adapter, w_id, d_id, c_id, o_id);
+    order_status_txn.Read();
+    order_status_txn.Write();
+    key_gen_adapter->Finialize();
+  }
+  FlushAndRefreshTxn();
+  {
+    auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
+    OrderStatusTxn order_status_txn(txn_adapter, w_id, d_id, c_id, o_id);
+    ASSERT_TRUE(order_status_txn.Execute());
+  }
+}
+
+TEST_F(TransactionTest, Deliver) {
+  int w_id = 1;
+  int d_id = 2;
+  int no_o_id = 2;
+  int c_id = 3;
+  int o_carrier = 123;
+  int64_t datetime = 1234567890;
+  {
+    auto key_gen_adapter = std::make_shared<TxnKeyGenStorageAdapter>(txn);
+    DeliverTxn deliver(key_gen_adapter, w_id, d_id, no_o_id, c_id, o_carrier, datetime);
+    deliver.Read();
+    deliver.Write();
+    key_gen_adapter->Finialize();
+  }
+  FlushAndRefreshTxn();
+  {
+    auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
+    DeliverTxn deliver(txn_adapter, w_id, d_id, no_o_id, c_id, o_carrier, datetime);
+    ASSERT_TRUE(deliver.Execute());
+  }
+}
+
+TEST_F(TransactionTest, StockLevel) {
+  int w_id = 1;
+  int d_id = 2;
+  int o_id = 2;
+  std::array<int, StockLevelTxn::kTotalItems> i_ids;
+  for (int i = 0; i < StockLevelTxn::kTotalItems; i++) {
+    i_ids[i] = i;
+  }
+  {
+    auto key_gen_adapter = std::make_shared<TxnKeyGenStorageAdapter>(txn);
+    StockLevelTxn stock_level(key_gen_adapter, w_id, d_id, o_id, i_ids);
+    stock_level.Read();
+    stock_level.Write();
+    key_gen_adapter->Finialize();
+  }
+  FlushAndRefreshTxn();
+  {
+    auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
+    StockLevelTxn stock_level(txn_adapter, w_id, d_id, o_id, i_ids);
+    ASSERT_TRUE(stock_level.Execute());
   }
 }

@@ -1,10 +1,10 @@
-#include "execution/tpcc/new_order.h"
+#include "execution/tpcc/transaction.h"
 
 namespace slog {
 namespace tpcc {
 
 NewOrderTxn::NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int d_id, int c_id, int o_id,
-                         int64_t datetime, const std::vector<OrderLine>& ol, int w_i_id)
+                         int64_t datetime, const std::array<OrderLine, 10>& ol, int w_i_id)
     : warehouse_(storage_adapter),
       district_(storage_adapter),
       customer_(storage_adapter),
@@ -18,11 +18,11 @@ NewOrderTxn::NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int
   a_c_id_ = MakeInt32Scalar(c_id);
   a_o_id_ = MakeInt32Scalar(o_id);
   datetime_ = MakeInt64Scalar(datetime);
-  for (const auto& l : ol) {
-    a_ol_.push_back(OrderLineScalar{.a_id = MakeInt8Scalar(l.id),
-                                    .a_supply_w_id = MakeInt32Scalar(l.supply_w_id),
-                                    .a_item_id = MakeInt32Scalar(l.item_id),
-                                    .a_quantity = MakeInt8Scalar(l.quantity)});
+  for (size_t i = 0; i < ol.size(); i++) {
+    a_ol_[i] = OrderLineScalar{.a_id = MakeInt8Scalar(ol[i].id),
+                               .a_supply_w_id = MakeInt32Scalar(ol[i].supply_w_id),
+                               .a_item_id = MakeInt32Scalar(ol[i].item_id),
+                               .a_quantity = MakeInt8Scalar(ol[i].quantity)};
   }
   w_i_id_ = MakeInt32Scalar(w_i_id);
 }
@@ -73,40 +73,32 @@ bool NewOrderTxn::Read() {
 }
 
 void NewOrderTxn::Compute() {
-  new_d_next_o_id_ = MakeInt32Scalar(d_next_o_id_->value + 1);
+  new_d_next_o_id_->value = d_next_o_id_->value + 1;
 
   bool all_local = true;
   for (auto& l : a_ol_) {
     if (!(*l.a_supply_w_id == *a_w_id_)) {
       all_local = false;
     }
-    l.amount = MakeInt32Scalar(l.a_quantity->value * l.i_price->value);
+    l.amount->value = l.a_quantity->value * l.i_price->value;
     if (l.s_quantity->value > l.a_quantity->value) {
       l.s_quantity->value -= l.a_quantity->value;
     } else {
       l.s_quantity->value -= l.a_quantity->value - 91;
     }
   }
-  all_local_ = MakeInt8Scalar(all_local);
+  all_local_->value = all_local;
 }
 
 bool NewOrderTxn::Write() {
   bool ok = true;
-  if (!district_.Update({a_w_id_, a_d_id_}, {DistrictSchema::Column::NEXT_O_ID}, {new_d_next_o_id_})) {
-    ok = false;
-  }
-
   auto null_carrier_id = MakeInt8Scalar(0);
   auto ol_cnt = MakeInt8Scalar(a_ol_.size());
-  if (!order_.Insert({a_w_id_, a_d_id_, a_o_id_, a_c_id_, datetime_, null_carrier_id, ol_cnt, all_local_})) {
-    ok = false;
-  }
-
-  if (!new_order_.Insert({a_w_id_, a_d_id_, a_o_id_, MakeInt8Scalar()})) {
-    ok = false;
-  }
-
   auto null_delivery_d = MakeInt64Scalar(0);
+
+  ok &= district_.Update({a_w_id_, a_d_id_}, {DistrictSchema::Column::NEXT_O_ID}, {new_d_next_o_id_});
+  ok &= order_.Insert({a_w_id_, a_d_id_, a_o_id_, a_c_id_, datetime_, null_carrier_id, ol_cnt, all_local_});
+  ok &= new_order_.Insert({a_w_id_, a_d_id_, a_o_id_, MakeInt8Scalar()});
   for (const auto& l : a_ol_) {
     ok &= stock_.Update({l.a_supply_w_id, l.a_item_id}, {StockSchema::Column::QUANTITY}, {l.s_quantity});
     ok &= order_line_.Insert({a_w_id_, a_d_id_, a_o_id_, l.a_id, l.a_item_id, l.a_supply_w_id, null_delivery_d,
