@@ -53,22 +53,14 @@ class TableTest : public ::testing::Test {
     data = {{MakeInt32Scalar(1000),
              MakeInt8Scalar(2),
              MakeFixedTextScalar<10>("UMD-------"),
-             MakeFixedTextScalar<20>("Baltimore Blvd.-----"),
-             MakeFixedTextScalar<20>("Paint Branch Drive--"),
-             MakeFixedTextScalar<20>("College Park--------"),
-             MakeFixedTextScalar<2>("MA"),
-             MakeFixedTextScalar<9>("20742----"),
+             MakeFixedTextScalar<71>("Baltimore Blvd.-----Paint Branch Drive--College Park--------MA20742----"),
              MakeInt32Scalar(1234),
              MakeInt64Scalar(1234567),
              MakeInt32Scalar(4321)},
             {MakeInt32Scalar(2001),
              MakeInt8Scalar(3),
              MakeFixedTextScalar<10>("Goods Inc."),
-             MakeFixedTextScalar<20>("Main Street---------"),
-             MakeFixedTextScalar<20>("Main Street 2-------"),
-             MakeFixedTextScalar<20>("Some City-----------"),
-             MakeFixedTextScalar<2>("CA"),
-             MakeFixedTextScalar<9>("12345----"),
+             MakeFixedTextScalar<71>("Main Street---------Main Street 2-------Some City-----------CA12345----"),
              MakeInt32Scalar(4214),
              MakeInt64Scalar(521232),
              MakeInt32Scalar(6476)}};
@@ -82,13 +74,16 @@ class TableTest : public ::testing::Test {
       // Populate data to the storage
       storage_table.Insert(row);
       // Populate keys to the txn
-      auto new_entry = txn.mutable_keys()->Add();
-      new_entry->set_key(Table<DistrictSchema>::MakeStorageKey({row.begin(), row.begin() + 2}));
-      new_entry->mutable_value_entry()->set_type(KeyType::WRITE);
-      // This is to check if the metadata initializer is working correctly
-      auto home = std::static_pointer_cast<Int32Scalar>(row[0])->value % 2;
-      new_entry->mutable_value_entry()->mutable_metadata()->set_master(home);
-      new_entry->mutable_value_entry()->mutable_metadata()->set_counter(0);
+      auto keys = Table<DistrictSchema>::MakeStorageKeys({row.begin(), row.begin() + 2});
+      for (const auto& key : keys) {
+        auto new_entry = txn.mutable_keys()->Add();
+        new_entry->set_key(key);
+        new_entry->mutable_value_entry()->set_type(KeyType::WRITE);
+        // This is to check if the metadata initializer is working correctly
+        auto home = std::static_pointer_cast<Int32Scalar>(row[0])->value % 2;
+        new_entry->mutable_value_entry()->mutable_metadata()->set_master(home);
+        new_entry->mutable_value_entry()->mutable_metadata()->set_counter(0);
+      }
     }
 
     auto txn_adapter = std::make_shared<TxnStorageAdapter>(txn);
@@ -109,7 +104,7 @@ class TableTest : public ::testing::Test {
       }
     }
     for (const auto& key : txn.deleted_keys()) {
-      storage->Delete(key);
+      ASSERT_TRUE(storage->Delete(key));
     }
     for (auto& kv : *(txn.mutable_keys())) {
       const auto& key = kv.key();
@@ -134,7 +129,7 @@ TEST_F(TableTest, InsertAndSelect) {
     std::vector<ScalarPtr> pkey{row.begin(), row.begin() + 2};
     ASSERT_TRUE(ScalarListsEqual(txn_table->Select(pkey), row));
   }
-  ASSERT_EQ(txn.keys_size(), data.size());
+  ASSERT_EQ(txn.keys_size(), data.size() * (DistrictSchema::kNonPKeySize));
   ASSERT_EQ(txn.deleted_keys_size(), 0);
 }
 
@@ -146,32 +141,32 @@ TEST_F(TableTest, UpdateAndSelect) {
     ASSERT_TRUE(
         txn_table->Update(pkey, {DistrictSchema::Column::NAME, DistrictSchema::Column::YTD}, {new_name, new_ytd}));
   }
-  ASSERT_EQ(txn.keys_size(), data.size());
+  ASSERT_EQ(txn.keys_size(), data.size() * (DistrictSchema::kNonPKeySize));
   ASSERT_EQ(txn.deleted_keys_size(), 0);
 
   FlushAndRefreshTxn();
 
   for (const auto& row : data) {
-    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + DistrictSchema::PKeySize};
+    std::vector<ScalarPtr> pkey{row.begin(), row.begin() + DistrictSchema::kPKeySize};
 
     auto res = txn_table->Select(pkey, {DistrictSchema::Column::ID, DistrictSchema::Column::YTD,
-                                        DistrictSchema::Column::NAME, DistrictSchema::Column::STREET_1});
+                                        DistrictSchema::Column::NAME, DistrictSchema::Column::ADDRESS});
     ASSERT_TRUE(ScalarListsEqual(res, {row[1], new_ytd, new_name, row[3]}));
   }
 }
 
 TEST_F(TableTest, Delete) {
-  ASSERT_TRUE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}));
-  ASSERT_FALSE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}));
-  ASSERT_EQ(txn.keys_size(), data.size() - 1);
-  ASSERT_EQ(txn.deleted_keys_size(), 1);
+  ASSERT_TRUE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::kPKeySize}));
+  ASSERT_FALSE(txn_table->Delete({data[0].begin(), data[0].begin() + DistrictSchema::kPKeySize}));
+  ASSERT_EQ(txn.keys_size(), (data.size() - 1) * (DistrictSchema::kNonPKeySize));
+  ASSERT_EQ(txn.deleted_keys_size(), DistrictSchema::kNonPKeySize);
 
   FlushAndRefreshTxn();
 
   for (size_t i = 1; i < data.size(); i++) {
-    std::vector<ScalarPtr> pkey{data[i].begin(), data[i].begin() + DistrictSchema::PKeySize};
+    std::vector<ScalarPtr> pkey{data[i].begin(), data[i].begin() + DistrictSchema::kPKeySize};
     auto res = txn_table->Select(pkey);
     ASSERT_TRUE(ScalarListsEqual(res, data[i]));
   }
-  ASSERT_TRUE(txn_table->Select({data[0].begin(), data[0].begin() + DistrictSchema::PKeySize}).empty());
+  ASSERT_TRUE(txn_table->Select({data[0].begin(), data[0].begin() + DistrictSchema::kPKeySize}).empty());
 }

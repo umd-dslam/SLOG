@@ -10,16 +10,10 @@ namespace tpcc {
 
 class StorageAdapter {
  public:
-  struct UpdateEntry {
-    size_t offset;
-    size_t size;
-    const void* data;
-  };
-
   virtual ~StorageAdapter() = default;
   virtual const std::string* Read(const std::string& key) = 0;
   virtual bool Insert(const std::string& key, std::string&& value) = 0;
-  virtual bool Update(const std::string& key, const std::vector<UpdateEntry>& updates) = 0;
+  virtual bool Update(const std::string& key, std::string&& value) = 0;
   virtual bool Delete(std::string&& key) = 0;
 };
 
@@ -28,16 +22,14 @@ using StorageAdapterPtr = std::shared_ptr<StorageAdapter>;
 class KVStorageAdapter : public StorageAdapter {
  public:
   KVStorageAdapter(const std::shared_ptr<Storage>& storage,
-                             const std::shared_ptr<MetadataInitializer>& metadata_initializer);
+                   const std::shared_ptr<MetadataInitializer>& metadata_initializer);
   // This Read method is leaky. Only used for testing
   const std::string* Read(const std::string&) override;
   bool Insert(const std::string& key, std::string&& value) override;
-  bool Update(const std::string&, const std::vector<UpdateEntry>&) override {
+  bool Update(const std::string&, std::string&&) override {
     throw std::runtime_error("Update is unimplemented in KVStorageAdapter");
   }
-  bool Delete(std::string&&) override {
-    throw std::runtime_error("Delete is unimplemented in KVStorageAdapter");
-  }
+  bool Delete(std::string&&) override { throw std::runtime_error("Delete is unimplemented in KVStorageAdapter"); }
 
  private:
   std::shared_ptr<Storage> storage_;
@@ -50,7 +42,7 @@ class TxnStorageAdapter : public StorageAdapter {
   TxnStorageAdapter(Transaction& txn);
   const std::string* Read(const std::string& key) override;
   bool Insert(const std::string& key, std::string&& value) override;
-  bool Update(const std::string& key, const std::vector<UpdateEntry>& updates) override;
+  bool Update(const std::string& key, std::string&& value) override;
   bool Delete(std::string&& key) override;
 
  private:
