@@ -64,4 +64,23 @@ vector<string> Split(const std::string& str, const std::string& delims) {
   return res;
 }
 
+const std::string RandomStringGenerator::kCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ");
+
+RandomStringGenerator::RandomStringGenerator(int seed, size_t pool_size) : rg_(seed), rnd_str_pool_offset_(0) {
+  rnd_str_pool_.reserve(pool_size);
+  std::uniform_int_distribution<uint32_t> char_rnd(0, kCharacters.size() - 1);
+  for (size_t i = 0; i < pool_size; i++) {
+    rnd_str_pool_.push_back(kCharacters[char_rnd(rg_)]);
+  }
+}
+
+std::string RandomStringGenerator::operator()(size_t len) {
+  if (rnd_str_pool_offset_ + len >= rnd_str_pool_.size()) {
+    rnd_str_pool_offset_ = 0;
+  }
+  auto res = rnd_str_pool_.substr(rnd_str_pool_offset_, len);
+  rnd_str_pool_offset_ += len;
+  return res;
+}
+
 }  // namespace slog

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -44,5 +45,18 @@ std::string Join(const Container& parts, char delim = ';') {
   }
   return ss.str();
 }
+
+class RandomStringGenerator {
+ public:
+  RandomStringGenerator(int seed = 0, size_t pool_size = 100000);
+  std::string operator()(size_t len);
+
+ private:
+  const static std::string kCharacters;
+
+  std::mt19937 rg_;
+  size_t rnd_str_pool_offset_;
+  std::string rnd_str_pool_;
+};
 
 }  // namespace slog

@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/configuration.h"
+#include "common/string_utils.h"
 #include "common/types.h"
 #include "proto/transaction.pb.h"
 #include "workload/workload.h"
@@ -30,6 +31,7 @@ class BasicWorkload : public Workload {
   vector<vector<KeyList>> partition_to_key_lists_;
 
   std::mt19937 rg_;
+  RandomStringGenerator rnd_str_;
 
   TxnId client_txn_id_counter_;
 };

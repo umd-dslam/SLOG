@@ -166,28 +166,14 @@ class Workload {
   WorkloadParams params_;
 };
 
-const std::string kCharacters("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-/**
- * Generates a random string of length n
- */
-inline std::string RandomString(size_t n, std::mt19937& rg) {
-  std::uniform_int_distribution<uint32_t> dis(0, kCharacters.size() - 1);
-  std::string s;
-  s.reserve(n);
-  for (size_t i = 0; i < n; i++) {
-    s += kCharacters[dis(rg)];
-  }
-  return s;
-}
-
 class KeyList {
  public:
   KeyList(size_t num_hot_keys = 0) : is_simple_(false), num_hot_keys_(num_hot_keys) {}
 
   KeyList(const ConfigurationPtr config, int partition, int master, size_t num_hot_keys = 0)
       : is_simple_(true), partition_(partition), master_(master), num_hot_keys_(num_hot_keys) {
-    auto simple_partitioning = config->simple_partitioning();
-    auto num_records = static_cast<long long>(simple_partitioning->num_records());
+    auto simple_partitioning = config->proto_config().simple_partitioning();
+    auto num_records = static_cast<long long>(simple_partitioning.num_records());
     num_partitions_ = config->num_partitions();
     num_replicas_ = config->num_replicas();
     num_keys_ = std::max(1LL, ((num_records - partition) / num_partitions_ - master) / num_replicas_);
