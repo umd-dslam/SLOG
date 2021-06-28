@@ -69,21 +69,7 @@ void KeyValueExecution::Execute(Transaction& txn) {
     txn.set_abort_reason(abort_reason.str());
   } else {
     txn.set_status(TransactionStatus::COMMITTED);
-
-    for (const auto& kv : txn.keys()) {
-      const auto& key = kv.key();
-      const auto& value = kv.value_entry();
-      if (!sharder_->is_local_key(key) || value.type() == KeyType::READ) {
-        continue;
-      }
-      Record new_record;
-      new_record.SetMetadata(value.metadata());
-      new_record.SetValue(value.new_value());
-      storage_->Write(key, new_record);
-    }
-    for (const auto& key : txn.deleted_keys()) {
-      storage_->Delete(key);
-    }
+    ApplyWrites(txn, sharder_, storage_);
   }
 }
 

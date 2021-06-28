@@ -4,7 +4,7 @@ namespace slog {
 namespace tpcc {
 
 NewOrderTxn::NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int d_id, int c_id, int o_id,
-                         int64_t datetime, const std::array<OrderLine, 10>& ol, int w_i_id)
+                         int64_t datetime, int w_i_id, const std::array<OrderLine, 10>& ol)
     : warehouse_(storage_adapter),
       district_(storage_adapter),
       customer_(storage_adapter),

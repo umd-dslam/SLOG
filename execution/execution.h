@@ -13,6 +13,8 @@ class Execution {
  public:
   virtual ~Execution() = default;
   virtual void Execute(Transaction& txn) = 0;
+
+  static void ApplyWrites(const Transaction& txn, const SharderPtr& sharder, const std::shared_ptr<Storage>& storage);
 };
 
 class KeyValueExecution : public Execution {

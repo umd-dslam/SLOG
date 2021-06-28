@@ -35,7 +35,7 @@ class NewOrderTxn : public TPCCTransaction {
   };
 
   NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int d_id, int c_id, int o_id, int64_t datetime,
-              const std::array<OrderLine, 10>& ol, int w_i_id);
+              int w_i_id, const std::array<OrderLine, 10>& ol);
   bool Read() final;
   void Compute() final;
   bool Write() final;

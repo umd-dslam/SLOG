@@ -1,5 +1,6 @@
 target_sources(slog-core
   PRIVATE
+    execution.cpp
     execution.h
     key_value.cpp
     tpcc.cpp
