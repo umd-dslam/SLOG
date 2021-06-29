@@ -15,7 +15,7 @@ const RawParamMap DEFAULT_PARAMS = {{REMASTER_GAP, "50"}};
 
 }  // namespace
 
-RemasteringWorkload::RemasteringWorkload(const ConfigurationPtr config, uint32_t region, const string& data_dir,
+RemasteringWorkload::RemasteringWorkload(const ConfigurationPtr& config, uint32_t region, const string& data_dir,
                                          const string& params_str, const uint32_t seed)
     : BasicWorkload(config, region, data_dir, params_str, seed, DEFAULT_PARAMS) {
   name_ = "remastering";

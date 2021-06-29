@@ -57,22 +57,10 @@ const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},   {MH_HOMES, "2"},     {MH_ZI
                                     {MP_PARTS, "2"}, {HOT, "0"},          {RECORDS, "10"}, {HOT_RECORDS, "0"},
                                     {WRITES, "10"},  {VALUE_SIZE, "100"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
 
-std::discrete_distribution<> zipf_distribution(double a, size_t n) {
-  std::vector<double> weights(n);
-  double s = 0;
-  for (size_t i = 1; i <= n; i++) {
-    s += 1 / std::pow(i, a);
-  }
-  for (size_t i = 0; i < n; i++) {
-    weights[i] = 1 / (std::pow(i + 1, a) * s);
-  }
-  return std::discrete_distribution<>(weights.begin(), weights.end());
-}
-
 }  // namespace
 
-BasicWorkload::BasicWorkload(const ConfigurationPtr config, uint32_t region, const string& data_dir,
-                             const string& params_str, const uint32_t seed, const RawParamMap extra_default_params)
+BasicWorkload::BasicWorkload(const ConfigurationPtr& config, uint32_t region, const string& data_dir,
+                             const string& params_str, const uint32_t seed, const RawParamMap& extra_default_params)
     : Workload(MergeParams(extra_default_params, DEFAULT_PARAMS), params_str),
       config_(config),
       local_region_(region),
@@ -181,20 +169,15 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     auto max_num_homes = std::min(params_.GetUInt32(MH_HOMES), num_replicas);
     CHECK_GE(max_num_homes, 2) << "At least 2 regions must be selected for MH txns";
     auto num_homes = std::uniform_int_distribution{2U, max_num_homes}(rg_);
+    candidate_homes.reserve(num_homes);
+
     if (params_.GetInt32(NEAREST)) {
       candidate_homes.push_back(local_region_);
       num_homes--;
     }
-
     auto zipf_coef = params_.GetDouble(MH_ZIPF);
-    auto dis = zipf_distribution(zipf_coef, distance_ranking_.size());
-    for (size_t i = 0; i < num_homes; i++) {
-      auto next_home = distance_ranking_[dis(rg_)];
-      while (std::find(candidate_homes.begin(), candidate_homes.end(), next_home) != candidate_homes.end()) {
-        next_home = distance_ranking_[dis(rg_)];
-      }
-      candidate_homes.push_back(next_home);
-    }
+    auto sampled_homes = zipf_sample(rg_, zipf_coef, distance_ranking_, num_homes);
+    candidate_homes.insert(candidate_homes.end(), sampled_homes.begin(), sampled_homes.end());
   } else {
     if (params_.GetInt32(NEAREST)) {
       candidate_homes.push_back(local_region_);

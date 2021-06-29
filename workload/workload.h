@@ -16,6 +16,33 @@ namespace slog {
 
 using RawParamMap = std::unordered_map<std::string, std::string>;
 
+inline std::discrete_distribution<> zipf_distribution(double a, size_t n) {
+  std::vector<double> weights(n);
+  double s = 0;
+  for (size_t i = 1; i <= n; i++) {
+    s += 1 / std::pow(i, a);
+  }
+  for (size_t i = 0; i < n; i++) {
+    weights[i] = 1 / (std::pow(i + 1, a) * s);
+  }
+  return std::discrete_distribution<>(weights.begin(), weights.end());
+}
+
+template <typename T, typename G>
+std::vector<T> zipf_sample(G& gen, double zipf_coef, const std::vector<T>& source, int n) {
+  std::vector<T> res;
+  res.reserve(n);
+  auto dis = zipf_distribution(zipf_coef, source.size());
+  for (int i = 0; i < n; i++) {
+    auto next = source[dis(gen)];
+    while (std::find(res.begin(), res.end(), next) != res.end()) {
+      next = source[dis(gen)];
+    }
+    res.push_back(next);
+  }
+  return res;
+}
+
 class WorkloadParams {
  public:
   WorkloadParams(const RawParamMap& default_params) { raw_params_ = default_params; }
@@ -170,7 +197,7 @@ class KeyList {
  public:
   KeyList(size_t num_hot_keys = 0) : is_simple_(false), num_hot_keys_(num_hot_keys) {}
 
-  KeyList(const ConfigurationPtr config, int partition, int master, size_t num_hot_keys = 0)
+  KeyList(const ConfigurationPtr& config, int partition, int master, size_t num_hot_keys = 0)
       : is_simple_(true), partition_(partition), master_(master), num_hot_keys_(num_hot_keys) {
     auto simple_partitioning = config->proto_config().simple_partitioning();
     auto num_records = static_cast<long long>(simple_partitioning.num_records());

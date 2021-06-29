@@ -14,9 +14,9 @@ namespace slog {
 
 class BasicWorkload : public Workload {
  public:
-  BasicWorkload(const ConfigurationPtr config, uint32_t region, const std::string& data_dir,
+  BasicWorkload(const ConfigurationPtr& config, uint32_t region, const std::string& data_dir,
                 const std::string& params_str, const uint32_t seed = std::random_device()(),
-                const RawParamMap extra_default_params = {});
+                const RawParamMap& extra_default_params = {});
 
   std::pair<Transaction*, TransactionProfile> NextTransaction();
 

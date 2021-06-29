@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "execution/tpcc/constants.h"
 #include "execution/tpcc/table.h"
 
 namespace slog {
@@ -35,7 +36,7 @@ class NewOrderTxn : public TPCCTransaction {
   };
 
   NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int d_id, int c_id, int o_id, int64_t datetime,
-              int w_i_id, const std::array<OrderLine, 10>& ol);
+              int i_w_id, const std::array<OrderLine, kLinePerOrder>& ol);
   bool Read() final;
   void Compute() final;
   bool Write() final;
@@ -68,7 +69,7 @@ class NewOrderTxn : public TPCCTransaction {
   Int32ScalarPtr a_o_id_;
   Int64ScalarPtr datetime_;
   std::array<OrderLineScalar, 10> a_ol_;
-  Int32ScalarPtr w_i_id_;
+  Int32ScalarPtr i_w_id_;
 
   // Read results
   Int32ScalarPtr w_tax_ = MakeInt32Scalar();

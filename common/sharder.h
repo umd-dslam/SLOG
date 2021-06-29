@@ -41,4 +41,10 @@ class SimpleSharder : public Sharder {
   uint32_t compute_partition(const Key& key) const final;
 };
 
+class TPCCSharder : public Sharder {
+ public:
+  TPCCSharder(const ConfigurationPtr& config);
+  uint32_t compute_partition(const Key& key) const final;
+};
+
 }  // namespace slog

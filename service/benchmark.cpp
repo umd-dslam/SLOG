@@ -14,6 +14,7 @@
 #include "service/service_utils.h"
 #include "workload/basic_workload.h"
 #include "workload/remastering_workload.h"
+#include "workload/tpcc_workload.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_int32(generators, 1, "Number of generator threads");
@@ -63,6 +64,9 @@ vector<unique_ptr<ModuleRunner>> InitializeGenerators() {
       workload = make_unique<BasicWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "remastering") {
       workload = make_unique<RemasteringWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
+    } else if (FLAGS_wl == "tpcc") {
+      workload =
+          make_unique<TPCCWorkload>(config, FLAGS_r, FLAGS_params, std::make_pair(i, FLAGS_generators), seed + i);
     } else {
       LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
     }

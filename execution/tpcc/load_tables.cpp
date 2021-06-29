@@ -26,22 +26,27 @@ class PartitionedTPCCDataLoader {
     LoadOrder();
   }
 
-  static void LoadItem(const StorageAdapterPtr& storage_adapter, int partition) {
+  static void LoadItem(const StorageAdapterPtr& storage_adapter, const std::vector<int>& rep_w) {
     Table<ItemSchema> item(storage_adapter);
-    LOG(INFO) << "Loading " << kMaxItems << " items in partition: " << partition << std::endl;
+    LOG(INFO) << "Loading " << kMaxItems << " items for each of " << rep_w.size() << " representative warehouses";
 
     std::mt19937 rg;
     RandomStringGenerator str_rnd;
     std::uniform_int_distribution<> price_rnd(100, 10000);
     for (int id = 1; id <= kMaxItems; id++) {
-      item.Insert({
-          MakeInt32Scalar(partition),
-          MakeInt32Scalar(id),
-          MakeInt32Scalar(id),
-          MakeFixedTextScalar<24>(str_rnd(24)),
-          MakeInt32Scalar(price_rnd(rg)),
-          MakeFixedTextScalar<50>(str_rnd(50)),
-      });
+      auto name = MakeFixedTextScalar<24>(str_rnd(24));
+      auto price = MakeInt32Scalar(price_rnd(rg));
+      auto data = MakeFixedTextScalar<50>(str_rnd(50));
+      for (auto w_id : rep_w) {
+        item.Insert({
+            MakeInt32Scalar(w_id),
+            MakeInt32Scalar(id),
+            MakeInt32Scalar(id),
+            name,
+            price,
+            data,
+        });
+      }
     }
   }
 
@@ -185,10 +190,17 @@ class PartitionedTPCCDataLoader {
   }
 };
 
-void LoadTables(const StorageAdapterPtr& storage_adapter, int W, int num_partitions, int partition, int num_threads) {
+void LoadTables(const StorageAdapterPtr& storage_adapter, int W, int num_replicas, int num_partitions, int partition,
+                int num_threads) {
   LOG(INFO) << "Generating ~" << W / num_partitions << " warehouses using " << num_threads << " threads. ";
 
-  PartitionedTPCCDataLoader::LoadItem(storage_adapter, partition);
+  std::vector<int> rep_w;
+  int rep_w_counter = partition;
+  for (int i = 0; i < num_replicas; i++) {
+    rep_w.push_back(rep_w_counter + 1);
+    rep_w_counter += num_partitions;
+  }
+  PartitionedTPCCDataLoader::LoadItem(storage_adapter, rep_w);
 
   std::atomic<int> num_done = 0;
   auto LoadFn = [&](int from_w, int to_w, int seed) {

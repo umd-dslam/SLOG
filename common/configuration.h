@@ -48,8 +48,6 @@ class Configuration {
   uint32_t leader_replica_for_multi_home_ordering() const;
   uint32_t leader_partition_for_multi_home_ordering() const;
 
-  const internal::SimplePartitioning* simple_partitioning() const;
-
   uint32_t replication_delay_pct() const;
   uint32_t replication_delay_amount_ms() const;
 

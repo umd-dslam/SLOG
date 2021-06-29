@@ -181,7 +181,7 @@ TEST_F(TransactionTest, DISABLED_NewOrder) {
   int o_id = 5000;
   int64_t datetime = 1234567890;
   int w_i_id = 100;
-  std::array<NewOrderTxn::OrderLine, 10> ol;
+  std::array<NewOrderTxn::OrderLine, kLinePerOrder> ol;
   for (int i = 0; i < static_cast<int>(ol.size()); i++) {
     ol[i] = NewOrderTxn::OrderLine{.id = i + 1, .supply_w_id = 1, .item_id = (i + 1) * 10, .quantity = 4};
   }

@@ -17,10 +17,12 @@ uint32_t FNVHash(It begin, It end) {
 }  // namespace
 
 std::shared_ptr<Sharder> Sharder::MakeSharder(const ConfigurationPtr& config) {
-  if (config->proto_config().has_hash_partitioning()) {
-    return std::make_shared<HashSharder>(config);
+  if (config->proto_config().has_simple_partitioning()) {
+    return std::make_shared<SimpleSharder>(config);
+  } else if (config->proto_config().has_tpcc_partitioning()) {
+    return std::make_shared<TPCCSharder>(config);
   }
-  return std::make_shared<SimpleSharder>(config);
+  return std::make_shared<HashSharder>(config);
 }
 
 Sharder::Sharder(const ConfigurationPtr& config)
@@ -43,5 +45,11 @@ uint32_t HashSharder::compute_partition(const Key& key) const {
 SimpleSharder::SimpleSharder(const ConfigurationPtr& config) : Sharder(config) {}
 
 uint32_t SimpleSharder::compute_partition(const Key& key) const { return std::stoll(key) % num_partitions_; }
+
+TPCCSharder::TPCCSharder(const ConfigurationPtr& config) : Sharder(config) {}
+uint32_t TPCCSharder::compute_partition(const Key& key) const {
+  int w_id = *reinterpret_cast<const int*>(key.data());
+  return (w_id - 1) % num_partitions_;
+}
 
 }  // namespace slog

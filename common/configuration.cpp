@@ -67,6 +67,15 @@ Configuration::Configuration(const internal::Configuration& config, const string
   CHECK(local_address_is_valid) << "The configuration does not contain the provided local machine ID: \""
                                 << local_address_ << "\"";
 
+  if (config_.execution_type() == internal::ExecutionType::TPC_C) {
+    CHECK(config_.has_tpcc_partitioning()) << "TPC-C execution type can only be paired with TPC-C partitioning";
+  }
+
+  if (config_.has_tpcc_partitioning()) {
+    CHECK(config_.execution_type() == internal::ExecutionType::TPC_C)
+        << "TPC-C partitioning can only be paired with TPC-C execution type";
+  }
+
   if (config_.replication_order_size() > local_replica_) {
     auto order_str = Split(config_.replication_order(local_replica_), ",");
     for (auto rstr : order_str) {
@@ -155,10 +164,6 @@ uint32_t Configuration::leader_partition_for_multi_home_ordering() const {
   // Avoid using partition 0 here since that partition already works as the
   // leader of the local paxos process
   return num_partitions() - 1;
-}
-
-const internal::SimplePartitioning* Configuration::simple_partitioning() const {
-  return config_.has_simple_partitioning() ? &config_.simple_partitioning() : nullptr;
 }
 
 uint32_t Configuration::replication_delay_pct() const { return config_.replication_delay().delay_pct(); }

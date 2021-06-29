@@ -10,6 +10,8 @@
 #include "common/sharder.h"
 #include "common/types.h"
 #include "connection/broker.h"
+#include "execution/tpcc/load_tables.h"
+#include "execution/tpcc/metadata_initializer.h"
 #include "module/consensus.h"
 #include "module/forwarder.h"
 #include "module/interleaver.h"
@@ -79,29 +81,27 @@ void LoadData(slog::Storage& storage, const ConfigurationPtr& config, const stri
   close(fd);
 }
 
-void GenerateData(slog::Storage& storage, std::shared_ptr<slog::MetadataInitializer> metadata_initializer,
-                  const ConfigurationPtr& config) {
-  auto simple_partitioning = config->simple_partitioning();
-  auto num_records = simple_partitioning->num_records();
+void GenerateSimpleData(std::shared_ptr<slog::Storage> storage,
+                        const std::shared_ptr<slog::MetadataInitializer>& metadata_initializer,
+                        const ConfigurationPtr& config) {
+  auto simple_partitioning = config->proto_config().simple_partitioning();
+  auto num_records = simple_partitioning.num_records();
   auto num_partitions = config->num_partitions();
-  auto num_replicas = config->num_replicas();
   auto partition = config->local_partition();
 
   // Create a value of specified size by repeating the character 'a'
-  string value(simple_partitioning->record_size_bytes(), 'a');
+  string value(simple_partitioning.record_size_bytes(), 'a');
 
   LOG(INFO) << "Generating ~" << num_records / num_partitions << " records using " << FLAGS_data_threads << " threads. "
-            << "Record size = " << simple_partitioning->record_size_bytes() << " bytes";
+            << "Record size = " << simple_partitioning.record_size_bytes() << " bytes";
 
   std::atomic<uint64_t> counter = 0;
-  size_t num_done = 0;
+  std::atomic<size_t> num_done = 0;
   auto GenerateFn = [&](uint64_t from_key, uint64_t to_key) {
-    uint64_t start_key = from_key + (partition + num_partitions - from_key % num_partitions) % num_partitions;
-    uint64_t end_key = std::min(to_key, num_records);
-    for (uint64_t key = start_key; key < end_key; key += num_partitions) {
+    for (uint64_t key = from_key; key < to_key; key += num_partitions) {
       Record record(value);
       record.SetMetadata(metadata_initializer->Compute(std::to_string(key)));
-      storage.Write(std::to_string(key), record);
+      storage->Write(std::to_string(key), record);
       counter++;
     }
     num_done++;
@@ -109,7 +109,13 @@ void GenerateData(slog::Storage& storage, std::shared_ptr<slog::MetadataInitiali
   std::vector<std::thread> threads;
   uint64_t range = num_records / FLAGS_data_threads + 1;
   for (uint32_t i = 0; i < FLAGS_data_threads; i++) {
-    threads.emplace_back(GenerateFn, i * range, (i + 1) * range);
+    uint64_t range_start = i * range;
+    uint64_t partition_of_range_start = range_start % num_partitions;
+    uint64_t distance_to_next_in_partition_key =
+        (partition - partition_of_range_start + num_partitions) % num_partitions;
+    uint64_t from_key = range_start + distance_to_next_in_partition_key;
+    uint64_t to_key = std::min((i + 1) * range, num_records);
+    threads.emplace_back(GenerateFn, from_key, to_key);
   }
   while (num_done < FLAGS_data_threads) {
     std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -118,6 +124,15 @@ void GenerateData(slog::Storage& storage, std::shared_ptr<slog::MetadataInitiali
   for (auto& t : threads) {
     t.join();
   }
+}
+
+void GenerateTPCCData(std::shared_ptr<slog::Storage> storage,
+                      const std::shared_ptr<slog::MetadataInitializer>& metadata_initializer,
+                      const ConfigurationPtr& config) {
+  auto tpcc_partitioning = config->proto_config().tpcc_partitioning();
+  auto storage_adapter = std::make_shared<slog::tpcc::KVStorageAdapter>(storage, metadata_initializer);
+  slog::tpcc::LoadTables(storage_adapter, tpcc_partitioning.warehouses(), config->num_replicas(),
+                         config->num_partitions(), config->local_partition(), FLAGS_data_threads);
 }
 
 int main(int argc, char* argv[]) {
@@ -160,15 +175,21 @@ int main(int argc, char* argv[]) {
   // Create and initialize storage layer
   auto storage = make_shared<slog::MemOnlyStorage>();
   std::shared_ptr<slog::MetadataInitializer> metadata_initializer;
-  // If simple partitioning is used, generate the data;
-  // otherwise, load data from an external file
-  if (config->simple_partitioning()) {
-    metadata_initializer =
-        make_shared<slog::SimpleMetadataInitializer>(config->num_replicas(), config->num_partitions());
-    GenerateData(*storage, metadata_initializer, config);
-  } else {
-    metadata_initializer = make_shared<slog::ConstantMetadataInitializer>(0);
-    LoadData(*storage, config, FLAGS_data_dir);
+  switch (config->proto_config().partitioning_case()) {
+    case slog::internal::Configuration::kSimplePartitioning:
+      metadata_initializer =
+          make_shared<slog::SimpleMetadataInitializer>(config->num_replicas(), config->num_partitions());
+      GenerateSimpleData(storage, metadata_initializer, config);
+      break;
+    case slog::internal::Configuration::kTpccPartitioning:
+      metadata_initializer =
+          make_shared<slog::tpcc::TPCCMetadataInitializer>(config->num_replicas(), config->num_partitions());
+      GenerateTPCCData(storage, metadata_initializer, config);
+      break;
+    default:
+      metadata_initializer = make_shared<slog::ConstantMetadataInitializer>(0);
+      LoadData(*storage, config, FLAGS_data_dir);
+      break;
   }
 
   auto config_name = FLAGS_config;

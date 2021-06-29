@@ -4,6 +4,7 @@ target_sources(slog-core
     execution.h
     key_value.cpp
     tpcc.cpp
+    tpcc/constants.h
     tpcc/deliver.cpp
     tpcc/load_tables.cpp
     tpcc/load_tables.h

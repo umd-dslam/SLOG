@@ -1,10 +1,11 @@
+#include "execution/tpcc/constants.h"
 #include "execution/tpcc/transaction.h"
 
 namespace slog {
 namespace tpcc {
 
 NewOrderTxn::NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int d_id, int c_id, int o_id,
-                         int64_t datetime, int w_i_id, const std::array<OrderLine, 10>& ol)
+                         int64_t datetime, int i_w_id, const std::array<OrderLine, kLinePerOrder>& ol)
     : warehouse_(storage_adapter),
       district_(storage_adapter),
       customer_(storage_adapter),
@@ -24,7 +25,7 @@ NewOrderTxn::NewOrderTxn(const StorageAdapterPtr& storage_adapter, int w_id, int
                                .a_item_id = MakeInt32Scalar(ol[i].item_id),
                                .a_quantity = MakeInt8Scalar(ol[i].quantity)};
   }
-  w_i_id_ = MakeInt32Scalar(w_i_id);
+  i_w_id_ = MakeInt32Scalar(i_w_id);
 }
 
 bool NewOrderTxn::Read() {
@@ -55,7 +56,7 @@ bool NewOrderTxn::Read() {
   }
 
   for (auto& l : a_ol_) {
-    auto item_res = item_.Select({w_i_id_, l.a_item_id},
+    auto item_res = item_.Select({i_w_id_, l.a_item_id},
                                  {ItemSchema::Column::PRICE, ItemSchema::Column::NAME, ItemSchema::Column::DATA});
     auto stock_res =
         stock_.Select({l.a_supply_w_id, l.a_item_id}, {StockSchema::Column::QUANTITY, StockSchema::Column::ALL_DIST});

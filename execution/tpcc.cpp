@@ -1,6 +1,7 @@
 #include <string>
 
 #include "execution/execution.h"
+#include "execution/tpcc/constants.h"
 #include "execution/tpcc/transaction.h"
 
 namespace slog {
@@ -36,7 +37,7 @@ void TPCCExecution::Execute(Transaction& txn) {
     int o_id = stoi(args[4]);
     int64_t datetime = stoll(args[5]);
     int w_i_id = stoll(args[6]);
-    std::array<tpcc::NewOrderTxn::OrderLine, 10> ol;
+    std::array<tpcc::NewOrderTxn::OrderLine, tpcc::kLinePerOrder> ol;
     for (int i = 0; i < static_cast<int>(ol.size()); i++) {
       const auto& order_line = txn.code().procedures(i + 1);
       if (order_line.args_size() != 4) {
@@ -48,7 +49,8 @@ void TPCCExecution::Execute(Transaction& txn) {
       int supply_w_id = stoi(order_line.args(1));
       int item_id = stoi(order_line.args(2));
       int quantity = stoi(order_line.args(3));
-      ol[i] = tpcc::NewOrderTxn::OrderLine{.id = ol_id, .supply_w_id = supply_w_id, .item_id = item_id, .quantity = quantity};
+      ol[i] = tpcc::NewOrderTxn::OrderLine{
+          .id = ol_id, .supply_w_id = supply_w_id, .item_id = item_id, .quantity = quantity};
     }
 
     tpcc::NewOrderTxn new_order(txn_adapter, w_id, d_id, c_id, o_id, datetime, w_i_id, ol);
@@ -82,10 +84,10 @@ void TPCCExecution::Execute(Transaction& txn) {
     int d_id = stoi(args[2]);
     int c_id = stoi(args[3]);
     int o_id = stoi(args[4]);
-  
+
     tpcc::OrderStatusTxn order_status(txn_adapter, w_id, d_id, c_id, o_id);
     result = order_status.Execute();
-  
+
   } else if (txn_name == "deliver") {
     if (args.size() != 7) {
       txn.set_status(TransactionStatus::ABORTED);
@@ -98,7 +100,7 @@ void TPCCExecution::Execute(Transaction& txn) {
     int c_id = stoi(args[4]);
     int o_carrier = stoi(args[5]);
     int64_t datetime = stoll(args[6]);
-    
+
     tpcc::DeliverTxn deliver(txn_adapter, w_id, d_id, no_o_id, c_id, o_carrier, datetime);
     result = deliver.Execute();
 
@@ -113,7 +115,7 @@ void TPCCExecution::Execute(Transaction& txn) {
     int o_id = stoi(args[3]);
     std::array<int, tpcc::StockLevelTxn::kTotalItems> i_ids;
     const auto& item_ids = txn.code().procedures(1);
-    if ( txn.code().procedures(1).args_size() != tpcc::StockLevelTxn::kTotalItems) {
+    if (txn.code().procedures(1).args_size() != tpcc::StockLevelTxn::kTotalItems) {
       txn.set_status(TransactionStatus::ABORTED);
       txn.set_abort_reason("stock_level: Invalid number of items");
       return;
@@ -133,7 +135,8 @@ void TPCCExecution::Execute(Transaction& txn) {
   if (result) {
     txn.set_status(TransactionStatus::COMMITTED);
     ApplyWrites(txn, sharder_, storage_);
-  } {
+  }
+  {
     txn.set_status(TransactionStatus::ABORTED);
     txn.set_abort_reason("Aborted by a TPC-C txn");
   }
