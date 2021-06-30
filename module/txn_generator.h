@@ -51,6 +51,9 @@ class TxnGenerator {
 // txn only after it receives response from the previous txn
 class SynchronousTxnGenerator : public Module, public TxnGenerator {
  public:
+  /**
+   * If num_txns is set to 0, the txns are generated on-the-fly
+   */
   SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context, std::unique_ptr<Workload>&& workload,
                           uint32_t region, uint32_t num_txns, int num_clients, int duration_s, bool dry_run);
   ~SynchronousTxnGenerator();

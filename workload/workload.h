@@ -168,6 +168,7 @@ struct TransactionProfile {
  */
 class Workload {
  public:
+  virtual ~Workload() = default;
   Workload(const RawParamMap& default_params, const std::string& params_str)
       : name_("unnamed"), params_(default_params) {
     params_.Update(params_str);

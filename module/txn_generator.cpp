@@ -118,10 +118,13 @@ SynchronousTxnGenerator::~SynchronousTxnGenerator() {
 }
 
 void SynchronousTxnGenerator::SetUp() {
-  CHECK_GT(num_txns_, 0) << "There must be at least one transaction";
-  LOG(INFO) << "Generating " << num_txns_ << " transactions";
-  for (size_t i = 0; i < num_txns_; i++) {
-    generated_txns_.push_back(workload_->NextTransaction());
+  if (num_txns_ <= 0) {
+    LOG(INFO) << "No txn is pre-generated";
+  } else {
+    LOG(INFO) << "Generating " << num_txns_ << " transactions";
+    for (size_t i = 0; i < num_txns_; i++) {
+      generated_txns_.push_back(workload_->NextTransaction());
+    }
   }
 
   if (!dry_run_) {
@@ -164,7 +167,12 @@ bool SynchronousTxnGenerator::Loop() {
 }
 
 void SynchronousTxnGenerator::SendNextTxn() {
-  const auto& selected_txn = generated_txns_[num_sent_txns() % generated_txns_.size()];
+  std::pair<Transaction*, TransactionProfile> selected_txn;
+  if (generated_txns_.empty()) {
+    selected_txn = workload_->NextTransaction();
+  } else {
+    selected_txn = generated_txns_[num_sent_txns() % generated_txns_.size()];
+  }
 
   api::Request req;
   req.mutable_txn()->set_allocated_txn(new Transaction(*selected_txn.first));
