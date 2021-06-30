@@ -15,7 +15,7 @@ bool OrderStatusTxn::Read() {
   customer_.Select({a_w_id_, a_d_id_, a_c_id_}, {CustomerSchema::Column::FULL_NAME, CustomerSchema::Column::BALANCE});
   order_.Select({a_w_id_, a_d_id_, a_o_id_}, {OrderSchema::Column::ENTRY_D, OrderSchema::Column::CARRIER_ID});
   auto ol_number = MakeInt8Scalar();
-  for (int i = 1; i <= 10; i++) {
+  for (int i = 1; i <= kLinePerOrder; i++) {
     ol_number->value = i;
     order_line_.Select(
         {a_w_id_, a_d_id_, a_o_id_, ol_number},

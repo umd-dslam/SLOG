@@ -20,7 +20,7 @@ bool StockLevelTxn::Read() {
   auto ol_number = MakeInt8Scalar();
   for (int i = a_o_id_->value - 20; i < a_o_id_->value; i++) {
     o_id->value = i;
-    for (int j = 0; j < 10; j++) {
+    for (int j = 0; j < kLinePerOrder; j++) {
       ol_number->value = j;
       order_line_.Select({a_w_id_, a_d_id_, o_id, ol_number}, {OrderLineSchema::Column::I_ID});
     }

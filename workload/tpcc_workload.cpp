@@ -268,7 +268,7 @@ void TPCCWorkload::StockLevel(Transaction& txn, int w_id) {
   txn_adapter->Finialize();
 
   auto procedure = txn.mutable_code()->add_procedures();
-  procedure->add_args("deliver");
+  procedure->add_args("stock");
   procedure->add_args(to_string(w_id));
   procedure->add_args(to_string(d_id));
   procedure->add_args(to_string(o_id));

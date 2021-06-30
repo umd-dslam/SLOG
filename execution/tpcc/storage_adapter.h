@@ -12,8 +12,10 @@ class StorageAdapter {
  public:
   virtual ~StorageAdapter() = default;
   virtual const std::string* Read(const std::string& key) = 0;
+  // Returns true if insertion succeeds
   virtual bool Insert(const std::string& key, std::string&& value) = 0;
-  virtual bool Update(const std::string& key, std::string&& value) = 0;
+  // Returns true if key exists before updating
+  virtual bool Update(const std::string& key, std::function<void(std::string&)>&& update_fn) = 0;
   virtual bool Delete(std::string&& key) = 0;
 };
 
@@ -26,7 +28,7 @@ class KVStorageAdapter : public StorageAdapter {
   // This Read method is leaky. Only used for testing
   const std::string* Read(const std::string&) override;
   bool Insert(const std::string& key, std::string&& value) override;
-  bool Update(const std::string&, std::string&&) override {
+  bool Update(const std::string&, std::function<void(std::string&)>&&) override {
     throw std::runtime_error("Update is unimplemented in KVStorageAdapter");
   }
   bool Delete(std::string&&) override { throw std::runtime_error("Delete is unimplemented in KVStorageAdapter"); }
@@ -42,7 +44,7 @@ class TxnStorageAdapter : public StorageAdapter {
   TxnStorageAdapter(Transaction& txn);
   const std::string* Read(const std::string& key) override;
   bool Insert(const std::string& key, std::string&& value) override;
-  bool Update(const std::string& key, std::string&& value) override;
+  bool Update(const std::string& key, std::function<void(std::string&)>&& update_fn) override;
   bool Delete(std::string&& key) override;
 
  private:
@@ -57,7 +59,7 @@ class TxnKeyGenStorageAdapter : public StorageAdapter {
 
   const std::string* Read(const std::string& key) override;
   bool Insert(const std::string& key, std::string&& value) override;
-  bool Update(const std::string& key, std::string&& updates) override;
+  bool Update(const std::string& key, std::function<void(std::string&)>&& update_fn) override;
   bool Delete(std::string&& key) override;
 
   void Finialize();

@@ -68,7 +68,7 @@ class NewOrderTxn : public TPCCTransaction {
   Int32ScalarPtr a_c_id_;
   Int32ScalarPtr a_o_id_;
   Int64ScalarPtr datetime_;
-  std::array<OrderLineScalar, 10> a_ol_;
+  std::array<OrderLineScalar, kLinePerOrder> a_ol_;
   Int32ScalarPtr i_w_id_;
 
   // Read results

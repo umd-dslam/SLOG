@@ -18,7 +18,7 @@ bool DeliverTxn::Read() {
   order_.Select({a_w_id_, a_d_id_, a_no_o_id_}, {OrderSchema::Column::C_ID});
 
   auto ol_id = MakeInt8Scalar();
-  for (int i = 1; i <= 10; i++) {
+  for (int i = 1; i <= kLinePerOrder; i++) {
     ol_id->value = i;
     auto res = order_line_.Select({a_w_id_, a_d_id_, a_no_o_id_, ol_id}, {OrderLineSchema::Column::AMOUNT});
     if (!res.empty()) {
@@ -44,7 +44,7 @@ bool DeliverTxn::Write() {
   new_order_.Delete({a_w_id_, a_d_id_, a_no_o_id_});
   order_.Update({a_w_id_, a_d_id_, a_no_o_id_}, {OrderSchema::Column::CARRIER_ID}, {a_o_carrier_});
   auto ol_id = MakeInt8Scalar();
-  for (int i = 1; i <= 10; i++) {
+  for (int i = 1; i <= kLinePerOrder; i++) {
     ol_id->value = i;
     order_line_.Update({a_w_id_, a_d_id_, a_no_o_id_, ol_id}, {OrderLineSchema::Column::DELIVERY_D}, {datetime_});
   }

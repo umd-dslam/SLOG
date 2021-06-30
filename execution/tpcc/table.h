@@ -22,10 +22,52 @@ class Table {
   using Column = typename Schema::Column;
   static constexpr size_t kNumColumns = Schema::kNumColumns;
   static constexpr size_t kPKeySize = Schema::kPKeySize;
+  static constexpr size_t kGroupedColumns = Schema::kGroupedColumns;
 
   Table(const StorageAdapterPtr& storage_adapter) : storage_adapter_(storage_adapter) { InitializeColumnOffsets(); }
 
   std::vector<ScalarPtr> Select(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns = {}) {
+    if (kGroupedColumns) {
+      return SelectGrouped(pkey, columns);
+    }
+    return SelectUngrouped(pkey, columns);
+  }
+
+ private:
+  std::vector<ScalarPtr> SelectGrouped(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns) {
+    auto storage_key = MakeStorageKey(pkey);
+    auto storage_value = storage_adapter_->Read(storage_key);
+    if (storage_value == nullptr) {
+      return {};
+    }
+
+    auto encoded_columns = storage_value->data();
+    std::vector<ScalarPtr> result;
+    result.reserve(columns.size());
+
+    // If no column is provided, select ALL columns
+    if (columns.empty()) {
+      result.insert(result.end(), pkey.begin(), pkey.end());
+      for (size_t i = kPKeySize; i < kNumColumns; i++) {
+        auto value = reinterpret_cast<const void*>(encoded_columns + column_offsets_[i]);
+        result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
+      }
+    } else {
+      for (auto c : columns) {
+        auto i = static_cast<size_t>(c);
+        if (i < kPKeySize) {
+          result.push_back(pkey[i]);
+        } else {
+          auto value = reinterpret_cast<const void*>(encoded_columns + column_offsets_[i]);
+          result.push_back(MakeScalar(Schema::ColumnTypes[i], value));
+        }
+      }
+    }
+
+    return result;
+  }
+
+  std::vector<ScalarPtr> SelectUngrouped(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns) {
     std::vector<ScalarPtr> result;
     result.reserve(columns.size());
 
@@ -36,7 +78,7 @@ class Table {
       result.insert(result.end(), pkey.begin(), pkey.end());
       for (size_t i = kPKeySize; i < kNumColumns; i++) {
         auto value = storage_adapter_->Read(storage_keys[i - kPKeySize]);
-        if (value != nullptr) {
+        if (value != nullptr && !value->empty()) {
           result.push_back(MakeScalar(Schema::ColumnTypes[i], reinterpret_cast<const void*>(value->data())));
           value_found = true;
         }
@@ -48,7 +90,7 @@ class Table {
           result.push_back(pkey[col]);
         } else {
           auto value = storage_adapter_->Read(storage_keys[i]);
-          if (value != nullptr) {
+          if (value != nullptr && !value->empty()) {
             result.push_back(MakeScalar(Schema::ColumnTypes[col], reinterpret_cast<const void*>(value->data())));
             value_found = true;
           }
@@ -62,6 +104,7 @@ class Table {
     return result;
   }
 
+ public:
   bool Update(const std::vector<ScalarPtr>& pkey, const std::vector<Column>& columns,
               const std::vector<ScalarPtr>& values) {
     CHECK_EQ(columns.size(), values.size()) << "Number of values does not match number of columns";
@@ -71,10 +114,23 @@ class Table {
     }
 
     bool ok = true;
-    auto storage_keys = MakeStorageKeys(pkey, columns);
-    for (size_t i = 0; i < columns.size(); i++) {
-      std::string value(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
-      ok &= storage_adapter_->Update(storage_keys[i], std::move(value));
+    if (kGroupedColumns) {
+      ok &= storage_adapter_->Update(MakeStorageKey(pkey), [this, &columns, &values](std::string& stored_value) {
+        for (size_t i = 0; i < values.size(); i++) {
+          auto c = columns[i];
+          const auto& v = values[i];
+          auto offset = column_offsets_[static_cast<size_t>(c)];
+          auto value_size = v->type->size();
+          stored_value.replace(offset, value_size, reinterpret_cast<const char*>(v->data()), value_size);
+        }
+      });
+    } else {
+      auto storage_keys = MakeStorageKeys(pkey, columns);
+      for (size_t i = 0; i < columns.size(); i++) {
+        ok &= storage_adapter_->Update(storage_keys[i], [&values, i](std::string& stored_value) {
+          stored_value = std::string(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
+        });
+      }
     }
     return ok;
   }
@@ -82,26 +138,69 @@ class Table {
   bool Insert(const std::vector<ScalarPtr>& values) {
     CHECK_EQ(values.size(), kNumColumns) << "Number of values does not match number of columns";
 
+    size_t storage_value_size = 0;
     for (size_t i = kPKeySize; i < kNumColumns; i++) {
       ValidateType(values[i], static_cast<Column>(i));
+      storage_value_size += values[i]->type->size();
     }
 
     bool ok = true;
-    auto storage_keys = MakeStorageKeys(values);
-    for (size_t i = kPKeySize; i < kNumColumns; i++) {
-      std::string value(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
-      ok &= storage_adapter_->Insert(storage_keys[i - kPKeySize], std::move(value));
+    if (kGroupedColumns) {
+      std::string storage_value;
+      storage_value.reserve(storage_value_size);
+      for (size_t i = kPKeySize; i < kNumColumns; i++) {
+        storage_value.append(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
+      }
+      ok &= storage_adapter_->Insert(MakeStorageKey(values), std::move(storage_value));
+    } else {
+      auto storage_keys = MakeStorageKeys(values);
+      for (size_t i = kPKeySize; i < kNumColumns; i++) {
+        std::string storage_value(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
+        ok &= storage_adapter_->Insert(storage_keys[i - kPKeySize], std::move(storage_value));
+      }
     }
     return ok;
   }
 
   bool Delete(const std::vector<ScalarPtr>& pkey) {
     bool ok = true;
-    auto storage_keys = MakeStorageKeys(pkey);
-    for (auto& key : storage_keys) {
-      ok &= storage_adapter_->Delete(std::move(key));
+    if (kGroupedColumns) {
+      auto storage_key = MakeStorageKey(pkey);
+      ok &= storage_adapter_->Delete(std::move(storage_key));
+    } else {
+      auto storage_keys = MakeStorageKeys(pkey);
+      for (auto& key : storage_keys) {
+        ok &= storage_adapter_->Delete(std::move(key));
+      }
     }
     return ok;
+  }
+
+  inline static void PrintRows(const std::vector<std::vector<ScalarPtr>>& rows, const std::vector<Column>& cols = {}) {
+    if (rows.empty()) {
+      return;
+    }
+
+    auto columns = cols;
+    if (columns.empty()) {
+      for (size_t i = 0; i < Schema::kNumColumns; i++) {
+        columns.push_back(static_cast<Column>(i));
+      }
+    }
+
+    for (const auto& row : rows) {
+      CHECK_EQ(row.size(), columns.size()) << "Number of values does not match number of columns";
+      bool first = true;
+      for (size_t i = 0; i < columns.size(); i++) {
+        ValidateType(row[i], columns[i]);
+        if (!first) {
+          std::cout << " | ";
+        }
+        std::cout << row[i]->to_string();
+        first = false;
+      }
+      std::cout << std::endl;
+    }
   }
 
   /**
@@ -140,31 +239,25 @@ class Table {
     return keys;
   }
 
-  inline static void PrintRows(const std::vector<std::vector<ScalarPtr>>& rows, const std::vector<Column>& cols = {}) {
-    if (rows.empty()) {
-      return;
+  inline static std::string MakeStorageKey(const std::vector<ScalarPtr>& values) {
+    CHECK_GE(values.size(), kPKeySize) << "Number of values needs to be equal or larger than primary key size";
+    size_t storage_key_size = sizeof(TableId);
+    for (size_t i = 0; i < kPKeySize; i++) {
+      ValidateType(values[i], static_cast<Column>(i));
+      storage_key_size += values[i]->type->size();
     }
 
-    auto columns = cols;
-    if (columns.empty()) {
-      for (size_t i = 0; i < Schema::kNumColumns; i++) {
-        columns.push_back(static_cast<Column>(i));
-      }
+    std::string storage_key;
+    storage_key.reserve(storage_key_size);
+    // The first value is used for partitioning
+    storage_key.append(reinterpret_cast<const char*>(values[0]->data()), values[0]->type->size());
+    // Table id
+    storage_key.append(reinterpret_cast<const char*>(&Schema::kId), sizeof(TableId));
+    for (size_t i = 1; i < kPKeySize; i++) {
+      storage_key.append(reinterpret_cast<const char*>(values[i]->data()), values[i]->type->size());
     }
 
-    for (const auto& row : rows) {
-      CHECK_EQ(row.size(), columns.size()) << "Number of values does not match number of columns";
-      bool first = true;
-      for (size_t i = 0; i < columns.size(); i++) {
-        ValidateType(row[i], columns[i]);
-        if (!first) {
-          std::cout << " | ";
-        }
-        std::cout << row[i]->to_string();
-        first = false;
-      }
-      std::cout << std::endl;
-    }
+    return storage_key;
   }
 
  private:
@@ -201,12 +294,13 @@ class Table {
 };
 
 #define ARRAY(...) __VA_ARGS__
-#define SCHEMA(NAME, ID, NUM_COLUMNS, PKEY_SIZE, COLUMNS, COLUMN_TYPES)                                  \
+#define SCHEMA(NAME, ID, NUM_COLUMNS, PKEY_SIZE, GROUPED, COLUMNS, COLUMN_TYPES)                         \
   struct NAME {                                                                                          \
     static constexpr TableId kId = ID;                                                                   \
     static constexpr size_t kNumColumns = NUM_COLUMNS;                                                   \
     static constexpr size_t kPKeySize = PKEY_SIZE;                                                       \
     static constexpr size_t kNonPKeySize = kNumColumns - kPKeySize;                                      \
+    static constexpr bool kGroupedColumns = GROUPED;                                                     \
     enum struct Column : int8_t { COLUMNS };                                                             \
     inline static const std::array<std::shared_ptr<DataType>, kNumColumns> ColumnTypes = {COLUMN_TYPES}; \
   }
@@ -217,6 +311,7 @@ SCHEMA(WarehouseSchema,
        TableId::WAREHOUSE,
        5, // NUM_COLUMNS
        1, // PKEY_SIZE
+       false, // GROUPED
        ARRAY(ID,
              NAME,
              ADDRESS, // STREET_1, STREET_2, CITY, STATE, ZIP
@@ -232,6 +327,7 @@ SCHEMA(DistrictSchema,
        TableId::DISTRICT,
        7, // NUM_COLUMNS
        2,  // PKEY_SIZE
+       false, // GROUPED
        ARRAY(W_ID,
              ID,
              NAME,
@@ -251,6 +347,7 @@ SCHEMA(CustomerSchema,
        TableId::CUSTOMER,
        15, // NUM_COLUMNS
        3,  // PKEY_SIZE
+       false, // GROUPED
        ARRAY(W_ID,
              D_ID,
              ID,
@@ -286,6 +383,7 @@ SCHEMA(HistorySchema,
        TableId::HISTORY,
        9, // NUM_COLUMNS
        4, // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              D_ID,
              C_ID,
@@ -309,6 +407,7 @@ SCHEMA(NewOrderSchema,
        TableId::NEW_ORDER,
        4, // NUM_COLUMNS
        3, // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              D_ID,
              O_ID,
@@ -322,6 +421,7 @@ SCHEMA(OrderSchema,
        TableId::ORDER,
        8, // NUM_COLUMNS
        3, // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              D_ID,
              ID,
@@ -343,6 +443,7 @@ SCHEMA(OrderLineSchema,
        TableId::ORDER_LINE,
        10, // NUM_COLUMNS
        4,  // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              D_ID,
              O_ID,
@@ -368,6 +469,7 @@ SCHEMA(ItemSchema,
        TableId::ITEM,
        6, // NUM_COLUMNS
        2, // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              ID,
              IM_ID,
@@ -385,6 +487,7 @@ SCHEMA(StockSchema,
        TableId::STOCK,
        8, // NUM_COLUMNS
        2, // PKEY_SIZE
+       true, // GROUPED
        ARRAY(W_ID,
              I_ID,
              QUANTITY,
