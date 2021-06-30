@@ -24,6 +24,16 @@ class TPCCTransaction {
   virtual bool Read() = 0;
   virtual void Compute() = 0;
   virtual bool Write() = 0;
+
+  const std::string& error() const { return error_; }
+
+ protected:
+  void SetError(const std::string& error) {
+    if (error_.empty()) error_ = error;
+  }
+
+ private:
+  std::string error_;
 };
 
 class NewOrderTxn : public TPCCTransaction {

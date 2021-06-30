@@ -52,7 +52,7 @@ bool TxnStorageAdapter::Insert(const std::string& key, std::string&& value) {
     return false;
   }
   auto value_entry = txn_.mutable_keys(it->second)->mutable_value_entry();
-  if (value_entry->type() != KeyType::WRITE || !value_entry->value().empty()) {
+  if (value_entry->type() != KeyType::WRITE) {
     return false;
   }
   value_entry->set_new_value(std::move(value));

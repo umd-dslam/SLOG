@@ -25,6 +25,7 @@ bool PaymentTxn::Read() {
     w_address_ = UncheckedCast<FixedTextScalar>(res[1]);
     w_ytd_ = UncheckedCast<Int64Scalar>(res[2]);
   } else {
+    SetError("Warehouse does not exist");
     ok = false;
   }
 
@@ -35,6 +36,7 @@ bool PaymentTxn::Read() {
     d_address_ = UncheckedCast<FixedTextScalar>(res[1]);
     d_ytd_ = UncheckedCast<Int64Scalar>(res[2]);
   } else {
+    SetError("District does not exist");
     ok = false;
   }
 
@@ -57,6 +59,7 @@ bool PaymentTxn::Read() {
     c_payment_cnt_ = UncheckedCast<Int16Scalar>(res[9]);
     c_data_ = UncheckedCast<FixedTextScalar>(res[10]);
   } else {
+    SetError("Customer does not exist");
     ok = false;
   }
 
@@ -74,13 +77,23 @@ void PaymentTxn::Compute() {
 
 bool PaymentTxn::Write() {
   bool ok = true;
-  ok &= warehouse_.Update({a_w_id_}, {WarehouseSchema::Column::YTD}, {new_w_ytd_});
-  ok &= district_.Update({a_w_id_, a_d_id_}, {DistrictSchema::Column::YTD}, {new_d_ytd_});
-  ok &= customer_.Update({a_c_w_id_, a_c_d_id_, a_c_id_},
-                         {CustomerSchema::Column::BALANCE, CustomerSchema::Column::YTD_PAYMENT,
-                          CustomerSchema::Column::PAYMENT_CNT, CustomerSchema::Column::DATA},
-                         {new_c_balance_, new_c_ytd_payment_, new_c_payment_cnt_, c_data_});
-  ok &= history_.Insert({a_w_id_, a_d_id_, a_c_id_, a_h_id_, a_c_d_id_, a_c_w_id_, datetime_, a_amount_, new_h_data_});
+  if (!warehouse_.Update({a_w_id_}, {WarehouseSchema::Column::YTD}, {new_w_ytd_})) {
+    SetError("Cannot update Warehouse");
+    ok = false;
+  }
+  if (!district_.Update({a_w_id_, a_d_id_}, {DistrictSchema::Column::YTD}, {new_d_ytd_})) {
+    SetError("Cannot update District");
+    ok = false;
+  }
+  if (!customer_.Update({a_c_w_id_, a_c_d_id_, a_c_id_},
+                        {CustomerSchema::Column::BALANCE, CustomerSchema::Column::YTD_PAYMENT,
+                         CustomerSchema::Column::PAYMENT_CNT, CustomerSchema::Column::DATA},
+                        {new_c_balance_, new_c_ytd_payment_, new_c_payment_cnt_, c_data_})) {
+    SetError("Cannot update Customer");
+    ok = false;
+  }
+
+  history_.Insert({a_w_id_, a_d_id_, a_c_id_, a_h_id_, a_c_d_id_, a_c_w_id_, datetime_, a_amount_, new_h_data_});
 
   return ok;
 }

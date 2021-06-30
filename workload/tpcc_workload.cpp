@@ -217,7 +217,7 @@ void TPCCWorkload::OrderStatus(Transaction& txn, int w_id) {
   auto d_id = std::uniform_int_distribution<>(1, tpcc::kDistPerWare)(rg_);
   int c_id = NURand(rg_, 1023, 1, tpcc::kCustPerDist);
   auto max_o_id = id_generator_.max_o_id();
-  auto o_id = std::uniform_int_distribution<>(max_o_id, max_o_id + 5)(rg_);
+  auto o_id = std::uniform_int_distribution<>(max_o_id - 5, max_o_id)(rg_);
 
   tpcc::OrderStatusTxn order_status_txn(txn_adapter, w_id, d_id, c_id, o_id);
   order_status_txn.Read();
@@ -268,7 +268,7 @@ void TPCCWorkload::StockLevel(Transaction& txn, int w_id) {
   txn_adapter->Finialize();
 
   auto procedure = txn.mutable_code()->add_procedures();
-  procedure->add_args("stock");
+  procedure->add_args("stock_level");
   procedure->add_args(to_string(w_id));
   procedure->add_args(to_string(d_id));
   procedure->add_args(to_string(o_id));

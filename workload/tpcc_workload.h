@@ -37,7 +37,7 @@ class TPCCWorkload : public Workload {
   std::vector<int> txn_mix_;
 
   struct TPCCIds {
-    TPCCIds(int i = 0) : o_id(tpcc::kOrdPerDist + i), no_o_id(1), h_id(i + 1) {}
+    TPCCIds(int i = 1) : o_id(tpcc::kOrdPerDist + i), no_o_id(1), h_id(i + 1) {}
     int o_id;
     int no_o_id;
     int h_id;
@@ -46,7 +46,7 @@ class TPCCWorkload : public Workload {
   class TPCCIdGenerator {
    public:
     TPCCIdGenerator() = default;
-    TPCCIdGenerator(int w, int init, int step) : max_o_id_(init), step_(step) {
+    TPCCIdGenerator(int w, int init, int step) : max_o_id_(tpcc::kOrdPerDist), step_(step) {
       ids_.reserve(w);
       for (int i = 0; i < w; i++) {
         auto& warehouse = ids_.emplace_back();

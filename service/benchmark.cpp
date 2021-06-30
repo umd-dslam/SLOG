@@ -66,7 +66,7 @@ vector<unique_ptr<ModuleRunner>> InitializeGenerators() {
       workload = make_unique<RemasteringWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "tpcc") {
       workload =
-          make_unique<TPCCWorkload>(config, FLAGS_r, FLAGS_params, std::make_pair(i, FLAGS_generators), seed + i);
+          make_unique<TPCCWorkload>(config, FLAGS_r, FLAGS_params, std::make_pair(i + 1, FLAGS_generators), seed + i);
     } else {
       LOG(FATAL) << "Unknown workload: " << FLAGS_wl;
     }
