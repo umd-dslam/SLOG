@@ -317,11 +317,11 @@ SCHEMA(WarehouseSchema,
              ADDRESS, // STREET_1, STREET_2, CITY, STATE, ZIP
              TAX,
              YTD),
-       ARRAY(Int32Type::Get(), 
-             FixedTextType<10>::Get(),
-             FixedTextType<71>::Get(),
-             Int32Type::Get(),
-             Int64Type::Get()));
+       ARRAY(Int32Type::Get(),          // ID
+             FixedTextType<10>::Get(),  // NAME
+             FixedTextType<71>::Get(),  // ADDRESS
+             Int32Type::Get(),          // TAX
+             Int64Type::Get()));        // YTD
 
 SCHEMA(DistrictSchema,
        TableId::DISTRICT,
@@ -335,13 +335,13 @@ SCHEMA(DistrictSchema,
              TAX,
              YTD,
              NEXT_O_ID), 
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             FixedTextType<10>::Get(),
-             FixedTextType<71>::Get(),
-             Int32Type::Get(),
-             Int64Type::Get(),
-             Int32Type::Get()));
+       ARRAY(Int32Type::Get(),          // W_ID
+             Int8Type::Get(),           // ID
+             FixedTextType<10>::Get(),  // NAME
+             FixedTextType<71>::Get(),  // ADDRESS
+             Int32Type::Get(),          // TAX
+             Int64Type::Get(),          // YTD
+             Int32Type::Get()));        // NEXT_O_ID
 
 SCHEMA(CustomerSchema,
        TableId::CUSTOMER,
@@ -363,21 +363,21 @@ SCHEMA(CustomerSchema,
              PAYMENT_CNT,
              DELIVERY_CNT,
              DATA), 
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             FixedTextType<34>::Get(),
-             FixedTextType<71>::Get(),
-             FixedTextType<16>::Get(),
-             Int64Type::Get(),
-             FixedTextType<2>::Get(),
-             Int64Type::Get(),
-             Int32Type::Get(),
-             Int64Type::Get(),
-             Int64Type::Get(),
-             Int16Type::Get(),
-             Int16Type::Get(),
-             FixedTextType<250>::Get()));
+       ARRAY(Int32Type::Get(),            // W_ID
+             Int8Type::Get(),             // D_ID
+             Int32Type::Get(),            // ID
+             FixedTextType<34>::Get(),    // FULL_NAME
+             FixedTextType<71>::Get(),    // ADDRESS
+             FixedTextType<16>::Get(),    // PHONE
+             Int64Type::Get(),            // SINCE
+             FixedTextType<2>::Get(),     // CREDIT
+             Int64Type::Get(),            // CREDIT_LIM
+             Int32Type::Get(),            // DISCOUNT
+             Int64Type::Get(),            // BALANCE
+             Int64Type::Get(),            // YTD_PAYMENT
+             Int16Type::Get(),            // PAYMENT_CNT
+             Int16Type::Get(),            // DELIVERY_CNT
+             FixedTextType<250>::Get())); // DATA
 
 SCHEMA(HistorySchema,
        TableId::HISTORY,
@@ -393,15 +393,15 @@ SCHEMA(HistorySchema,
              DATE,
              AMOUNT,
              DATA), 
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int64Type::Get(),
-             Int32Type::Get(),
-             FixedTextType<24>::Get()));
+       ARRAY(Int32Type::Get(),            // W_ID
+             Int8Type::Get(),             // D_ID
+             Int32Type::Get(),            // C_ID
+             Int32Type::Get(),            // ID
+             Int8Type::Get(),             // C_D_ID
+             Int32Type::Get(),            // C_W_ID
+              Int64Type::Get(),           // DATE
+              Int32Type::Get(),           // AMOUNT
+             FixedTextType<24>::Get()));  // DATA
 
 SCHEMA(NewOrderSchema,
        TableId::NEW_ORDER,
@@ -412,10 +412,10 @@ SCHEMA(NewOrderSchema,
              D_ID,
              O_ID,
              DUMMY),
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int8Type::Get()));
+       ARRAY(Int32Type::Get(),  // W_ID
+             Int8Type::Get(),   // D_ID
+             Int32Type::Get(),  // O_ID
+             Int8Type::Get())); // DUMMY
 
 SCHEMA(OrderSchema,
        TableId::ORDER,
@@ -430,14 +430,14 @@ SCHEMA(OrderSchema,
              CARRIER_ID,
              OL_CNT,
              ALL_LOCAL), 
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int32Type::Get(),
-             Int64Type::Get(),
-             Int8Type::Get(),
-             Int8Type::Get(),
-             Int8Type::Get()));
+       ARRAY(Int32Type::Get(),  // W_ID
+             Int8Type::Get(),   // D_ID
+             Int32Type::Get(),  // ID
+             Int32Type::Get(),  // C_ID
+             Int64Type::Get(),  // ENTRY_D
+             Int8Type::Get(),   // CARRIER_ID
+             Int8Type::Get(),   // OL_CNT
+             Int8Type::Get())); // ALL_LOCAL
 
 SCHEMA(OrderLineSchema,
        TableId::ORDER_LINE,
@@ -454,16 +454,16 @@ SCHEMA(OrderLineSchema,
              QUANTITY,
              AMOUNT,
              DIST_INFO), 
-       ARRAY(Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             Int32Type::Get(),
-             Int64Type::Get(),
-             Int8Type::Get(),
-             Int32Type::Get(),
-             FixedTextType<24>::Get()));
+       ARRAY(Int32Type::Get(),            // W_ID
+             Int8Type::Get(),             // D_ID
+             Int32Type::Get(),            // O_ID
+             Int8Type::Get(),             // NUMBER
+             Int32Type::Get(),            // I_ID
+             Int32Type::Get(),            // SUPPLY_W_ID
+             Int64Type::Get(),            // DELIVERY_D
+             Int8Type::Get(),             // QUANTITY
+             Int32Type::Get(),            // AMOUNT
+             FixedTextType<24>::Get()));  // DIST_INFO
 
 SCHEMA(ItemSchema,
        TableId::ITEM,
@@ -476,13 +476,12 @@ SCHEMA(ItemSchema,
              NAME,
              PRICE,
              DATA), 
-       ARRAY(Int32Type::Get(),
-             Int32Type::Get(),
-             Int32Type::Get(),
-             FixedTextType<24>::Get(),
-             Int32Type::Get(),
-             FixedTextType<50>::Get()));
-
+       ARRAY(Int32Type::Get(),            // W_ID
+             Int32Type::Get(),            // ID
+             Int32Type::Get(),            // IM_ID
+             FixedTextType<24>::Get(),    // NAME
+             Int32Type::Get(),            // PRICE
+             FixedTextType<50>::Get()));  // DATA
 SCHEMA(StockSchema,
        TableId::STOCK,
        8, // NUM_COLUMNS
@@ -496,14 +495,14 @@ SCHEMA(StockSchema,
              ORDER_CNT,
              REMOTE_CNT,
              DATA), 
-       ARRAY(Int32Type::Get(),
-             Int32Type::Get(),
-             Int16Type::Get(),
-             FixedTextType<240>::Get(),
-             Int32Type::Get(),
-             Int16Type::Get(),
-             Int16Type::Get(),
-             FixedTextType<50>::Get()));
+       ARRAY(Int32Type::Get(),            // W_ID
+             Int32Type::Get(),            // I_ID
+             Int16Type::Get(),            // QUANTITY
+             FixedTextType<240>::Get(),   // ALL_DIST
+             Int32Type::Get(),            // YTD
+             Int16Type::Get(),            // ORDER_CNT
+             Int16Type::Get(),            // REMOTE_CNT
+             FixedTextType<50>::Get()));  // DATA
 
 // clang-format on
 
