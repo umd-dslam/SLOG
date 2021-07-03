@@ -12,7 +12,7 @@ FROM ubuntu:focal AS builder
     RUN rm -rf build \
         && mkdir build \
         && cd build \
-        && cmake .. -DCMAKE_BUILD_TYPE=release -DBUILD_SLOG_TESTS=OFF ${CMAKE_OPTIONS}\
+        && cmake .. -DBUILD_SLOG_TESTS=OFF ${CMAKE_OPTIONS} -DCMAKE_BUILD_TYPE=release \
         && make -j$(nproc) \
         && cd ..
 

@@ -911,26 +911,35 @@ class BenchmarkCommand(AdminCommand):
         # Clean up everything
         def clean_up(remote_proc):
             client, addr, *_ = remote_proc
-            container_name = f'{BENCHMARK_CONTAINER_NAME}'
-            cleanup_container(client, container_name, addr=addr)
+            cleanup_container(client, BENCHMARK_CONTAINER_NAME, addr=addr)
+            # Test for benchmark starting delay
+            start_time = time.time()
             client.containers.run(
                 args.image,
-                name=container_name,
-                command=["/bin/sh", "-c", f"rm -rf {out_dir}"],
-                # Mount a directory on the host into the container
-                mounts=[SLOG_DATA_MOUNT],
+                name="benchmark_test",
+                command=["/bin/sh", "-c", "echo"],
+                remove=True,
+                detach=True,
             )
+            elapsed_time = time.time() - start_time
             LOG.info("%s: Removed old data directory", addr)
-            cleanup_container(client, container_name, addr=addr)
+            return elapsed_time
 
         with Pool(processes=len(self.remote_procs)) as pool:
-            pool.map(clean_up, self.remote_procs)
+            delays = pool.map(clean_up, self.remote_procs)
         
+        LOG.info("Delay per client: %s", {
+            self.remote_procs[i].public_address : f'{delays[i]:.2f}'
+            for i in range(len(self.remote_procs))
+        })
+
         if args.cleanup:
             return
 
-        def benchmark_runner(proc):
+        def benchmark_runner(enumerated_proc):
+            i, proc = enumerated_proc
             client, addr, _, rep, *_ = proc
+            rmdir_cmd = f"rm -rf {out_dir}"
             mkdir_cmd = f"mkdir -p {out_dir}"
             shell_cmd = (
                 f"benchmark "
@@ -952,19 +961,22 @@ class BenchmarkCommand(AdminCommand):
                 if args.rate is not None else 
                 f"--clients {args.clients}"
             )
+            delay = max(delays) - delays[i]
+            LOG.info("%s: Delay for %f seconds before running the benchmark", addr, delay)
+            time.sleep(delay)
             container = client.containers.run(
                 args.image,
                 name=f'{BENCHMARK_CONTAINER_NAME}',
                 command=[
                     "/bin/sh", "-c",
-                    f"{sync_config_cmd} && {mkdir_cmd} && {shell_cmd}"
+                    f"{sync_config_cmd} && {rmdir_cmd} && {mkdir_cmd} && {shell_cmd}"
                 ],
                 # Mount a directory on the host into the container
                 mounts=[SLOG_DATA_MOUNT],
                 # Expose all ports from container to host
                 network_mode="host",
                 detach=True,
-                environment=parse_envs(args.e),
+                environment=parse_envs(args.e)
             )
             LOG.info(
                 "%s: Synced config and ran command: %s",
@@ -974,7 +986,7 @@ class BenchmarkCommand(AdminCommand):
             return container, addr
         
         with Pool(processes=len(self.remote_procs)) as pool:
-            containers = pool.map(benchmark_runner, self.remote_procs)
+            containers = pool.map(benchmark_runner, enumerate(self.remote_procs))
 
         wait_for_containers(containers)
         LOG.info("Tag: %s", tag)
