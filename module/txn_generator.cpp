@@ -168,21 +168,26 @@ bool SynchronousTxnGenerator::Loop() {
 
 void SynchronousTxnGenerator::SendNextTxn() {
   std::pair<Transaction*, TransactionProfile> selected_txn;
-  if (generated_txns_.empty()) {
-    selected_txn = workload_->NextTransaction();
-  } else {
-    selected_txn = generated_txns_[num_sent_txns() % generated_txns_.size()];
-  }
 
   api::Request req;
-  req.mutable_txn()->set_allocated_txn(new Transaction(*selected_txn.first));
   req.set_stream_id(num_sent_txns());
-  SendSerializedProtoWithEmptyDelim(socket_, req);
 
   TxnInfo info;
-  info.txn = req.mutable_txn()->release_txn();
-  info.profile = selected_txn.second;
+  if (generated_txns_.empty()) {
+    auto [txn, profile] = workload_->NextTransaction();
+    req.mutable_txn()->set_allocated_txn(txn);
+    info.profile = profile;
+  } else {
+    auto [txn, profile] = generated_txns_[num_sent_txns() % generated_txns_.size()];
+    req.mutable_txn()->set_allocated_txn(new Transaction(*txn));
+    info.profile = profile;
+  }
+
+  SendSerializedProtoWithEmptyDelim(socket_, req);
+
   info.sent_at = system_clock::now();
+  info.txn = req.mutable_txn()->release_txn();
+
   txns_.push_back(std::move(info));
 
   ++num_sent_txns_;
