@@ -5,6 +5,7 @@
 #include <array>
 #include <exception>
 #include <iostream>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -274,8 +275,11 @@ class Table {
   inline static std::vector<Column> non_pkey_columns_;
   inline static std::array<size_t, kNumColumns> column_offsets_;
   inline static bool column_offsets_initialized_ = false;
+  inline static std::mutex column_offsets_mut_;
 
-  inline static void InitializeColumnOffsets() {
+  inline static void InitializeColumnOffsets() 
+  {
+    std::lock_guard<std::mutex> guard(column_offsets_mut_);
     if (column_offsets_initialized_) {
       return;
     }
