@@ -112,7 +112,7 @@ class UngroupedTableTest : public TableTest {
         new_entry->set_key(key);
         new_entry->mutable_value_entry()->set_type(KeyType::WRITE);
         // This is to check if the metadata initializer is working correctly
-        auto home = std::static_pointer_cast<Int32Scalar>(row[0])->value % 2;
+        auto home = (std::static_pointer_cast<Int32Scalar>(row[0])->value - 1) % 2;
         new_entry->mutable_value_entry()->mutable_metadata()->set_master(home);
         new_entry->mutable_value_entry()->mutable_metadata()->set_counter(0);
       }
@@ -205,7 +205,7 @@ class GroupedTableTest : public TableTest {
       new_entry->set_key(Table<ItemSchema>::MakeStorageKey({row.begin(), row.begin() + ItemSchema::kPKeySize}));
       new_entry->mutable_value_entry()->set_type(KeyType::WRITE);
       // This is to check if the metadata initializer is working correctly
-      auto home = std::static_pointer_cast<Int32Scalar>(row[0])->value % 2;
+      auto home = (std::static_pointer_cast<Int32Scalar>(row[0])->value - 1) % 2;
       new_entry->mutable_value_entry()->mutable_metadata()->set_master(home);
       new_entry->mutable_value_entry()->mutable_metadata()->set_counter(0);
     }
