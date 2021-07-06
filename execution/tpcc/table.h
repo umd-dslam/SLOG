@@ -277,8 +277,7 @@ class Table {
   inline static bool column_offsets_initialized_ = false;
   inline static std::mutex column_offsets_mut_;
 
-  inline static void InitializeColumnOffsets() 
-  {
+  inline static void InitializeColumnOffsets() {
     std::lock_guard<std::mutex> guard(column_offsets_mut_);
     if (column_offsets_initialized_) {
       return;

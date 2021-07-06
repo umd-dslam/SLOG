@@ -1018,10 +1018,10 @@ class CollectClientCommand(AdminCommand):
             help="Username of the target machines"
         )
 
-    def init_remote_processes(self, args):
+    def init_remote_processes(self, _):
         pass
 
-    def pull_slog_image(self, args):
+    def pull_slog_image(self, _):
         pass
 
     def do_command(self, args):
@@ -1050,44 +1050,58 @@ class CollectServerCommand(AdminCommand):
         group.add_argument("--flush-only", action="store_true", help="Only trigger flushing metrics to disk")
         group.add_argument("--download-only", action="store_true", help="Only download the data files")
 
+    def init_remote_processes(self, _):
+        pass
+
+    def pull_slog_image(self, _):
+        pass
+
     def do_command(self, args):
-        if len(self.remote_procs) == 0:
-            return
-
         if not args.download_only:
-            def clean_up(remote_proc):
-                client, addr, *_ = remote_proc
-                cleanup_container(client, SLOG_CLIENT_CONTAINER_NAME, addr=addr)
+            addresses = [
+                a
+                for r in self.config.replicas
+                for a in r.addresses
+            ]
 
-            with Pool(processes=len(self.remote_procs)) as pool:
-                pool.map(clean_up, self.remote_procs)
+            out_dir = os.path.join(HOST_DATA_DIR, args.tag)
+            config_path = os.path.join(HOST_DATA_DIR, self.config_name)
+            rmdir_cmd = f"rm -rf {out_dir}"
+            mkdir_cmd = f"mkdir -p {out_dir}"
+            cp_config_cmd = f"cp {config_path} {out_dir}"
 
-            config_path = os.path.join(CONTAINER_DATA_DIR, self.config_name)
-            def trigger_flushing_metrics(remote_proc):
-                client, addr, *_ = remote_proc
+            commands = []
+            for addr in addresses:
+                cmd = f'ssh {args.user}@{addr} "{rmdir_cmd} && {mkdir_cmd} && {cp_config_cmd}"'
+                commands.append(f'({cmd}) & ')
+
+            LOG.info("Executing commands:\n%s", '\n'.join(commands))
+            os.system(''.join(commands) + ' wait')
+
+            docker_client = docker.from_env()
+            if not args.no_pull:
+                docker_client.images.pull(args.image)
+
+            def trigger_flushing_metrics(enumerated_address):
+                i, address = enumerated_address
                 out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
-                mkdir_cmd = f"mkdir -p {out_dir}"
-                cp_config_cmd = f"cp {config_path} {out_dir}"
-                metrics_cmd = f"client metrics {out_dir} --port {self.config.server_port}"
-                client.containers.run(
+                docker_client.containers.run(
                     args.image,
-                    name=SLOG_CLIENT_CONTAINER_NAME,
+                    name=f"{SLOG_CLIENT_CONTAINER_NAME}_{i}",
                     command=[
                         "/bin/sh", "-c",
-                        f"{mkdir_cmd} && {cp_config_cmd} && {metrics_cmd}"
+                        f"client metrics {out_dir} --host {address} --port {self.config.server_port}"
                     ],
-                    # Mount a directory on the host into the container
-                    mounts=[SLOG_DATA_MOUNT],
-                    # Expose all ports from container to host
-                    network_mode="host",
+                    remove=True,
                 )
                 LOG.info("%s: Triggered flushing metrics to disk", addr)
 
-            with Pool(processes=len(self.remote_procs)) as pool:
-                pool.map(trigger_flushing_metrics, self.remote_procs)
+            with Pool(processes=len(addresses)) as pool:
+                pool.map(trigger_flushing_metrics, enumerate(addresses))
 
         if args.flush_only:
             return
+
         server_out_dir = os.path.join(args.out_dir, args.tag, "server")
         machines = [
             {
