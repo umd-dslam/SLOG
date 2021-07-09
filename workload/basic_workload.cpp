@@ -65,6 +65,7 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr& config, uint32_t region, co
       config_(config),
       local_region_(region),
       distance_ranking_(config->distance_ranking_from(region)),
+      zipf_coef_(params_.GetInt32(MH_ZIPF)),
       partition_to_key_lists_(config->num_partitions()),
       rg_(seed),
       rnd_str_(seed),
@@ -95,7 +96,20 @@ BasicWorkload::BasicWorkload(const ConfigurationPtr& config, uint32_t region, co
     }
   }
 
+  if (distance_ranking_.empty()) {
+    for (size_t i = 0; i < num_replicas; i++) {
+      if (i != local_region_) {
+        distance_ranking_.push_back(i);
+      }
+    }
+    if (zipf_coef_ > 0) {
+      LOG(WARNING) << "Distance ranking is not provided. MH_ZIPF is reset to 0.";
+      zipf_coef_ = 0;
+    }
+  }
+
   CHECK_EQ(distance_ranking_.size(), num_replicas - 1) << "Distance ranking size must match the number of regions";
+
   if (!params_.GetInt32(NEAREST)) {
     distance_ranking_.insert(distance_ranking_.begin(), local_region_);
   }
@@ -175,8 +189,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
       candidate_homes.push_back(local_region_);
       num_homes--;
     }
-    auto zipf_coef = params_.GetDouble(MH_ZIPF);
-    auto sampled_homes = zipf_sample(rg_, zipf_coef, distance_ranking_, num_homes);
+    auto sampled_homes = zipf_sample(rg_, zipf_coef_, distance_ranking_, num_homes);
     candidate_homes.insert(candidate_homes.end(), sampled_homes.begin(), sampled_homes.end());
   } else {
     if (params_.GetInt32(NEAREST)) {

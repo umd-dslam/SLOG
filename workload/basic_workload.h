@@ -24,6 +24,7 @@ class BasicWorkload : public Workload {
   ConfigurationPtr config_;
   uint32_t local_region_;
   std::vector<int> distance_ranking_;
+  int zipf_coef_;
 
   // This is an index of keys by their partition and home.
   // Each partition holds a vector of homes, each of which
