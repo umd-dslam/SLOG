@@ -1,13 +1,27 @@
 #!/bin/bash
+#
+# Usage:
+#   -a  Path to the admin tool
+#   -c  Path to the config file
+#   -i  Docker image name
+#   -o  Output directory
+#   -u  Username used to SSH to the remote machines
+#
+# Example:
+#
+# tools/microbenchmark.sh\
+#  -a tools/admin.py\
+#  -c ~/configs/slog/slog.conf\
+#  -i ctring/slog:rma-master\
+#  -o ~/data/slog
+#
 
-# Example usage:
-#
-# tools/microbenchmark.sh -a tools/admin.py -c ~/configs/slog/slog.conf -i ctring/slog:ddr-master -o ~/data/slog/ -p ddr
-#
+BENCHMARK_ARGS="--clients 200 --generators 5 --txns 500000 --duration 30 --sample 10"
 
 USER="ubuntu"
-PREFIX="test"
+PREFIX="slog"
 OUT_DIR="."
+TRIALS=1
 
 while getopts a:c:i:o:p:u: flag
 do
@@ -18,6 +32,7 @@ do
     o) OUT_DIR=${OPTARG};;
     u) USER=${OPTARG};;
     p) PREFIX=${OPTARG};;
+    t) TRIALS=${OPTARG};;
   esac
 done
 
@@ -37,15 +52,12 @@ if [[ -z $IMAGE ]]; then
   exit 1
 fi
 
-BENCHMARK_ARGS="--clients 20000 --workers 5 --txns 500000 --duration 15 --sample 10 --seed 0"
-
 set -x
 
 function run_benchmark {
   HOT=$1
   MH=$2
   MP=$3
-  TRIALS=$4
   TAG=${PREFIX}-hot${HOT}mh${MH}mp${MP}
   
   for i in $(seq 1 ${TRIALS})
@@ -55,29 +67,28 @@ function run_benchmark {
     else
       NTAG=${TAG}
     fi
-    python3 ${ADMIN_TOOL} benchmark ${CONFIG} ${BENCHMARK_ARGS} --image ${IMAGE} -u ${USER} --params "writes=5,records=10,hot=$HOT,mh=$MH,mp=$MP" --tag ${NTAG}
-    sleep 5
+    python3 ${ADMIN_TOOL} benchmark ${CONFIG} ${BENCHMARK_ARGS} --image ${IMAGE} -u ${USER} --params "writes=10,records=10,hot=$HOT,hot_records=2,mh=$MH,mp=$MP" --tag ${NTAG}
     python3 ${ADMIN_TOOL} collect_client --out-dir ${OUT_DIR} -u ${USER} ${CONFIG} ${NTAG}
-    python3 ${ADMIN_TOOL} collect_server --out-dir ${OUT_DIR} -u ${USER} --image ${IMAGE} ${CONFIG} ${NTAG}
-    sleep 1
+    # For debug only
+    # python3 ${ADMIN_TOOL} collect_server --out-dir ${OUT_DIR} -u ${USER} --image ${IMAGE} ${CONFIG} --tag ${NTAG}
   done
 }
 
-run_benchmark 10000 0 0 3
-run_benchmark 10000 50 0 3
-run_benchmark 10000 100 0 3
-run_benchmark 10000 0 50 3
-run_benchmark 10000 50 50 3
-run_benchmark 10000 100 50 3
-run_benchmark 10000 0 100 3
-run_benchmark 10000 50 100 3
-run_benchmark 10000 100 100 3
-run_benchmark 30 0 0 3
-run_benchmark 30 50 0 3
-run_benchmark 30 100 0 3
-run_benchmark 30 0 50 3
-run_benchmark 30 50 50 3
-run_benchmark 30 100 50 3
-run_benchmark 30 0 100 3
-run_benchmark 30 50 100 3
-run_benchmark 30 100 100 3
+run_benchmark 10000 0 0
+run_benchmark 10000 50 0
+run_benchmark 10000 100 0
+run_benchmark 10000 0 50
+run_benchmark 10000 50 50
+run_benchmark 10000 100 50
+run_benchmark 10000 0 100
+run_benchmark 10000 50 100
+run_benchmark 10000 100 100
+run_benchmark 30 0 0
+run_benchmark 30 50 0
+run_benchmark 30 100 0
+run_benchmark 30 0 50
+run_benchmark 30 50 50
+run_benchmark 30 100 50
+run_benchmark 30 0 100
+run_benchmark 30 50 100
+run_benchmark 30 100 100
