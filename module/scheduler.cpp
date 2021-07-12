@@ -18,7 +18,8 @@ using internal::Response;
 
 Scheduler::Scheduler(const shared_ptr<Broker>& broker, const shared_ptr<Storage>& storage,
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule(broker, {kSchedulerChannel, false /* recv_raw */}, metrics_manager, poll_timeout) {
+    : NetworkedModule(broker, {kSchedulerChannel, false /* recv_raw */}, metrics_manager, poll_timeout),
+      global_log_counter_(0) {
   for (size_t i = 0; i < config()->num_workers(); i++) {
     workers_.push_back(MakeRunnerFor<Worker>(broker, Worker::MakeChannel(i), storage, metrics_manager, poll_timeout));
   }
@@ -108,6 +109,8 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
   auto holder_it = ins.first;
   auto& holder = holder_it->second;
 
+  global_log_counter_++;
+
   if (ins.second) {
     RECORD(holder.txn().mutable_internal(), TransactionEvent::ENTER_SCHEDULER);
 
@@ -124,6 +127,8 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
     VLOG(2) << "Added " << ENUM_NAME(txn->internal().type(), TransactionType) << " transaction (" << txn_id << ", "
             << txn->internal().home() << ")";
   }
+
+  holder.txn().mutable_internal()->add_global_log_positions(global_log_counter_);
 
   if (holder.is_aborting()) {
     if (holder.is_ready_for_gc()) {

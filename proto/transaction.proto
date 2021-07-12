@@ -81,6 +81,9 @@ message TransactionInternal {
     repeated TransactionEvent events = 9;
     repeated int64 event_times = 10;    // when the events took place
     repeated uint32 event_machines = 11; // where the events took place
+
+    // positions in the global log
+    repeated int64 global_log_positions = 12;
 }
 
 message RemasterProcedure {
