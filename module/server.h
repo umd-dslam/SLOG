@@ -53,7 +53,7 @@ class Server : public NetworkedModule {
   bool OnCustomSocket() final;
 
  private:
-  void ProcessCompletedSubtxn(EnvelopePtr&& req);
+  void ProcessFinishedSubtxn(EnvelopePtr&& req);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
   void SendTxnToClient(Transaction* txn);
@@ -72,9 +72,9 @@ class Server : public NetworkedModule {
   };
   std::unordered_map<TxnId, PendingResponse> pending_responses_;
 
-  class CompletedTransaction {
+  class FinishedTransaction {
    public:
-    CompletedTransaction(size_t involved_partitions);
+    FinishedTransaction(size_t involved_partitions);
     bool AddSubTxn(EnvelopePtr&& new_req);
     Transaction* ReleaseTxn();
 
@@ -82,7 +82,7 @@ class Server : public NetworkedModule {
     EnvelopePtr req_;
     size_t remaining_partitions_;
   };
-  std::unordered_map<TxnId, CompletedTransaction> completed_txns_;
+  std::unordered_map<TxnId, FinishedTransaction> finished_txns_;
 
   std::unordered_set<MachineId> offline_machines_;
 };

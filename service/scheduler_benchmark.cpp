@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
   vector<TxnInfo> results;
   for (size_t i = 0; i < transactions.size(); i++) {
     auto env = RecvEnvelope(result_socket);
-    auto txn = env->mutable_request()->mutable_completed_subtxn()->release_txn();
+    auto txn = env->mutable_request()->mutable_finished_subtxn()->release_txn();
     auto txn_id = txn->internal().id();
     results.push_back({.txn = txn, .sent_at = sent_at[txn_id]});
   }

@@ -142,10 +142,10 @@ void PrintServerStats(const rapidjson::Document& stats, uint32_t level) {
     }
     cout << "\n";
   }
-  cout << "Partially completed txns: " << stats[NUM_PARTIALLY_COMPLETED_TXNS].GetUint() << "\n";
+  cout << "Partially finished txns: " << stats[NUM_PARTIALLY_FINISHED_TXNS].GetUint() << "\n";
   if (level >= 1) {
-    cout << "List of partially completed txns: ";
-    TRUNCATED_FOR_EACH(txn_id, stats[PARTIALLY_COMPLETED_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
+    cout << "List of partially finished txns: ";
+    TRUNCATED_FOR_EACH(txn_id, stats[PARTIALLY_FINISHED_TXNS].GetArray()) { cout << txn_id.GetUint() << " "; }
     cout << "\n";
   }
   cout << endl;

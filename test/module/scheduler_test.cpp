@@ -75,9 +75,9 @@ class SchedulerTest : public ::testing::Test {
     for (uint32_t i = 0; i < num_partitions; i++) {
       auto req_env = test_slogs[receiver]->ReceiveFromOutputSocket(kServerChannel);
       CHECK(req_env != nullptr);
-      CHECK_EQ(req_env->request().type_case(), internal::Request::kCompletedSubtxn);
-      auto completed_subtxn = req_env->request().completed_subtxn();
-      auto sub_txn = completed_subtxn.txn();
+      CHECK_EQ(req_env->request().type_case(), internal::Request::kFinishedSubtxn);
+      auto finished_subtxn = req_env->request().finished_subtxn();
+      auto sub_txn = finished_subtxn.txn();
       CHECK_EQ(sub_txn.internal().involved_partitions_size(), num_partitions);
 
       if (first_time) {

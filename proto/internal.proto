@@ -66,7 +66,7 @@ message Request {
         PaxosAcceptRequest paxos_accept = 10;
         PaxosCommitRequest paxos_commit = 11;
         RemoteReadResult remote_read_result = 12;
-        CompletedSubtransaction completed_subtxn = 13;
+        FinishedSubtransaction finished_subtxn = 13;
         StatsRequest stats = 14;
     }
 }
@@ -142,7 +142,7 @@ message RemoteReadResult {
     string abort_reason = 5;
 }
 
-message CompletedSubtransaction {
+message FinishedSubtransaction {
     Transaction txn = 1;
     uint32 partition = 2;
 }

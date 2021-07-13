@@ -277,9 +277,9 @@ void Worker::Finish(TxnId txn_id) {
       txn->mutable_remaster()->Clear();
     }
     Envelope env;
-    auto completed_sub_txn = env.mutable_request()->mutable_completed_subtxn();
-    completed_sub_txn->set_partition(config()->local_partition());
-    completed_sub_txn->set_allocated_txn(txn);
+    auto finished_sub_txn = env.mutable_request()->mutable_finished_subtxn();
+    finished_sub_txn->set_partition(config()->local_partition());
+    finished_sub_txn->set_allocated_txn(txn);
     Send(env, txn->internal().coordinating_server(), kServerChannel);
   } else {
     delete txn;
