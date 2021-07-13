@@ -16,7 +16,7 @@
 #include "service/service_utils.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
-DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
+DEFINE_uint32(port, 2021, "Port number of the SLOG server to connect to");
 DEFINE_uint32(repeat, 1, "Used with \"txn\" command. Send the txn multiple times");
 DEFINE_bool(no_wait, false, "Used with \"txn\" command. Don't wait for reply");
 DEFINE_int32(truncate, 50, "Number of lines to truncate the output at");
@@ -102,12 +102,11 @@ void ExecuteTxn(const char* txn_file) {
         cout << txn;
         if (!txn.internal().events().empty()) {
           cout << left << setw(40) << "Tracing event";
-          cout << right << setw(8) << "Machine" << setw(20) << "Time"
+          cout << right << setw(8) << "Machine" << setw(22) << "Time" << setw(7) << "Home"
                << "\n";
-          for (int i = 0; i < txn.internal().events_size(); ++i) {
-            cout << left << setw(40) << ENUM_NAME(txn.internal().events(i), TransactionEvent);
-            cout << right << setw(8) << txn.internal().event_machines(i) << setw(20) << txn.internal().event_times(i)
-                 << "\n";
+          for (auto& e : txn.internal().events()) {
+            cout << left << setw(40) << ENUM_NAME(e.event(), TransactionEvent);
+            cout << right << setw(8) << e.machine() << setw(22) << e.time() << setw(7) << e.home() << "\n";
           }
         }
       }

@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
 
   // Output the results
   const vector<string> kTxnColumns = {"txn_id", "sent_at", "reads", "writes"};
-  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine"};
+  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine", "home"};
   CSVWriter profiles(FLAGS_out_dir + "/transactions.csv", kTxnColumns);
   CSVWriter events(FLAGS_out_dir + "/events.csv", kEventsColumns);
 
@@ -140,10 +140,9 @@ int main(int argc, char* argv[]) {
       }
     }
     profiles << txn_internal.id() << info.sent_at.time_since_epoch().count() << Join(reads) << Join(writes) << csvendl;
-    for (int i = 0; i < txn_internal.events_size(); i++) {
-      auto event = txn_internal.events(i);
-      events << txn_internal.id() << ENUM_NAME(event, TransactionEvent) << txn_internal.event_times(i)
-             << txn_internal.event_machines(i) << csvendl;
+    for (auto& e : txn_internal.events()) {
+      events << txn_internal.id() << ENUM_NAME(e.event(), TransactionEvent) << e.time() << e.machine() << e.home()
+             << csvendl;
     }
   }
 }

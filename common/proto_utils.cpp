@@ -237,9 +237,8 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
       }
     }
   }
+
   txn.mutable_internal()->mutable_events()->MergeFrom(other.internal().events());
-  txn.mutable_internal()->mutable_event_times()->MergeFrom(other.internal().event_times());
-  txn.mutable_internal()->mutable_event_machines()->MergeFrom(other.internal().event_machines());
 
   auto involved_replicas = txn.mutable_internal()->mutable_involved_replicas();
   involved_replicas->MergeFrom(other.internal().involved_replicas());
@@ -357,8 +356,6 @@ vector<Transaction*> Unbatch(internal::Batch* batch) {
 
     // Transfer recorded events from batch to each txn in the batch
     txn_internal->mutable_events()->MergeFrom(batch->events());
-    txn_internal->mutable_event_times()->MergeFrom(batch->event_times());
-    txn_internal->mutable_event_machines()->MergeFrom(batch->event_machines());
 
     buffer[i] = txn;
   }

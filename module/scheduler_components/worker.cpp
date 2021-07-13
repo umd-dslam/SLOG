@@ -261,7 +261,7 @@ void Worker::Execute(TxnId txn_id) {
 
 void Worker::Finish(TxnId txn_id) {
   auto& state = TxnState(txn_id);
-  auto txn = state.txn_holder->Release();
+  auto txn = state.txn_holder->FinalizeAndRelease();
 
   RECORD(txn->mutable_internal(), TransactionEvent::EXIT_WORKER);
 

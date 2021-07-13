@@ -13,9 +13,7 @@ message Batch {
     TransactionType transaction_type = 3;
     // For recording the event time for all
     // transactions in this batch simultaneously
-    repeated TransactionEvent events = 4;
-    repeated int64 event_times = 5;    // when the events took place
-    repeated uint32 event_machines = 6; // where the events took place
+    repeated TransactionEventInfo events = 4;
 }
 
 message LocalBatchOrder {

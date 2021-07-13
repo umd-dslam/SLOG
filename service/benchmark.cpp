@@ -156,7 +156,7 @@ void RunBenchmark(vector<unique_ptr<ModuleRunner>>& generators) {
 struct ResultWriters {
   const vector<string> kTxnColumns = {"txn_id",    "coordinator",    "replicas", "partitions",
                                       "generator", "global_log_pos", "sent_at",  "received_at"};
-  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine"};
+  const vector<string> kEventsColumns = {"txn_id", "event", "time", "machine", "home"};
   const vector<string> kSummaryColumns = {"committed",       "aborted",    "not_started",
                                           "single_home",     "multi_home", "single_partition",
                                           "multi_partition", "remaster",   "elapsed_time"};
@@ -281,10 +281,9 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
                   << info.generator_id << global_log_pos << info.sent_at.time_since_epoch().count()
                   << info.recv_at.time_since_epoch().count() << csvendl;
 
-    for (int i = 0; i < txn_internal.events_size(); i++) {
-      auto event = txn_internal.events(i);
-      writers->events << txn_internal.id() << ENUM_NAME(event, TransactionEvent) << txn_internal.event_times(i)
-                      << txn_internal.event_machines(i) << csvendl;
+    for (auto& e : txn_internal.events()) {
+      writers->events << txn_internal.id() << ENUM_NAME(e.event(), TransactionEvent) << e.time() << e.machine()
+                      << e.home() << csvendl;
     }
   }
 
