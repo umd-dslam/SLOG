@@ -31,7 +31,8 @@ constexpr char TXN_MIX[] = "mix";
 // Only send single-home transactions
 constexpr char SH_ONLY[] = "sh_only";
 
-const RawParamMap DEFAULT_PARAMS = {{PARTITION, "-1"}, {HOMES, "2"}, {MH_ZIPF, "0"}, {TXN_MIX, "45:43:4:4:4"}, {SH_ONLY, "0"}};
+const RawParamMap DEFAULT_PARAMS = {
+    {PARTITION, "-1"}, {HOMES, "2"}, {MH_ZIPF, "0"}, {TXN_MIX, "45:43:4:4:4"}, {SH_ONLY, "0"}};
 
 template <typename G>
 int NURand(G& g, int A, int x, int y) {
