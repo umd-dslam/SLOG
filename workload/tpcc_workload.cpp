@@ -28,8 +28,10 @@ constexpr char HOMES[] = "homes";
 constexpr char MH_ZIPF[] = "mh_zipf";
 // Colon-separated list of % of the 5 txn types. Default is: "45:43:4:4:4"
 constexpr char TXN_MIX[] = "mix";
+// Only send single-home transactions
+constexpr char SH_ONLY[] = "sh_only";
 
-const RawParamMap DEFAULT_PARAMS = {{PARTITION, "-1"}, {HOMES, "2"}, {MH_ZIPF, "0"}, {TXN_MIX, "45:43:4:4:4"}};
+const RawParamMap DEFAULT_PARAMS = {{PARTITION, "-1"}, {HOMES, "2"}, {MH_ZIPF, "0"}, {TXN_MIX, "45:43:4:4:4"}, {SH_ONLY, "0"}};
 
 template <typename G>
 int NURand(G& g, int A, int x, int y) {
@@ -53,12 +55,25 @@ TPCCWorkload::TPCCWorkload(const ConfigurationPtr& config, uint32_t region, cons
       config_(config),
       local_region_(region),
       distance_ranking_(config->distance_ranking_from(region)),
+      zipf_coef_(params_.GetInt32(MH_ZIPF)),
       rg_(seed),
       client_txn_id_counter_(0) {
   name_ = "tpcc";
   CHECK(config_->proto_config().has_tpcc_partitioning()) << "TPC-C workload is only compatible with TPC-C partitioning";
 
   auto num_replicas = config_->num_replicas();
+  if (distance_ranking_.empty()) {
+    for (size_t i = 0; i < num_replicas; i++) {
+      if (i != local_region_) {
+        distance_ranking_.push_back(i);
+      }
+    }
+    if (zipf_coef_ > 0) {
+      LOG(WARNING) << "Distance ranking is not provided. MH_ZIPF is reset to 0.";
+      zipf_coef_ = 0;
+    }
+  }
+
   CHECK_EQ(distance_ranking_.size(), num_replicas - 1) << "Distance ranking size must match the number of regions";
 
   auto num_partitions = config_->num_partitions();
@@ -279,14 +294,17 @@ void TPCCWorkload::StockLevel(Transaction& txn, int w_id) {
 }
 
 std::vector<int> TPCCWorkload::SelectRemoteWarehouses(int partition) {
+  if (params_.GetInt32(SH_ONLY) == 1) {
+    return {SampleOnce(rg_, warehouse_index_[partition][local_region_])};
+  }
+
   auto num_replicas = config_->num_replicas();
   auto max_num_homes = std::min(params_.GetUInt32(HOMES), num_replicas);
   if (max_num_homes < 2) {
     return {};
   }
   auto num_homes = std::uniform_int_distribution{2U, max_num_homes}(rg_);
-  auto zipf_coef = params_.GetDouble(MH_ZIPF);
-  auto remote_warehouses = zipf_sample(rg_, zipf_coef, distance_ranking_, num_homes - 1);
+  auto remote_warehouses = zipf_sample(rg_, zipf_coef_, distance_ranking_, num_homes - 1);
 
   for (size_t i = 0; i < remote_warehouses.size(); i++) {
     auto r = remote_warehouses[i];

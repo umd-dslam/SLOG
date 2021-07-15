@@ -1094,7 +1094,7 @@ class CollectServerCommand(AdminCommand):
                     ],
                     remove=True,
                 )
-                LOG.info("%s: Triggered flushing metrics to disk", addr)
+                LOG.info("%s: Triggered flushing metrics to disk", address)
 
             with Pool(processes=len(addresses)) as pool:
                 pool.map(trigger_flushing_metrics, enumerate(addresses))

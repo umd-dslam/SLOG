@@ -31,6 +31,7 @@ class TPCCWorkload : public Workload {
   ConfigurationPtr config_;
   uint32_t local_region_;
   std::vector<int> distance_ranking_;
+  int zipf_coef_;
   vector<vector<vector<int>>> warehouse_index_;
   std::mt19937 rg_;
   TxnId client_txn_id_counter_;
