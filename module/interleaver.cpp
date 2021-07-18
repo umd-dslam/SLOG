@@ -75,8 +75,6 @@ void Interleaver::Initialize() {
   local_queue_socket.set(zmq::sockopt::rcvhwm, 0);
   local_queue_socket.bind(MakeInProcChannelAddress(kLocalLogChannel));
 
-  SetMainVsCustomSocketWeights(config()->interleaver_remote_to_local_ratio());
-
   AddCustomSocket(std::move(local_queue_socket));
 }
 

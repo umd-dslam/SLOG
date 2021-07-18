@@ -14,9 +14,6 @@ endif()
 add_library(test-utils test_utils.cpp)
 target_link_libraries(test-utils PUBLIC slog-core)
 
-add_executable(networked_module_test module/base/networked_module_test.cpp)
-target_link_libraries(networked_module_test PRIVATE test-utils)
-
 macro(add_slog_test TESTFILE)
   get_filename_component(TESTNAME ${TESTFILE} NAME_WE)
   add_executable(${TESTNAME} ${TESTFILE})

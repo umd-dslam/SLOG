@@ -30,10 +30,7 @@ NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context,
       sender_(config, context),
       poller_(poll_timeout),
       recv_retries_start_(config->recv_retries()),
-      recv_retries_(0),
-      weights_({1, 1}),
-      counters_({0, 0}),
-      current_(0) {
+      recv_retries_(0) {
   std::ostringstream os;
   os << "rep = " << config->local_replica() << ", part = " << config->local_partition()
      << ", machine_id = " << config->local_machine_id();
@@ -91,43 +88,25 @@ bool NetworkedModule::Loop() {
     return false;
   }
 
-  bool got_message = false;
-  if (current_ == 0) {
-    if (OnEnvelopeReceived(RecvEnvelope(inproc_socket_, true /* dont_wait */))) {
-      got_message = true;
-      recv_retries_ = recv_retries_start_;
-    }
+  if (OnEnvelopeReceived(RecvEnvelope(inproc_socket_, true /* dont_wait */))) {
+    recv_retries_ = recv_retries_start_;
+  }
 
-    if (outproc_socket_.handle() != ZMQ_NULLPTR) {
-      if (zmq::message_t msg; outproc_socket_.recv(msg, zmq::recv_flags::dontwait)) {
-        auto env = DeserializeEnvelope(msg);
-        if (OnEnvelopeReceived(move(env))) {
-          got_message = true;
-          recv_retries_ = recv_retries_start_;
-        }
+  if (outproc_socket_.handle() != ZMQ_NULLPTR) {
+    if (zmq::message_t msg; outproc_socket_.recv(msg, zmq::recv_flags::dontwait)) {
+      auto env = DeserializeEnvelope(msg);
+      if (OnEnvelopeReceived(move(env))) {
+        recv_retries_ = recv_retries_start_;
       }
     }
   }
 
-  if (current_ == 1) {
-    if (OnCustomSocket()) {
-      got_message = true;
-      recv_retries_ = recv_retries_start_;
-    }
+  if (OnCustomSocket()) {
+    recv_retries_ = recv_retries_start_;
   }
 
   if (recv_retries_ > 0) {
     recv_retries_--;
-  }
-
-  if (got_message) {
-    counters_[current_]++;
-  }
-  if (!got_message || counters_[current_] >= weights_[current_]) {
-    // If there is no custom socket, we don't need to switch to the custom socket weight
-    uint8_t has_custom_sockets = !custom_sockets_.empty();
-    current_ = (current_ + 1) & has_custom_sockets;
-    counters_[current_] = 0;
   }
 
   return false;

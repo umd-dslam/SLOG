@@ -142,8 +142,4 @@ message Configuration {
     bool synchronized_batching = 23;
     // Percentage of metrics to sample
     uint32 sample_rate = 24;
-    // The ratio between fetching rate for remote logs message vs fetching rate for local log messages. Expressed
-    // in the format "<remote>:<local>". For example "5:1" means the interleaver tries to fetch 5 messages for
-    // remote logs before fetching 1 message for local log.
-    string interleaver_remote_to_local_ratio = 25;
 }

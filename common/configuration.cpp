@@ -203,16 +203,6 @@ bool Configuration::synchronized_batching() const { return config_.synchronized_
 
 uint32_t Configuration::sample_rate() const { return config_.sample_rate(); }
 
-std::array<int, 2> Configuration::interleaver_remote_to_local_ratio() const {
-  auto& ratio_str = config_.interleaver_remote_to_local_ratio();
-  if (ratio_str.empty()) {
-    return {1, 1};
-  }
-  auto ratio = Split(ratio_str, ":");
-  CHECK_EQ(ratio.size(), 2) << "Invalid ratio string";
-  return {std::stoi(ratio[0]), std::stoi(ratio[1])};
-}
-
 std::vector<int> Configuration::distance_ranking_from(int replica_id) const {
   auto ranking_str = Split(config_.replicas(replica_id).distance_ranking(), ",");
   std::vector<int> ranking;
