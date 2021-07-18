@@ -36,11 +36,9 @@ struct TransactionState {
  */
 class Worker : public NetworkedModule {
  public:
-  Worker(const std::shared_ptr<Broker>& broker, Channel channel, const std::shared_ptr<Storage>& storage,
+  Worker(int id, const std::shared_ptr<Broker>& broker, const std::shared_ptr<Storage>& storage,
          const MetricsRepositoryManagerPtr& metrics_manager,
          std::chrono::milliseconds poll_timeout_ms = kModuleTimeout);
-
-  static Channel MakeChannel(int worker_num) { return kMaxChannel + worker_num; }
 
   std::string name() const override { return "Worker-" + std::to_string(channel()); }
 
