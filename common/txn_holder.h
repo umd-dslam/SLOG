@@ -67,23 +67,21 @@ class TxnHolder {
             }
           }
         }
-
-        if (lo_txn != main_txn) {
-          // Only transfer the events after the cutoff point to the main txn
-          while (internal->events_size() > cutoff) {
-            main_internal->mutable_events()->AddAllocated(internal->mutable_events()->ReleaseLast());
-          }
-          lo_txn.reset();
-        }
       }
     }
 
-    for (int i = 0; i < cutoff; i++) {
-      main_internal->mutable_events(i)->set_home(-1);
+    for (auto& lo_txn : lo_txns_) {
+      if (lo_txn != nullptr && lo_txn != main_txn) {
+        auto internal = lo_txn->mutable_internal();
+        // Only transfer the events after the cutoff point to the main txn
+        while (internal->events_size() > cutoff) {
+          main_internal->mutable_events()->AddAllocated(internal->mutable_events()->ReleaseLast());
+        }
+        lo_txn.reset();
+      }
     }
 
     // Do not use clear() here because lo_txns_ must never change in size
-
     return lo_txns_[main_txn_idx_].release();
   }
 
