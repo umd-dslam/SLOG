@@ -1085,6 +1085,8 @@ class CollectServerCommand(AdminCommand):
             def trigger_flushing_metrics(enumerated_address):
                 i, address = enumerated_address
                 out_dir = os.path.join(CONTAINER_DATA_DIR, args.tag)
+                container_name = f"{SLOG_CLIENT_CONTAINER_NAME}_{i}"
+                cleanup_container(docker_client, container_name)
                 docker_client.containers.run(
                     args.image,
                     name=f"{SLOG_CLIENT_CONTAINER_NAME}_{i}",
