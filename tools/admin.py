@@ -24,6 +24,7 @@ from paramiko.ssh_exception import PasswordRequiredException
 
 from common import Command, initialize_and_run_commands
 from gen_data import add_exported_gen_data_arguments
+from netem import gen_netem_script
 from proto.configuration_pb2 import Configuration, Replica
 
 logging.basicConfig(
@@ -1116,6 +1117,51 @@ class CollectServerCommand(AdminCommand):
         fetch_data(machines, args.user, args.tag, server_out_dir)
 
 
+class GenNetEmCommand(AdminCommand):
+
+    NAME = "gen_netem"
+    HELP = "Generate netem scripts for every server"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "config",
+            metavar="config_file",
+            help="Path to a config file",
+        )
+        parser.add_argument(
+            "--user", "-u",
+            default=USER,
+            help="Username of the target machines"
+        )
+
+    def init_remote_processes(self, _):
+        pass
+
+    def pull_slog_image(self, _):
+        pass
+
+    def do_command(self, args):
+        commands = []
+        for i, r_from in enumerate(self.config.replicas):
+            netems = []
+            filters = []
+            for j, r_to in enumerate(self.config.replicas):
+                if i == j:
+                    continue
+
+                netems.append("delay 100ms 1ms")
+                filters.append([ip for ip in r_to.addresses])
+            
+            script = gen_netem_script(netems, filters)
+
+            for ip in r_from.addresses:
+                commands.append(
+                    f'(ssh {args.user}@{ip} "echo \\"{script}\\" > netem.sh && chmod +x netem.sh") & '
+                )
+        print(commands)
+        os.system(''.join(commands) + ' wait')
+
+
 if __name__ == "__main__":
     start_time = time.time()
     initialize_and_run_commands(
@@ -1130,6 +1176,7 @@ if __name__ == "__main__":
             StatusCommand,
             LogsCommand,
             LocalCommand,
+            GenNetEmCommand,
         ]
     )
     LOG.info("Elapsed time: %.1f sec", time.time() - start_time)
