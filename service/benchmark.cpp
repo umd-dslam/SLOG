@@ -29,6 +29,7 @@ DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remaste
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_double(sample, 10, "Percent of sampled transactions to be written to result files");
+DEFINE_int32(min_sample, 25000, "Minimum number of samples");
 DEFINE_int32(
     seed, -1,
     "Seed for any randomization in the benchmark. If set to negative, seed will be picked from std::random_device()");
@@ -262,8 +263,8 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   }
   std::mt19937 rg(seed);
   std::shuffle(txn_infos.begin(), txn_infos.end(), rg);
-  auto sample_size = static_cast<size_t>(txn_infos.size() * FLAGS_sample / 100);
-  txn_infos.resize(sample_size);
+  auto sample_size = static_cast<int>(txn_infos.size() * FLAGS_sample / 100);
+  txn_infos.resize(std::max(sample_size, FLAGS_min_sample));
 
   for (const auto& info : txn_infos) {
     CHECK(info.txn != nullptr);

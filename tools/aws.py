@@ -8,11 +8,8 @@ from subprocess import Popen, PIPE
 from common import Command, initialize_and_run_commands
 from tabulate import tabulate
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(process)d - %(levelname)s: %(message)s'
-)
-LOG = logging.getLogger("spot_cluster")
+LOG = logging.getLogger("aws")
+
 MAX_RETRIES = 6
 
 INSTALL_DOCKER_COMMAND = (
@@ -166,7 +163,7 @@ class CreateSpotClusterCommand(AWSCommand):
         instance_ids = {}
         for region in regions:
             if region not in spot_fleet_requests:
-                LOG.warn(
+                LOG.warning(
                     "%s: No spot fleet request found. Skipping", region
                 )
                 continue
@@ -214,7 +211,7 @@ class CreateSpotClusterCommand(AWSCommand):
         instance_private_ips = {}
         for region in regions:
             if region not in instance_ids:
-                LOG.warn('%s: Skip fetching IP addresses', region)
+                LOG.warning('%s: Skip fetching IP addresses', region)
                 continue
 
             ec2 = boto3.client('ec2', region_name=region)
@@ -239,7 +236,6 @@ class CreateSpotClusterCommand(AWSCommand):
             except Exception as e:
                 LOG.exception(region, e)
 
-        install_docker(instance_public_ips)
         print_instance_ips(instance_public_ips, "PUBLIC IP ADDRESSES")
         print_instance_ips(instance_private_ips, "PRIVATE IP ADDRESSES")
         print_slog_config_fragment(instance_public_ips, instance_private_ips, args.clients)
@@ -332,10 +328,6 @@ class ListInstancesCommand(AWSCommand):
             nargs="*",
             help="Filter instances by state"
         )
-        parser.add_argument(
-            "-c", type=int,
-            help="When this parameter is set, a config fragment is printed. This value is used for number of clients"
-        )
 
     def initialize_and_do_command(self, args):
         if not args.regions:
@@ -384,7 +376,6 @@ class ListInstancesCommand(AWSCommand):
                 instance_ips[region] = ips
 
             print_instance_ips(instance_ips)
-            print_slog_config_fragment(instance_ips, args.c)
 
 
 if __name__ == "__main__":
