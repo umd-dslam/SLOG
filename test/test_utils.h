@@ -7,11 +7,11 @@
 #include <vector>
 
 #include "common/configuration.h"
-#include "common/txn_holder.h"
 #include "connection/broker.h"
 #include "connection/sender.h"
 #include "connection/zmq_utils.h"
 #include "module/base/module.h"
+#include "module/scheduler_components/txn_holder.h"
 #include "proto/internal.pb.h"
 #include "storage/mem_only_storage.h"
 #include "storage/metadata_initializer.h"

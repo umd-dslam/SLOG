@@ -4,8 +4,8 @@
 
 #include <list>
 
-#include "common/txn_holder.h"
 #include "common/types.h"
+#include "module/scheduler_components/txn_holder.h"
 #include "storage/storage.h"
 
 using std::list;

@@ -25,6 +25,8 @@ target_sources(slog-core
     scheduler_components/rma_lock_manager.h
     scheduler_components/simple_remaster_manager.cpp
     scheduler_components/simple_remaster_manager.h
+    scheduler_components/txn_holder.cpp
+    scheduler_components/txn_holder.h
     scheduler_components/worker.cpp
     scheduler_components/worker.h
     sequencer.cpp

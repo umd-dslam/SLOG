@@ -14,8 +14,8 @@
 #include "common/configuration.h"
 #include "common/constants.h"
 #include "common/json_utils.h"
-#include "common/txn_holder.h"
 #include "common/types.h"
+#include "module/scheduler_components/txn_holder.h"
 
 using std::list;
 using std::pair;

@@ -8,10 +8,10 @@
 
 #include "common/configuration.h"
 #include "common/metrics.h"
-#include "common/txn_holder.h"
 #include "common/types.h"
 #include "execution/execution.h"
 #include "module/base/networked_module.h"
+#include "module/scheduler_components/txn_holder.h"
 #include "proto/internal.pb.h"
 #include "proto/transaction.pb.h"
 #include "storage/storage.h"
