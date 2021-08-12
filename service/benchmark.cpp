@@ -263,8 +263,9 @@ void WriteResults(const vector<unique_ptr<ModuleRunner>>& generators) {
   }
   std::mt19937 rg(seed);
   std::shuffle(txn_infos.begin(), txn_infos.end(), rg);
-  auto sample_size = static_cast<int>(txn_infos.size() * FLAGS_sample / 100);
-  txn_infos.resize(std::max(sample_size, FLAGS_min_sample));
+  auto sample_size =
+      std::max(static_cast<size_t>(txn_infos.size() * FLAGS_sample / 100), static_cast<size_t>(FLAGS_min_sample));
+  txn_infos.resize(std::min(sample_size, txn_infos.size()));
 
   for (const auto& info : txn_infos) {
     CHECK(info.txn != nullptr);

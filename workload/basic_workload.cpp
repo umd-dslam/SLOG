@@ -212,9 +212,11 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   CHECK_LE(hot_records, records) << "Number of hot records cannot exceed number of records in a transaction!";
 
   // Randomly pick some records to be hot records (can be either read or write records)
+  std::uniform_int_distribution<uint32_t> partition_rnd(0, candidate_partitions.size() - 1);
+  std::uniform_int_distribution<uint32_t> home_rnd(0, candidate_homes.size() - 1);
   for (size_t i = 0; i < records; i++) {
-    auto partition = candidate_partitions[i % candidate_partitions.size()];
-    auto home = candidate_homes[i % candidate_homes.size()];
+    auto partition = candidate_partitions[partition_rnd(rg_)];
+    auto home = candidate_homes[home_rnd(rg_)];
 
     Key key;
     auto is_hot = i < hot_records;
