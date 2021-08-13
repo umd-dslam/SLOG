@@ -33,7 +33,7 @@ logging.basicConfig(
 )
 LOG = logging.getLogger("admin")
 
-SSH = "ssh -o StrictHostKeyChecking no"
+SSH = 'ssh "-o StrictHostKeyChecking no"'
 
 USER = "ubuntu"
 CONTAINER_DATA_DIR = "/var/tmp"
