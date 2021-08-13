@@ -33,6 +33,8 @@ logging.basicConfig(
 )
 LOG = logging.getLogger("admin")
 
+SSH = "ssh -o StrictHostKeyChecking no"
+
 USER = "ubuntu"
 CONTAINER_DATA_DIR = "/var/tmp"
 HOST_DATA_DIR = "/var/tmp"
@@ -171,7 +173,7 @@ def fetch_data(machines, user, tag, out_path):
 
         os.makedirs(out_final_path, exist_ok=True)
         cmd = (
-            f'ssh {user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
+            f'{SSH} {user}@{addr} "tar -czf {data_tar_path} -C {data_path} ." && '
             f'rsync -vh --inplace {user}@{addr}:{data_tar_path} {out_path} && '
             f'tar -xzf {out_tar_path} -C {out_final_path}'
         )
@@ -1073,7 +1075,7 @@ class CollectServerCommand(AdminCommand):
 
             commands = []
             for addr in addresses:
-                cmd = f'ssh {args.user}@{addr} "{rmdir_cmd} && {mkdir_cmd} && {cp_config_cmd}"'
+                cmd = f'{SSH} {args.user}@{addr} "{rmdir_cmd} && {mkdir_cmd} && {cp_config_cmd}"'
                 commands.append(f'({cmd}) & ')
 
             LOG.info("Executing commands:\n%s", '\n'.join(commands))
@@ -1156,7 +1158,7 @@ class GenNetEmCommand(AdminCommand):
 
             for ip in r_from.addresses:
                 commands.append(
-                    f'(ssh {args.user}@{ip} "echo \\"{script}\\" > netem.sh && chmod +x netem.sh") & '
+                    f'({SSH} {args.user}@{ip} "echo \\"{script}\\" > netem.sh && chmod +x netem.sh") & '
                 )
         print(commands)
         os.system(''.join(commands) + ' wait')
