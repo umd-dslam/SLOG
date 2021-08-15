@@ -23,17 +23,21 @@ void ValidateTransaction(Transaction* txn) {
 Server::FinishedTransaction::FinishedTransaction(size_t involved_partitions)
     : remaining_partitions_(involved_partitions) {}
 
-bool Server::FinishedTransaction::AddSubTxn(EnvelopePtr&& new_req) {
+bool Server::FinishedTransaction::AddSubTxn(EnvelopePtr&& new_req, uint32_t part) {
   DCHECK(new_req != nullptr);
 
   remaining_partitions_--;
 
   if (req_ == nullptr) {
     req_ = std::move(new_req);
+    auto txn = req_->mutable_request()->mutable_finished_subtxn()->mutable_txn();
+    txn->mutable_internal()->clear_involved_partitions();
+    txn->mutable_internal()->add_involved_partitions(part);
   } else {
     auto& subtxn = new_req->request().finished_subtxn();
     auto txn = req_->mutable_request()->mutable_finished_subtxn()->mutable_txn();
     MergeTransaction(*txn, subtxn.txn());
+    txn->mutable_internal()->add_involved_partitions(part);
   }
 
   return remaining_partitions_ == 0;
@@ -200,9 +204,11 @@ void Server::ProcessFinishedSubtxn(EnvelopePtr&& env) {
     return;
   }
 
+  auto part = config()->UnpackMachineId(env->from()).second;
+
   auto res = finished_txns_.try_emplace(txn_id, txn_internal->involved_partitions_size());
   auto& finished_txn = res.first->second;
-  if (finished_txn.AddSubTxn(std::move(env))) {
+  if (finished_txn.AddSubTxn(std::move(env), part)) {
     SendTxnToClient(finished_txn.ReleaseTxn());
     finished_txns_.erase(txn_id);
   }

@@ -75,7 +75,7 @@ class Server : public NetworkedModule {
   class FinishedTransaction {
    public:
     FinishedTransaction(size_t involved_partitions);
-    bool AddSubTxn(EnvelopePtr&& new_req);
+    bool AddSubTxn(EnvelopePtr&& new_req, uint32_t part);
     Transaction* ReleaseTxn();
 
    private:
