@@ -215,33 +215,36 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   std::uniform_int_distribution<uint32_t> partition_rnd(0, candidate_partitions.size() - 1);
   std::uniform_int_distribution<uint32_t> home_rnd(0, candidate_homes.size() - 1);
   for (size_t i = 0; i < records; i++) {
-    auto partition = candidate_partitions[partition_rnd(rg_)];
-    auto home = candidate_homes[home_rnd(rg_)];
+    for (;;) {
+      auto partition = candidate_partitions[partition_rnd(rg_)];
+      auto home = candidate_homes[home_rnd(rg_)];
 
-    Key key;
-    auto is_hot = i < hot_records;
-    if (is_hot) {
-      key = partition_to_key_lists_[partition][home].GetRandomHotKey(rg_);
-    } else {
-      key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
-    }
-
-    auto ins = pro.records.try_emplace(key, TransactionProfile::Record());
-    if (ins.second) {
-      auto& record = ins.first->second;
-      record.is_hot = is_hot;
-      // Decide whether this is a read or a write record
-      if (i < writes) {
-        code.push_back({"SET", key, rnd_str_(value_size)});
-        keys.emplace_back(key, KeyType::WRITE);
-        record.is_write = true;
+      Key key;
+      auto is_hot = i < hot_records;
+      if (is_hot) {
+        key = partition_to_key_lists_[partition][home].GetRandomHotKey(rg_);
       } else {
-        code.push_back({"GET", key});
-        keys.emplace_back(key, KeyType::READ);
-        record.is_write = false;
+        key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
       }
-      record.home = home;
-      record.partition = partition;
+
+      auto ins = pro.records.try_emplace(key, TransactionProfile::Record());
+      if (ins.second) {
+        auto& record = ins.first->second;
+        record.is_hot = is_hot;
+        // Decide whether this is a read or a write record
+        if (i < writes) {
+          code.push_back({"SET", key, rnd_str_(value_size)});
+          keys.emplace_back(key, KeyType::WRITE);
+          record.is_write = true;
+        } else {
+          code.push_back({"GET", key});
+          keys.emplace_back(key, KeyType::READ);
+          record.is_write = false;
+        }
+        record.home = home;
+        record.partition = partition;
+        break;
+      }
     }
   }
 

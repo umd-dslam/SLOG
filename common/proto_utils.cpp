@@ -239,6 +239,8 @@ void MergeTransaction(Transaction& txn, const Transaction& other) {
   }
 
   txn.mutable_internal()->mutable_events()->MergeFrom(other.internal().events());
+  txn.mutable_internal()->mutable_global_log_positions()->Add(-1);
+  txn.mutable_internal()->mutable_global_log_positions()->MergeFrom(other.internal().global_log_positions());
 
   auto involved_replicas = txn.mutable_internal()->mutable_involved_replicas();
   involved_replicas->MergeFrom(other.internal().involved_replicas());

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <queue>
-#include <random>
 #include <unordered_map>
 
 #include "common/configuration.h"
@@ -72,8 +71,6 @@ class Interleaver : public NetworkedModule {
   LocalLog local_log_;
   std::vector<MachineId> other_partitions_;
   std::vector<bool> need_ack_from_replica_;
-
-  std::mt19937 rg_;
 };
 
 }  // namespace slog

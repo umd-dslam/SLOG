@@ -128,6 +128,7 @@ void Scheduler::ProcessTransaction(EnvelopePtr&& env) {
             << txn->internal().home() << ")";
   }
 
+  holder.txn().mutable_internal()->add_global_log_positions(txn->internal().home());
   holder.txn().mutable_internal()->add_global_log_positions(global_log_counter_);
 
   if (holder.is_aborting()) {
