@@ -1,4 +1,8 @@
 import argparse
+import logging
+
+LOG_FORMAT = "%(asctime)s %(name)10s %(levelname)s: %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 class Command:
     """Base class for a command"""
