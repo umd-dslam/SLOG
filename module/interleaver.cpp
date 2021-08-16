@@ -235,8 +235,10 @@ void Interleaver::AdvanceLogs() {
         if (rep == local_replica) {
           continue;
         }
+        // Send to a fixed partition of the destination replica to avoid reordering.
+        // The partition is selected such that the logs are evenly distributed over
+        // all partitions
         auto part = (rep + num_replicas - local_replica) % num_replicas % num_partitions;
-
         if (need_ack_from_replica_[rep]) {
           ack_destinations.push_back(config()->MakeMachineId(rep, part));
         } else {

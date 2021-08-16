@@ -130,13 +130,15 @@ void Sequencer::SendBatch() {
 
   // Distribute the batch data to other replicas. All partitions of current batch are contained in a single message
   auto env = NewBatchForwardingMessage(move(batch_partitions));
-  // Send to any partition
-  auto remote_partition = batch_id_counter_ % num_partitions;
   vector<MachineId> destinations;
   destinations.reserve(num_replicas);
   for (uint32_t rep = 0; rep < num_replicas; rep++) {
     if (rep != local_replica) {
-      destinations.push_back(config()->MakeMachineId(rep, remote_partition));
+      // Send to a fixed partition of the destination replica to avoid reordering.
+      // The partition is selected such that the logs are evenly distributed over
+      // all partitions
+      auto part = (rep + num_replicas - local_replica) % num_replicas % num_partitions;
+      destinations.push_back(config()->MakeMachineId(rep, part));
     }
   }
 
