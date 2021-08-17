@@ -1131,10 +1131,17 @@ class GenNetEmCommand(AdminCommand):
             help="Path to a config file",
         )
         parser.add_argument(
+            "latency",
+            help="Path to a csv file containing a matrix of one-way latency between regions"
+        )
+        parser.add_argument(
             "--user", "-u",
             default=USER,
             help="Username of the target machines"
         )
+        parser.add_argument("--dev", default="ens5")
+        parser.add_argument("--jitter", type=int, default=1, help="Delay jitter in ms")
+        parser.add_argument("--dry-run", action="store_true")
 
     def init_remote_processes(self, _):
         pass
@@ -1143,7 +1150,17 @@ class GenNetEmCommand(AdminCommand):
         pass
 
     def do_command(self, args):
+        latency = []
+        with open(args.latency, "r") as f:
+            for line in f:
+                arr = list(map(int, line.split(',')))
+                assert len(arr) == len(self.config.replicas), "Number of regions must match config"
+                latency.append(arr)
+
+        assert len(latency) == len(self.config.replicas), "Number of regions must match config"
+        
         commands = []
+        preview = []
         for i, r_from in enumerate(self.config.replicas):
             netems = []
             filters = []
@@ -1151,17 +1168,26 @@ class GenNetEmCommand(AdminCommand):
                 if i == j:
                     continue
 
-                netems.append("delay 100ms 1ms")
+                netems.append(f"delay {latency[i][j]}ms {args.jitter}ms")
                 filters.append([ip for ip in r_to.addresses])
             
-            script = gen_netem_script(netems, filters)
+            script = gen_netem_script(netems, args.dev, filters)
 
+            preview.append((i, script))
             for ip in r_from.addresses:
                 commands.append(
                     f'({SSH} {args.user}@{ip} "echo \\"{script}\\" > netem.sh && chmod +x netem.sh") & '
                 )
-        print(commands)
-        os.system(''.join(commands) + ' wait')
+
+        for r, script in preview:
+            print("**************************")
+            print(f"   Script for region {r}  ")
+            print( "**************************")
+            print(script)
+            print()
+
+        if not args.dry_run:
+            os.system(''.join(commands) + ' wait')
 
 
 if __name__ == "__main__":
