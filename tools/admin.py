@@ -1153,7 +1153,7 @@ class GenNetEmCommand(AdminCommand):
         latency = []
         with open(args.latency, "r") as f:
             for line in f:
-                arr = list(map(int, line.split(',')))
+                arr = list(map(float, line.split(',')))
                 assert len(arr) == len(self.config.replicas), "Number of regions must match config"
                 latency.append(arr)
 
@@ -1169,12 +1169,12 @@ class GenNetEmCommand(AdminCommand):
                     continue
 
                 netems.append(f"delay {latency[i][j]}ms {args.jitter}ms")
-                filters.append([ip for ip in r_to.addresses])
+                filters.append([ip for ip in public_addresses(r_to)])
             
             script = gen_netem_script(netems, args.dev, filters)
 
             preview.append((i, script))
-            for ip in r_from.addresses:
+            for ip in public_addresses(r_from):
                 commands.append(
                     f'({SSH} {args.user}@{ip} "echo \\"{script}\\" > netem.sh && chmod +x netem.sh") & '
                 )
