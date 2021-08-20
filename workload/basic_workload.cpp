@@ -148,25 +148,25 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   pro.is_multi_partition = is_mp(rg_);
 
   // Select a number of partitions to choose from for each record
-  vector<uint32_t> candidate_partitions;
+  vector<uint32_t> selected_partitions;
   if (pro.is_multi_partition) {
     CHECK_GE(num_partitions, 2) << "There must be at least 2 partitions for MP txns";
-    candidate_partitions.resize(num_partitions);
-    iota(candidate_partitions.begin(), candidate_partitions.end(), 0);
-    shuffle(candidate_partitions.begin(), candidate_partitions.end(), rg_);
+    selected_partitions.resize(num_partitions);
+    iota(selected_partitions.begin(), selected_partitions.end(), 0);
+    shuffle(selected_partitions.begin(), selected_partitions.end(), rg_);
     auto max_num_partitions = std::min(num_partitions, params_.GetUInt32(MP_PARTS));
     CHECK_GE(max_num_partitions, 2) << "At least 2 partitions must be selected for MP txns";
     std::uniform_int_distribution num_partitions(2U, max_num_partitions);
-    candidate_partitions.resize(num_partitions(rg_));
+    selected_partitions.resize(num_partitions(rg_));
   } else {
     auto sp_partition = params_.GetInt32(SP_PARTITION);
     if (sp_partition < 0) {
       std::uniform_int_distribution<uint32_t> dis(0, num_partitions - 1);
-      candidate_partitions.push_back(dis(rg_));
+      selected_partitions.push_back(dis(rg_));
     } else {
       CHECK_LT(static_cast<uint32_t>(sp_partition), num_partitions)
           << "Selected single-partition partition does not exist";
-      candidate_partitions.push_back(sp_partition);
+      selected_partitions.push_back(sp_partition);
     }
   }
 
@@ -177,26 +177,26 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   pro.is_multi_home = is_mh(rg_);
 
   // Select a number of homes to choose from for each record
-  vector<uint32_t> candidate_homes;
+  vector<uint32_t> selected_homes;
   if (pro.is_multi_home) {
     CHECK_GE(num_replicas, 2) << "There must be at least 2 regions for MH txns";
     auto max_num_homes = std::min(params_.GetUInt32(MH_HOMES), num_replicas);
     CHECK_GE(max_num_homes, 2) << "At least 2 regions must be selected for MH txns";
     auto num_homes = std::uniform_int_distribution{2U, max_num_homes}(rg_);
-    candidate_homes.reserve(num_homes);
+    selected_homes.reserve(num_homes);
 
     if (params_.GetInt32(NEAREST)) {
-      candidate_homes.push_back(local_region_);
+      selected_homes.push_back(local_region_);
       num_homes--;
     }
     auto sampled_homes = zipf_sample(rg_, zipf_coef_, distance_ranking_, num_homes);
-    candidate_homes.insert(candidate_homes.end(), sampled_homes.begin(), sampled_homes.end());
+    selected_homes.insert(selected_homes.end(), sampled_homes.begin(), sampled_homes.end());
   } else {
     if (params_.GetInt32(NEAREST)) {
-      candidate_homes.push_back(local_region_);
+      selected_homes.push_back(local_region_);
     } else {
       std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
-      candidate_homes.push_back(dis(rg_));
+      selected_homes.push_back(dis(rg_));
     }
   }
 
@@ -211,17 +211,16 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
   CHECK_LE(writes, records) << "Number of writes cannot exceed number of records in a transaction!";
   CHECK_LE(hot_records, records) << "Number of hot records cannot exceed number of records in a transaction!";
 
-  // Randomly pick some records to be hot records (can be either read or write records)
-  std::uniform_int_distribution<uint32_t> partition_rnd(0, candidate_partitions.size() - 1);
-  std::uniform_int_distribution<uint32_t> home_rnd(0, candidate_homes.size() - 1);
-  for (size_t i = 0; i < records; i++) {
-    for (;;) {
-      auto partition = candidate_partitions[partition_rnd(rg_)];
-      auto home = candidate_homes[home_rnd(rg_)];
+  std::vector<bool> is_hot(hot_records, true);
+  is_hot.resize(records);
+  std::shuffle(is_hot.begin(), is_hot.end(), rg_);
 
+  for (size_t i = 0; i < records; i++) {
+    auto partition = selected_partitions[i % selected_partitions.size()];
+    auto home = selected_homes[i / ((records + 1) / selected_homes.size())];
+    for (;;) {
       Key key;
-      auto is_hot = i < hot_records;
-      if (is_hot) {
+      if (is_hot[i]) {
         key = partition_to_key_lists_[partition][home].GetRandomHotKey(rg_);
       } else {
         key = partition_to_key_lists_[partition][home].GetRandomColdKey(rg_);
@@ -230,7 +229,7 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
       auto ins = pro.records.try_emplace(key, TransactionProfile::Record());
       if (ins.second) {
         auto& record = ins.first->second;
-        record.is_hot = is_hot;
+        record.is_hot = is_hot[i];
         // Decide whether this is a read or a write record
         if (i < writes) {
           code.push_back({"SET", key, rnd_str_(value_size)});
