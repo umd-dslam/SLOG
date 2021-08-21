@@ -1169,7 +1169,7 @@ class GenNetEmCommand(AdminCommand):
                     continue
 
                 netems.append(f"delay {latency[i][j]}ms {args.jitter}ms")
-                filters.append([ip for ip in public_addresses(r_to)])
+                filters.append([ip for ip in private_addresses(r_to)])
             
             script = gen_netem_script(netems, args.dev, filters)
 
