@@ -52,10 +52,13 @@ constexpr char NEAREST[] = "nearest";
 // Use a negative number to select a random partition for
 // each transaction
 constexpr char SP_PARTITION[] = "sp_partition";
+// Home that is used in a single-home transaction.
+// The NEAREST parameter is ignored if this is positive
+constexpr char SH_HOME[] = "sh_home";
 
 const RawParamMap DEFAULT_PARAMS = {{MH_PCT, "0"},   {MH_HOMES, "2"},    {MH_ZIPF, "0"},  {MP_PCT, "0"},
                                     {MP_PARTS, "2"}, {HOT, "0"},         {RECORDS, "10"}, {HOT_RECORDS, "0"},
-                                    {WRITES, "10"},  {VALUE_SIZE, "50"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}};
+                                    {WRITES, "10"},  {VALUE_SIZE, "50"}, {NEAREST, "1"},  {SP_PARTITION, "-1"}, {SH_HOME, "-1"}};
 
 }  // namespace
 
@@ -192,11 +195,15 @@ std::pair<Transaction*, TransactionProfile> BasicWorkload::NextTransaction() {
     auto sampled_homes = zipf_sample(rg_, zipf_coef_, distance_ranking_, num_homes);
     selected_homes.insert(selected_homes.end(), sampled_homes.begin(), sampled_homes.end());
   } else {
-    if (params_.GetInt32(NEAREST)) {
-      selected_homes.push_back(local_region_);
+    if (params_.GetInt32(SH_HOME) >= 0) {
+      selected_homes.push_back(params_.GetInt32(SH_HOME));
     } else {
-      std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
-      selected_homes.push_back(dis(rg_));
+      if (params_.GetInt32(NEAREST)) {
+        selected_homes.push_back(local_region_);
+      } else {
+        std::uniform_int_distribution<uint32_t> dis(0, num_replicas - 1);
+        selected_homes.push_back(dis(rg_));
+      }
     }
   }
 
