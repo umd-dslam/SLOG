@@ -110,36 +110,40 @@ message Configuration {
     }
     // Number of worker threads for processing the transactions
     uint32 num_workers = 11;
+    // How long the mh orderer waits for batching
+    uint64 mh_orderer_batch_duration = 12;
     // How long the forwarder waits for batching
-    uint64 forwarder_batch_duration = 12;
+    uint64 forwarder_batch_duration = 13;
     // How long the sequencer waits for batching
-    uint64 sequencer_batch_duration = 13;
+    uint64 sequencer_batch_duration = 14;
+    // How big can a batch be in number of txns
+    int32 sequencer_batch_size = 15;
     // Number of replicas that need to be synchronously replicated to
-    uint32 replication_factor = 14;
+    uint32 replication_factor = 16;
     // Order of replicas for synchronous replication. This is a list of strings each of which corresponds
     // to a replica. Each string is an ordered comma-separated list of replica ids that the current replica
     // will synchronously replicate to based on replication order. The current replica will be ignored if exists
     // in the list. For example, ['1,2', '2,1,0', ''] means that, with a replication factor of 3, replica 0 will
     // synchronously replicate to 1 and 2, replica 1 will replicate to 2 and 0, and replica 2 will not synchronously
     // replicate to anywhere.
-    repeated string replication_order = 15;
+    repeated string replication_order = 17;
     // Replication of txn batches will be delayed to simulate uneven network latency
-    ReplicationDelayExperiment replication_delay = 16;
+    ReplicationDelayExperiment replication_delay = 18;
     // Enable recording for the specified events
-    repeated TransactionEvent enabled_events = 17;
+    repeated TransactionEvent enabled_events = 19;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
-    bool bypass_mh_orderer = 18;
+    bool bypass_mh_orderer = 20;
     // Pin each module to a cpu
-    repeated CpuPinning cpu_pinnings = 19;
+    repeated CpuPinning cpu_pinnings = 21;
     // Return dummy txns back to the client instead of full results
-    bool return_dummy_txn = 20;
+    bool return_dummy_txn = 22;
     // Number of retries after calling zmq::recv something
-    int32 recv_retries = 21;
+    int32 recv_retries = 23;
     // Way of executing code of a txn
-    ExecutionType execution_type = 22;
+    ExecutionType execution_type = 24;
     // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
     // txns are put into the batches at approximately the same time
-    bool synchronized_batching = 23;
+    bool synchronized_batching = 25;
     // Percentage of metrics to sample
-    uint32 sample_rate = 24;
+    uint32 sample_rate = 26;
 }

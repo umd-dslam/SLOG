@@ -36,18 +36,22 @@ class Sequencer : public NetworkedModule {
   void OnInternalRequestReceived(EnvelopePtr&& env) final;
 
  private:
+  using PartitionedBatch = std::vector<std::unique_ptr<internal::Batch>>;
+
   void BatchTxn(Transaction* txn);
   void ProcessStatsRequest(const internal::StatsRequest& stats_request);
 
+  void StartOver();
   void NewBatch();
   BatchId batch_id() const { return batch_id_counter_ * kMaxNumMachines + config()->local_machine_id(); }
-  void SendBatch();
-  EnvelopePtr NewBatchForwardingMessage(std::vector<internal::Batch*>&& batch);
+  void SendBatches();
+  EnvelopePtr NewBatchForwardingMessage(std::vector<internal::Batch*>&& batch, int home_position);
 
   const SharderPtr sharder_;
-  std::vector<std::unique_ptr<internal::Batch>> partitioned_batch_;
+  std::vector<PartitionedBatch> batches_;
   BatchId batch_id_counter_;
-  int batch_size_;
+  int current_batch_size_;
+  int total_batch_size_;
 
   std::mt19937 rg_;
 

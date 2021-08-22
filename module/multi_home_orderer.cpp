@@ -123,7 +123,7 @@ void MultiHomeOrderer::AddToBatch(Transaction* txn) {
 
   // If this is the first txn in the batch, schedule to send the batch at a later time
   if (batch_size_ == 1) {
-    NewTimedCallback(config()->sequencer_batch_duration(), [this]() {
+    NewTimedCallback(config()->mh_orderer_batch_duration(), [this]() {
       SendBatch();
       NewBatch();
     });

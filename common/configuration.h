@@ -34,8 +34,10 @@ class Configuration {
   uint32_t num_partitions() const;
   uint32_t num_workers() const;
   std::vector<MachineId> all_machine_ids() const;
+  std::chrono::milliseconds mh_orderer_batch_duration() const;
   std::chrono::milliseconds forwarder_batch_duration() const;
   std::chrono::milliseconds sequencer_batch_duration() const;
+  int sequencer_batch_size() const;
   uint32_t replication_factor() const;
 
   const std::string& local_address() const;

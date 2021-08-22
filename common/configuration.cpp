@@ -115,6 +115,10 @@ uint32_t Configuration::forwarder_port() const { return config_.forwarder_port()
 
 uint32_t Configuration::sequencer_port() const { return config_.sequencer_port(); }
 
+std::chrono::milliseconds Configuration::mh_orderer_batch_duration() const {
+  return milliseconds(config_.mh_orderer_batch_duration());
+}
+
 milliseconds Configuration::forwarder_batch_duration() const {
   return milliseconds(config_.forwarder_batch_duration());
 }
@@ -124,6 +128,10 @@ milliseconds Configuration::sequencer_batch_duration() const {
     return 1ms;
   }
   return milliseconds(config_.sequencer_batch_duration());
+}
+
+int Configuration::sequencer_batch_size() const {
+  return config_.sequencer_batch_size();
 }
 
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
