@@ -1,3 +1,5 @@
+import argparse
+
 def gen_netem_script(netems, dev, filters):
     '''Generates a tc netem script
 
@@ -41,3 +43,14 @@ def gen_netem_script(netems, dev, filters):
     ]
     return '\n'.join(script)
 
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Generate netem script")
+    parser.add_argument("netem", help="Netem commands")
+    parser.add_argument("-d", "--dev", default="eth0", help="Network interface to apply on")
+    parser.add_argument("-f", "--filter", nargs="*", help="IP addresses to apply on")
+
+    args = parser.parse_args()
+    if args.filter is None:
+        args.filter = []
+    print(gen_netem_script([args.netem], args.dev, [args.filter]))
