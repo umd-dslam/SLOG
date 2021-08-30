@@ -25,7 +25,7 @@ class BrokerThread : public Module {
  public:
   BrokerThread(const shared_ptr<zmq::context_t>& context, const string& internal_endpoint,
                const string& external_endpoint, const vector<pair<Channel, bool>>& channels, int recv_retries_start_,
-               std::chrono::milliseconds poll_timeout_ms)
+               std::chrono::milliseconds poll_timeout_ms, int rcvbuf)
       : external_socket_(*context, ZMQ_PULL),
         internal_socket_(*context, ZMQ_PULL),
         internal_endpoint_(internal_endpoint),
@@ -33,8 +33,8 @@ class BrokerThread : public Module {
         poll_timeout_ms_(poll_timeout_ms),
         recv_retries_start_(recv_retries_start_),
         recv_retries_(0) {
-    // Remove all limits on the message queue
     external_socket_.set(zmq::sockopt::rcvhwm, 0);
+    external_socket_.set(zmq::sockopt::rcvbuf, rcvbuf);
 
     for (auto [chan, send_raw] : channels) {
       DCHECK(channels_.find(chan) == channels_.end()) << "Duplicate channel: " << chan;
@@ -201,7 +201,8 @@ void Broker::StartInNewThreads() {
         MakeRemoteAddress(config_->protocol(), config_->local_address(), config_->broker_ports(i), true /* binding */);
 
     auto& t = threads_.emplace_back(MakeRunnerFor<BrokerThread>(context_, internal_endpoint, external_endpoint,
-                                                                channels_, config_->recv_retries(), poll_timeout_ms_));
+                                                                channels_, config_->recv_retries(), poll_timeout_ms_,
+                                                                config_->broker_rcvbuf()));
 
     std::optional<uint32_t> cpu = {};
     if (i < cpus.size()) {

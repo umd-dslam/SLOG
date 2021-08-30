@@ -15,7 +15,7 @@ namespace slog {
  */
 class Sender {
  public:
-  Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context);
+  Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context, bool is_long = false);
 
   /**
    * Send a request or response to a given channel of a given machine
@@ -68,6 +68,8 @@ class Sender {
   // Keep a pointer to context here to make sure that the below sockets
   // are destroyed before the context is
   std::shared_ptr<zmq::context_t> context_;
+  // Sockets of a long sender have a larger kernel buffer size
+  bool is_long_;
   std::unordered_map<uint64_t, SocketPtr> machine_id_and_port_to_sockets_;
   std::unordered_map<Channel, zmq::socket_t> local_channel_to_socket_;
 };

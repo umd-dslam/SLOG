@@ -28,15 +28,15 @@ class NetworkedModule : public Module {
  public:
   NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config, Channel channel,
                   const MetricsRepositoryManagerPtr& metrics_manager,
-                  std::optional<std::chrono::milliseconds> poll_timeout);
+                  std::optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender);
 
   NetworkedModule(const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                   const MetricsRepositoryManagerPtr& metrics_manager,
-                  std::optional<std::chrono::milliseconds> poll_timeout);
+                  std::optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender = false);
 
   NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config, uint32_t port,
                   Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
-                  std::optional<std::chrono::milliseconds> poll_timeout);
+                  std::optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender = false);
 
  protected:
   virtual void Initialize(){};

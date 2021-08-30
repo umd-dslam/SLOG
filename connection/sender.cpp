@@ -4,8 +4,8 @@ using std::move;
 
 namespace slog {
 
-Sender::Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context)
-    : config_(config), context_(context) {}
+Sender::Sender(const ConfigurationPtr& config, const std::shared_ptr<zmq::context_t>& context, bool is_long)
+    : config_(config), context_(context), is_long_(is_long) {}
 
 void Sender::Send(const internal::Envelope& envelope, MachineId to_machine_id, Channel to_channel) {
   auto& socket = GetRemoteSocket(to_machine_id, to_channel);
@@ -87,6 +87,9 @@ Sender::SocketPtr& Sender::GetRemoteSocket(MachineId machine_id, Channel channel
   if (socket == nullptr) {
     socket = std::make_unique<zmq::socket_t>(*context_, ZMQ_PUSH);
     socket->set(zmq::sockopt::sndhwm, 0);
+    if (is_long_) {
+      socket->set(zmq::sockopt::sndbuf, config_->long_sender_sndbuf());
+    }
     auto endpoint = MakeRemoteAddress(config_->protocol(), config_->address(machine_id), port);
     socket->connect(endpoint);
   }

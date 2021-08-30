@@ -33,7 +33,8 @@ Forwarder::Forwarder(const std::shared_ptr<zmq::context_t>& context, const Confi
                      const shared_ptr<LookupMasterIndex>& lookup_master_index,
                      const std::shared_ptr<MetadataInitializer>& metadata_initializer,
                      const MetricsRepositoryManagerPtr& metrics_manager, std::chrono::milliseconds poll_timeout)
-    : NetworkedModule(context, config, config->forwarder_port(), kForwarderChannel, metrics_manager, poll_timeout),
+    : NetworkedModule(context, config, config->forwarder_port(), kForwarderChannel, metrics_manager, poll_timeout,
+                      true /* is_long_sender */),
       sharder_(Sharder::MakeSharder(config)),
       lookup_master_index_(lookup_master_index),
       metadata_initializer_(metadata_initializer),

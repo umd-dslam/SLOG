@@ -130,9 +130,7 @@ milliseconds Configuration::sequencer_batch_duration() const {
   return milliseconds(config_.sequencer_batch_duration());
 }
 
-int Configuration::sequencer_batch_size() const {
-  return config_.sequencer_batch_size();
-}
+int Configuration::sequencer_batch_size() const { return config_.sequencer_batch_size(); }
 
 uint32_t Configuration::replication_factor() const { return std::max(config_.replication_factor(), 1U); }
 
@@ -215,5 +213,9 @@ std::vector<int> Configuration::distance_ranking_from(int replica_id) const {
   }
   return ranking;
 }
+
+int Configuration::broker_rcvbuf() const { return config_.broker_rcvbuf() <= 0 ? -1 : config_.broker_rcvbuf(); }
+
+int Configuration::long_sender_sndbuf() const { return config_.long_sender_sndbuf() <= 0 ? - 1 : config_.long_sender_sndbuf(); }
 
 }  // namespace slog

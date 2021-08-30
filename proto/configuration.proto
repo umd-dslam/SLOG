@@ -146,4 +146,8 @@ message Configuration {
     bool synchronized_batching = 25;
     // Percentage of metrics to sample
     uint32 sample_rate = 26;
+    // Kernel receiving buffer size (bytes) of a broker socket
+    int32 broker_rcvbuf = 27;
+    // Kernel sending buffer size (bytes) of long-distance sockets (e.g. those in the Forwarder and Sequencer)
+    int32 long_sender_sndbuf = 28;
 }

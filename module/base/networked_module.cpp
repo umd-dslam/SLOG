@@ -20,14 +20,14 @@ using internal::Envelope;
 
 NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                                  Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
-                                 std::optional<std::chrono::milliseconds> poll_timeout)
+                                 std::optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender)
     : context_(context),
       config_(config),
       channel_(channel),
       port_(std::nullopt),
       metrics_manager_(metrics_manager),
       inproc_socket_(*context_, ZMQ_PULL),
-      sender_(config, context),
+      sender_(config, context, is_long_sender),
       poller_(poll_timeout),
       recv_retries_start_(config->recv_retries()),
       recv_retries_(0) {
@@ -39,15 +39,16 @@ NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context,
 
 NetworkedModule::NetworkedModule(const std::shared_ptr<Broker>& broker, ChannelOption chopt,
                                  const MetricsRepositoryManagerPtr& metrics_manager,
-                                 optional<std::chrono::milliseconds> poll_timeout)
-    : NetworkedModule(broker->context(), broker->config(), chopt.channel, metrics_manager, poll_timeout) {
+                                 optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender)
+    : NetworkedModule(broker->context(), broker->config(), chopt.channel, metrics_manager, poll_timeout,
+                      is_long_sender) {
   broker->AddChannel(channel_, chopt.recv_raw);
 }
 
 NetworkedModule::NetworkedModule(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                                  uint32_t port, Channel channel, const MetricsRepositoryManagerPtr& metrics_manager,
-                                 std::optional<std::chrono::milliseconds> poll_timeout)
-    : NetworkedModule(context, config, channel, metrics_manager, poll_timeout) {
+                                 std::optional<std::chrono::milliseconds> poll_timeout, bool is_long_sender)
+    : NetworkedModule(context, config, channel, metrics_manager, poll_timeout, is_long_sender) {
   port_ = port;
 }
 

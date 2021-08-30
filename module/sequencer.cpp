@@ -20,7 +20,8 @@ using std::chrono::milliseconds;
 
 Sequencer::Sequencer(const std::shared_ptr<zmq::context_t>& context, const ConfigurationPtr& config,
                      const MetricsRepositoryManagerPtr& metrics_manager, milliseconds poll_timeout)
-    : NetworkedModule(context, config, config->sequencer_port(), kSequencerChannel, metrics_manager, poll_timeout),
+    : NetworkedModule(context, config, config->sequencer_port(), kSequencerChannel, metrics_manager, poll_timeout,
+                      true /* is_long_sender */),
       sharder_(Sharder::MakeSharder(config)),
       batch_id_counter_(0),
       rg_(std::random_device()()),
@@ -167,12 +168,11 @@ void Sequencer::SendBatches() {
 
         VLOG(3) << "Delay batch " << batch_id << " for " << delay_ms << " ms";
 
-        NewTimedCallback(milliseconds(delay_ms),
-                        [this, destinations, batch_id, delayed_env = env.release()]() {
-                          VLOG(3) << "Sending delayed batch " << batch_id;
-                          Send(*delayed_env, destinations, kInterleaverChannel);
-                          delete delayed_env;
-                        });
+        NewTimedCallback(milliseconds(delay_ms), [this, destinations, batch_id, delayed_env = env.release()]() {
+          VLOG(3) << "Sending delayed batch " << batch_id;
+          Send(*delayed_env, destinations, kInterleaverChannel);
+          delete delayed_env;
+        });
 
         return;
       }
