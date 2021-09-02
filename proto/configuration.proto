@@ -118,36 +118,39 @@ message Configuration {
     uint64 sequencer_batch_duration = 14;
     // How big can a batch be in number of txns
     int32 sequencer_batch_size = 15;
+    // By default, a sequencer sticks to a single partition of a region to send the batch to.
+    // If this option is true, the partitions are selected in a round-robin manner (rrr: round-robin replication).
+    bool sequencer_rrr = 16;
     // Number of replicas that need to be synchronously replicated to
-    uint32 replication_factor = 16;
+    uint32 replication_factor = 17;
     // Order of replicas for synchronous replication. This is a list of strings each of which corresponds
     // to a replica. Each string is an ordered comma-separated list of replica ids that the current replica
     // will synchronously replicate to based on replication order. The current replica will be ignored if exists
     // in the list. For example, ['1,2', '2,1,0', ''] means that, with a replication factor of 3, replica 0 will
     // synchronously replicate to 1 and 2, replica 1 will replicate to 2 and 0, and replica 2 will not synchronously
     // replicate to anywhere.
-    repeated string replication_order = 17;
+    repeated string replication_order = 18;
     // Replication of txn batches will be delayed to simulate uneven network latency
-    ReplicationDelayExperiment replication_delay = 18;
+    ReplicationDelayExperiment replication_delay = 19;
     // Enable recording for the specified events
-    repeated TransactionEvent enabled_events = 19;
+    repeated TransactionEvent enabled_events = 20;
     // For multi-home txn, send lock-only txns directly to the regions, skipping the global orderer
-    bool bypass_mh_orderer = 20;
+    bool bypass_mh_orderer = 21;
     // Pin each module to a cpu
-    repeated CpuPinning cpu_pinnings = 21;
+    repeated CpuPinning cpu_pinnings = 22;
     // Return dummy txns back to the client instead of full results
-    bool return_dummy_txn = 22;
+    bool return_dummy_txn = 23;
     // Number of retries after calling zmq::recv something
-    int32 recv_retries = 23;
+    int32 recv_retries = 24;
     // Way of executing code of a txn
-    ExecutionType execution_type = 24;
+    ExecutionType execution_type = 25;
     // For each MH transaction, the involved regions will wait in such a way that their respective lock-only 
     // txns are put into the batches at approximately the same time
-    bool synchronized_batching = 25;
+    bool synchronized_batching = 26;
     // Percentage of metrics to sample
-    uint32 sample_rate = 26;
+    uint32 sample_rate = 27;
     // Kernel receiving buffer size (bytes) of a broker socket
-    int32 broker_rcvbuf = 27;
+    int32 broker_rcvbuf = 28;
     // Kernel sending buffer size (bytes) of long-distance sockets (e.g. those in the Forwarder and Sequencer)
-    int32 long_sender_sndbuf = 28;
+    int32 long_sender_sndbuf = 29;
 }

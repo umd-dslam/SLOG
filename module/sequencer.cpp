@@ -152,10 +152,12 @@ void Sequencer::SendBatches() {
     destinations.reserve(num_replicas);
     for (uint32_t rep = 0; rep < num_replicas; rep++) {
       if (rep != local_replica) {
-        // Send to a fixed partition of the destination replica to avoid reordering.
-        // The partition is selected such that the logs are evenly distributed over
-        // all partitions
-        auto part = (rep + num_replicas - local_replica) % num_replicas % num_partitions;
+        uint32_t part = 0;
+        if (config()->sequencer_rrr()) {
+          part = home_position % num_partitions;
+        } else {
+          part = (rep + num_replicas - local_replica) % num_replicas % num_partitions;
+        }
         destinations.push_back(config()->MakeMachineId(rep, part));
       }
     }

@@ -38,6 +38,7 @@ class Configuration {
   std::chrono::milliseconds forwarder_batch_duration() const;
   std::chrono::milliseconds sequencer_batch_duration() const;
   int sequencer_batch_size() const;
+  bool sequencer_rrr() const;
   uint32_t replication_factor() const;
 
   const std::string& local_address() const;
