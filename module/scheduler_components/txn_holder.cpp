@@ -60,8 +60,11 @@ Transaction* TxnHolder::FinalizeAndRelease() {
     if (lo_txn != nullptr && lo_txn != main_txn) {
       auto internal = lo_txn->mutable_internal();
       // Only transfer the events after the cutoff point to the main txn
+      for (int i = cutoff; i < internal->events_size(); i++) {
+        main_internal->mutable_events()->AddAllocated(internal->mutable_events(i));
+      }
       while (internal->events_size() > cutoff) {
-        main_internal->mutable_events()->AddAllocated(internal->mutable_events()->ReleaseLast());
+        internal->mutable_events()->ReleaseLast();
       }
       lo_txn.reset();
     }
