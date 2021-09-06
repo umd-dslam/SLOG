@@ -22,6 +22,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 option(BUILD_SLOG_CLIENT           "Build the client"                      ON)
 option(BUILD_SLOG_TESTS            "Build the tests"                       ON)
 option(ENABLE_TXN_EVENT_RECORDING  "Enable transaction events recording"   ON)
+option(FETCH_DEPENDENCIES          "Automatically fetch the dependencies"  ON)
 set(REMASTER_PROTOCOL "COUNTERLESS" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
@@ -35,82 +36,102 @@ message(STATUS "  LOCK_MANAGER = ${LOCK_MANAGER}")
 #               Dependencies
 #========================================
 
-include(FetchContent)
+if (FETCH_DEPENDENCIES)
 
-FetchContent_Declare(libzmq
-  GIT_REPOSITORY  https://github.com/zeromq/libzmq.git
-  GIT_TAG         v4.3.3
-)
-FetchContent_GetProperties(libzmq)
-if(NOT libzmq_POPULATED)
-  message("Populating: ZeroMQ")
-  FetchContent_Populate(libzmq)
-  set(ZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for ZeroMQ" FORCE)
-  add_subdirectory(${libzmq_SOURCE_DIR} ${libzmq_BINARY_DIR})
-endif()
+  include(FetchContent)
 
-FetchContent_Declare(cppzmq
-  GIT_REPOSITORY  https://github.com/zeromq/cppzmq.git
-  GIT_TAG         v4.7.1
-)
-FetchContent_GetProperties(cppzmq)
-if(NOT cppzmq_POPULATED)
-  message("Populating: cppzmq")
-  FetchContent_Populate(cppzmq)
-  set(CPPZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for cppzmq" FORCE)
-  add_subdirectory(${cppzmq_SOURCE_DIR} ${cppzmq_BINARY_DIR})
-endif()
+  FetchContent_Declare(libzmq
+    GIT_REPOSITORY  https://github.com/zeromq/libzmq.git
+    GIT_TAG         v4.3.3
+  )
+  FetchContent_GetProperties(libzmq)
+  if(NOT libzmq_POPULATED)
+    message("Populating: ZeroMQ")
+    FetchContent_Populate(libzmq)
+    set(ZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for ZeroMQ" FORCE)
+    add_subdirectory(${libzmq_SOURCE_DIR} ${libzmq_BINARY_DIR})
+  endif()
 
-FetchContent_Declare(gflags
-  GIT_REPOSITORY  https://github.com/gflags/gflags.git
-  GIT_TAG         v2.2.2
-)
-FetchContent_GetProperties(gflags)
-if(NOT gflags_POPULATED)
-  message("Populating: gflags")
-  FetchContent_Populate(gflags)
-  set(GFLAGS_BUILD_TESTING OFF CACHE INTERNAL "Build tests")
-  # Needed to work with glog
-  set(GFLAGS_NAMESPACE "google" CACHE INTERNAL "Set namespace for gflags")
-  add_subdirectory(${gflags_SOURCE_DIR} ${gflags_BINARY_DIR})
-endif()
+  FetchContent_Declare(cppzmq
+    GIT_REPOSITORY  https://github.com/zeromq/cppzmq.git
+    GIT_TAG         v4.7.1
+  )
+  FetchContent_GetProperties(cppzmq)
+  if(NOT cppzmq_POPULATED)
+    message("Populating: cppzmq")
+    FetchContent_Populate(cppzmq)
+    set(CPPZMQ_BUILD_TESTS OFF CACHE INTERNAL "Build tests for cppzmq" FORCE)
+    add_subdirectory(${cppzmq_SOURCE_DIR} ${cppzmq_BINARY_DIR})
+  endif()
 
-FetchContent_Declare(glog
-  GIT_REPOSITORY  https://github.com/google/glog.git
-  GIT_TAG         v0.4.0
-)
-FetchContent_GetProperties(glog)
-if(NOT glog_POPULATED)
-  message("Populating: glog")
-  FetchContent_Populate(glog)
-  set(WITH_GFLAGS FALSE CACHE INTERNAL "Build glog with gflags")
-  set(BUILD_TESTING FALSE CACHE INTERNAL "Build tests")
-  add_subdirectory(${glog_SOURCE_DIR} ${glog_BINARY_DIR})
-endif()
+  FetchContent_Declare(gflags
+    GIT_REPOSITORY  https://github.com/gflags/gflags.git
+    GIT_TAG         v2.2.2
+  )
+  FetchContent_GetProperties(gflags)
+  if(NOT gflags_POPULATED)
+    message("Populating: gflags")
+    FetchContent_Populate(gflags)
+    set(GFLAGS_BUILD_TESTING OFF CACHE INTERNAL "Build tests")
+    # Needed to work with glog
+    set(GFLAGS_NAMESPACE "google" CACHE INTERNAL "Set namespace for gflags")
+    add_subdirectory(${gflags_SOURCE_DIR} ${gflags_BINARY_DIR})
+  endif()
 
-FetchContent_Declare(rapidjson
-  GIT_REPOSITORY  https://github.com/Tencent/rapidjson
-  GIT_TAG         v1.1.0
-  GIT_SHALLOW     TRUE
-)
-FetchContent_GetProperties(rapidjson)
-if (NOT rapidjson_POPULATED)
-  message("Populating: rapidjson")
-  FetchContent_Populate(rapidjson)
+  FetchContent_Declare(glog
+    GIT_REPOSITORY  https://github.com/google/glog.git
+    GIT_TAG         v0.4.0
+  )
+  FetchContent_GetProperties(glog)
+  if(NOT glog_POPULATED)
+    message("Populating: glog")
+    FetchContent_Populate(glog)
+    set(WITH_GFLAGS FALSE CACHE INTERNAL "Build glog with gflags")
+    set(BUILD_TESTING FALSE CACHE INTERNAL "Build tests")
+    add_subdirectory(${glog_SOURCE_DIR} ${glog_BINARY_DIR})
+  endif()
+
+  FetchContent_Declare(rapidjson
+    GIT_REPOSITORY  https://github.com/Tencent/rapidjson
+    GIT_TAG         v1.1.0
+    GIT_SHALLOW     TRUE
+  )
+  FetchContent_GetProperties(rapidjson)
+  if (NOT rapidjson_POPULATED)
+    message("Populating: rapidjson")
+    FetchContent_Populate(rapidjson)
+    add_library(rapidjson INTERFACE)
+    target_include_directories(rapidjson INTERFACE "${rapidjson_SOURCE_DIR}/include")
+  endif()
+
+  FetchContent_Declare(protobuf
+    GIT_REPOSITORY  https://github.com/protocolbuffers/protobuf.git
+    GIT_TAG         v3.14.0
+  )
+  FetchContent_GetProperties(protobuf)
+  if (NOT protobuf_POPULATED)
+    message("Populating: protobuf")
+    FetchContent_Populate(protobuf)
+    set(protobuf_BUILD_TESTS OFF CACHE INTERNAL "Build protobuf tests" FORCE)
+    add_subdirectory(${protobuf_SOURCE_DIR}/cmake ${protobuf_BINARY_DIR})
+  endif()
+
+else()
+  set(DEPENDENCIES_DIR "${CMAKE_SOURCE_DIR}/.deps")
+  list(APPEND CMAKE_PREFIX_PATH ${DEPENDENCIES_DIR})
+  # gflags does not include this in its target so need to add manually
+  link_directories("${DEPENDENCIES_DIR}/lib")
+
+  set(GFLAGS_USE_TARGET_NAMESPACE TRUE)
+  find_package(gflags REQUIRED)
+
+  find_package(glog REQUIRED)
+
+  find_package(cppzmq REQUIRED)
+
+  find_package(RapidJSON REQUIRED)
   add_library(rapidjson INTERFACE)
-  target_include_directories(rapidjson INTERFACE "${rapidjson_SOURCE_DIR}/include")
-endif()
-
-FetchContent_Declare(protobuf
-  GIT_REPOSITORY  https://github.com/protocolbuffers/protobuf.git
-  GIT_TAG         v3.14.0
-)
-FetchContent_GetProperties(protobuf)
-if (NOT protobuf_POPULATED)
-  message("Populating: protobuf")
-  FetchContent_Populate(protobuf)
-  set(protobuf_BUILD_TESTS OFF CACHE INTERNAL "Build protobuf tests" FORCE)
-  add_subdirectory(${protobuf_SOURCE_DIR}/cmake ${protobuf_BINARY_DIR})
+  target_include_directories(rapidjson INTERFACE "${RAPIDJSON_INCLUDE_DIRS}")
 endif()
 
 #========================================
