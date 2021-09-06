@@ -68,6 +68,8 @@ class LockState {
  */
 class RMALockManager {
  public:
+  RMALockManager();
+
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait

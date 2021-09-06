@@ -70,6 +70,8 @@ class LockQueueTail {
  */
 class DDRLockManager {
  public:
+  DDRLockManager();
+
   /**
    * Tries to acquire all locks for a given transaction. If not
    * all locks are acquired, the transaction is queued up to wait

@@ -26,6 +26,11 @@ vector<TxnId> LockQueueTail::AcquireWriteLock(TxnId txn_id) {
   return deps;
 }
 
+DDRLockManager::DDRLockManager() {
+  lock_table_.reserve(25000000);
+  txn_info_.reserve(1000000);
+}
+
 AcquireLocksResult DDRLockManager::AcquireLocks(const Transaction& txn) {
   auto txn_id = txn.internal().id();
   auto home = txn.internal().home();
