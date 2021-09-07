@@ -36,6 +36,8 @@ function need_install {
   return 0
 }
 
+CMAKE="cmake -DCMAKE_BUILD_TYPE=release -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX"
+
 if need_install 'zmq' 'libzmq.a'; then
   libzmq_ver=4.3.3
 
@@ -51,7 +53,7 @@ if need_install 'zmq' 'libzmq.a'; then
   cd zeromq-${libzmq_ver}
   mkdir -p build
   cd build
-  cmake .. -DWITH_PERF_TOOL=OFF -DZMQ_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX
+  $CMAKE -DWITH_PERF_TOOL=OFF -DZMQ_BUILD_TESTS=OFF ..
   make -j$(nproc) install
   cd ../..
 
@@ -73,7 +75,7 @@ if need_install 'cppzmq' 'cppzmq*'; then
   cd cppzmq-${cppzmq_ver}
   mkdir -p build
   cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX -DCPPZMQ_BUILD_TESTS=OFF 
+  $CMAKE -DCPPZMQ_BUILD_TESTS=OFF ..
   make -j$(nproc) install
   cd ../..
 
@@ -95,7 +97,7 @@ if need_install 'protobuf' 'libprotobuf*'; then
   cd protobuf-${protobuf_ver}
   mkdir -p build
   cd build
-  cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -Dprotobuf_BUILD_TESTS=OFF ../cmake
+  $CMAKE -Dprotobuf_BUILD_TESTS=OFF ../cmake
   make -j$(nproc) install
   cd ../..
 
@@ -117,7 +119,7 @@ if need_install 'gflags' 'libgflags*'; then
   cd gflags-${gflags_ver}
   mkdir -p build-tmp # folder has file named BUILD, macOS is not case-sensitive
   cd build-tmp
-  cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -DGFLAGS_BUILD_TESTING=OFF -DGFLAGS_NAMESPACE="google" ..
+  $CMAKE -DGFLAGS_BUILD_TESTING=OFF -DGFLAGS_NAMESPACE="google" ..
   make -j$(nproc) install
   cd ../..
 
@@ -139,7 +141,7 @@ if need_install 'glog' 'libglog*'; then
   cd glog-${glog_ver}
   mkdir -p build
   cd build
-  cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -DBUILD_TESTING=OFF ..
+  $CMAKE -DBUILD_TESTING=OFF ..
   make -j$(nproc) install
   cd ../..
 
@@ -161,7 +163,7 @@ if need_install 'rapidjson' 'rapidjson*'; then
   cd rapidjson-${rapidjson_ver}
   mkdir -p build
   cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX\
+  $CMAKE ..\
     -DRAPIDJSON_BUILD_EXAMPLES=OFF\
     -DRAPIDJSON_BUILD_TESTS=OFF\
     -DRAPIDJSON_BUILD_DOC=OFF\
