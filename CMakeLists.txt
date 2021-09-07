@@ -22,7 +22,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 option(BUILD_SLOG_CLIENT           "Build the client"                      ON)
 option(BUILD_SLOG_TESTS            "Build the tests"                       ON)
 option(ENABLE_TXN_EVENT_RECORDING  "Enable transaction events recording"   ON)
-option(FETCH_DEPENDENCIES          "Automatically fetch the dependencies"  ON)
+option(FETCH_DEPENDENCIES          "Automatically fetch the dependencies"  OFF)
 set(REMASTER_PROTOCOL "COUNTERLESS" CACHE STRING "Protocol for remastering (\"SIMPLE\", \"PER_KEY\", \"COUNTERLESS\", \"NONE\")")
 set(LOCK_MANAGER "RMA" CACHE STRING "Lock manager (\"OLD\", \"DDR\", \"RMA\")")
 
@@ -36,7 +36,28 @@ message(STATUS "  LOCK_MANAGER = ${LOCK_MANAGER}")
 #               Dependencies
 #========================================
 
-if (FETCH_DEPENDENCIES)
+set(DEPENDENCIES_DIR "${CMAKE_SOURCE_DIR}/.deps")
+
+if (EXISTS "${DEPENDENCIES_DIR}" AND IS_DIRECTORY "${DEPENDENCIES_DIR}" AND NOT ${FETCH_DEPENDENCIES})
+  message(STATUS "Using dependencies from ${DEPENDENCIES_DIR}")
+
+  list(APPEND CMAKE_PREFIX_PATH ${DEPENDENCIES_DIR})
+  # gflags does not include this in its target so need to add manually
+  link_directories("${DEPENDENCIES_DIR}/lib")
+
+  set(GFLAGS_USE_TARGET_NAMESPACE TRUE)
+  find_package(gflags REQUIRED)
+  find_package(glog REQUIRED)
+
+  find_package(cppzmq REQUIRED)
+
+  find_package(RapidJSON REQUIRED)
+
+  add_library(rapidjson INTERFACE)
+  target_include_directories(rapidjson INTERFACE "${RAPIDJSON_INCLUDE_DIRS}")
+
+else()
+  message(STATUS "Fetching dependencies")
 
   include(FetchContent)
 
@@ -115,23 +136,6 @@ if (FETCH_DEPENDENCIES)
     set(protobuf_BUILD_TESTS OFF CACHE INTERNAL "Build protobuf tests" FORCE)
     add_subdirectory(${protobuf_SOURCE_DIR}/cmake ${protobuf_BINARY_DIR})
   endif()
-
-else()
-  set(DEPENDENCIES_DIR "${CMAKE_SOURCE_DIR}/.deps")
-  list(APPEND CMAKE_PREFIX_PATH ${DEPENDENCIES_DIR})
-  # gflags does not include this in its target so need to add manually
-  link_directories("${DEPENDENCIES_DIR}/lib")
-
-  set(GFLAGS_USE_TARGET_NAMESPACE TRUE)
-  find_package(gflags REQUIRED)
-
-  find_package(glog REQUIRED)
-
-  find_package(cppzmq REQUIRED)
-
-  find_package(RapidJSON REQUIRED)
-  add_library(rapidjson INTERFACE)
-  target_include_directories(rapidjson INTERFACE "${RAPIDJSON_INCLUDE_DIRS}")
 endif()
 
 #========================================
