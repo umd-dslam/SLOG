@@ -6,3 +6,5 @@ build
 *.dat
 venv
 tmp
+config
+README.md
