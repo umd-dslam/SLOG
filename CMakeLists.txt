@@ -144,6 +144,7 @@ endif()
 
 # Call this so that we can use protobuf_generate_cpp and protobuf_generate_python
 # Other results are discarded
+set(Protobuf_USE_STATIC_LIBS ON)
 find_package(Protobuf QUIET)
 
 # Generating code from protobuf files is done here instead of in a CMakeLists.txt
