@@ -93,10 +93,11 @@ if need_install 'protobuf' 'libprotobuf*'; then
 
   echo "Installing protobuf"
   cd protobuf-${protobuf_ver}
-  ./autogen.sh
-  ./configure --prefix=$INSTALL_PREFIX
+  mkdir -p build
+  cd build
+  cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -Dprotobuf_BUILD_TESTS=OFF ../cmake
   make -j$(nproc) install
-  cd ..
+  cd ../..
 
   cd ..
   rm -rf $DOWNLOAD_DIR
