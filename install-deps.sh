@@ -1,11 +1,23 @@
 #!/bin/bash
 
+SUDO=sudo
+FORCE_INSTALL=0
+
+while getopts ":df" option; do
+   case $option in
+      d) unset SUDO
+      ;;
+      f) FORCE_INSTALL=1
+      ;;
+   esac
+done
+
 # stop on error
 set -e
 
 # Install toolings to compile dependencies
-sudo apt-get update
-sudo apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
+$SUDO apt-get update
+$SUDO apt-get -y install autoconf automake libtool curl unzip libreadline-dev pkg-config wget || true
 
 INSTALL_PREFIX=$PWD/.deps
 DOWNLOAD_DIR=$INSTALL_PREFIX/download
@@ -14,6 +26,9 @@ cd $INSTALL_PREFIX
 
 function need_install {
   rm -rf $DOWNLOAD_DIR
+  if [ $FORCE_INSTALL -eq 1 ]; then
+    return 0
+  fi
   if [ -n "$(find $INSTALL_PREFIX -name $2)" ]; then
     echo "Found $1. Skipping installation."
     return -1

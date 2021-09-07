@@ -9,6 +9,7 @@ FROM ubuntu:focal AS builder
     WORKDIR /src
 
     COPY . .
+    RUN ./install-deps.sh -d
     RUN rm -rf build \
         && mkdir build \
         && cd build \
