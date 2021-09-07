@@ -218,6 +218,8 @@ std::vector<int> Configuration::distance_ranking_from(int replica_id) const {
 
 int Configuration::broker_rcvbuf() const { return config_.broker_rcvbuf() <= 0 ? -1 : config_.broker_rcvbuf(); }
 
-int Configuration::long_sender_sndbuf() const { return config_.long_sender_sndbuf() <= 0 ? - 1 : config_.long_sender_sndbuf(); }
+int Configuration::long_sender_sndbuf() const {
+  return config_.long_sender_sndbuf() <= 0 ? -1 : config_.long_sender_sndbuf();
+}
 
 }  // namespace slog
