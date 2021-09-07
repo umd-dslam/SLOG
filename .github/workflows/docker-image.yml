@@ -20,9 +20,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install dependencies
-      run: ./install-deps.sh
-
     - name: Cache Docker layers
       uses: actions/cache@v2
       with:
