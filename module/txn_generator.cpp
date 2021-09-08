@@ -93,7 +93,8 @@ bool TxnGenerator::timer_running() const { return timer_running_; }
 
 SynchronousTxnGenerator::SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context,
                                                  std::unique_ptr<Workload>&& workload, uint32_t region,
-                                                 uint32_t num_txns, int num_clients, int duration_s, bool dry_run)
+                                                 uint32_t num_txns, int num_clients, int duration_s,
+                                                 int startup_spacing_us, bool dry_run)
     : TxnGenerator(std::move(workload)),
       config_(config),
       socket_(context, ZMQ_DEALER),
@@ -101,6 +102,7 @@ SynchronousTxnGenerator::SynchronousTxnGenerator(const ConfigurationPtr& config,
       region_(region),
       num_txns_(num_txns),
       num_clients_(num_clients),
+      startup_spacing_(startup_spacing_us),
       duration_(duration_s * 1000),
       dry_run_(dry_run) {
   CHECK_GT(duration_s, 0) << "Duration must be set for synchronous txn generator";
@@ -131,8 +133,12 @@ void SynchronousTxnGenerator::SetUp() {
     ConnectToServer(config_, socket_, region_);
     poller_.PushSocket(socket_);
     for (int i = 0; i < num_clients_; i++) {
-      SendNextTxn();
-      std::this_thread::sleep_for(500us);
+      poller_.AddTimedCallback(startup_spacing_ * i, [this, i]() {
+        SendNextTxn();
+        if (i == num_clients_ - 1) {
+          LOG(INFO) << "Started all clients";
+        }
+      });
     }
   }
 

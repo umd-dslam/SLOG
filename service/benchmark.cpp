@@ -34,6 +34,7 @@ DEFINE_int32(
     seed, -1,
     "Seed for any randomization in the benchmark. If set to negative, seed will be picked from std::random_device()");
 DEFINE_bool(txn_profiles, false, "Output transaction profiles");
+DEFINE_int32(startup_spacing, 1, "Spacing between startup of the clients in microseconds");
 
 using namespace slog;
 
@@ -83,9 +84,9 @@ vector<unique_ptr<ModuleRunner>> InitializeGenerators() {
                                                                    FLAGS_duration, FLAGS_dry_run));
     } else {
       int num_clients = FLAGS_clients / FLAGS_generators + (i < (FLAGS_clients % FLAGS_generators));
-      generators.push_back(MakeRunnerFor<SynchronousTxnGenerator>(config, context, std::move(workload), FLAGS_r,
-                                                                  num_txns_per_generator, num_clients, FLAGS_duration,
-                                                                  FLAGS_dry_run));
+      generators.push_back(MakeRunnerFor<SynchronousTxnGenerator>(
+          config, context, std::move(workload), FLAGS_r, num_txns_per_generator, num_clients, FLAGS_duration,
+          FLAGS_generators * FLAGS_startup_spacing, FLAGS_dry_run));
     }
   }
   return generators;

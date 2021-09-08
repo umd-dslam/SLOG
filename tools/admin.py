@@ -853,6 +853,11 @@ class BenchmarkCommand(AdminCommand):
             help="Output the profile of the sampled txns"
         )
         parser.add_argument(
+            "--startup-spacing", "-ss", type=int,
+            default=1000,
+            help="Spacing between startup of the clients in microseconds"
+        )
+        parser.add_argument(
             "-e",
             nargs="*",
             help="Environment variables to pass to the container. For example, "
@@ -958,6 +963,7 @@ class BenchmarkCommand(AdminCommand):
                 f"--sample {args.sample} "
                 f"--seed {args.seed} "
                 f"--txn_profiles={args.txn_profiles} "
+                f"--startup-spacing={args.startup_spacing} "
             )
             shell_cmd += (
                 f"--rate {args.rate} " 

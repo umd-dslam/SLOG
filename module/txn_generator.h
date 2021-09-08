@@ -55,7 +55,8 @@ class SynchronousTxnGenerator : public Module, public TxnGenerator {
    * If num_txns is set to 0, the txns are generated on-the-fly
    */
   SynchronousTxnGenerator(const ConfigurationPtr& config, zmq::context_t& context, std::unique_ptr<Workload>&& workload,
-                          uint32_t region, uint32_t num_txns, int num_clients, int duration_s, bool dry_run);
+                          uint32_t region, uint32_t num_txns, int num_clients, int duration_s, int startup_spacing_us,
+                          bool dry_run);
   ~SynchronousTxnGenerator();
   void SetUp() final;
   bool Loop() final;
@@ -71,6 +72,7 @@ class SynchronousTxnGenerator : public Module, public TxnGenerator {
   uint32_t region_;
   uint32_t num_txns_;
   int num_clients_;
+  std::chrono::microseconds startup_spacing_;
   std::chrono::milliseconds duration_;
   bool dry_run_;
   std::vector<std::pair<Transaction*, TransactionProfile>> generated_txns_;
