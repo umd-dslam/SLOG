@@ -275,6 +275,7 @@ class InstallDockerCommand(AWSCommand):
 
     def add_arguments(self, parser):
         super().add_arguments(parser)
+        parser.add_argument("--addresses", "-a", nargs="*", help="IP addresses")
         parser.add_argument(
             "--clients", type=int, default=1, help="Number of client machines"
         )
@@ -283,30 +284,35 @@ class InstallDockerCommand(AWSCommand):
         )
 
     def initialize_and_do_command(self, args):
-        if not args.regions:
+        if args.addresses is None and not args.regions:
             LOG.error("Must provide at least one region with --regions")
             return
 
         instance_public_ips = {}
         instance_private_ips = {}
-        for region in args.regions:
-            ec2 = boto3.client('ec2', region_name=region)
-            try:
-                running_instances = ec2.describe_instances(
-                    Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
-                )
-                LOG.info("%s: Collecting IP addresses", region)
-                instance_public_ips[region] = []
-                instance_private_ips[region] = []
-                for r in running_instances['Reservations']:
-                    instance_public_ips[region] += [
-                        i['PublicIpAddress'].strip() for i in r['Instances']
-                    ]
-                    instance_private_ips[region] += [
-                        i["PrivateIpAddress"].strip() for i in r["Instances"]
-                    ]
-            except Exception as e:
-                LOG.exception(region, e)
+
+        if args.addresses is not None:
+            instance_public_ips["addresses"] = args.addresses
+            instance_private_ips["addresses"] = []
+        else:
+            for region in args.regions:
+                ec2 = boto3.client('ec2', region_name=region)
+                try:
+                    running_instances = ec2.describe_instances(
+                        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
+                    )
+                    LOG.info("%s: Collecting IP addresses", region)
+                    instance_public_ips[region] = []
+                    instance_private_ips[region] = []
+                    for r in running_instances['Reservations']:
+                        instance_public_ips[region] += [
+                            i['PublicIpAddress'].strip() for i in r['Instances']
+                        ]
+                        instance_private_ips[region] += [
+                            i["PrivateIpAddress"].strip() for i in r["Instances"]
+                        ]
+                except Exception as e:
+                    LOG.exception(region, e)
         
         if not args.dry_run:
             install_docker(instance_public_ips)
