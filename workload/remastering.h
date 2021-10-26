@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "workload/basic_workload.h"
+#include "workload/basic.h"
 
 namespace slog {
 

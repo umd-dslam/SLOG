@@ -1,4 +1,4 @@
-#include "workload/remastering_workload.h"
+#include "workload/remastering.h"
 
 #include "common/proto_utils.h"
 

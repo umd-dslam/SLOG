@@ -7,7 +7,7 @@
 #include "module/scheduler.h"
 #include "service/service_utils.h"
 #include "storage/mem_only_storage.h"
-#include "workload/basic_workload.h"
+#include "workload/basic.h"
 
 DEFINE_uint32(txns, 100, "Number of transactions");
 DEFINE_uint32(workers, 3, "Number of workers");

@@ -12,9 +12,9 @@
 #include "common/string_utils.h"
 #include "module/txn_generator.h"
 #include "service/service_utils.h"
-#include "workload/basic_workload.h"
-#include "workload/remastering_workload.h"
-#include "workload/tpcc_workload.h"
+#include "workload/basic.h"
+#include "workload/remastering.h"
+#include "workload/tpcc.h"
 
 DEFINE_string(config, "slog.conf", "Path to the configuration file");
 DEFINE_int32(generators, 1, "Number of generator threads");

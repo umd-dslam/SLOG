@@ -1,4 +1,4 @@
-#include "workload/tpcc_workload.h"
+#include "workload/tpcc.h"
 
 #include <glog/logging.h>
 

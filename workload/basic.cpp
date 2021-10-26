@@ -1,4 +1,4 @@
-#include "workload/basic_workload.h"
+#include "workload/basic.h"
 
 #include <fcntl.h>
 #include <glog/logging.h>
