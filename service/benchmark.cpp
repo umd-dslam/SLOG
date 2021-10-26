@@ -13,6 +13,7 @@
 #include "module/txn_generator.h"
 #include "service/service_utils.h"
 #include "workload/basic.h"
+#include "workload/cockroach.h"
 #include "workload/remastering.h"
 #include "workload/tpcc.h"
 
@@ -25,7 +26,7 @@ DEFINE_int32(rate, 0, "Maximum number of transactions sent per second.");
 DEFINE_int32(clients, 0, "Number of concurrent client. This option does nothing if 'rate' is set");
 DEFINE_int32(duration, 0, "Maximum duration in seconds to run the benchmark");
 DEFINE_uint32(txns, 100, "Total number of txns to be generated");
-DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, remastering)");
+DEFINE_string(wl, "basic", "Name of the workload to use (options: basic, cockroach, remastering)");
 DEFINE_string(params, "", "Parameters of the workload");
 DEFINE_bool(dry_run, false, "Generate the transactions without actually sending to the server");
 DEFINE_double(sample, 10, "Percent of sampled transactions to be written to result files");
@@ -64,6 +65,8 @@ vector<unique_ptr<ModuleRunner>> InitializeGenerators() {
     unique_ptr<Workload> workload;
     if (FLAGS_wl == "basic") {
       workload = make_unique<BasicWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
+    } else if (FLAGS_wl == "cockroach") {
+      workload = make_unique<CockroachWorkload>(config, FLAGS_r, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "remastering") {
       workload = make_unique<RemasteringWorkload>(config, FLAGS_r, FLAGS_data_dir, FLAGS_params, seed + i);
     } else if (FLAGS_wl == "tpcc") {
