@@ -16,7 +16,7 @@
 #include "service/service_utils.h"
 
 DEFINE_string(host, "localhost", "Hostname of the SLOG server to connect to");
-DEFINE_uint32(port, 2021, "Port number of the SLOG server to connect to");
+DEFINE_uint32(port, 2023, "Port number of the SLOG server to connect to");
 DEFINE_uint32(repeat, 1, "Used with \"txn\" command. Send the txn multiple times");
 DEFINE_bool(no_wait, false, "Used with \"txn\" command. Don't wait for reply");
 DEFINE_int32(truncate, 50, "Number of lines to truncate the output at");

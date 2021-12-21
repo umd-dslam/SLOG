@@ -4,18 +4,19 @@
 
 # What is SLOG?
 
-SLOG is a geographically distributed data store that achieves high-throughput and low-latency transactions while guaranteeing strict serializability. 
+SLOG is a geographically distributed data store that achieves high-throughput and low-latency transactions while guaranteeing strict serializability.
 For more details, see this [blog post](http://dbmsmusings.blogspot.com/2019/10/introducing-slog-cheating-low-latency.html) or the [SLOG paper](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
 This repository contains an experimental implementation of the system, which is not suitable for use in production.
 
-# Getting Started 
+# Getting Started
 
 The following guide has been tested on Ubuntu 20.04 with GCC 9.3.0 and CMake 3.16.3. Additional docs are in [the Wiki](https://github.com/ctring/SLOG/wiki).
 
 ## Build SLOG
 
 First, install the build tools:
+
 ```
 sudo apt install cmake build-essential pkg-config
 ```
@@ -32,11 +33,13 @@ $ make -j$(nproc)
 ## Run SLOG on a single machine
 
 The following command starts SLOG using the example configuration for a single-node cluster.
+
 ```
-$ build/slog -config examples/single.conf -address /tmp/slog 
+$ build/slog -config examples/single.conf -address 127.0.0.1
 ```
 
 After that, use the client to send a transaction that writes some data.
+
 ```
 $ build/client txn examples/write.json
 ...
@@ -66,6 +69,7 @@ Involved replicas: 0
 ```
 
 Send a transaction to copy data from the previous keys to different keys:
+
 ```
 $ build/client txn examples/copy.json
 ...
@@ -104,6 +108,7 @@ Involved replicas: 0
 ```
 
 Send a transaction to read the written data.
+
 ```
 $ build/client txn examples/read.json
 ...
@@ -148,11 +153,13 @@ The following guide shows how to manually run SLOG on a cluster of multiple mach
 In this example, we start SLOG on a cluster using the configuration in `examples/cluster.conf`. You need to change the IP addresses in this file to match with the addresses of your machines. You can add more machines by increasing either the number of replicas or the number of partitions in a replica. The number of machines in a replica must be the same across all replicas and equal to `num_partitions`.
 
 After cloning and building SLOG, run the following command on each machine.
+
 ```
 $ build/slog -config examples/cluster.conf -address <ip-address> -replica <replica-id> -partition <partition-id>
 ```
 
 For example, assuming the machine configuration is
+
 ```
 replicas: {
     addresses: "192.168.2.11",
@@ -165,23 +172,25 @@ replicas: {
 ```
 
 The commands to be run for the machines respectively from top to bottom are:
-```
-$ build/slog -config examples/cluster.conf -address 192.168.2.11 
-``` 
 
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.12 
-``` 
+$ build/slog -config examples/cluster.conf -address 192.168.2.11
+```
 
 ```
-$ build/slog -config examples/cluster.conf -address 192.168.2.13 
-``` 
+$ build/slog -config examples/cluster.conf -address 192.168.2.12
+```
+
+```
+$ build/slog -config examples/cluster.conf -address 192.168.2.13
+```
 
 ```
 $ build/slog -config examples/cluster.conf -address 192.168.2.14
 ```
 
 Use the client to send a write transaction to a machine in the cluster. If you changed the `port` option in the configuration file, you need to use the `--port` argument in the command to match with the new port.
+
 ```
 $ build/client txn examples/write.json --host 192.168.2.11
 ...
@@ -211,6 +220,7 @@ Involved replicas: 0 1
 ```
 
 Send a copy transaction that copies the values from the written keys to new keys.
+
 ```
 $ build/client txn examples/copy.json --host 192.168.2.11
 ...
@@ -249,6 +259,7 @@ Involved replicas: 0 1
 ```
 
 Send a read transaction to read the written data. This time, we read from a different replica to demonstrate that the data has been replicated.
+
 ```
 $ build/client txn examples/read.json --host 192.168.2.13
 ...
