@@ -7,11 +7,9 @@ For more details, see this [blog post](http://dbmsmusings.blogspot.com/2019/10/i
 
 This repository contains an experimental implementation of the system, which is not suitable for use in production.
 
-# Getting Started
+## How to Build
 
 The following guide has been tested on Ubuntu 20.04 with GCC 9.3.0 and CMake 3.16.3. Additional docs are in [the Wiki](https://github.com/ctring/SLOG/wiki).
-
-## Build SLOG
 
 First, install the build tools:
 
@@ -28,7 +26,9 @@ $ cmake .. -DCMAKE_BUILD_TYPE=release
 $ make -j$(nproc)
 ```
 
-## Run SLOG on a single machine
+## How to Run
+<details>
+        <summary>Run SLOG on a single machine</summary>
 
 The following command starts SLOG using the example configuration for a single-node cluster.
 
@@ -143,8 +143,10 @@ Coordinating server: 0
 Involved partitions: 0
 Involved replicas: 0
 ```
+</details>
 
-## Run SLOG on a cluster
+<details>
+        <summary>Run SLOG on a cluster</summary>
 
 The following guide shows how to manually run SLOG on a cluster of multiple machines. This can be time-consuming when the number of machines is large so you should use the [Admin tool](https://github.com/ctring/SLOG/wiki/Using-the-Admin-tool) instead.
 
@@ -294,3 +296,4 @@ Coordinating server: 2
 Involved partitions: 0 1
 Involved replicas: 0 1
 ```
+</details>
