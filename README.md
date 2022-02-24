@@ -2,8 +2,6 @@
 
 [![Build Status](https://github.com/ctring/SLOG/workflows/Build%20and%20Test/badge.svg)](https://github.com/ctring/SLOG/actions)
 
-# What is SLOG?
-
 SLOG is a geographically distributed data store that achieves high-throughput and low-latency transactions while guaranteeing strict serializability.
 For more details, see this [blog post](http://dbmsmusings.blogspot.com/2019/10/introducing-slog-cheating-low-latency.html) or the [SLOG paper](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
 
