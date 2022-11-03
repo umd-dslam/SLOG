@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/ctring/SLOG/workflows/Build%20and%20Test/badge.svg)](https://github.com/ctring/SLOG/actions)
 
 SLOG is a geographically distributed data store that achieves high-throughput and low-latency transactions while guaranteeing strict serializability.
-For more details, see this [blog post](http://dbmsmusings.blogspot.com/2019/10/introducing-slog-cheating-low-latency.html) or the [SLOG paper](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf).
+For more details, see this [blog post](http://dbmsmusings.blogspot.com/2019/10/introducing-slog-cheating-low-latency.html) or the [SLOG paper](http://www.vldb.org/pvldb/vol12/p1747-ren.pdf) (NOTE: the code in this repo is a rewritten version of the code used to run the experiments in the paper).
 
 This repository contains an experimental implementation of the system, which is not suitable for use in production.
 
@@ -310,5 +310,6 @@ broker_rcvbuf: 10485760
 long_sender_sndbuf: 10485760
 ```
         
-        
+## Acknowledgements
+
 This work was sponsored by the NSF under grants IIS-1718581 and IIS-1763797.
